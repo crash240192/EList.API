@@ -1,0 +1,64 @@
+﻿using EList.DbDataProvider.Interfaces;
+using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Models.SearchRequests;
+using LinqToDB;
+
+namespace EList.DbDataProvider.DataProviders
+{
+    public class InvitationsDataProvider : DataProviderBase, IInvitationsDataProvider
+    {
+        public InvitationsDataProvider(IDataConnectionProvider dataConnectionProvider) : base(dataConnectionProvider)
+        {
+        }
+
+        public async Task CreateInvitationsAsync(InvitationDto invitation)
+        {
+            invitation.CreationDate = DateTime.Now;
+            await _connection.InsertWithIdentityAsync(invitation);
+        }
+
+        public async Task<InvitationDto> GetInvitationAsync(Guid id)
+        {
+            var result = await _connection.Invitations.FirstOrDefaultAsync(i => i.Id == id);
+            return result;
+        }
+
+        public async Task DeleteInvitationAsync(Guid id)
+        {
+            await _connection.Invitations.DeleteAsync(i => i.Id == id);
+        }
+
+        public async Task DeleteInvitationAsync(Guid eventId, Guid accountId)
+        {
+            await _connection.Invitations.DeleteAsync(i => i.EventId == eventId && i.InvitedAccountId == accountId);
+        }
+
+        public async Task<(int, List<InvitationDto>)> SearchInvitationsAsync(InvitationsSearchRequest request)
+        {
+            var invitationsRequest = _connection.Invitations.AsQueryable();
+
+            if (request.InviterOrgIds?.Any() ?? false)
+                invitationsRequest = invitationsRequest.Where(i => i.InviterOrganizationId!= null)
+                    .Where(i => request.InviterOrgIds.Contains(i.InviterOrganizationId.Value));
+
+            if (request.InviterAccountIds?.Any() ?? false)
+                invitationsRequest = invitationsRequest.Where(i => request.InviterAccountIds.Contains(i.InviterAccountId));
+
+            if (request.InvitedAccountIds?.Any() ?? false)
+                invitationsRequest = invitationsRequest.Where(i => request.InvitedAccountIds.Contains(i.InvitedAccountId));
+
+            if (request.EventIds?.Any() ?? false)
+                invitationsRequest = invitationsRequest.Where(i => request.EventIds.Contains(i.EventId));
+
+            var totalCount = invitationsRequest.Count();
+
+            List<InvitationDto> resultList;
+            if (request.PageSize != null && request.PageIndex != null)
+                resultList = await invitationsRequest.Skip(request.PageSize.Value * (request.PageIndex.Value - 1)).Take(request.PageSize.Value).ToListAsync();
+            else 
+                resultList = await invitationsRequest.ToListAsync();
+
+            return (totalCount, resultList); 
+        }
+    }
+}

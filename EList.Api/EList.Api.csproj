@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UserSecretsId>b244478e-5be7-483f-8f0b-09de0b3326e4</UserSecretsId>
+		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+		<ContainerImageName>crash240192/elist-api</ContainerImageName>
+		<ContainerImageTag>3.0.1</ContainerImageTag>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.17.0" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\EList.AutoMapperProfile\EList.AutoMapperProfile.csproj" />
+		<ProjectReference Include="..\EList.DI\EList.DI.csproj" />
+		<ProjectReference Include="..\EList.Services.Interfaces\EList.Services.Interfaces.csproj" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,17 @@
+image: mcr.microsoft.com/dotnet/core/sdk:3.1
+
+stages:
+  - build
+  - test
+  - deploy
+
+before_script:
+  - $PSVersionTable.PSVersion
+  - dotnet --version
+  - nuget help | select-string Version
+
+dummy job on windows:
+  script:
+    - echo ok
+  tags:
+    - windows

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EList.DbDataProvider\EList.DbDataProvider.csproj" />
+    <ProjectReference Include="..\EList.Models\EList.Models.csproj" />
+  </ItemGroup>
+
+</Project>
