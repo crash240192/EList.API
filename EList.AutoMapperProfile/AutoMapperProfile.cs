@@ -55,7 +55,8 @@ namespace EList.AutoMapperProfile
 
             CreateMap<EventParametersRequest, SetEventParametersRequest>().ReverseMap();
 
-            
+            CreateMap<EventsSearchRequest, DbDataProvider.Models.SearchRequests.EventsSearchRequest>().ReverseMap();
+
 
 
             CreateMap<Models.Enums.Gender, DbDataProvider.Models.Enums.Gender>().ReverseMap();

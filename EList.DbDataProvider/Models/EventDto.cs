@@ -47,5 +47,14 @@ namespace EList.DbDataProvider.Models
 
         [Association(ThisKey = nameof(Id), OtherKey = nameof(EventsRatingDto.EventId))]
         public EventsRatingDto Rating { get; set; }
+
+        [Association(ThisKey = nameof(Id), OtherKey = nameof(EventOrganizatorDto.EventId))]
+        public EventOrganizatorDto Organizator { get; set; }
+
+        [Association(ThisKey = nameof(Id), OtherKey = nameof(ParticipationDto.EventId))]
+        public List<ParticipationDto> Participants { get; set; }
+
+        [Association(ThisKey = nameof(Id), OtherKey = nameof(EventTypeRelationDto.EventId))]
+        public List<EventTypeRelationDto> Types { get; set; }
     }
 }

@@ -43,9 +43,12 @@ namespace EList.DbDataProvider.DataProviders
             var eventParametersRequest = _connection.EventParameters.AsQueryable();
             var eventTypes = _connection.EventTypes.AsQueryable();
             var eventsRequest = _connection.Events
+                .LoadWith(i => i.Organizator)
+                .LoadWith(i => i.Parameters)
+                .LoadWith(i => i.Participants)
+                .LoadWith(i => i.Types)
                 .Where(i => request.StartTime != null ? i.StartTime >= request.StartTime : true)
                 .Where(i => request.EndTime != null ? i.StartTime <= request.EndTime : true).AsQueryable();
-
 
             #region parameters
             List<Guid> eventParameterIds = null;
@@ -55,13 +58,18 @@ namespace EList.DbDataProvider.DataProviders
 
             if (request.Price != null)
                 eventParametersRequest = eventParametersRequest.Where(i => i.Cost <= request.Price);
-
-
             #endregion
 
             #region eventTypes
             if (request.Types?.Any() ?? false)
                 eventTypes = eventTypes.Where(i => request.Types.Contains(i.Id));
+
+
+            //if (request.Categories?.Any() ?? false)
+            //{
+            //    var eventTypesByCategories = _connection.EventCategories.Where(i => request.Categories.Contains(i.Id)).SelectMany(i => i.);
+            //}
+                
 
             if (request.Categories?.Any() ?? false)
                 eventTypes = eventTypes.Where(i => request.Categories.Contains(i.EventCategoryId));
@@ -82,9 +90,23 @@ namespace EList.DbDataProvider.DataProviders
             eventsRequest = eventsRequest.Where(i => eventIdsByEventTypes.Contains(i.Id));
             #endregion
 
+            #region organizator and participant
+            if (request.OrganizatorId != null)
+            {
+                if (request.ParticipantId != null)
+                    eventsRequest = eventsRequest.Where(i => i.Organizator.AccountId == request.OrganizatorId || i.Participants.Any(p => p.AccountId == request.ParticipantId));
+                else
+                    eventsRequest = eventsRequest.Where(i => i.Organizator.AccountId == request.OrganizatorId);
+            }
+            else if (request.ParticipantId != null)
+            {
+                eventsRequest = eventsRequest.Where(i => i.Participants.Any(p => p.AccountId == request.ParticipantId));
+            }
+            #endregion
+
             var totalCount = await eventsRequest.CountAsync();
 
-            var resultList = await eventsRequest.Skip(request.PageSize * (request.PageIndex - 1)).Take(request.PageSize).ToListAsync();
+            var resultList = await eventsRequest.Skip(request.PageSize * (request.PageIndex)).Take(request.PageSize).ToListAsync();
 
             return (totalCount, resultList);
         }
