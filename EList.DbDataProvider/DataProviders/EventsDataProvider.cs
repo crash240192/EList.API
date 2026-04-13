@@ -47,8 +47,8 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.Parameters)
                 .LoadWith(i => i.Participants)
                 .LoadWith(i => i.Types)
-                .Where(i => request.StartTime != null ? i.StartTime >= request.StartTime : true)
-                .Where(i => request.EndTime != null ? i.StartTime <= request.EndTime : true).AsQueryable();
+                .Where(i => request.StartTime != null ? i.EndTime >= request.StartTime : true)
+                .Where(i => request.EndTime != null ? i.EndTime <= request.EndTime : true).AsQueryable();
 
             #region parameters
             List<Guid> eventParameterIds = null;
