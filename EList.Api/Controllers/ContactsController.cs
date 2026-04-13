@@ -28,14 +28,16 @@ namespace EList.Api.Controllers.ContactData
         private readonly IContactsService _contactDataService;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
-
+        private readonly IAccountDataHolder _accountDataHolder;
         public ContactsController(ICorrelationIdProvider correlationIdProvider,
             IContactsService contactDataService,
-            IDataConnectionProvider connectionProvider)
+            IDataConnectionProvider connectionProvider,
+            IAccountDataHolder accountDataHolder)
         {
             _contactDataService = contactDataService;
             _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
+            _accountDataHolder = accountDataHolder;
         }
 
         /// <summary>
@@ -288,9 +290,7 @@ namespace EList.Api.Controllers.ContactData
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var token = this.GetToken();
-
-                var result = await _contactDataService.GetAccountContactsAsync(token);
+                var result = await _contactDataService.GetAccountContactsAsync(_accountDataHolder.AccountId);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
