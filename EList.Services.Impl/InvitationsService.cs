@@ -72,7 +72,7 @@ namespace EList.Services.Impl
             if (!eventParameters?.AllowUsersToInvite ?? false)
             {
                 var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(request.EventId);
-                if (!organizators?.Any(i => i.AccountId == _accountDataHolder.AccountId) ?? true)
+                if (!organizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
                     return CommandResult.Fail(ErrorCode.AccessError, $"Приглашения на текущее события запрещены администратором");
 
                 //TODO Сделать аналогичную проверку для организаций

@@ -1,7 +1,9 @@
 ﻿using AutoMapper;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.Models.Accounts;
 using EList.Models.EventOrganizators;
+using EList.Models.Person;
 using EList.Repositories.Interfaces;
 
 namespace EList.Repositories.Impl
@@ -45,7 +47,14 @@ namespace EList.Repositories.Impl
         public async Task<List<EventOrganizator>?> GetByEventIdAsync(Guid eventId)
         {
             var items = await _eventOrganizatorsDataProvider.GetByEventIdAsync(eventId);
-            var result = items?.Select(i => _mapper.Map<EventOrganizator>(i)).ToList();
+            var result = items?.Select(i => new EventOrganizator
+            {
+                Account = _mapper.Map<Account>(i.Account),
+                PersonInfo = _mapper.Map<PersonInfo>(i.Account.PersonInfo),
+                Id = i.Id,
+                EventId = eventId,
+                OrganizationId = i.OrganizationId
+            }).ToList();
             return result;
         }
 

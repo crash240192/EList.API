@@ -442,7 +442,7 @@ namespace EList.Services.Impl
 
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
 
-            if (!eventOrganizators?.Any(i => i.AccountId == _accountDataHolder.AccountId) ?? false)
+            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? false)
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
 
             //TODO: Если у ивента организатором является какая-то компания, проверить, является ли accountId её участником

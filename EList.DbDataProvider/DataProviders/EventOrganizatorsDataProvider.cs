@@ -33,7 +33,10 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<List<EventOrganizatorDto>> GetByEventIdAsync (Guid eventId)
         {
-            var events = await _connection.Organizators.Where(i => i.EventId == eventId).ToListAsync();
+            var events = await _connection.Organizators
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.PersonInfo)
+                .Where(i => i.EventId == eventId).ToListAsync();
             return events;
         }
     }
