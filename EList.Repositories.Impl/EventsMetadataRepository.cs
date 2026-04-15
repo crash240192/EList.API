@@ -27,7 +27,8 @@ namespace EList.Repositories.Impl
                 Description = request.Description,
                 EventCategoryId = request.EventCategoryId,
                 Ico = request.Ico,
-                NamePath = request.NamePath
+                Name = request.Name,
+                LocalizationPath = request.LocalizationPath
             };
             var result = await _eventsMetadataDataProvider.CreateEventTypeAsync(mappedRequest);
             return result;
@@ -73,7 +74,8 @@ namespace EList.Repositories.Impl
                 Description = request.Description,
                 EventCategoryId = request.EventCategoryId,
                 Ico = request.Ico,
-                NamePath = request.NamePath,
+                Name = request.Name,
+                LocalizationPath = request.LocalizationPath,
                 Id = id
             };
             await _eventsMetadataDataProvider.UpdateEventTypeAsync(mappedRequest);
@@ -92,7 +94,8 @@ namespace EList.Repositories.Impl
             {
                 Description = request.Description,
                 Ico = request.Ico,
-                NamePath = request.NamePath,
+                Name = request.Name,
+                LocalizationPath = request.LocalizationPath
             };
             var result = await _eventsMetadataDataProvider.CreateEventCategoryAsync(mappedRequest);
             return result;
@@ -124,7 +127,8 @@ namespace EList.Repositories.Impl
                 Description = request.Description,
                 Ico = request.Ico,
                 Id = id,
-                NamePath = request.NamePath
+                LocalizationPath = request.LocalizationPath,
+                Name = request.Name
             };
             await _eventsMetadataDataProvider.UpdateEventCategoryAsync(mappedRequest);
         }

@@ -18,7 +18,7 @@
         /// <summary>
         /// Маршрут до названия
         /// </summary>
-        public string NamePath { get; set; }
+        public string LocalizationPath { get; set; }
 
         /// <summary>
         /// Иконка

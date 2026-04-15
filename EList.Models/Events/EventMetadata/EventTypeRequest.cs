@@ -5,11 +5,15 @@
     /// </summary>
     public class EventTypeRequest
     {
+        /// <summary>
+        /// Маршрут до локализации названия
+        /// </summary>
+        public string LocalizationPath { get; set; }
 
         /// <summary>
-        /// Маршрут до названия типа события
+        /// Название
         /// </summary>
-        public string NamePath { get; set; }
+        public string Name { get; set; }
 
         /// <summary>
         /// Описание типа события

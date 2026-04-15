@@ -18,7 +18,7 @@
         /// <summary>
         /// Маршрут до названия типа события
         /// </summary>
-        public string NamePath { get; set; }
+        public string LocalizationPath { get; set; }
 
         /// <summary>
         /// Описание типа события

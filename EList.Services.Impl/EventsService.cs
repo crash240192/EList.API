@@ -10,6 +10,7 @@ using EList.Models.Events.EventMetadata;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
+using Org.BouncyCastle.Ocsp;
 using System.Diagnostics;
 
 namespace EList.Services.Impl
@@ -93,7 +94,7 @@ namespace EList.Services.Impl
 
             var result = await _eventsMetadataRepository.GetAllEventTypesAsync();
 
-            result.ForEach(i => i.Name = Localizator.GetProperty(Languages.russian, i.NamePath));
+            result.ForEach(i => i.Name = Localizator.GetProperty(i.LocalizationPath, i.Name));
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<EventType>>(result);
@@ -111,7 +112,7 @@ namespace EList.Services.Impl
             if (result == null)
                 return CommandResult<EventType?>.Fail(ErrorCode.EventTypeNotFound, "Тип события не найден");
 
-            result.Name = Localizator.GetProperty(Languages.russian, result.NamePath);
+            result.Name = Localizator.GetProperty(result.LocalizationPath, result.Name);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<EventType?>(result);
@@ -127,7 +128,7 @@ namespace EList.Services.Impl
             //TODO: Добавить сюда проверку на наличие события
 
             var result = await _eventsMetadataRepository.GetEventTypesByEventIdAsync(eventId);
-            result.ForEach(i => i.Name = Localizator.GetProperty(Languages.russian, i.NamePath));
+            result.ForEach(i => i.Name = Localizator.GetProperty(i.LocalizationPath, i.Name));
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<EventType>>(result);
@@ -143,7 +144,7 @@ namespace EList.Services.Impl
             //TODO: Добавить сюда проверку на наличие события
 
             var result = await _eventsMetadataRepository.GetEventTypesByCategoryIdAsync(categoryId);
-            result.ForEach(i => i.Name = Localizator.GetProperty(Languages.russian, i.NamePath));
+            result.ForEach(i => i.Name = Localizator.GetProperty(i.LocalizationPath, i.Name));
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<EventType>>(result);
@@ -222,7 +223,7 @@ namespace EList.Services.Impl
 
             var result = await _eventsMetadataRepository.GetAllEventCategoriesAsync();
 
-            result.ForEach(i => i.Name = Localizator.GetProperty(Languages.russian, i.NamePath));
+            result.ForEach(i => i.Name = Localizator.GetProperty(i.LocalizationPath, i.Name));
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<EventCategory>>(result);
@@ -240,7 +241,7 @@ namespace EList.Services.Impl
             if (result == null)
                 return CommandResult<EventCategory?>.Fail(ErrorCode.EventCategoryNotFound, "Категория события не найдена");
 
-            result.Name = Localizator.GetProperty(Languages.russian, result.NamePath);
+            result.Name = Localizator.GetProperty(result.LocalizationPath, result.Name);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<EventCategory?>(result);

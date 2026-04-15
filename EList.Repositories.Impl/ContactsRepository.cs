@@ -24,7 +24,8 @@ namespace EList.Repositories.Impl
                 AllowNotifications = request.AllowNotifications,
                 Description = request.Description,
                 Mask = request.Mask,
-                NamePath = request.NamePath
+                Name = request.Name,
+                LocalizationPath = request.LocalizationPath
             };
             var result = await _contactDataProvider.CreateContactTypeAsync(mappedRequest);
             return result;
@@ -53,7 +54,8 @@ namespace EList.Repositories.Impl
                 AllowNotifications = request.AllowNotifications,
                 Description = request.Description,
                 Mask = request.Mask,
-                NamePath = request.NamePath,
+                Name = request.Name,
+                LocalizationPath = request.LocalizationPath,
                 Id = id
             };
             await _contactDataProvider.UpdateContactTypeAsync(mappedRequest);

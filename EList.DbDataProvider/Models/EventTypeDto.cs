@@ -8,8 +8,11 @@ namespace EList.DbDataProvider.Models
         [Column("id"), PrimaryKey, Identity]
         public Guid Id { get; set; }
 
-        [Column("name_path")]
-        public string NamePath { get; set; }
+        [Column("localization_path")]
+        public string LocalizationPath { get; set; }
+
+        [Column("name")]
+        public string Name { get; set; }
 
         [Column("description")]
         public string Description { get; set; }

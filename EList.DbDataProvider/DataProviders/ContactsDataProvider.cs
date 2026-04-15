@@ -20,7 +20,8 @@ namespace EList.DbDataProvider.DataProviders
         public async Task UpdateContactTypeAsync(ContactTypeDto item)
         {
             await _connection.ContactTypes.Where(i => i.Id == item.Id)
-                .Set(i => i.NamePath, item.NamePath)
+                .Set(i => i.Name, item.Name)
+                .Set(i => i.LocalizationPath, item.LocalizationPath)
                 .Set(i => i.Description, item.Description)
                 .Set(i => i.Mask, item.Mask)
                 .Set(i => i.AllowNotifications, item.AllowNotifications)

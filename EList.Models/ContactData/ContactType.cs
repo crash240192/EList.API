@@ -13,12 +13,12 @@
         /// <summary>
         /// Путь до значения в файле ресурса локализации
         /// </summary>
-        public string NamePath { get; set; }
+        public string LocalizationPath { get; set; }
 
         /// <summary>
         /// Название типа контакта
         /// </summary>
-        public string LocalizedName { get; set; }
+        public string Name { get; set; }
 
         /// <summary>
         /// Описание

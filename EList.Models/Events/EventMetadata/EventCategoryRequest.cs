@@ -7,9 +7,14 @@
     {
 
         /// <summary>
-        /// Маршрут до названия
+        /// Маршрут до локализации названия
         /// </summary>
-        public string NamePath { get; set; }
+        public string LocalizationPath { get; set; }
+
+        /// <summary>
+        /// Название
+        /// </summary>
+        public string Name { get; set; }
 
         /// <summary>
         /// Иконка

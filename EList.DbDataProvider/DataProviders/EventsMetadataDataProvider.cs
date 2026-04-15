@@ -66,7 +66,8 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.EventTypes.Where(i => i.Id == item.Id)
                 .Set(i => i.Ico, item.Ico)
                 .Set(i => i.Description, item.Description)
-                .Set(i => i.NamePath, item.NamePath)
+                .Set(i => i.Name, item.Name)
+                .Set(i => i.LocalizationPath, item.LocalizationPath)
                 .Set(i => i.EventCategoryId, item.EventCategoryId)
                 .UpdateAsync();
         }
@@ -132,7 +133,8 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.EventCategories.Where(i => i.Id == item.Id)
                 .Set(i => i.Ico, item.Ico)
                 .Set(i => i.Description, item.Description)
-                .Set(i => i.NamePath, item.NamePath)
+                .Set(i => i.Name, item.Name)
+                .Set(i => i.LocalizationPath, item.LocalizationPath)
                 .UpdateAsync();
         }
         #endregion

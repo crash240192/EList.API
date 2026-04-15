@@ -64,7 +64,7 @@ namespace EList.Services.Impl
             var result = await _contactDataRepository.GetAllContactTypesAsync();
 
             if (result?.Any() ?? false)
-                result.ForEach(i => i.LocalizedName = Localizator.GetProperty(Languages.russian, i.NamePath));
+                result.ForEach(i => i.Name = Localizator.GetProperty(i.LocalizationPath, i.Name));
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<ContactType>>(result);
@@ -79,6 +79,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _contactDataRepository.GetContactTypeAsync(id);
+            result.Name = Localizator.GetProperty(result.LocalizationPath, result.Name);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<ContactType?>(result);

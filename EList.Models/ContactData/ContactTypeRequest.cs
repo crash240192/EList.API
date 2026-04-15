@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace EList.Models.ContactData
+﻿namespace EList.Models.ContactData
 {
     /// <summary>
     /// Класс-контейнер запроса на создание типа контактных данных
@@ -14,7 +8,12 @@ namespace EList.Models.ContactData
         /// <summary>
         /// Путь до значение в файле локализации
         /// </summary>
-        public string NamePath { get; set; }
+        public string LocalizationPath { get; set; }
+
+        /// <summary>
+        /// Название
+        /// </summary>
+        public string Name { get; set; }
         
         /// <summary>
         /// Описание типа контакта

@@ -62,7 +62,8 @@ insert into public.system_notifications
 
 CREATE TABLE public.contact_types (
 	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
-	name_path varchar NOT NULL,
+	localization_path varchar NOT NULL,
+	name varchar(100) not null,
 	description varchar not null,
 	mask varchar NULL,
 	allow_notifications bool not null default false,
@@ -91,7 +92,8 @@ CREATE TABLE public.tariffs (
 
 CREATE TABLE public.event_categories (
 	id uuid NOT NULL default public.uuid_generate_v4(),
-	name_path varchar(255) NOT null,
+	name varchar(100) not null,
+	localization_path varchar(255) NOT null,
 	description varchar(255),
 	ico bytea not null,
 	CONSTRAINT event_category_pk PRIMARY KEY (id)
@@ -99,7 +101,8 @@ CREATE TABLE public.event_categories (
 
 CREATE TABLE public.event_types (
 	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
-	name_path varchar(255) NOT NULL,
+	localization_path varchar(255) NOT NULL,
+	name varchar(100) not null,
 	category_id uuid NOT NULL,
 	ico bytea NOT NULL,
 	description varchar(255),
@@ -338,8 +341,9 @@ create table public.auto_invitation_inviter_rls (
 );
 
 insert into public.contact_types 
-(id, name_path, description, mask, allow_notifications) values ('1d69590d-06ea-4778-a37c-d591b8f25df8', '$.contactData.contactTypes.phone', 'Телефон', '_ (___) ___-__-__', true),
-('8887c160-70b1-4591-903e-8289eb7f5e0a', '$.contactData.contactTypes.email', 'Электронная почта', '_@_._', true);
+(id, localization_path, name, description, mask, allow_notifications) values 
+('1d69590d-06ea-4778-a37c-d591b8f25df8', '$.contactData.contactTypes.phone', 'Телефон', 'Телефон', '_ (___) ___-__-__', true),
+('8887c160-70b1-4591-903e-8289eb7f5e0a', '$.contactData.contactTypes.email', 'Электронная почта', 'Электронная почта', '_@_._', true);
 
 
 
