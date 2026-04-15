@@ -42,11 +42,15 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
-        public async Task<List<PersonInfoDto>> GetEventParticipantsAsync(Guid eventId)
+        public async Task<List<AccountDto>> GetEventParticipantsAsync(Guid eventId)
         {
-            var accountIds = await _connection.Participations.Where(i => eventId == i.EventId).Select(i => i.AccountId).ToListAsync();
-            var persons = await _connection.Persons.Where(i => accountIds.Contains(i.AccountId)).ToListAsync();
-            return persons;
+            var accounts = await _connection.Participations
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.PersonInfo)
+                .Where(i => eventId == i.EventId)
+                .Select(i => i.Account)
+                .ToListAsync();
+            return accounts;
         }
     }
 }

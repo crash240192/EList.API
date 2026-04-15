@@ -57,8 +57,7 @@ namespace EList.AutoMapperProfile
 
             CreateMap<EventsSearchRequest, DbDataProvider.Models.SearchRequests.EventsSearchRequest>().ReverseMap();
 
-
-
+            //CreateMap<(Account, PersonInfo),>
             CreateMap<Models.Enums.Gender, DbDataProvider.Models.Enums.Gender>().ReverseMap();
             CreateMap<Models.Enums.SystemNotificationType, DbDataProvider.Models.Enums.SystemNotificationType>().ReverseMap();
         }

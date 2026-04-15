@@ -140,7 +140,7 @@ namespace EList.Repositories.Impl
             var mappedRequest = new EventParametersDto
             {
                 AgeLimit = request.AgeLimit,
-                AllowedGender = _mapper.Map<Gender>(request.AllowedGender),
+                AllowedGender = request.AllowedGender != null ? _mapper.Map<Gender>(request.AllowedGender) : null,
                 MaxPersonsCount = request.MaxPersonsCount,
                 Private = request.Private,
                 AllowUsersToInvite = request.AllowUsersToInvite,

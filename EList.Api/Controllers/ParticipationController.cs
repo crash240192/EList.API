@@ -3,6 +3,8 @@ using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
+using EList.Models.Accounts;
+using EList.Models.Participation;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -102,7 +104,7 @@ namespace EList.Api.Controllers
         /// <param name="id"></param>
         /// <returns></returns>
         [HttpGet("eventParticipants/{id}")]
-        public async Task<CommandResult> GetEventParticipantsAsync(Guid id)
+        public async Task<CommandResult<List<Participant>>> GetEventParticipantsAsync(Guid id)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();

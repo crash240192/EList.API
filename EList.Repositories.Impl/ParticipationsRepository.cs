@@ -1,5 +1,7 @@
 ﻿using AutoMapper;
 using EList.DbDataProvider.Interfaces;
+using EList.Models.Accounts;
+using EList.Models.Participation;
 using EList.Models.Person;
 using EList.Repositories.Interfaces;
 
@@ -27,10 +29,15 @@ namespace EList.Repositories.Impl
             return await _participationsDataProvider.ParticipateAsync(accountId, eventId);
         }
 
-        public async Task<List<PersonInfo>> GetEventParticipantsAsync(Guid eventId)
+        public async Task<List<Participant>> GetEventParticipantsAsync(Guid eventId)
         {
-            var personItems = await _participationsDataProvider.GetEventParticipantsAsync(eventId);
-            var result = _mapper.Map<List<PersonInfo>>(personItems);
+            var participantsDtos = await _participationsDataProvider.GetEventParticipantsAsync(eventId);
+
+            var result = participantsDtos.Select(i => new Participant
+            {
+                Account = _mapper.Map<Account>(i),
+                PersonInfo = _mapper.Map<PersonInfo>(i.PersonInfo)
+            }).ToList();
             return result;
         }
     }

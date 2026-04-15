@@ -1,0 +1,57 @@
+﻿using EList.Common.CorrelationId;
+using EList.Common.Logger;
+using EList.Common.Models;
+using EList.Common.Support;
+using EList.Models.EventOrganizators;
+using EList.Repositories.Interfaces;
+using EList.Services.Interfaces;
+using NLog;
+using System.Diagnostics;
+
+namespace EList.Services.Impl
+{
+    public class EventOrganizatorsService : IEventOrganizatorsService
+    {
+        #region logger
+        private static readonly ILogger log = LogManager.GetCurrentClassLogger();
+        private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
+        private const string LOGGER_NAME = "EList.Services.Impl.EventOrganizatorsService.";
+        #endregion
+
+        private readonly IEventsRepository _eventsRepository;
+        private readonly ICorrelationIdProvider _correlationIdProvider;
+        private readonly IAccountDataHolder _accountDataHolder;
+        private readonly IEventOrganizatorsRepository _organizatorsRepository;
+
+        public EventOrganizatorsService(ICorrelationIdProvider correlationIdProvider,
+            IEventsRepository eventsRepository,
+            IAccountDataHolder accountDataHolder,
+            IEventOrganizatorsRepository organizatorsRepository)
+        {
+            _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
+            _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
+            _accountDataHolder = accountDataHolder;
+            _organizatorsRepository = organizatorsRepository ?? throw new ArgumentNullException(nameof(organizatorsRepository));
+        }
+
+        public async Task<CommandResult<List<EventOrganizator>>> GetByEventIdAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetByEventIdAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var curEvent = await _eventsRepository.GetEventAsync(eventId);
+
+            if (curEvent == null)
+                return CommandResult<List<EventOrganizator>>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            //TODO: Реализовать проверку, доступен ли пользователю просмотр списка участников
+
+            var result = await _organizatorsRepository.GetByEventIdAsync(eventId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<EventOrganizator>>(result);
+        }
+    }
+}

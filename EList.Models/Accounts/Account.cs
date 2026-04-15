@@ -1,4 +1,6 @@
-﻿namespace EList.Models.Accounts
+﻿using EList.Models.Person;
+
+namespace EList.Models.Accounts
 {
     /// <summary>
     /// Аккаунт
