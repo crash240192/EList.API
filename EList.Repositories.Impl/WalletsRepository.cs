@@ -38,6 +38,13 @@ namespace EList.Repositories.Impl
             var result = _mapper.Map<Tariff>(tariff);
             return result;
         }
+        
+        public async Task<List<Tariff>?> GetTariffsAsync()
+        {
+            var tariff = await _walletsDataProvider.GetTariffsAsync();
+            var result = _mapper.Map<List<Tariff>>(tariff);
+            return result;
+        }
 
 
 

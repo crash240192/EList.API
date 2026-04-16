@@ -170,6 +170,34 @@ namespace EList.Api.Controllers
                 throw;
             }
         }
+
+        /// <summary>
+        /// Список тарифов
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("tariff/all")]
+        public async Task<CommandResult<List<Tariff>?>> GetAllTariffsAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetAllTariffsAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _walletsService.GetAllTariffsAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
         #endregion
 
 

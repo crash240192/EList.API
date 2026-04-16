@@ -328,6 +328,19 @@ namespace EList.Services.Impl
             return new CommandResult<Tariff?>(result);
         }
 
+        public async Task<CommandResult<List<Tariff>?>> GetAllTariffsAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetAllTariffsAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var result = await _walletsRepository.GetTariffsAsync();
+            
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<Tariff>?>(result);
+        }
 
         public async Task<CommandResult<List<Wallet>>> GetOverdueWalletsAsync()
         {

@@ -25,7 +25,7 @@ namespace EList.Models.Accounts
         /// <summary>
         /// Местоположение по умолчанию
         /// </summary>
-        public string? Longitude { get; set; }
+        public double? Longitude { get; set; }
 
         /// <summary>
         /// Логин

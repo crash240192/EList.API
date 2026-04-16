@@ -1,4 +1,6 @@
-﻿namespace EList.Models.Wallets
+﻿using System.Text.Json.Serialization;
+
+namespace EList.Models.Wallets
 {
     /// <summary>
     /// Тариф
@@ -23,7 +25,20 @@
         /// <summary>
         /// Период списания 
         /// </summary>
-        public TimeSpan Period { get; set; }
+        public int PeriodDays { get; set; }
+
+        [JsonIgnore]
+        public TimeSpan Period 
+        { 
+            get 
+            {
+                return TimeSpan.FromDays(PeriodDays);
+            }
+            set
+            {
+                PeriodDays = value.Days;
+            }
+        } 
 
         /// <summary>
         /// Идентификатор валидатора тарифа

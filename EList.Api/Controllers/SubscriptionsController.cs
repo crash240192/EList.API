@@ -116,10 +116,10 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Отобразить подписки пользователя
         /// </summary>
-        /// <param name="request"></param>
+        /// <param name="accountId"></param>
         /// <returns></returns>
-        [HttpGet("getSubscriptions")]
-        public async Task<CommandResult> GetSubscriptionsAsync()
+        [HttpGet("getSubscriptions/{accountId}")]
+        public async Task<CommandResult<PagedList<Subscription>>> GetSubscriptionsAsync(Guid accountId)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -129,7 +129,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _subscriptionsService.GetSubscriptionsAsync();
+                var result = await _subscriptionsService.GetSubscriptionsAsync(accountId);
                 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -143,22 +143,22 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
-        /// Отобразить подписчиков пользователя
+        /// Количество подписок пользователя
         /// </summary>
-        /// <param name="request"></param>
+        /// <param name="accountId"></param>
         /// <returns></returns>
-        [HttpGet("getSubscribers")]
-        public async Task<CommandResult> GetSubscribersAsync()
+        [HttpGet("getSubscriptionsCount/{accountId}")]
+        public async Task<CommandResult<int>> GetSubscriptionsCountAsync(Guid accountId)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetSubscribersAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(GetSubscriptionsCountAsync)}";
 
             try
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _subscriptionsService.GetSubscribersAsync();
+                var result = await _subscriptionsService.GetSubscriptionsCountAsync(accountId);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -171,11 +171,68 @@ namespace EList.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Отобразить подписчиков пользователя
+        /// </summary>
+        /// <param name="accountId"></param>
+        /// <returns></returns>
+        [HttpGet("getSubscribers/{accountId}")]
+        public async Task<CommandResult<PagedList<Subscription>>> GetSubscribersAsync(Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetSubscribersAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _subscriptionsService.GetSubscribersAsync(accountId);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Количество подписчиков пользователя
+        /// </summary>
+        /// <param name="accountId"></param>
+        /// <returns></returns>
+        [HttpGet("getSubscribersCount/{accountId}")]
+        public async Task<CommandResult<int>> GetSubscribersCountAsync(Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetSubscribersCountAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _subscriptionsService.GetSubscribersCountAsync(accountId);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
 
         /// <summary>
         /// Отобразить подписчиков пользователя
         /// </summary>
-        /// <param name="request"></param>
+        /// <param name="accountId"></param>
         /// <returns></returns>
         [HttpDelete("deleteSubscription/{accountId}")]
         public async Task<CommandResult> DeleteSubscriptionAsync(Guid accountId)

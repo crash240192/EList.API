@@ -9,6 +9,7 @@ namespace EList.Repositories.Interfaces
         Task UpdateTariffAsync(Tariff item);
 
         Task<Tariff?> GetTariffAsync(Guid tariffId);
+        Task<List<Tariff>?> GetTariffsAsync();
         Task<Tariff?> GetWalletTariffAsync(Guid walletId);
 
         Task<Guid> CreateTariffValidatorAsync(TariffValidator item);

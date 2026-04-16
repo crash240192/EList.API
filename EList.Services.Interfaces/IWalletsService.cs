@@ -9,6 +9,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult> UpdateTariffAsync(Tariff item);
 
         Task<CommandResult<Tariff?>> GetTariffAsync(Guid tariffId);
+        Task<CommandResult<List<Tariff>?>> GetAllTariffsAsync();
         Task<CommandResult<Tariff?>> GetWalletTariffAsync(Guid walletId);
 
         Task<CommandResult<Guid?>> CreateTariffValidatorAsync(TariffValidator item);

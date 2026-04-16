@@ -94,7 +94,7 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
-        public async Task<CommandResult<List<Subscription>?>> GetSubscriptionsAsync()
+        public async Task<CommandResult<PagedList<Subscription>?>> GetSubscriptionsAsync(Guid accountId)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -102,13 +102,27 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var subscriptions = await _subscriptionsRepository.GetSubscriptionsAsync(_accountDataHolder.AccountId);
+            var subscriptions = await _subscriptionsRepository.GetSubscriptionsAsync(accountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<List<Subscription>?>(subscriptions);
+            return new CommandResult<PagedList<Subscription>?>(subscriptions);
         }
 
-        public async Task<CommandResult<List<Subscription>?>> GetSubscribersAsync()
+        public async Task<CommandResult<int>> GetSubscriptionsCountAsync(Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetSubscriptionsCountAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var subscriptionsCount = await _subscriptionsRepository.GetSubscriptionsCountAsync(accountId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<int>(subscriptionsCount);
+        }
+
+        public async Task<CommandResult<PagedList<Subscription>?>> GetSubscribersAsync(Guid accountId)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -116,10 +130,24 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var subscriptions = await _subscriptionsRepository.GetSubscribersAsync(_accountDataHolder.AccountId);
+            var subscriptions = await _subscriptionsRepository.GetSubscribersAsync(accountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<List<Subscription>?>(subscriptions);
+            return new CommandResult<PagedList<Subscription>?>(subscriptions);
+        }
+
+        public async Task<CommandResult<int>> GetSubscribersCountAsync(Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetSubscribersCountAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var subscriptionsCount = await _subscriptionsRepository.GetSubscribersCountAsync(accountId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<int>(subscriptionsCount);
         }
 
         public async Task<CommandResult> DeleteSubscriptionAsync(Guid subscribedToId)

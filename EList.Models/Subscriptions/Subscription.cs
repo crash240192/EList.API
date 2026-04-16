@@ -1,12 +1,14 @@
-﻿namespace EList.Models.Subscriptions
+﻿using EList.Models.Accounts;
+
+namespace EList.Models.Subscriptions
 {
     public class Subscription
     {
         public Guid Id { get; set; }
 
-        public Guid SubscriberId { get; set; }
+        public Subscriber Subscriber { get; set; }
 
-        public Guid SubscribedToId { get; set; }
+        public Subscriber SubscribedTo { get; set; }
 
         public bool NotifyParticipated { get; set; }
 

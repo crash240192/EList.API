@@ -132,9 +132,8 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var authData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
-            var account = await _accountsRepository.GetAccountAsync(authData.AccountId);
 
-            await _accountsRepository.UpdateLocationAsync(account.Id, latitude, longitude);
+            await _accountsRepository.UpdateLocationAsync(_accountDataHolder.AccountId, latitude, longitude);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

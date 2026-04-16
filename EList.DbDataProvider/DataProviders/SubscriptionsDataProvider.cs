@@ -10,11 +10,27 @@ namespace EList.DbDataProvider.DataProviders
         {
         }
 
-        public async Task<List<SubscriptionDto>> GetSubscriptionsAsync(Guid accountId)
+        public async Task<(int, List<SubscriptionDto>)> GetSubscriptionsAsync(Guid accountId)
+        {
+            var request = _connection.Subscriptions
+                //.LoadWith(i => i.Subscriber)
+                //.ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.SubscribedTo)
+                .ThenLoad(i => i.PersonInfo)
+                .Where(i => i.SubscriberId == accountId);
+
+            var count = await request.CountAsync();
+
+            var result = await request.ToListAsync();
+            return (count, result);
+        }
+
+        public async Task<int> GetSubscriptionsCountAsync(Guid accountId)
         {
             var result = await _connection.Subscriptions
                 .Where(i => i.SubscriberId == accountId)
-                .ToListAsync();
+                .CountAsync();
+
             return result;
         }
 
@@ -25,21 +41,35 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
-        public async Task<List<SubscriptionDto>> GetSubscribersAsync(Guid accountId, bool? notifyParticipated = null, bool? notifyEventCreated = false, bool? notifySubscribed = false)
+        public async Task<(int, List<SubscriptionDto>)> GetSubscribersAsync(Guid accountId, bool? notifyParticipated = null, bool? notifyEventCreated = false, bool? notifySubscribed = false)
         {
             var request = _connection.Subscriptions
+                .LoadWith(i => i.Subscriber)
+                .ThenLoad(i => i.PersonInfo)
+                //.LoadWith(i => i.SubscribedTo)
+                //.ThenLoad(i => i.PersonInfo)
                 .Where(i => i.SubscribedToId == accountId);
 
             if (notifyParticipated != null) 
                 request = request.Where(i => i.NotifyParticipated == notifyParticipated);
-
+            
             if (notifyEventCreated != null)
                 request = request.Where(i => i.NotifyEventCreated == notifyEventCreated);
 
             if (notifySubscribed != null)
                 request = request.Where(i => i.NotifySubscribed == notifySubscribed);
 
+            var count = await request.CountAsync();
+
             var result = await request.ToListAsync();
+            return (count, result);
+        }
+
+        public async Task<int> GetSubscribersCountAsync(Guid accountId)
+        {
+            var result = await _connection.Subscriptions
+                .Where(i => i.SubscribedToId == accountId)
+                .CountAsync();
             return result;
         }
 

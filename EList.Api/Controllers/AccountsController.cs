@@ -4,6 +4,7 @@ using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.Models.Accounts;
+using EList.Models.Location;
 using EList.Services.Impl;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -98,6 +99,34 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _accountsService.GetAccountByTokenAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Обновление координат пользователя
+        /// </summary>
+        /// <param name="location"></param>
+        /// <returns></returns>
+        [HttpPost("updateLocation")]
+        public async Task<CommandResult> UpdateLocationAsync(Location location)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetAccountAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _accountsService.UpdateLocationAsync(location.Latitude, location.Longitude);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;

@@ -6,9 +6,11 @@ namespace EList.Services.Interfaces
     public interface ISubscriptionsService
     {
         Task<CommandResult> SubscribeToAccountAsync(Guid subscribedToId);
-        Task<CommandResult<List<Subscription>?>> GetSubscriptionsAsync();
-        Task<CommandResult> UpdateSubscriptionAsync(Guid subscribedToId, UpdateSubscriptionRequestBase request);
-        Task<CommandResult<List<Subscription>?>> GetSubscribersAsync();
+        Task<CommandResult<PagedList<Subscription>?>> GetSubscriptionsAsync(Guid accountId);
+        Task<CommandResult<int>> GetSubscriptionsCountAsync(Guid accountId);
+        Task<CommandResult<PagedList<Subscription>?>> GetSubscribersAsync(Guid accountId);
+        Task<CommandResult<int>> GetSubscribersCountAsync(Guid accountId);
+        Task<CommandResult> UpdateSubscriptionAsync(Guid subscribedToId, UpdateSubscriptionRequestBase request);        
         Task<CommandResult> DeleteSubscriptionAsync(Guid subscribedToId);
     }
 }

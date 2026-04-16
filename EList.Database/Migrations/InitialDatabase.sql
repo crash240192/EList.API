@@ -84,7 +84,7 @@ CREATE TABLE public.tariffs (
 	id uuid NOT NULL DEFAULT uuid_generate_v4(),
 	"name" varchar NOT NULL,
 	"cost" numeric NOT NULL,
-	"period" timestamp NOT NULL,
+	"period" interval NOT NULL,
 	validator_id uuid not null,
 	CONSTRAINT tariff_pk PRIMARY KEY (id),
 	constraint tariff_validator_fk foreign key (validator_id) references public.tariff_validators(id)

@@ -37,6 +37,14 @@ namespace EList.DbDataProvider.DataProviders
             return item;
         }
 
+        public async Task<List<TariffDto>?> GetTariffsAsync()
+        {
+            var result = await _connection.Tariffs
+                .LoadWith(i => i.TariffValidator)
+                .ToListAsync();
+            return result;
+        }
+
         public async Task<TariffDto?> GetWalletTariffAsync(Guid walletId)
         {
             var wallet = await _connection.Wallets.FirstOrDefaultAsync(i => i.Id == walletId);
