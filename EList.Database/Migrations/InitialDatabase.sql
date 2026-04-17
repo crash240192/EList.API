@@ -153,7 +153,7 @@ CREATE TABLE public.person_info(
 CREATE TABLE public.wallets (
 	id uuid NOT NULL DEFAULT uuid_generate_v4(),
 	balance numeric NOT NULL,
-	paid_date timestamptz NOT NULL,
+	paid_date timestamptz NULL,
 	tariff_id uuid NULL,
 	last_charge_date timestamptz NULL,
 	CONSTRAINT wallet_pk PRIMARY KEY (id),

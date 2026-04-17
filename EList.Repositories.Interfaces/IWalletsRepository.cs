@@ -17,7 +17,7 @@ namespace EList.Repositories.Interfaces
         Task<TariffValidator?> GetTariffValidatorAsync(Guid tariffValidatorId);
         Task<TariffValidator?> GetTariffValidatorByTariffIdAsync(Guid tariffId);
 
-        Task<Guid> CreateWalletAsync(Wallet item);
+        Task<Guid> CreateWalletAsync();
         Task SetWalletTariffAsync(Guid walletId, Guid tariffId);
 
         Task<Wallet?> GetWalletAsync(Guid walletId);

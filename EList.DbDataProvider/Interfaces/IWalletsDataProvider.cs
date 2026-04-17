@@ -17,7 +17,7 @@ namespace EList.DbDataProvider.Interfaces
         Task<TariffValidatorDto?> GetTariffValidatorByTariffIdAsync(Guid tariffId);
 
 
-        Task<Guid> CreateWalletAsync(WalletDto item);
+        Task<Guid> CreateWalletAsync();
         Task SetWalletTariffAsync(Guid walletId, Guid tariffId);
 
         Task<WalletDto?> GetWalletAsync(Guid walletId);

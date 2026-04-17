@@ -12,7 +12,7 @@ namespace EList.DbDataProvider.Models
         public double Balance { get; set; }
 
         [Column("paid_date")]
-        public DateTimeOffset PaidDate { get; set; }
+        public DateTimeOffset? PaidDate { get; set; }
 
         [Column("tariff_id")]
         public Guid? TariffId { get; set; }

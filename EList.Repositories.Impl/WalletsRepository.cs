@@ -77,10 +77,9 @@ namespace EList.Repositories.Impl
 
 
 
-        public async Task<Guid> CreateWalletAsync(Wallet item)
+        public async Task<Guid> CreateWalletAsync()
         {
-            var mappedRequest = _mapper.Map<WalletDto>(item);
-            var result = await _walletsDataProvider.CreateWalletAsync(mappedRequest);
+            var result = await _walletsDataProvider.CreateWalletAsync();
             return result;
         }
         

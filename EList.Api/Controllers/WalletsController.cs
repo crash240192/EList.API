@@ -342,8 +342,8 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
-        [HttpPost("create")]
-        public async Task<CommandResult<Guid?>> CreateAccountWalletAsync(Wallet request)
+        [HttpGet("create")]
+        public async Task<CommandResult<Guid?>> CreateAccountWalletAsync()
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -354,7 +354,7 @@ namespace EList.Api.Controllers
                 await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _walletsService.CreateAccountWalletAsync(request);
+                var result = await _walletsService.CreateAccountWalletAsync();
                 if (!result.Success)
                 {
                     await _connectionProvider.RollbackTransactionAsync();

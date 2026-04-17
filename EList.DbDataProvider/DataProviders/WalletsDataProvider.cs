@@ -92,9 +92,15 @@ namespace EList.DbDataProvider.DataProviders
         }
 
 
-        public async Task<Guid> CreateWalletAsync(WalletDto item)
+        public async Task<Guid> CreateWalletAsync()
         {
-            var result = (Guid)await _connection.InsertWithIdentityAsync(item);
+            var result = (Guid)await _connection.InsertWithIdentityAsync(new WalletDto
+            {
+                Balance = 0,
+                LastChargeDate = null,
+                TariffId = null,
+                PaidDate = null
+            });
             return result;
         }
 

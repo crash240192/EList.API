@@ -115,7 +115,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var tariffValidator = await _walletsRepository.GetTariffValidatorAsync(item.Id);
-            if (tariffValidator != null)
+            if (tariffValidator == null)
                 return CommandResult.Fail(ErrorCode.TariffValidatorNotFound, $"Валидатор тарифа с id='{item.Id}' не найден");
 
             await _walletsRepository.UpdateTariffValidatorAsync(item);
@@ -157,7 +157,7 @@ namespace EList.Services.Impl
         }
 
 
-        public async Task<CommandResult<Guid?>> CreateAccountWalletAsync(Wallet item)
+        public async Task<CommandResult<Guid?>> CreateAccountWalletAsync()
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -165,18 +165,11 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            if (item.TariffId != null)
-            {
-                var tariff = await _walletsRepository.GetTariffAsync(item.TariffId.Value);
-                if (tariff == null)
-                    return CommandResult<Guid?>.Fail(ErrorCode.TariffNotFound, $"Тариф с id='{item.TariffId}' не найден");
-            }
-
             var account = await _accountsRepository.GetAccountAsync(_accountDataHolder.AccountId);
 
-            if (account.WalletId != null)
+            if (account.WalletId == null)
             {
-                var result = await _walletsRepository.CreateWalletAsync(item);
+                var result = await _walletsRepository.CreateWalletAsync();
                 await _accountsRepository.SetAccountWalletAsync(_accountDataHolder.AccountId, result);
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return new CommandResult<Guid?>(result);
@@ -283,7 +276,7 @@ namespace EList.Services.Impl
             return new CommandResult<Wallet?>(result);
         }
 
-        
+
         public async Task<CommandResult<Wallet?>> GetOrganizationWalletAsync(Guid organizationId)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -337,7 +330,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _walletsRepository.GetTariffsAsync();
-            
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<Tariff>?>(result);
         }
@@ -351,7 +344,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _walletsRepository.GetOverdueWalletsAsync();
-            
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<Wallet>>(result);
         }

@@ -17,7 +17,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult<TariffValidator?>> GetTariffValidatorAsync(Guid tariffValidatorId);
         Task<CommandResult<TariffValidator?>> GetTariffValidatorByTariffIdAsync(Guid tariffId);
 
-        Task<CommandResult<Guid?>> CreateAccountWalletAsync(Wallet item);
+        Task<CommandResult<Guid?>> CreateAccountWalletAsync();
         Task<CommandResult<Guid?>> CreateOrganizationWalletAsync(Wallet item);
         Task<CommandResult> SetWalletTariffAsync(Guid walletId, Guid tariffId);
 

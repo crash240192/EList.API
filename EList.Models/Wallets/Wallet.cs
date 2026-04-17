@@ -18,7 +18,7 @@
         /// <summary>
         /// Дата последней оплаты
         /// </summary>
-        public DateTimeOffset PaidDate { get; set; }
+        public DateTimeOffset? PaidDate { get; set; }
 
         /// <summary>
         /// Идентификатор тарифа
