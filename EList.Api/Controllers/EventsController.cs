@@ -546,6 +546,40 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Назначение событию обложки
+        /// </summary>
+        /// <param name="eventId"></param>
+        /// <param name="imageId"></param>
+        /// <returns></returns>
+        [HttpGet("setCoverImage")]
+        public async Task<CommandResult> SetEventCoverImageAsync(Guid eventId, Guid? imageId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SetEventCoverImageAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _eventsService.SetEventCoverImageAsync(eventId, imageId);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Обновление события
         /// </summary>
         /// <param name="request"></param>

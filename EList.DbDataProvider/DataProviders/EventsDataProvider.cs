@@ -2,6 +2,7 @@
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.SearchRequests;
 using LinqToDB;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace EList.DbDataProvider.DataProviders
 {
@@ -34,6 +35,15 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.Longitude, item.Longitude)
                 .Set(i => i.Name, item.Name)
                 .Set(i => i.StartTime, item.StartTime)
+                .Set(i => i.CoverImageId, item.CoverImageId)
+                .Set(i => i.UpdateDate, DateTimeOffset.Now.ToUniversalTime())
+                .UpdateAsync();
+        }
+
+        public async Task SetEventCoverImageAsync(Guid eventId, Guid? imageId)
+        {
+            var eventItem = await _connection.Events.Where(i => i.Id == eventId)
+                .Set(i => i.CoverImageId, imageId)
                 .Set(i => i.UpdateDate, DateTimeOffset.Now.ToUniversalTime())
                 .UpdateAsync();
         }
@@ -69,7 +79,7 @@ namespace EList.DbDataProvider.DataProviders
             //{
             //    var eventTypesByCategories = _connection.EventCategories.Where(i => request.Categories.Contains(i.Id)).SelectMany(i => i.);
             //}
-                
+
 
             if (request.Categories?.Any() ?? false)
                 eventTypes = eventTypes.Where(i => request.Categories.Contains(i.EventCategoryId));

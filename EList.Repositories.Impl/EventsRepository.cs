@@ -32,7 +32,8 @@ namespace EList.Repositories.Impl
                 CreateDate = DateTimeOffset.Now.ToUniversalTime(),
                 Address = request.Address,
                 Description = request.Description,
-                EndTime = request.EndTime
+                EndTime = request.EndTime,
+                CoverImageId = request.CoverImageId
             };
             var result = await _eventsDataProvider.CreateEventAsync(mappedRequest);
             return result;
@@ -60,9 +61,15 @@ namespace EList.Repositories.Impl
                 Address = request.Address,
                 Description = request.Description,
                 EndTime = request.EndTime,
+                CoverImageId = request.CoverImageId,
                 Id = id
             };
             await _eventsDataProvider.UpdateEventAsync(mappedRequest);
+        }
+
+        public async Task SetEventCoverImageAsync(Guid id, Guid? imageId)
+        {            
+            await _eventsDataProvider.SetEventCoverImageAsync(id, imageId);
         }
 
         public async Task<PagedList<Event>> SearchEventsAsync(EventsSearchRequest request)

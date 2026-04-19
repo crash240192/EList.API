@@ -44,5 +44,10 @@
         /// Флаг вкл/выкл
         /// </summary>
         public bool Active { get; set; }
+
+        /// <summary>
+        /// Идентификатор файла обложки
+        /// </summary>
+        public Guid? CoverImageId { get; set; }
     }
 }

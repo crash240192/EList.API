@@ -34,7 +34,10 @@ namespace EList.DbDataProvider.Models
 
         [Column("event_parameters_id")]
         public Guid? EventParametersId { get; set; }
-        
+
+        [Column("cover_image_id")]
+        public Guid? CoverImageId { get; set; }
+
         [Column("create_date")]
         public DateTimeOffset CreateDate { get; set; }
 

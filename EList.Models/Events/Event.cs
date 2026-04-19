@@ -64,5 +64,10 @@
         /// Дата последнего обновления
         /// </summary>
         public DateTimeOffset UpdateDate { get; set; }
+
+        /// <summary>
+        /// Идентификатор файла обложки
+        /// </summary>
+        public Guid? CoverImageId { get; set; }
     }
 }

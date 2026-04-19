@@ -30,7 +30,7 @@ namespace EList.Api.Controllers
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
 
-        public AuthorizationController(IAuthorizationService authorizationService, 
+        public AuthorizationController(IAuthorizationService authorizationService,
             ICorrelationIdProvider correlationIdProvider,
             IDataConnectionProvider connectionProvider)
         {
@@ -119,13 +119,40 @@ namespace EList.Api.Controllers
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(AuthorizeAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(CheckAuthorizationAsync)}";
 
             try
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = CommandResult.OK;
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Выслать код активации
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("sendActivationCode")]
+        public async Task<CommandResult> SendActivationCodeAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SendActivationCodeAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _authorizationService.SendActivationCodeAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;

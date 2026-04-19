@@ -242,6 +242,7 @@ CREATE TABLE public.events (
 	event_parameters_id uuid null,
 	create_date timestamptz NOT NULL,
 	update_date timestamptz NOT NULL,
+	cover_image_id uuid NULL,
 	CONSTRAINT event_pk PRIMARY KEY (id),
 	constraint event_parameters_fk foreign key (event_parameters_id) references public.event_parameters(id)
 );

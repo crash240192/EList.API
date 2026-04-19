@@ -18,6 +18,6 @@
         /// <summary>
         /// Простое уведомление с кодом активации.
         /// </summary>
-        NewAuthorization = 2
+        Activation = 2
     }
 }

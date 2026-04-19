@@ -6,7 +6,8 @@ namespace EList.Services.Interfaces
     public interface IAuthorizationService
     {
         Task<CommandResult<AuthorizationResponse>> AuthorizeAsync(string login, string password, string clientHash);
-     
+
+        Task<CommandResult> SendActivationCodeAsync();
         Task<CommandResult<Authorization?>> GetAuthorizationDataAsync(Guid token);
         Task<CommandResult<Authorization?>> GetAuthorizationDataAsync(string clientHash);
         Task<CommandResult<Guid>> CreateTokenAsync(string clientHash);

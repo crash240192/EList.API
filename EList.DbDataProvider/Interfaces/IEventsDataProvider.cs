@@ -8,6 +8,7 @@ namespace EList.DbDataProvider.Interfaces
         Task<Guid> CreateEventAsync(EventDto item);
         Task<EventDto> GetEventAsync(Guid id);
         Task UpdateEventAsync(EventDto item);
+        Task SetEventCoverImageAsync(Guid eventId, Guid? imageId);
         Task<(int, List<EventDto>)> SearchEventsAsync(EventsSearchRequest request);
     }
 }

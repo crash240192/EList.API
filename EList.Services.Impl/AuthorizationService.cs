@@ -10,6 +10,7 @@ using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using EList.Validators.Interfaces;
 using Microsoft.AspNetCore.Mvc.Formatters;
+using Newtonsoft.Json.Linq;
 using NLog;
 using System.Diagnostics;
 
@@ -79,7 +80,7 @@ namespace EList.Services.Impl
             {
                 var tokenId = await _authorizationRepository.CreateTokenAsync(account.Id, clientHash);
                 _accountDataHolder.Token = tokenId;
-                await _notificationService.NotifyUserByContactAsync(SystemNotificationType.NewAuthorization);
+                await _notificationService.NotifyUserByContactAsync(SystemNotificationType.Activation);
                 //return CommandResult<Guid?>.Fail(ErrorCode.AuthorizationDataInactive, $"Для активации клиента было выслано уведомление на ваш контакт авторизационный контакт");
 
                 result.Token = tokenId;
@@ -95,7 +96,7 @@ namespace EList.Services.Impl
 
             if (!tokenSearchResult.Active)
             {
-                await _notificationService.NotifyUserByContactAsync(SystemNotificationType.NewAuthorization);
+                await _notificationService.NotifyUserByContactAsync(SystemNotificationType.Activation);
                 //return CommandResult<Guid?>.Fail(ErrorCode.AuthorizationDataInactive, $"Указанный клиент заблокирован. Для активации клиента было выслано уведомление на ваш контакт авторизационный контакт");
                 result.Token = tokenSearchResult.Token;
                 result.ActivationRequired = true;
@@ -110,6 +111,20 @@ namespace EList.Services.Impl
             result.ActivationRequired = false;
 
             return commandResult;
+        }
+
+        public async Task<CommandResult> SendActivationCodeAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SendActivationCodeAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            await _notificationService.NotifyUserByContactAsync(SystemNotificationType.Activation);
+            
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
         }
 
         public async Task<CommandResult<Authorization?>> GetAuthorizationDataAsync(Guid token)
@@ -190,7 +205,7 @@ namespace EList.Services.Impl
                 {
                     await _authorizationRepository.DeactivateTokenAsync(existingToken.Token);
 
-                    await _notificationService.NotifyUserByContactAsync(SystemNotificationType.NewAuthorization);
+                    await _notificationService.NotifyUserByContactAsync(SystemNotificationType.Activation);
 
                     var notificationContact = (await _contactsRepository.GetAccountContactsAsync(existingToken.AccountId)).FirstOrDefault(i => i.IsAuthorizationContact);
 
@@ -202,7 +217,7 @@ namespace EList.Services.Impl
 
             await _authorizationRepository.ActivateTokenAsync(existingToken.Token);
 
-            await _notificationService.NotifyUserByContactAsync(SystemNotificationType.NewAuthorization);
+            await _notificationService.NotifyUserByContactAsync(SystemNotificationType.Activation);
 
             await _filestorageClient.RegisterAuthDataAsync(existingToken.Token, existingToken.AccountId, existingToken.ClientHash);
 

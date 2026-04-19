@@ -453,6 +453,32 @@ namespace EList.Services.Impl
             return new CommandResult<Guid?>(eventId);
         }
 
+        public async Task<CommandResult> SetEventCoverImageAsync(Guid eventId, Guid? imageId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SetEventCoverImageAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventItem = await _eventsRepository.GetEventAsync(eventId);
+            if (eventItem == null)
+                return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            //var accountInfo = await _authorizationRepository.GetAuthorizationDataAsync(token);
+
+            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
+
+            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? false)
+                return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
+
+            //TODO: Если у ивента организатором является какая-то компания, проверить, является ли accountId её участником
+
+            await _eventsRepository.SetEventCoverImageAsync(eventId, imageId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<Guid?>(eventId);
+        }
+
         public async Task<CommandResult<Event>> GetEventAsync(Guid id)
         {
             var correlationId = _correlationIdProvider.Get();
