@@ -82,6 +82,16 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<ContactDataDto?> GetAuthorizationContactAsync(Guid accountId)
+        {
+            var result = await _connection.ContactData
+                .LoadWith(i => i.ContactType)
+                .LoadWith(i => i.AccountRelation)
+                .Where(i => i.AccountRelation.AccountId == accountId)
+                .FirstOrDefaultAsync();
+            return result;
+        }
+
         public async Task<List<ContactDataDto>?> GetAccountContactsAsync(Guid accountId)
         {
             var result = await _connection.ContactData

@@ -87,7 +87,7 @@ namespace EList.Services.Impl
 
             await _contactsRepository.BindAccountAndContactAsync(accountId, contactId);
 
-            await _notificationsService.NotifyUserByContactAsync(SystemNotificationType.AccountCreated);
+            //await _notificationsService.NotifyUserByContactAsync(SystemNotificationType.AccountCreated);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(accountId);

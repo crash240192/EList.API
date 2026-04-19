@@ -14,6 +14,7 @@ namespace EList.DbDataProvider.Interfaces
         Task UpdateContactAsync(ContactDataDto request);
         Task BindAccountAndContactAsync(Guid accountId, Guid contactId);
         Task<ContactDataDto?> GetAccountContactAsync(Guid id);
+        Task<ContactDataDto?> GetAuthorizationContactAsync(Guid accountId);
         Task<List<ContactDataDto>?> GetAccountContactsAsync(Guid accountId);
     }
 }

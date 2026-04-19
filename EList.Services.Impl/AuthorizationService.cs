@@ -75,18 +75,18 @@ namespace EList.Services.Impl
 
             var result = new AuthorizationResponse();
             var commandResult = new CommandResult<AuthorizationResponse>(result);
+            var contact = await _contactsRepository.GetAccountContactAsync(account.Id);
 
             if (tokenSearchResult == null)
             {
                 var tokenId = await _authorizationRepository.CreateTokenAsync(account.Id, clientHash);
                 _accountDataHolder.Token = tokenId;
                 await _notificationService.NotifyUserByContactAsync(SystemNotificationType.Activation);
-                //return CommandResult<Guid?>.Fail(ErrorCode.AuthorizationDataInactive, $"Для активации клиента было выслано уведомление на ваш контакт авторизационный контакт");
 
                 result.Token = tokenId;
                 result.ActivationRequired = true;
 
-                commandResult.Message = "Для активации клиента было выслано уведомление на ваш контакт авторизационный контакт";
+                commandResult.Message = $"Для активации клиента было выслано уведомление на {contact?.Value}";
                 return commandResult;
             }
             else
@@ -97,11 +97,10 @@ namespace EList.Services.Impl
             if (!tokenSearchResult.Active)
             {
                 await _notificationService.NotifyUserByContactAsync(SystemNotificationType.Activation);
-                //return CommandResult<Guid?>.Fail(ErrorCode.AuthorizationDataInactive, $"Указанный клиент заблокирован. Для активации клиента было выслано уведомление на ваш контакт авторизационный контакт");
                 result.Token = tokenSearchResult.Token;
                 result.ActivationRequired = true;
 
-                commandResult.Message = "Указанный клиент заблокирован. Для активации клиента было выслано уведомление на ваш авторизационный контакт";
+                commandResult.Message = $"Указанный клиент заблокирован. Для активации клиента было выслано уведомление на {contact?.Value}";
                 return commandResult;
             }
 

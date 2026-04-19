@@ -13,6 +13,7 @@ namespace EList.Repositories.Interfaces
         Task UpdateContactAsync(Guid id, ContactRequest request);
         Task BindAccountAndContactAsync(Guid accountId, Guid contactId);
         Task<ContactDataItem?> GetAccountContactAsync(Guid id);
+        Task<ContactDataItem?> GetAuthorizationContactAsync(Guid accountId);
         Task<List<ContactDataItem>> GetAccountContactsAsync(Guid accountId);
     }
 }

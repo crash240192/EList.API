@@ -102,6 +102,15 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task<ContactDataItem?> GetAuthorizationContactAsync(Guid accountId)
+        {
+            var contact = await _contactDataProvider.GetAuthorizationContactAsync(accountId);
+            var result = _mapper.Map<ContactDataItem>(contact);
+            if (result != null)
+                result.AccountId = contact?.AccountRelation.AccountId;
+            return result;
+        }
+
         public async Task<List<ContactDataItem>?> GetAccountContactsAsync(Guid accountId)
         { 
             var contacts = await _contactDataProvider.GetAccountContactsAsync(accountId);
