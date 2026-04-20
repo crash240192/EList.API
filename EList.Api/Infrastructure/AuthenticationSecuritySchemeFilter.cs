@@ -1,15 +1,13 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace EList.Api.Infrastructure
 {
     /// <summary>
     /// Фильтр добавления визуального отображения необходимости указывать токен авторизации
     /// </summary>
-    public class BasicAuthenticationSecuritySchemeFilter : IOperationFilter
+    public class AuthenticationSecuritySchemeFilter : IOperationFilter
     {
         /// <summary>
         /// Метод применения фильтра

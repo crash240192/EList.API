@@ -1,22 +1,20 @@
-﻿using EList.Services.Interfaces;
+﻿using EList.Common.Encryption;
+using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
-using Microsoft.VisualBasic;
 using NLog;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using EList.Common.Constants;
 using Constants = EList.Common.Constants.Constants;
-using EList.Common.Encryption;
 
 namespace EList.Api.Infrastructure
 {
     /// <summary>
     /// Хендлер выполнения авторизации на API контроллере
     /// </summary>
-    public class BasicAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+    public class AuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
     {
         private const string ClassName = "Booking.Infrastructures.BasicAuthenticationHandler";
         private readonly Logger _currentLogger = LogManager.GetCurrentClassLogger();
@@ -28,7 +26,7 @@ namespace EList.Api.Infrastructure
         /// <summary>
         /// Инициализация хендлера
         /// </summary>
-        public BasicAuthenticationHandler(
+        public AuthenticationHandler(
             IOptionsMonitor<AuthenticationSchemeOptions> options,
             ILoggerFactory logger,
             UrlEncoder encoder,
@@ -108,7 +106,7 @@ namespace EList.Api.Infrastructure
 
                 _accountDataHolder.AccountId = account.Result.Id;
 
-                if (!authorizationItem.Result.Active && (Request.Path != "/api/authorization/activate"))
+                if (!authorizationItem.Result.Active && (Request.Path != "/api/authorization/activate" || Request.Path != "/api/authorization/sendActivationCode"))
                 {
                     logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Token is not active");
                     return AuthenticateResult.Fail("Token is not active");

@@ -42,15 +42,15 @@ builder.Services.AddSwaggerGen(c =>
         //var xmlCommentsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EList.API.xml");
         //c.IncludeXmlComments(xmlCommentsPath);
 
-        var apiSecurityScheme = BasicAuthenticationSecuritySchemeFilter.GetOpenApiSecurityScheme();
+        var apiSecurityScheme = AuthenticationSecuritySchemeFilter.GetOpenApiSecurityScheme();
         c.AddSecurityDefinition(apiSecurityScheme.Reference.Id, apiSecurityScheme);
-        c.OperationFilter<BasicAuthenticationSecuritySchemeFilter>();
+        c.OperationFilter<AuthenticationSecuritySchemeFilter>();
         c.OperationFilter<HeaderFilter>();
     });
 builder.Services.AddCors();
 builder.Services.AddMvc();
 
-builder.Services.AddAuthentication("BasicAuthentication").AddScheme<AuthenticationSchemeOptions, BasicAuthenticationHandler>("BasicAuthentication", null);
+builder.Services.AddAuthentication("BasicAuthentication").AddScheme<AuthenticationSchemeOptions, AuthenticationHandler>("BasicAuthentication", null);
 
 ContainerConfigurator.Configure(builder.Services, new EListServiceMappingProvider() );
 var mappingConfig = new MapperConfiguration(mc => { mc.AddProfile(new AutoMapperProfile()); });
