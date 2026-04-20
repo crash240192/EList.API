@@ -106,7 +106,7 @@ namespace EList.Api.Infrastructure
 
                 _accountDataHolder.AccountId = account.Result.Id;
 
-                if (!authorizationItem.Result.Active && (Request.Path != "/api/authorization/activate" || Request.Path != "/api/authorization/sendActivationCode"))
+                if (!authorizationItem.Result.Active && (Request.Path != "/api/authorization/activate" && Request.Path != "/api/authorization/sendActivationCode"))
                 {
                     logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Token is not active");
                     return AuthenticateResult.Fail("Token is not active");

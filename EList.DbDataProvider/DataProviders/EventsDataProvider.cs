@@ -91,7 +91,7 @@ namespace EList.DbDataProvider.DataProviders
             var nameSubstrings = request.Name?.Split(' ').Where(i => i.Length > 0).ToList() ?? null;
 
             if (nameSubstrings?.Count() > 0)
-                eventsRequest = eventsRequest.Where(i => nameSubstrings.All(name => i.Name.ToLower().Contains(name.ToLower())));
+                eventsRequest = eventsRequest.Where(i => nameSubstrings.All(name => i.Address.ToLower().Contains(name.ToLower()) || i.Name.ToLower().Contains(name.ToLower())));
 
             var eventIdsByEventTypes = await _connection.EventTypeRelations.Where(i => eventTypeIdsByTypes
                 .Contains(i.EventTypeId))

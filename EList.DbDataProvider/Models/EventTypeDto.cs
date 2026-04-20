@@ -18,7 +18,7 @@ namespace EList.DbDataProvider.Models
         public string Description { get; set; }
 
         [Column("ico")]
-        public byte[] Ico { get; set; }
+        public string Ico { get; set; }
 
         [Column("category_id")]
         public Guid EventCategoryId { get; set; }

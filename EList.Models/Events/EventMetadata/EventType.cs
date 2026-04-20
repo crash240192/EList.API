@@ -28,7 +28,7 @@
         /// <summary>
         /// Иконка
         /// </summary>
-        public byte[] Ico { get; set; }
+        public string Ico { get; set; }
 
         /// <summary>
         /// Идентификатор категории
