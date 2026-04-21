@@ -1,6 +1,7 @@
 ﻿using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using LinqToDB;
+using LinqToDB.Async;
 
 namespace EList.DbDataProvider.DataProviders
 {

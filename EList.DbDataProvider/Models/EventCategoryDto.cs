@@ -2,7 +2,7 @@
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.event_categories")]
+    [Table("event_categories")]
     public class EventCategoryDto
     {
         [Column("id"), PrimaryKey, Identity]

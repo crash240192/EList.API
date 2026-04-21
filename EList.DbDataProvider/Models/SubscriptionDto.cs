@@ -2,7 +2,7 @@
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.subscriptions")]
+    [Table("subscriptions")]
     public class SubscriptionDto
     {
         [Column("id"), PrimaryKey, Identity]

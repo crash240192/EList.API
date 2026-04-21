@@ -236,6 +236,7 @@ CREATE TABLE public.events (
 	"name" varchar(255) NOT NULL,
 	latitude numeric NOT NULL default 0,
 	longitude numeric NOT NULL default 0,
+	"location" geography(Point, 4326) not null,
 	description text NULL,
 	address varchar NULL,
 	active bool NOT NULL default true,
@@ -247,6 +248,22 @@ CREATE TABLE public.events (
 	constraint event_parameters_fk foreign key (event_parameters_id) references public.event_parameters(id)
 );
 
+CREATE OR REPLACE FUNCTION update_event_location()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.location = ST_SetSRID(
+        ST_MakePoint(NEW.longitude, NEW.latitude),
+        4326
+    )::geography;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_event_location
+	BEFORE INSERT OR UPDATE OF latitude, longitude
+		ON events
+		FOR EACH ROW
+			EXECUTE FUNCTION update_event_location();
 
 
 create table public.event_type_rls(

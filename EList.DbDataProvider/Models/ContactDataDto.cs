@@ -3,7 +3,7 @@ using System.Net;
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.contact_data")]
+    [Table("contact_data")]
     public class ContactDataDto
     {
         [Column("id"), PrimaryKey, Identity]

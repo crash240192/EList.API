@@ -1,8 +1,9 @@
 ﻿using LinqToDB.Mapping;
+using NetTopologySuite.Geometries;
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.events")]
+    [Table("events")]
     public class EventDto
     {
         [Column("id"), PrimaryKey, Identity]

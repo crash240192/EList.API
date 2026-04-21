@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.tariff_validators")]
+    [Table("tariff_validators")]
     public class TariffValidatorDto
     {
         [Column("id"), PrimaryKey, Identity]

@@ -3,7 +3,7 @@ using LinqToDB.Mapping;
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.event_parameters")]
+    [Table("event_parameters")]
     public class EventParametersDto
     {
         [Column("id"), PrimaryKey, Identity]

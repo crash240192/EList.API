@@ -2,7 +2,7 @@
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.authorization_token")]
+    [Table("authorization_token")]
     public class AuthorizationDto
     {
         [Column("token"), PrimaryKey, Identity]

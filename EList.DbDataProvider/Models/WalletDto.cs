@@ -2,7 +2,7 @@
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.wallets")]
+    [Table("wallets")]
     public class WalletDto
     {
         [Column("id"), PrimaryKey, Identity]

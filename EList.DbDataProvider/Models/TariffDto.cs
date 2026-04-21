@@ -2,7 +2,7 @@
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.tariffs")]
+    [Table("tariffs")]
     public class TariffDto
     {
         [Column("id"), PrimaryKey, Identity]

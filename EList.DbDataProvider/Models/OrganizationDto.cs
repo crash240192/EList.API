@@ -2,7 +2,7 @@
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.organizations")]
+    [Table("organizations")]
     public class OrganizationDto
     {
         [Column("id"), PrimaryKey, Identity]

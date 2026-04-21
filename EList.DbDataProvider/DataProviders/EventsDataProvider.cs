@@ -2,6 +2,8 @@
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.SearchRequests;
 using LinqToDB;
+using LinqToDB.Async;
+using LinqToDB.Data;
 using static System.Net.Mime.MediaTypeNames;
 
 namespace EList.DbDataProvider.DataProviders
@@ -59,6 +61,46 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.Types)
                 .Where(i => request.StartTime != null ? i.EndTime >= request.StartTime : true)
                 .Where(i => request.EndTime != null ? i.EndTime <= request.EndTime : true).AsQueryable();
+            //.Where(i => request.LocationRange != null ? ;
+
+            /*
+            //Вариант поиска по кругу, но использует подзапрос.
+            if (request.Latitude != null && request.Longitude != null && request.LocationRange != null)
+            {
+                var lat = request.Latitude.Value;
+                var lng = request.Longitude.Value;
+                var radius = request.LocationRange.Value; // в метрах
+
+                // Получаем ID событий в радиусе через сырой SQL
+                var nearbyIds = await _connection.QueryToListAsync<Guid>(@"
+                    SELECT id FROM events
+                    WHERE ST_DWithin(
+                        location::geography,
+                        ST_SetSRID(ST_MakePoint(@lng, @lat), 4326)::geography,
+                        @radius
+                    )",
+                    new { lat, lng, radius });
+
+                eventsRequest = eventsRequest.Where(e => nearbyIds.Contains(e.Id));
+            }
+            */
+
+            //Вариант без подзапроса, но ищет по квадрату, а не по кругу.
+            if (request.Latitude != null && request.Longitude != null && request.LocationRange != null)
+            {
+                var lat = request.Latitude.Value;
+                var lng = request.Longitude.Value;
+                var radiusKm = request.LocationRange.Value / 1000.0;
+
+                // Грубый bbox-фильтр через обычные колонки (быстро, с индексом)
+                // 1 градус широты ≈ 111 км
+                var latDelta = radiusKm / 111.0;
+                var lngDelta = radiusKm / (111.0 * Math.Cos(lat * Math.PI / 180.0));
+
+                eventsRequest = eventsRequest
+                    .Where(e => e.Latitude >= lat - latDelta && e.Latitude <= lat + latDelta)
+                    .Where(e => e.Longitude >= lng - lngDelta && e.Longitude <= lng + lngDelta);
+            }
 
             #region parameters
             List<Guid> eventParameterIds = null;

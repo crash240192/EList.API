@@ -2,6 +2,7 @@
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.Enums;
 using LinqToDB;
+using LinqToDB.Async;
 
 namespace EList.DbDataProvider.DataProviders
 {

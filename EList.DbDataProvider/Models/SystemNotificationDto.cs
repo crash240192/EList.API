@@ -4,7 +4,7 @@ using LinqToDB.Mapping;
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.system_notifications")]
+    [Table("system_notifications")]
     public class SystemNotificationDto
     {
         [Column("id"), PrimaryKey, Identity]

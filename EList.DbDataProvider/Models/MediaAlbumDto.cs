@@ -2,7 +2,7 @@
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.media_albums")]
+    [Table("media_albums")]
     public class MediaAlbumDto
     {
         [Column("id"), PrimaryKey, Identity]

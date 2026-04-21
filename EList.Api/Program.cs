@@ -6,7 +6,6 @@ using EList.AutoMapperProfile;
 using EList.Common.DI;
 using EList.DbDataProvider.Interfaces;
 using EList.DI;
-using EList.Services.Impl;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;

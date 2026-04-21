@@ -2,6 +2,7 @@
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.SearchRequests;
 using LinqToDB;
+using LinqToDB.Async;
 
 namespace EList.DbDataProvider.DataProviders
 {

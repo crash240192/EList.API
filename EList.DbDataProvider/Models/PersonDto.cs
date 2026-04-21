@@ -4,7 +4,7 @@ using LinqToDB.Mapping;
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.person_info")]
+    [Table("person_info")]
     public class PersonInfoDto
     {
         [Column("id"), PrimaryKey, Identity]

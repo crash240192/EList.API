@@ -2,7 +2,7 @@
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("public.accounts_avatars_history")]
+    [Table("accounts_avatars_history")]
     public class AccountAvatarDto
     {
         [Column("id"), PrimaryKey, Identity]
