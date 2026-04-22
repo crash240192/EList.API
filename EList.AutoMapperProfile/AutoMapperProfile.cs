@@ -15,6 +15,7 @@ using EList.Models.Person;
 using EList.Models.Subscriptions;
 using EList.Models.EventsRating;
 using EList.Models.Wallets;
+using EList.Models.Participation;
 
 namespace EList.AutoMapperProfile
 {
@@ -54,8 +55,8 @@ namespace EList.AutoMapperProfile
             CreateMap<EventOrganizatorDto, EventOrganizator>().ReverseMap();
 
             CreateMap<EventParametersRequest, SetEventParametersRequest>().ReverseMap();
-
             CreateMap<EventsSearchRequest, DbDataProvider.Models.SearchRequests.EventsSearchRequest>().ReverseMap();
+            CreateMap<EventParticipantsSearchRequest, DbDataProvider.Models.SearchRequests.EventParticipantsSearchRequest>().ReverseMap();
 
             //CreateMap<(Account, PersonInfo),>
             CreateMap<Models.Enums.Gender, DbDataProvider.Models.Enums.Gender>().ReverseMap();

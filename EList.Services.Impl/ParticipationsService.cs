@@ -5,6 +5,7 @@ using EList.Common.Support;
 using EList.Models.Accounts;
 using EList.Models.Participation;
 using EList.Models.Person;
+using EList.Models.Subscriptions;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
@@ -84,24 +85,24 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
-        public async Task<CommandResult<List<Participant>>> GetEventParticipantsAsync(Guid id)
+        public async Task<CommandResult<PagedList<Participant>>> GetEventParticipantsAsync(EventParticipantsSearchRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(ParticipateAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var curEvent = await _eventsRepository.GetEventAsync(id);
+            var curEvent = await _eventsRepository.GetEventAsync(request.EventId);
 
             if (curEvent == null)
-                return CommandResult<List<Participant>>.Fail(ErrorCode.EventNotFound, $"Событие с id='{id}' не найдено");
+                return CommandResult<PagedList<Participant>>.Fail(ErrorCode.EventNotFound, $"Событие с id='{request.EventId}' не найдено");
 
             //TODO: Реализовать проверку, доступен ли пользователю просмотр списка участников
 
-            var result = await _participationRepository.GetEventParticipantsAsync(id);
+            var result = await _participationRepository.GetEventParticipantsAsync(request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<List<Participant>>(result);
+            return new CommandResult<PagedList<Participant>>(result);
         }
     }
 }

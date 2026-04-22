@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.Models.Accounts;
 using EList.Models.Participation;
@@ -29,16 +30,18 @@ namespace EList.Repositories.Impl
             return await _participationsDataProvider.ParticipateAsync(accountId, eventId);
         }
 
-        public async Task<List<Participant>> GetEventParticipantsAsync(Guid eventId)
+        public async Task<PagedList<Participant>> GetEventParticipantsAsync(EventParticipantsSearchRequest request)
         {
-            var participantsDtos = await _participationsDataProvider.GetEventParticipantsAsync(eventId);
+            var mappedRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.EventParticipantsSearchRequest>(request);
+            var participantsResult = await _participationsDataProvider.GetEventParticipantsAsync(mappedRequest);
 
-            var result = participantsDtos.Select(i => new Participant
+            var resultList = participantsResult.Item2.Select(i => new Participant
             {
                 Account = _mapper.Map<Account>(i),
                 PersonInfo = _mapper.Map<PersonInfo>(i.PersonInfo)
             }).ToList();
-            return result;
+
+            return new PagedList<Participant>(participantsResult.Item1, resultList, request.PageIndex, request.PageSize);
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Models.SearchRequests;
 using LinqToDB;
 using LinqToDB.Async;
 
@@ -43,15 +44,57 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
-        public async Task<List<AccountDto>> GetEventParticipantsAsync(Guid eventId)
+        public async Task<(int, List<AccountDto>)> GetEventParticipantsAsync(EventParticipantsSearchRequest request)
         {
-            var accounts = await _connection.Participations
+            var accountsRequest = _connection.Participations
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.PersonInfo)
-                .Where(i => eventId == i.EventId)
-                .Select(i => i.Account)
-                .ToListAsync();
-            return accounts;
+                .Where(i => request.EventId == i.EventId)
+                .Select(i => i.Account);
+
+            #region name
+            if (!string.IsNullOrWhiteSpace(request.Name))
+            {
+                var splitNameSubscrings = request.Name.ToLower().Split(' ');
+                accountsRequest = accountsRequest.Where(i => splitNameSubscrings.All(nameItem => 
+                i.Login.ToLower().Contains(nameItem)
+                || (!string.IsNullOrWhiteSpace(i.PersonInfo.FirstName)
+                    ? i.PersonInfo.FirstName.ToLower().Contains(nameItem)
+                    : false)
+                || (!string.IsNullOrWhiteSpace(i.PersonInfo.LastName)
+                    ? i.PersonInfo.LastName.ToLower().Contains(nameItem)
+                    : false)
+                || (!string.IsNullOrWhiteSpace(i.PersonInfo.Patronymic)
+                    ? i.PersonInfo.Patronymic.ToLower().Contains(nameItem)
+                    : false)
+                ));
+            }
+            #endregion
+            if (request.Gender != null)
+                accountsRequest = accountsRequest.Where(i => i.PersonInfo.Gender == request.Gender);
+
+            if (request.Age != null)
+                accountsRequest = accountsRequest.Where(i => i.PersonInfo.Birthdate >= DateTime.Now.AddYears(-request.Age.Value));
+
+            #region subscriptions
+            if (request.SubscribedToId != null) // Список участников, подписанных на этого пользователя
+            {
+                accountsRequest = accountsRequest.LoadWith(i => i.Subscriptions)
+                    .Where(i => i.Subscriptions.Any(s => s.SubscribedToId == request.SubscribedToId));
+            }
+
+            if (request.SubscriberId != null) // Список участников на которых подписан этот пользователь
+            {
+                accountsRequest = accountsRequest.LoadWith(i => i.Subscribers)
+                    .Where(i => i.Subscribers.Any(s => s.SubscriberId == request.SubscriberId));
+            }
+            #endregion
+
+            var count = await accountsRequest.CountAsync();
+
+            var result = await accountsRequest.Skip(request.PageSize * (request.PageIndex)).Take(request.PageSize).ToListAsync();
+
+            return (count, result);
         }
     }
 }

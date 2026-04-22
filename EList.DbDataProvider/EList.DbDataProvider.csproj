@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\EList.Common\EList.Common\EList.Common.csproj" />
+    <ProjectReference Include="..\EList.Models\EList.Models.csproj" />
   </ItemGroup>
 
 </Project>

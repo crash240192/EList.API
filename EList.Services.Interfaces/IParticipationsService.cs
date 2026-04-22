@@ -1,7 +1,5 @@
 ﻿using EList.Common.Models;
-using EList.Models.Accounts;
 using EList.Models.Participation;
-using EList.Models.Person;
 
 namespace EList.Services.Interfaces
 {
@@ -9,6 +7,6 @@ namespace EList.Services.Interfaces
     {
         Task<CommandResult<Guid?>> ParticipateAsync(Guid id);
         Task<CommandResult> LeaveEventAsync(Guid id);
-        Task<CommandResult<List<Participant>>> GetEventParticipantsAsync(Guid id);
+        Task<CommandResult<PagedList<Participant>>> GetEventParticipantsAsync(EventParticipantsSearchRequest request);
     }
 }

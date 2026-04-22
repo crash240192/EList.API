@@ -101,10 +101,10 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Получить список участников события
         /// </summary>
-        /// <param name="id"></param>
+        /// <param name="request"></param>
         /// <returns></returns>
-        [HttpGet("eventParticipants/{id}")]
-        public async Task<CommandResult<List<Participant>>> GetEventParticipantsAsync(Guid id)
+        [HttpPost("eventParticipants")]
+        public async Task<CommandResult<PagedList<Participant>>> GetEventParticipantsAsync(EventParticipantsSearchRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -115,7 +115,7 @@ namespace EList.Api.Controllers
                 //await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _participationService.GetEventParticipantsAsync(id);
+                var result = await _participationService.GetEventParticipantsAsync(request);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -126,6 +126,7 @@ namespace EList.Api.Controllers
                 throw;
             }
         }
+
 
         // ??? получить количество участников события
     }

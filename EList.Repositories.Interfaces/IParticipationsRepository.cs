@@ -1,6 +1,6 @@
-﻿using EList.Models.Accounts;
+﻿using EList.Common.Models;
 using EList.Models.Participation;
-using EList.Models.Person;
+using EList.Models.Subscriptions;
 
 namespace EList.Repositories.Interfaces
 {
@@ -8,6 +8,6 @@ namespace EList.Repositories.Interfaces
     {
         Task<Guid> ParticipateAsync(Guid accountId, Guid eventId);
         Task LeaveEventAsync(Guid accountId, Guid eventId);
-        Task<List<Participant>> GetEventParticipantsAsync(Guid eventId);
+        Task<PagedList<Participant>> GetEventParticipantsAsync(EventParticipantsSearchRequest request);
     }
 }

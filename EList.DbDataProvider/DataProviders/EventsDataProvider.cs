@@ -63,6 +63,7 @@ namespace EList.DbDataProvider.DataProviders
                 .Where(i => request.EndTime != null ? i.EndTime <= request.EndTime : true).AsQueryable();
             //.Where(i => request.LocationRange != null ? ;
 
+            #region location
             /*
             //Вариант поиска по кругу, но использует подзапрос.
             if (request.Latitude != null && request.Longitude != null && request.LocationRange != null)
@@ -101,6 +102,7 @@ namespace EList.DbDataProvider.DataProviders
                     .Where(e => e.Latitude >= lat - latDelta && e.Latitude <= lat + latDelta)
                     .Where(e => e.Longitude >= lng - lngDelta && e.Longitude <= lng + lngDelta);
             }
+            #endregion
 
             #region parameters
             List<Guid> eventParameterIds = null;
