@@ -2,8 +2,12 @@
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.Models.Accounts;
+using EList.Models.Events;
 using EList.Models.Invitations;
+using EList.Models.Person;
 using EList.Repositories.Interfaces;
+using NetTopologySuite.Index.HPRtree;
 
 namespace EList.Repositories.Impl
 {
@@ -55,7 +59,18 @@ namespace EList.Repositories.Impl
                 PageSize = request.PageSize,
             };
             var items = await _invitationsDataProvider.SearchInvitationsAsync(mappedRequest);
-            var resultList = _mapper.Map<List<Invitation>>(items.Item2);
+
+            var resultList = items.Item2?.Select(i =>
+            {
+                var mappedItem = _mapper.Map<Invitation>(i);
+                mappedItem.Event = _mapper.Map<Event>(i.Event);
+                mappedItem.Inviter = new Inviter
+                {
+                    Account = _mapper.Map<Account>(i.Inviter),
+                    PersonInfo = _mapper.Map<PersonInfo>(i.Inviter.PersonInfo)
+                };
+                return mappedItem;
+            })?.ToList();
 
             return new PagedList<Invitation>(items.Item1, resultList, request.PageIndex ?? 1, request.PageSize ?? items.Item1);
         }

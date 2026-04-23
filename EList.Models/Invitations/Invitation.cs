@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using EList.Models.Accounts;
+using EList.Models.Events;
+using EList.Models.Person;
 
 namespace EList.Models.Invitations
 {
@@ -40,5 +38,15 @@ namespace EList.Models.Invitations
         /// Дата создания записи
         /// </summary>
         public DateTimeOffset CreationDate { get; set; }
+
+        public Inviter Inviter { get; set; }
+
+        public Event Event { get; set; }
+    }
+
+    public class Inviter
+    {
+        public Account Account { get; set; }
+        public PersonInfo PersonInfo { get; set; }
     }
 }

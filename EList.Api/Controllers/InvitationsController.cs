@@ -77,7 +77,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet("userInvitations")]
-        public async Task<CommandResult<PagedList<Invitation>>> GetUserInvitationsAsync()
+        public async Task<CommandResult<PagedList<Invitation>>> GetUserInvitationsAsync(int pageIndex = 0, int pageSize = 20)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -88,7 +88,7 @@ namespace EList.Api.Controllers
                 await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _invitationsService.GetUserInvitationsAsync();
+                var result = await _invitationsService.GetUserInvitationsAsync(pageIndex, pageSize);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;

@@ -36,10 +36,17 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<(int, List<InvitationDto>)> SearchInvitationsAsync(InvitationsSearchRequest request)
         {
-            var invitationsRequest = _connection.Invitations.AsQueryable();
+            var invitationsRequest = _connection.Invitations
+                .LoadWith(i => i.Event)
+                .ThenLoad(i => i.Parameters)
+                .LoadWith(i => i.Inviter)
+                .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Invited)
+                .ThenLoad(i => i.PersonInfo)
+                .AsQueryable();
 
             if (request.InviterOrgIds?.Any() ?? false)
-                invitationsRequest = invitationsRequest.Where(i => i.InviterOrganizationId!= null)
+                invitationsRequest = invitationsRequest.Where(i => i.InviterOrganizationId != null)
                     .Where(i => request.InviterOrgIds.Contains(i.InviterOrganizationId.Value));
 
             if (request.InviterAccountIds?.Any() ?? false)
@@ -56,10 +63,10 @@ namespace EList.DbDataProvider.DataProviders
             List<InvitationDto> resultList;
             if (request.PageSize != null && request.PageIndex != null)
                 resultList = await invitationsRequest.Skip(request.PageSize.Value * (request.PageIndex.Value - 1)).Take(request.PageSize.Value).ToListAsync();
-            else 
+            else
                 resultList = await invitationsRequest.ToListAsync();
 
-            return (totalCount, resultList); 
+            return (totalCount, resultList);
         }
     }
 }

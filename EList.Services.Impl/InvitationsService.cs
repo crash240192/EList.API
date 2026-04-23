@@ -157,7 +157,7 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
-        public async Task<CommandResult<PagedList<Invitation>>> GetUserInvitationsAsync()
+        public async Task<CommandResult<PagedList<Invitation>>> GetUserInvitationsAsync(int pageIndex = 0, int pageSize = 20)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -167,7 +167,9 @@ namespace EList.Services.Impl
 
             var invitations = await _invitationsRepository.SearchInvitationsAsync(new InvitationsSearchRequest
             {
-                InvitedAccountIds = new List<Guid> { _accountDataHolder.AccountId }
+                InvitedAccountIds = new List<Guid> { _accountDataHolder.AccountId },
+                PageIndex = pageIndex,  
+                PageSize = pageSize,
             });
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
