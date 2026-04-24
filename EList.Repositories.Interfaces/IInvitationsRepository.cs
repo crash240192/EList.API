@@ -10,5 +10,6 @@ namespace EList.Repositories.Interfaces
         Task DeleteInvitationAsync(Guid id);
         Task DeleteInvitationAsync(Guid eventId, Guid accountId);
         Task <Invitation> GetInvitationAsync(Guid invitationId);
+        Task<Invitation> GetInvitationAsync(Guid invitedAccountId, Guid eventId);
     }
 }

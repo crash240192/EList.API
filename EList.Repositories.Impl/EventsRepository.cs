@@ -3,6 +3,7 @@ using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.Models.Events;
+using EList.Models.Events.EventMetadata;
 using EList.Repositories.Interfaces;
 
 namespace EList.Repositories.Impl
@@ -44,6 +45,7 @@ namespace EList.Repositories.Impl
             var item = await _eventsDataProvider.GetEventAsync(id);
 
             var result = _mapper.Map<Event>(item);
+            result.Types = item.Types?.Select(i => _mapper.Map<EventType>(i.Type))?.ToList();
             return result;
         }
 
@@ -76,7 +78,15 @@ namespace EList.Repositories.Impl
         {
             var mappedRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.EventsSearchRequest>(request);
             var items = await _eventsDataProvider.SearchEventsAsync(mappedRequest);
-            var resultList = _mapper.Map<List<Event>>(items.Item2);
+
+            var resultList = items.Item2.Select(i =>
+            {
+                var item = _mapper.Map<Event>(i);
+                var a = i.Types.Select(i => i.Type);
+                item.Types = i.Types.Select(i => i.Type).Select(i => _mapper.Map<EventType>(i)).ToList();
+                return item;
+            }).ToList();
+
             return new PagedList<Event>(items.Item1, resultList, request.PageIndex, request.PageSize);
         }
     }

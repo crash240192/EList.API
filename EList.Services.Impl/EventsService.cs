@@ -30,6 +30,7 @@ namespace EList.Services.Impl
         private readonly IAuthorizationRepository _authorizationRepository;
         private readonly IMapper _mapper;
         private readonly IAccountDataHolder _accountDataHolder;
+        private readonly IInvitationsRepository _invitationsRepository;
 
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
@@ -37,6 +38,7 @@ namespace EList.Services.Impl
             IEventOrganizatorsRepository eventOrganizatorsRepository,
             IAuthorizationRepository authorizationRepository,
             IMapper mapper,
+            IInvitationsRepository invitationsRepository,
             IAccountDataHolder accountDataHolder)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
@@ -44,6 +46,7 @@ namespace EList.Services.Impl
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _authorizationRepository = authorizationRepository ?? throw new Exception(nameof(authorizationRepository));
+            _invitationsRepository = invitationsRepository?? throw new Exception(nameof(invitationsRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
             _accountDataHolder = accountDataHolder;
         }
@@ -492,6 +495,17 @@ namespace EList.Services.Impl
 
             if (eventItem == null)
                 return CommandResult<Event>.Fail(ErrorCode.EventNotFound, $"Событие с id='{id}' не найдено");
+
+            if (eventItem.EventParametersId != null)
+            {
+                var parameters = await _eventsMetadataRepository.GetEventParametersAsync(eventItem.EventParametersId.Value);
+                if (parameters?.Private == true)
+                {
+                    var invitation = await _invitationsRepository.GetInvitationAsync(_accountDataHolder.AccountId, id);
+                    if (invitation == null)
+                        return CommandResult<Event>.Fail(ErrorCode.InvitationNotFound, "Посещать закрытые мероприятия можно только приглашению");
+                }   
+            }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Event>(eventItem);

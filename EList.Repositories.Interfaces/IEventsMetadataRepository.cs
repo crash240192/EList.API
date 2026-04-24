@@ -1,5 +1,4 @@
-﻿using EList.Common.Models;
-using EList.Models.Events.EventMetadata;
+﻿using EList.Models.Events.EventMetadata;
 
 namespace EList.Repositories.Interfaces
 {

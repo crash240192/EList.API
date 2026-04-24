@@ -37,14 +37,16 @@ namespace EList.AutoMapperProfile
             CreateMap<ContactDataDto, ContactDataItem>().ReverseMap();
             CreateMap<AuthorizationDto, Authorization>().ReverseMap();
             CreateMap<AccountDto, Account>().ReverseMap();
+            CreateMap<AccountDto, AccountPublicData>().ReverseMap();
             CreateMap<SystemNotificationDto, SystemNotification>().ReverseMap();
             CreateMap<SubscriptionDto, Subscription>().ReverseMap();
             CreateMap<EventCategoryDto, EventCategory>().ReverseMap();
             CreateMap<EventTypeDto, EventType>().ReverseMap();
             CreateMap<EventParametersDto, EventParameters>().ReverseMap();
-            CreateMap<EventDto, Event>().ReverseMap();
+            //CreateMap<EventDto, Event>().ReverseMap().ForMember(dest => dest.Types, opt => opt.Ignore());
+            CreateMap<Event, EventDto>().ReverseMap().ForMember(dest => dest.Types, opt => opt.Ignore());
             CreateMap<MediaAlbumDto, MediaAlbum>().ReverseMap();
-            CreateMap<InvitationDto, Invitation>().ReverseMap();
+            CreateMap<Invitation, InvitationDto>().ReverseMap().ForMember(dest => dest.Inviter, opt => opt.Ignore());
             CreateMap<EventsRatingDto, EventsRating>().ReverseMap();
 
             CreateMap<TariffDto, Tariff>().ReverseMap();

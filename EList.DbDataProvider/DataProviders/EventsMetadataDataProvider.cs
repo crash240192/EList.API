@@ -2,7 +2,6 @@
 using EList.DbDataProvider.Models;
 using LinqToDB;
 using LinqToDB.Async;
-using LinqToDB.Async;
 
 namespace EList.DbDataProvider.DataProviders
 {
@@ -137,6 +136,7 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.Description, item.Description)
                 .Set(i => i.Name, item.Name)
                 .Set(i => i.LocalizationPath, item.LocalizationPath)
+                .Set(i => i.Color, item.Color)
                 .UpdateAsync();
         }
         #endregion

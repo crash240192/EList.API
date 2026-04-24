@@ -1,4 +1,6 @@
-﻿namespace EList.Models.Events
+﻿using EList.Models.Events.EventMetadata;
+
+namespace EList.Models.Events
 {
     /// <summary>
     /// Событие
@@ -69,5 +71,10 @@
         /// Идентификатор файла обложки
         /// </summary>
         public Guid? CoverImageId { get; set; }
+
+        /// <summary>
+        /// Список типов мероприятий
+        /// </summary>
+        public List<EventType> Types { get; set; }
     }
 }

@@ -57,4 +57,25 @@ namespace EList.Models.Accounts
         /// </summary>
         public Guid? WalletId { get; set; }
     }
+
+    /// <summary>
+    /// Аккаунт
+    /// </summary>
+    public class AccountPublicData
+    {
+        /// <summary>
+        /// Идентификатор
+        /// </summary>
+        public Guid Id { get; set; }
+
+        /// <summary>
+        /// Поле вкл/выкл
+        /// </summary>
+        public bool Active { get; set; }
+
+        /// <summary>
+        /// Логин
+        /// </summary>
+        public string Login { get; set; }
+    }
 }

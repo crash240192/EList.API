@@ -90,13 +90,14 @@ CREATE TABLE public.tariffs (
 	constraint tariff_validator_fk foreign key (validator_id) references public.tariff_validators(id)
 );
 
-CREATE TABLE public.event_categories (
+CREATE TABLE public.event_categories2 (
 	id uuid NOT NULL default public.uuid_generate_v4(),
 	name varchar(100) not null,
 	localization_path varchar(255) NOT null,
 	description varchar(255),
 	ico bytea not null,
-	CONSTRAINT event_category_pk PRIMARY KEY (id)
+	color varchar(7) CHECK (color ~* '^#[a-f0-9]{6}$') null,
+	CONSTRAINT event_category_pk2 PRIMARY KEY (id)
 );
 
 CREATE TABLE public.event_types (

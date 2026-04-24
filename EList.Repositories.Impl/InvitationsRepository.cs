@@ -66,7 +66,7 @@ namespace EList.Repositories.Impl
                 mappedItem.Event = _mapper.Map<Event>(i.Event);
                 mappedItem.Inviter = new Inviter
                 {
-                    Account = _mapper.Map<Account>(i.Inviter),
+                    Account = _mapper.Map<AccountPublicData>(i.Inviter),
                     PersonInfo = _mapper.Map<PersonInfo>(i.Inviter.PersonInfo)
                 };
                 return mappedItem;
@@ -78,6 +78,13 @@ namespace EList.Repositories.Impl
         public async Task<Invitation> GetInvitationAsync(Guid invitationId)
         {
             var invitation = await _invitationsDataProvider.GetInvitationAsync(invitationId);
+            var result = _mapper.Map<Invitation>(invitation);
+            return result;
+        }
+
+        public async Task<Invitation> GetInvitationAsync(Guid invitedAccountId, Guid eventId)
+        {
+            var invitation = await _invitationsDataProvider.GetInvitationAsync(invitedAccountId, eventId);
             var result = _mapper.Map<Invitation>(invitation);
             return result;
         }

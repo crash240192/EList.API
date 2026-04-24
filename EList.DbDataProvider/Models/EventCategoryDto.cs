@@ -19,5 +19,8 @@ namespace EList.DbDataProvider.Models
 
         [Column("description")]
         public string Description { get; set; }
+
+        [Column("color")]
+        public string Color { get; set; }
     }
 }

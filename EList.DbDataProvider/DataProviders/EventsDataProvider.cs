@@ -22,7 +22,11 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<EventDto> GetEventAsync(Guid id)
         {
-            var eventItem = await _connection.Events.FirstOrDefaultAsync(i => i.Id == id);
+            var eventItem = await _connection.Events
+                .LoadWith(i => i.Types)
+                .ThenLoad(i => i.Type)
+                .ThenLoad(i => i.EventCategory)
+                .FirstOrDefaultAsync(i => i.Id == id);
             return eventItem;
         }
 
@@ -50,7 +54,7 @@ namespace EList.DbDataProvider.DataProviders
                 .UpdateAsync();
         }
 
-        public async Task<(int, List<EventDto>)> SearchEventsAsync(EventsSearchRequest request)
+        public async Task<(int, List<EventDto>)> SearchEventsAsync(EventsSearchRequest request)//, Guid? curAccountId = null)
         {
             var eventParametersRequest = _connection.EventParameters.AsQueryable();
             var eventTypes = _connection.EventTypes.AsQueryable();
@@ -59,6 +63,8 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.Parameters)
                 .LoadWith(i => i.Participants)
                 .LoadWith(i => i.Types)
+                .ThenLoad(i => i.Type)
+                .ThenLoad(i => i.EventCategory)
                 .Where(i => request.StartTime != null ? i.EndTime >= request.StartTime : true)
                 .Where(i => request.EndTime != null ? i.EndTime <= request.EndTime : true).AsQueryable();
             //.Where(i => request.LocationRange != null ? ;
@@ -117,13 +123,6 @@ namespace EList.DbDataProvider.DataProviders
             #region eventTypes
             if (request.Types?.Any() ?? false)
                 eventTypes = eventTypes.Where(i => request.Types.Contains(i.Id));
-
-
-            //if (request.Categories?.Any() ?? false)
-            //{
-            //    var eventTypesByCategories = _connection.EventCategories.Where(i => request.Categories.Contains(i.Id)).SelectMany(i => i.);
-            //}
-
 
             if (request.Categories?.Any() ?? false)
                 eventTypes = eventTypes.Where(i => request.Categories.Contains(i.EventCategoryId));

@@ -95,7 +95,8 @@ namespace EList.Repositories.Impl
                 Description = request.Description,
                 Ico = request.Ico,
                 Name = request.Name,
-                LocalizationPath = request.LocalizationPath
+                LocalizationPath = request.LocalizationPath,
+                Color = request.Color
             };
             var result = await _eventsMetadataDataProvider.CreateEventCategoryAsync(mappedRequest);
             return result;
@@ -128,7 +129,8 @@ namespace EList.Repositories.Impl
                 Ico = request.Ico,
                 Id = id,
                 LocalizationPath = request.LocalizationPath,
-                Name = request.Name
+                Name = request.Name,
+                Color = request.Color
             };
             await _eventsMetadataDataProvider.UpdateEventCategoryAsync(mappedRequest);
         }

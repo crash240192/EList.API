@@ -25,5 +25,10 @@
         /// Описание
         /// </summary>
         public string Description { get; set; }
+
+        /// <summary>
+        /// Цвет категории
+        /// </summary>
+        public string Color { get; set; }
     }
 }
