@@ -4,6 +4,7 @@ using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.Models.Accounts;
 using EList.Models.Events;
+using EList.Models.Events.EventMetadata;
 using EList.Models.Invitations;
 using EList.Models.Person;
 using EList.Repositories.Interfaces;
@@ -64,6 +65,7 @@ namespace EList.Repositories.Impl
             {
                 var mappedItem = _mapper.Map<Invitation>(i);
                 mappedItem.Event = _mapper.Map<Event>(i.Event);
+                mappedItem.Event.Types = i.Event.Types.Select(i => i.Type).Select(i => _mapper.Map<EventType>(i)).ToList();
                 mappedItem.Inviter = new Inviter
                 {
                     Account = _mapper.Map<AccountPublicData>(i.Inviter),

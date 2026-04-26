@@ -46,7 +46,7 @@ namespace EList.Services.Impl
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _authorizationRepository = authorizationRepository ?? throw new Exception(nameof(authorizationRepository));
-            _invitationsRepository = invitationsRepository?? throw new Exception(nameof(invitationsRepository));
+            _invitationsRepository = invitationsRepository ?? throw new Exception(nameof(invitationsRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
             _accountDataHolder = accountDataHolder;
         }
@@ -496,15 +496,15 @@ namespace EList.Services.Impl
             if (eventItem == null)
                 return CommandResult<Event>.Fail(ErrorCode.EventNotFound, $"Событие с id='{id}' не найдено");
 
-            if (eventItem.EventParametersId != null)
+            if (eventItem.Parameters?.Private == true)
             {
-                var parameters = await _eventsMetadataRepository.GetEventParametersAsync(eventItem.EventParametersId.Value);
-                if (parameters?.Private == true)
+                var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(id);
+                if (!organizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
                 {
                     var invitation = await _invitationsRepository.GetInvitationAsync(_accountDataHolder.AccountId, id);
                     if (invitation == null)
                         return CommandResult<Event>.Fail(ErrorCode.InvitationNotFound, "Посещать закрытые мероприятия можно только приглашению");
-                }   
+                }
             }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -518,9 +518,7 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SearchEventsAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var searchResult = await _eventsRepository.SearchEventsAsync(request);
-
-            //TODO: Добавить проверку на то что пользователю вообще доступно это событие
+            var searchResult = await _eventsRepository.SearchEventsAsync(request, _accountDataHolder.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<Event>>(searchResult);

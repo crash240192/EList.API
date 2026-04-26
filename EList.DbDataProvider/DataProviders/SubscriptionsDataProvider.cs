@@ -18,6 +18,7 @@ namespace EList.DbDataProvider.DataProviders
                 //.ThenLoad(i => i.PersonInfo)
                 .LoadWith(i => i.SubscribedTo)
                 .ThenLoad(i => i.PersonInfo)
+                .OrderBy(i => i.SubscribedTo.Login)
                 .Where(i => i.SubscriberId == accountId);
 
             var count = await request.CountAsync();
@@ -48,7 +49,8 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.Subscriber)
                 .ThenLoad(i => i.PersonInfo)
                 //.LoadWith(i => i.SubscribedTo)
-                //.ThenLoad(i => i.PersonInfo)
+                //.ThenLoad(i => i.PersonInfo)                
+                .OrderBy(i => i.Subscriber.Login)
                 .Where(i => i.SubscribedToId == accountId);
 
             if (notifyParticipated != null) 

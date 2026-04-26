@@ -73,6 +73,11 @@ namespace EList.Models.Events
         public Guid? CoverImageId { get; set; }
 
         /// <summary>
+        /// Дополнительные параметры мероприятия
+        /// </summary>
+        public EventParameters Parameters { get; set; }
+
+        /// <summary>
         /// Список типов мероприятий
         /// </summary>
         public List<EventType> Types { get; set; }

@@ -45,10 +45,15 @@ namespace EList.DbDataProvider.DataProviders
             var invitationsRequest = _connection.Invitations
                 .LoadWith(i => i.Event)
                 .ThenLoad(i => i.Parameters)
+                .LoadWith(i => i.Event)
+                .ThenLoad(i => i.Types)
+                .ThenLoad(i => i.Type)
+                .ThenLoad(i => i.EventCategory)
                 .LoadWith(i => i.Inviter)
                 .ThenLoad(i => i.PersonInfo)
                 .LoadWith(i => i.Invited)
                 .ThenLoad(i => i.PersonInfo)
+                .OrderBy(i => i.CreationDate)
                 .AsQueryable();
 
             if (request.InviterOrgIds?.Any() ?? false)

@@ -9,6 +9,6 @@ namespace EList.Repositories.Interfaces
         Task<Event> GetEventAsync(Guid id);
         Task UpdateEventAsync(Guid id, EventRequest request);
         Task SetEventCoverImageAsync(Guid id, Guid? imageId);
-        Task<PagedList<Event>> SearchEventsAsync(EventsSearchRequest request);
+        Task<PagedList<Event>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId);
     }
 }

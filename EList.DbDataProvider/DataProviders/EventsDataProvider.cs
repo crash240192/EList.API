@@ -26,6 +26,7 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.Types)
                 .ThenLoad(i => i.Type)
                 .ThenLoad(i => i.EventCategory)
+                .LoadWith(i => i.Parameters)
                 .FirstOrDefaultAsync(i => i.Id == id);
             return eventItem;
         }
@@ -54,7 +55,7 @@ namespace EList.DbDataProvider.DataProviders
                 .UpdateAsync();
         }
 
-        public async Task<(int, List<EventDto>)> SearchEventsAsync(EventsSearchRequest request)//, Guid? curAccountId = null)
+        public async Task<(int, List<EventDto>)> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId = null)
         {
             var eventParametersRequest = _connection.EventParameters.AsQueryable();
             var eventTypes = _connection.EventTypes.AsQueryable();
@@ -65,8 +66,11 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.Types)
                 .ThenLoad(i => i.Type)
                 .ThenLoad(i => i.EventCategory)
+                .LoadWith(i => i.Invitations)
                 .Where(i => request.StartTime != null ? i.EndTime >= request.StartTime : true)
-                .Where(i => request.EndTime != null ? i.EndTime <= request.EndTime : true).AsQueryable();
+                .Where(i => request.EndTime != null ? i.EndTime <= request.EndTime : true)
+                .OrderBy(i => i.StartTime)
+                .AsQueryable();
             //.Where(i => request.LocationRange != null ? ;
 
             #region location
@@ -155,6 +159,14 @@ namespace EList.DbDataProvider.DataProviders
             {
                 eventsRequest = eventsRequest.Where(i => i.Participants.Any(p => p.AccountId == request.ParticipantId));
             }
+
+            // Отображение частных мероприятий
+            if (curAccountId != null)
+                eventsRequest = eventsRequest.Where(i => i.Parameters.Private != true
+                        || (i.Parameters.Private == true && i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId))
+                        || (i.Parameters.Private == true && i.Participants.Any(p => p.AccountId == curAccountId))
+                        || i.Organizator.AccountId == curAccountId);
+
             #endregion
 
             var totalCount = await eventsRequest.CountAsync();

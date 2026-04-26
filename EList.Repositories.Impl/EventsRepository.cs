@@ -74,15 +74,14 @@ namespace EList.Repositories.Impl
             await _eventsDataProvider.SetEventCoverImageAsync(id, imageId);
         }
 
-        public async Task<PagedList<Event>> SearchEventsAsync(EventsSearchRequest request)
+        public async Task<PagedList<Event>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId)
         {
             var mappedRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.EventsSearchRequest>(request);
-            var items = await _eventsDataProvider.SearchEventsAsync(mappedRequest);
+            var items = await _eventsDataProvider.SearchEventsAsync(mappedRequest, curAccountId);
 
             var resultList = items.Item2.Select(i =>
             {
                 var item = _mapper.Map<Event>(i);
-                var a = i.Types.Select(i => i.Type);
                 item.Types = i.Types.Select(i => i.Type).Select(i => _mapper.Map<EventType>(i)).ToList();
                 return item;
             }).ToList();

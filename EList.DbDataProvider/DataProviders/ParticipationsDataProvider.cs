@@ -49,7 +49,8 @@ namespace EList.DbDataProvider.DataProviders
             var accountsRequest = _connection.Participations
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.PersonInfo)
-                .Where(i => request.EventId == i.EventId)
+                .Where(i => request.EventId == i.EventId)                
+                .OrderBy(i => i.Account.Login)
                 .Select(i => i.Account);
 
             #region name
