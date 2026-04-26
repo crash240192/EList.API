@@ -25,17 +25,16 @@ namespace EList.Repositories.Impl
 
         public async Task CreateInvitationsAsync(CreateInvitationsRequest request, Guid inviterAccountId)
         {
-            var invitationItems = request.AccountIds.Select(i => new InvitationDto
+            var invitationItems = request.AccountIds?.Select(i => new InvitationDto
             {
                 CreationDate = DateTimeOffset.Now,
                 EventId = request.EventId,
                 InvitedAccountId = i,
                 InviterOrganizationId = request.InviterOrganizationId,
                 InviterAccountId = inviterAccountId
-            });
+            })?.ToList();
 
-            foreach (var invite in invitationItems)
-                await _invitationsDataProvider.CreateInvitationsAsync(invite);
+            await _invitationsDataProvider.CreateInvitationsAsync(invitationItems);
         }
 
         public async Task DeleteInvitationAsync(Guid id)

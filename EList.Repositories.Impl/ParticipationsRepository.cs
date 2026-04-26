@@ -5,6 +5,7 @@ using EList.Models.Accounts;
 using EList.Models.Participation;
 using EList.Models.Person;
 using EList.Repositories.Interfaces;
+using NetTopologySuite.Index.HPRtree;
 
 namespace EList.Repositories.Impl
 {
@@ -41,7 +42,7 @@ namespace EList.Repositories.Impl
                 PersonInfo = _mapper.Map<PersonInfo>(i.PersonInfo)
             }).ToList();
 
-            return new PagedList<Participant>(participantsResult.Item1, resultList, request.PageIndex, request.PageSize);
+            return new PagedList<Participant>(participantsResult.Item1, resultList, request.PageIndex ?? 1, request.PageSize ?? participantsResult.Item1);
         }
     }
 }

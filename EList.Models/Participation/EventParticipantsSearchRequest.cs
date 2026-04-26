@@ -10,7 +10,7 @@ namespace EList.Models.Participation
         public string Name { get; set; }
         public Gender? Gender { get; set; }
         public int? Age { get; set; }
-        public int PageIndex { get; set; } = 0;
-        public int PageSize { get; set; } = 20;
+        public int? PageIndex { get; set; }
+        public int? PageSize { get; set; }
     }
 }

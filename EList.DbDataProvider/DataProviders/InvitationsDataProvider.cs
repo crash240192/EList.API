@@ -14,8 +14,22 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task CreateInvitationsAsync(InvitationDto invitation)
         {
-            invitation.CreationDate = DateTime.Now;
-            await _connection.InsertWithIdentityAsync(invitation);
+            if (!_connection.Invitations.Any(i => i.EventId == invitation.Id && i.InvitedAccountId == invitation.InvitedAccountId))
+            {
+                invitation.CreationDate = DateTime.Now;
+                await _connection.InsertWithIdentityAsync(invitation);
+            }
+        }
+
+        public async Task CreateInvitationsAsync(List<InvitationDto> invitations)
+        {
+            if (invitations?.Any() ?? false)
+            {
+                var existingInvitations = await _connection.Invitations.Where(i => invitations.Any(inv => inv.EventId == i.EventId && inv.InvitedAccountId == i.InvitedAccountId)).ToListAsync();
+                invitations = invitations.Where(i => !existingInvitations.Any(inv => inv.InvitedAccountId == i.InvitedAccountId && inv.EventId == i.EventId)).ToList();
+                invitations.ForEach(i => i.CreationDate = DateTime.Now);
+                await _connection.InsertWithIdentityAsync(invitations);
+            }
         }
 
         public async Task<InvitationDto> GetInvitationAsync(Guid id)

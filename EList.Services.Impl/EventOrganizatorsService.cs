@@ -53,5 +53,25 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<EventOrganizator>>(result);
         }
+
+        public async Task<CommandResult> AssignEventOrganizatorsAsync(Guid eventId, List<Guid> accountIds)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AssignEventOrganizatorsAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var curEvent = await _eventsRepository.GetEventAsync(eventId);
+
+            if (curEvent == null)
+                return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            //TODO: Реализовать проверку, доступен ли пользователю просмотр списка участников
+
+            await _organizatorsRepository.AssignAsync(eventId, accountIds);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
     }
 }

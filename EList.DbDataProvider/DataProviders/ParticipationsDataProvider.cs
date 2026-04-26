@@ -1,6 +1,8 @@
-﻿using EList.DbDataProvider.Interfaces;
+﻿using EList.Common.Extensions;
+using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.SearchRequests;
+using EList.Models.Invitations;
 using LinqToDB;
 using LinqToDB.Async;
 
@@ -93,9 +95,13 @@ namespace EList.DbDataProvider.DataProviders
 
             var count = await accountsRequest.CountAsync();
 
-            var result = await accountsRequest.Skip(request.PageSize * (request.PageIndex)).Take(request.PageSize).ToListAsync();
+            List<AccountDto> resultList;
+            if (request.PageSize != null && request.PageIndex != null)
+                resultList = await accountsRequest.Skip(request.PageSize.Value * (request.PageIndex.Value)).Take(request.PageSize.Value).ToListAsync();
+            else
+                resultList = await accountsRequest.ToListAsync();
 
-            return (count, result);
+            return (count, resultList);
         }
     }
 }

@@ -64,5 +64,10 @@ namespace EList.Repositories.Impl
             var result = _mapper.Map<EventOrganizator>(item);
             return result;
         }
+
+        public async Task AssignAsync(Guid eventId, List<Guid> accountIds)
+        {
+            await _eventOrganizatorsDataProvider.AssignAsync(eventId, accountIds);
+        }
     }
 }

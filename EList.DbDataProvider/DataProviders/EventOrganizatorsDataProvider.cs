@@ -26,19 +26,36 @@ namespace EList.DbDataProvider.DataProviders
                 .UpdateAsync();
         }
 
-        public async Task<EventOrganizatorDto> GetByIdAsync (Guid id)
+        public async Task<EventOrganizatorDto> GetByIdAsync(Guid id)
         {
             var result = await _connection.Organizators.FirstOrDefaultAsync(i => i.Id == id);
             return result;
         }
 
-        public async Task<List<EventOrganizatorDto>> GetByEventIdAsync (Guid eventId)
+        public async Task<List<EventOrganizatorDto>> GetByEventIdAsync(Guid eventId)
         {
             var events = await _connection.Organizators
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.PersonInfo)
                 .Where(i => i.EventId == eventId).ToListAsync();
             return events;
+        }
+
+        public async Task AssignAsync(Guid eventId, List<Guid> accountIds)
+        {
+            if (accountIds?.Any() ?? false)
+            {
+                var organizators = await _connection.Organizators
+                    .Where(i => i.EventId == eventId).ToListAsync();
+
+                var organizatorItems = accountIds?.Where(i => !organizators.Any(o => o.AccountId == i))?.Select(i => new EventOrganizatorDto
+                {
+                    AccountId = i,
+                    EventId = eventId
+                })?.ToList();
+
+                var res = await _connection.InsertWithIdentityAsync(organizatorItems);
+            }
         }
     }
 }

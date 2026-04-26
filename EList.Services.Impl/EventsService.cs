@@ -7,6 +7,7 @@ using EList.Localization;
 using EList.Models.EventOrganizators;
 using EList.Models.Events;
 using EList.Models.Events.EventMetadata;
+using EList.Models.Participation;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
@@ -31,6 +32,7 @@ namespace EList.Services.Impl
         private readonly IMapper _mapper;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IInvitationsRepository _invitationsRepository;
+        private readonly IParticipationsRepository _participationsRepository;
 
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
@@ -39,6 +41,7 @@ namespace EList.Services.Impl
             IAuthorizationRepository authorizationRepository,
             IMapper mapper,
             IInvitationsRepository invitationsRepository,
+            IParticipationsRepository participationsRepository,
             IAccountDataHolder accountDataHolder)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
@@ -47,6 +50,7 @@ namespace EList.Services.Impl
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _authorizationRepository = authorizationRepository ?? throw new Exception(nameof(authorizationRepository));
             _invitationsRepository = invitationsRepository ?? throw new Exception(nameof(invitationsRepository));
+            _participationsRepository = participationsRepository ?? throw new Exception(nameof(participationsRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
             _accountDataHolder = accountDataHolder;
         }
@@ -501,9 +505,13 @@ namespace EList.Services.Impl
                 var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(id);
                 if (!organizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
                 {
-                    var invitation = await _invitationsRepository.GetInvitationAsync(_accountDataHolder.AccountId, id);
-                    if (invitation == null)
-                        return CommandResult<Event>.Fail(ErrorCode.InvitationNotFound, "Посещать закрытые мероприятия можно только приглашению");
+                    var participants = await _participationsRepository.GetEventParticipantsAsync(new EventParticipantsSearchRequest { EventId = id });
+                    if (!participants.Result?.Any(p => p.Account.Id == _accountDataHolder.AccountId) ?? true)
+                    {
+                        var invitation = await _invitationsRepository.GetInvitationAsync(_accountDataHolder.AccountId, id);
+                        if (invitation == null)
+                            return CommandResult<Event>.Fail(ErrorCode.InvitationNotFound, "Посещать закрытые мероприятия можно только приглашению");
+                    }
                 }
             }
 
