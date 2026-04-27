@@ -19,6 +19,23 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task UpdateAlbumAsync(MediaAlbumDto item)
+        {
+            var album = _connection.Albums
+                .LoadWith(i => i.Parameters)
+                .Where(i => i.Id == item.Id)
+                .Set(i => i.Name, item.Name)
+                .Set(i => i.Description, item.Description)
+                .Set(i => i.UpdateDate, DateTimeOffset.Now);
+
+            if (item.Parameters != null)
+                album.Set(i => i.Parameters.ParticipantsReadonly, item.Parameters.ParticipantsReadonly)
+                .Set(i => i.Parameters.HeadAlbum, item.Parameters.HeadAlbum)
+                .Set(i => i.Parameters.PrivateAlbum, item.Parameters.PrivateAlbum);
+                
+            await album.UpdateAsync();
+        }
+
         public async Task<List<MediaAlbumDto>> GetAccountAlbumsAsync(Guid accountId)
         {
             var result = await _connection.Albums.Where(i => i.AccountId == accountId).ToListAsync();

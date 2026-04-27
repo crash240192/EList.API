@@ -72,6 +72,9 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.AllowPrivate, item.AllowPrivate)
                 .Set(i => i.AllowGenderSegregation, item.AllowGenderSegregation)
                 .Set(i => i.AgeLimit, item.AgeLimit)
+                .Set(i => i.AllowMultidaysEvent, item. AllowMultidaysEvent)
+                .Set(i => i.MaxEventsCount, item.MaxEventsCount)
+                .Set(i => i.CreateDateMaxPeriod, item.CreateDateMaxPeriod)
                 .UpdateAsync();
         }
 

@@ -19,22 +19,19 @@ namespace EList.Services.Impl
         #endregion
 
         private readonly ICorrelationIdProvider _correlationIdProvider;
-        private readonly IAuthorizationRepository _authorizationRepository;
         private readonly IMediaRepository _mediaRepository;
         private readonly IAccountDataHolder _accountDataHolder;
 
         public MediaService(ICorrelationIdProvider correlationIdProvider,
-            IAuthorizationRepository authorizationRepository,
             IMediaRepository mediaRepository,
             IAccountDataHolder accountDataHolder) 
         {
             _correlationIdProvider = correlationIdProvider;
-            _authorizationRepository = authorizationRepository;
             _mediaRepository = mediaRepository;
             _accountDataHolder = accountDataHolder;
         }
 
-        public async Task<CommandResult<Guid?>> CreateAlbumAsync(CreateAlbumRequest request)
+        public async Task<CommandResult<Guid?>> CreateAlbumAsync(EventAlbumRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -46,6 +43,22 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(result);
         }
+
+        public async Task<CommandResult> UpdateAlbumAsync(EventAlbumRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(UpdateAlbumAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            //TODO: Добавить проверку что пользователь может редактировать альбом
+
+            await _mediaRepository.UpdateAlbumAsync(request);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
 
         public async Task<CommandResult<List<MediaAlbum>>> GetAccountAlbumsAsync(Guid accountId)
         {

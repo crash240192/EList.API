@@ -45,7 +45,44 @@ namespace EList.Api.Controllers
         /// <param name="request"></param>
         /// <returns></returns>
         [HttpPost("albums/create")]
-        public async Task<CommandResult<Guid?>> CreateAlbumAsync(CreateAlbumRequest request)
+        public async Task<CommandResult<Guid?>> CreateAlbumAsync(EventAlbumRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CreateAlbumAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _mediaService.CreateAlbumAsync(request);
+                if (!result.Success)
+                {
+                    await _connectionProvider.RollbackTransactionAsync();
+                    return CommandResult<Guid?>.Fail(result.ErrorCode, result.Message);
+                }
+
+                await _connectionProvider.CommitTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Создание альбома
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        [HttpPut("albums/update")]
+        public async Task<CommandResult<Guid?>> UpdateAlbumAsync(EventAlbumRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();

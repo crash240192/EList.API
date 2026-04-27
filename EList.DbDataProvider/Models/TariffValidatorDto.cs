@@ -1,9 +1,4 @@
 ﻿using LinqToDB.Mapping;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace EList.DbDataProvider.Models
 {
@@ -24,6 +19,15 @@ namespace EList.DbDataProvider.Models
 
         [Column("age_limit")]
         public int? AgeLimit { get; set; }
+
+        [Column("max_events_count")]
+        public int? MaxEventsCount { get; set; }
+
+        [Column("max_period")]
+        public int? CreateDateMaxPeriod { get; set; }
+
+        [Column("allow_nultidays_events")]
+        public bool AllowMultidaysEvent {  get; set; }
 
         [Column("allow_gender_segregation")]
         public bool? AllowGenderSegregation { get; set; }

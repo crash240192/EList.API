@@ -5,7 +5,8 @@ namespace EList.Services.Interfaces
 {
     public interface IMediaService
     {
-        Task<CommandResult<Guid?>> CreateAlbumAsync(CreateAlbumRequest request);
+        Task<CommandResult<Guid?>> CreateAlbumAsync(EventAlbumRequest request);
+        Task<CommandResult> UpdateAlbumAsync(EventAlbumRequest request);
         Task<CommandResult<MediaAlbum>> GetAlbumAsync(Guid id);
         Task<CommandResult<List<MediaAlbum>>> GetAccountAlbumsAsync(Guid accountId);
         Task<CommandResult<List<MediaAlbum>>> GetEventAlbumsAsync(Guid eventId);

@@ -17,17 +17,18 @@ namespace EList.Repositories.Impl
             _mediaDataProvider = mediaDataProvider;
         }
 
-        public async Task<Guid?> CreateAlbumAsync(Guid accountId, CreateAlbumRequest request)
+        public async Task<Guid?> CreateAlbumAsync(Guid accountId, EventAlbumRequest request)
         {
-            var mapedRequest = new MediaAlbumDto
-            {
-                AccountId = accountId,
-                EventId = request.EventId,
-                Description = request.Description,
-                Name = request.Name
-            };
-            var result = await _mediaDataProvider.CreateAlbumAsync(mapedRequest);
+            var mappedRequest = _mapper.Map<MediaAlbumDto>(request);
+            mappedRequest.AccountId = accountId;
+            var result = await _mediaDataProvider.CreateAlbumAsync(mappedRequest);
             return result;
+        }
+
+        public async Task UpdateAlbumAsync(EventAlbumRequest request)
+        {
+            var mappedRequest = _mapper.Map<MediaAlbumDto>(request);
+            await _mediaDataProvider.UpdateAlbumAsync(mappedRequest);
         }
 
         public async Task<List<MediaAlbum>> GetAccountAlbumsAsync(Guid accountId)

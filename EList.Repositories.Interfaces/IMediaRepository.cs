@@ -5,7 +5,8 @@ namespace EList.Repositories.Interfaces
 {
     public interface IMediaRepository
     {
-        Task<Guid?> CreateAlbumAsync(Guid accountId, CreateAlbumRequest request);
+        Task<Guid?> CreateAlbumAsync(Guid accountId, EventAlbumRequest request);
+        Task UpdateAlbumAsync(EventAlbumRequest request);
         Task<MediaAlbum> GetAlbumAsync(Guid id);
         Task<List<MediaAlbum>> GetAccountAlbumsAsync(Guid accountId);
         Task<List<MediaAlbum>> GetEventAlbumsAsync(Guid eventId);

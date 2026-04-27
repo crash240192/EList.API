@@ -76,6 +76,9 @@ create table public.tariff_validators(
 	persons_limit int null,
 	allow_private bool not null default false,
 	age_limit int null,
+	max_period int NULL,
+	max_events_count int NULL,
+	allow_multidays_events bool DEFAULT false NOT NULL,
 	allow_gender_segregation bool null default false,
 	constraint tariff_validator_pk primary key (id)
 );
@@ -393,6 +396,7 @@ create table public.media_albums(
 	description text NULL,
 	create_date timestamptz not null default NOW(),
 	update_date timestamptz not null default NOW(),
+	wallpaper_id uuid NULL,
 	constraint media_album_pk primary key (id),
 	constraint media_album_account_fk foreign key (event_id) references public.accounts (id),
 	constraint media_album_event_fk foreign key (event_id) references public.events (id)

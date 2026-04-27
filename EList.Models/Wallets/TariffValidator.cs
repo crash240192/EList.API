@@ -26,6 +26,21 @@
         public bool AllowPrivate { get; set; }
 
         /// <summary>
+        /// Максимальное количество ивентов
+        /// </summary>
+        public int? MaxEventsCount { get; set; }
+
+        /// <summary>
+        /// Максимальный диапазо для создания события
+        /// </summary>
+        public int? CreateDateMaxPeriod { get; set; }
+
+        /// <summary>
+        /// разрешены многодневные мероприятия
+        /// </summary>
+        public bool AllowMultidaysEvent { get; set; }
+
+        /// <summary>
         /// Возрастной диапазон
         /// </summary>
         public int? AgeLimit { get; set; }

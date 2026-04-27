@@ -1,0 +1,21 @@
+﻿using EList.Models.Accounts;
+using LinqToDB.Mapping;
+
+namespace EList.DbDataProvider.Models
+{
+    [Table("file_album_rls")]
+    public class FileEventRelationDto
+    {
+        [Column("id"), PrimaryKey, Identity]
+        public Guid Id { get; set; }
+
+        [Column("file_id")]
+        public Guid FileId { get; set; }
+
+        [Column("album_id")]
+        public Guid AlbumId { get; set; }
+
+        [Association(ThisKey = nameof(AlbumId), OtherKey = nameof(MediaAlbumDto.Id))]
+        public MediaAlbumDto AlbumDto { get; set; }
+    }
+}
