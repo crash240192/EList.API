@@ -44,8 +44,12 @@ namespace EList.DbDataProvider.DataConnections
         public ITable<ParticipationDto> Participations => this.GetTable<ParticipationDto>();
         public ITable<EventsRatingDto> EventsRating => this.GetTable<EventsRatingDto>();
         public ITable<InvitationDto> Invitations => this.GetTable<InvitationDto>();
+        
         public ITable<MediaAlbumDto> Albums => this.GetTable<MediaAlbumDto>();
+        public ITable<AccountAlbumRelationDto> AccountAlbums => this.GetTable<AccountAlbumRelationDto>();
+        public ITable<EventAlbumRelationDto> EventAlbums => this.GetTable<EventAlbumRelationDto>();
         public ITable<AccountAvatarDto> AccountAvatars => this.GetTable<AccountAvatarDto>();
+
         public ITable<OrganizationAvatarDto> OrganizationAvatars => this.GetTable<OrganizationAvatarDto>();
         public ITable<WalletDto> Wallets => this.GetTable<WalletDto>();
         public ITable<TariffDto> Tariffs => this.GetTable<TariffDto>();

@@ -17,10 +17,9 @@ namespace EList.Repositories.Impl
             _mediaDataProvider = mediaDataProvider;
         }
 
-        public async Task<Guid?> CreateAlbumAsync(Guid accountId, EventAlbumRequest request)
+        public async Task<Guid?> CreateAlbumAsync(EventAlbumRequest request)
         {
-            var mappedRequest = _mapper.Map<MediaAlbumDto>(request);
-            mappedRequest.AccountId = accountId;
+            var mappedRequest = _mapper.Map<AlbumRequest>(request);
             var result = await _mediaDataProvider.CreateAlbumAsync(mappedRequest);
             return result;
         }
@@ -29,6 +28,15 @@ namespace EList.Repositories.Impl
         {
             var mappedRequest = _mapper.Map<MediaAlbumDto>(request);
             await _mediaDataProvider.UpdateAlbumAsync(mappedRequest);
+        }
+
+        public async Task AssingAlbumToAccountAsync(Guid accountId, Guid albumId)
+        { 
+        }
+
+        public async Task AssingAlbumToEventAsync(Guid eventId, Guid albumId)
+        { 
+
         }
 
         public async Task<List<MediaAlbum>> GetAccountAlbumsAsync(Guid accountId)

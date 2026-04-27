@@ -9,6 +9,7 @@ using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NLog;
+using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 using TM.Schedule.API.Attributes;
 
@@ -86,7 +87,7 @@ namespace EList.Api.Controllers
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateAlbumAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(UpdateAlbumAsync)}";
 
             try
             {
@@ -94,6 +95,82 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _mediaService.CreateAlbumAsync(request);
+                if (!result.Success)
+                {
+                    await _connectionProvider.RollbackTransactionAsync();
+                    return CommandResult<Guid?>.Fail(result.ErrorCode, result.Message);
+                }
+
+                await _connectionProvider.CommitTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Связать событие и альбом
+        /// </summary>
+        /// <param name="eventId"></param>
+        /// <param name="albumId"></param>
+        /// <returns></returns>
+        [HttpGet("albums/assign/toEvent")]
+        public async Task<CommandResult> AssingAlbumToEventAsync(Guid eventId, Guid albumId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AssingAlbumToEventAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _mediaService.AssingAlbumToEventAsync(eventId, albumId);
+                if (!result.Success)
+                {
+                    await _connectionProvider.RollbackTransactionAsync();
+                    return CommandResult<Guid?>.Fail(result.ErrorCode, result.Message);
+                }
+
+                await _connectionProvider.CommitTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Связать аккаунт и альбом
+        /// </summary>
+        /// <param name="accountId"></param>
+        /// <param name="albumId"></param>
+        /// <returns></returns>
+        [HttpGet("albums/assign/toAccount")]
+        public async Task<CommandResult> AssingAlbumToAccountAsync(Guid accountId, Guid albumId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AssingAlbumToAccountAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _mediaService.AssingAlbumToAccountAsync(accountId, albumId);
                 if (!result.Success)
                 {
                     await _connectionProvider.RollbackTransactionAsync();

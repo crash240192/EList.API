@@ -7,6 +7,10 @@ namespace EList.Services.Interfaces
     {
         Task<CommandResult<Guid?>> CreateAlbumAsync(EventAlbumRequest request);
         Task<CommandResult> UpdateAlbumAsync(EventAlbumRequest request);
+
+        Task<CommandResult> AssingAlbumToEventAsync(Guid eventId, Guid albumId);
+        Task<CommandResult> AssingAlbumToAccountAsync(Guid accountId, Guid albumId);
+
         Task<CommandResult<MediaAlbum>> GetAlbumAsync(Guid id);
         Task<CommandResult<List<MediaAlbum>>> GetAccountAlbumsAsync(Guid accountId);
         Task<CommandResult<List<MediaAlbum>>> GetEventAlbumsAsync(Guid eventId);

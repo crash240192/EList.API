@@ -55,5 +55,11 @@ namespace EList.DbDataProvider.Models
         /// </summary>
         [Association(ThisKey = nameof(Id), OtherKey = nameof(SubscriptionDto.SubscriberId))]
         public List<SubscriptionDto> Subscriptions { get; set; }
+
+        /// <summary>
+        /// Список альбомов пользователя
+        /// </summary>
+        [Association(ThisKey = nameof(Id), OtherKey = nameof(AccountAlbumRelationDto.AccountId))]
+        public List<AccountAlbumRelationDto> AlbumRelations { get; set; }
     }
 }

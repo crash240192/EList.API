@@ -4,7 +4,7 @@ namespace EList.DbDataProvider.Interfaces
 {
     public interface IMediaDataProvider
     {
-        Task<Guid?> CreateAlbumAsync(MediaAlbumDto item);
+        Task<Guid?> CreateAlbumAsync(AlbumRequest request);
         Task UpdateAlbumAsync(MediaAlbumDto item);
         Task<MediaAlbumDto> GetAlbumAsync(Guid id);
         Task<List<MediaAlbumDto>> GetAccountAlbumsAsync(Guid accountId);

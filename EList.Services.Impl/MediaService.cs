@@ -6,6 +6,7 @@ using EList.Models.Media;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
+using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 
 namespace EList.Services.Impl
@@ -37,8 +38,8 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(CreateAlbumAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-            var result = await _mediaRepository.CreateAlbumAsync(_accountDataHolder.AccountId, request);
+            request.AccountId = _accountDataHolder.AccountId;
+            var result = await _mediaRepository.CreateAlbumAsync(request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(result);
@@ -59,6 +60,35 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
+        public async Task<CommandResult> AssingAlbumToEventAsync(Guid eventId, Guid albumId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AssingAlbumToEventAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            //TODO: Добавить проверку что пользователь может редактировать альбом
+
+            await _mediaRepository.AssingAlbumToEventAsync(eventId, albumId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> AssingAlbumToAccountAsync(Guid accountId, Guid albumId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AssingAlbumToAccountAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            //TODO: Добавить проверку что пользователь может редактировать альбом
+
+            await _mediaRepository.AssingAlbumToAccountAsync(accountId, albumId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
 
         public async Task<CommandResult<List<MediaAlbum>>> GetAccountAlbumsAsync(Guid accountId)
         {

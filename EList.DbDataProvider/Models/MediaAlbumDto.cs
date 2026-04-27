@@ -8,17 +8,11 @@ namespace EList.DbDataProvider.Models
         [Column("id"), PrimaryKey, Identity]
         public Guid Id { get; set; }
 
-        [Column("account_id")]
-        public Guid AccountId { get; set; }
-
         [Column("name")]
         public string Name { get; set; }
 
         [Column("description")]
         public string Description { get; set; }
-
-        [Column("event_id")]
-        public Guid? EventId { get; set; }
 
         [Column("wallpaper_id")]
         public Guid? WallpaperId { get; set; }
@@ -34,6 +28,12 @@ namespace EList.DbDataProvider.Models
 
         [Association(ThisKey = nameof(Id), OtherKey = nameof(EventAlbumParametersDto.AlbumId))]
         public EventAlbumParametersDto Parameters { get; set; }
+
+        [Association(ThisKey = nameof(Id), OtherKey = nameof(EventAlbumRelationDto.AlbumId))]
+        public EventAlbumRelationDto EventRelation { get; set; }
+
+        [Association(ThisKey = nameof(Id), OtherKey = nameof(AccountAlbumRelationDto.AlbumId))]
+        public AccountAlbumRelationDto AccountRelation { get; set; }
     }
 }
 

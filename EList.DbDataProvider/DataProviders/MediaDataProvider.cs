@@ -11,11 +11,25 @@ namespace EList.DbDataProvider.DataProviders
         {
         }
 
-        public async Task<Guid?> CreateAlbumAsync(MediaAlbumDto item)
+        public async Task<Guid?> CreateAlbumAsync(AlbumRequest request)
         {
-            item.CreateDate = DateTimeOffset.Now;
-            item.UpdateDate = DateTimeOffset.Now;
-            var result = (Guid) await _connection.InsertWithIdentityAsync(item);
+            var album = new MediaAlbumDto
+            {
+                CreateDate = DateTimeOffset.Now,
+                UpdateDate = DateTimeOffset.Now,
+                Description = request.Description,
+                Name = request.Name,
+                WallpaperId = request.WallpaperId,
+                Parameters = request.Parameters
+            };
+            var result = (Guid) await _connection.InsertWithIdentityAsync(album);
+
+            await _connection.InsertWithIdentityAsync(new AccountAlbumRelationDto
+            {
+                AccountId = request.AccountId.Value,
+                AlbumId = result
+            });
+
             return result;
         }
 
@@ -38,7 +52,8 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<List<MediaAlbumDto>> GetAccountAlbumsAsync(Guid accountId)
         {
-            var result = await _connection.Albums.Where(i => i.AccountId == accountId).ToListAsync();
+            var result = await _connection.Albums.LoadWith(i => i.AccountRelation)
+                .Where(i => i.AccountRelation.AccountId == accountId).ToListAsync();
             return result;
         }
 
@@ -50,7 +65,9 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<List< MediaAlbumDto>> GetEventAlbumsAsync(Guid eventId)
         {
-            var result = await _connection.Albums.Where(i => i.EventId == eventId).ToListAsync();
+            var result = await _connection.Albums.LoadWith(i => i.EventRelation)
+                .Where(i => i.EventRelation.EventId == eventId)
+                .ToListAsync();
             return result;
         }
 

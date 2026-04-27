@@ -1,14 +1,14 @@
-﻿namespace EList.Models.Media
+﻿namespace EList.DbDataProvider.Models
 {
     /// <summary>
     /// Тело запроса на создание альбома
     /// </summary>
-    public class EventAlbumRequest
+    public class AlbumRequest
     {
         /// <summary>
         /// Идентификатор альбома
         /// </summary>
-        public Guid Id { get; set; }
+        public Guid? Id { get; set; }
 
         /// <summary>
         /// Название альбома
@@ -43,6 +43,6 @@
         /// <summary>
         /// Параметры альбоа
         /// </summary>
-        public EventAlbumParameters Parameters { get; set; }
+        public EventAlbumParametersDto Parameters { get; set; }
     }
 }
