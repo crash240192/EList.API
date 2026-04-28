@@ -391,8 +391,6 @@ create table public.organization_avatars_history(
 create table public.media_albums(
 	id uuid not null default public.uuid_generate_v4(),
 	"name" varchar(255) null,
-	account_id uuid not null,
-	event_id uuid null,
 	description text NULL,
 	create_date timestamptz not null default NOW(),
 	update_date timestamptz not null default NOW(),
@@ -415,10 +413,27 @@ create table public.event_album_parameters(
 create table public.file_album_rls(
 	id uuid not null default public.uuid_generate_v4(),
 	file_id uuid not null,
-	file_preview_id uuid not null,
 	album_id uuid not null,
 	constraint file_event_album_pk primary key (id),
 	constraint file_event_album_album_fk foreign key (album_id) references public.media_albums (id)
+);
+
+CREATE TABLE public.account_album_rls (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	album_id uuid NOT NULL,
+	account_id uuid NOT NULL,
+	CONSTRAINT account_album_relation_unique UNIQUE (id),
+	CONSTRAINT account_album_relation_accounts_fk FOREIGN KEY (account_id) REFERENCES public.accounts(id),
+	CONSTRAINT account_album_relation_media_albums_fk FOREIGN KEY (album_id) REFERENCES public.media_albums(id)
+);
+
+CREATE TABLE public.event_album_rls (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	event_id uuid NOT NULL,
+	album_id uuid NOT NULL,
+	CONSTRAINT event_album_rls_unique UNIQUE (id),
+	CONSTRAINT event_album_rls_events_fk FOREIGN KEY (event_id) REFERENCES public.events(id),
+	CONSTRAINT event_album_rls_media_albums_fk FOREIGN KEY (album_id) REFERENCES public.media_albums(id)
 );
 
 

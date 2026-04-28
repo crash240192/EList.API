@@ -22,7 +22,7 @@ namespace EList.DbDataProvider.DataProviders
                 WallpaperId = request.WallpaperId,
                 Parameters = request.Parameters
             };
-            var result = (Guid) await _connection.InsertWithIdentityAsync(album);
+            var result = (Guid)await _connection.InsertWithIdentityAsync(album);
 
             await _connection.InsertWithIdentityAsync(new AccountAlbumRelationDto
             {
@@ -46,8 +46,28 @@ namespace EList.DbDataProvider.DataProviders
                 album.Set(i => i.Parameters.ParticipantsReadonly, item.Parameters.ParticipantsReadonly)
                 .Set(i => i.Parameters.HeadAlbum, item.Parameters.HeadAlbum)
                 .Set(i => i.Parameters.PrivateAlbum, item.Parameters.PrivateAlbum);
-                
+
             await album.UpdateAsync();
+        }
+
+        public async Task AssingAlbumToAccountAsync(Guid accountId, Guid albumId)
+        {
+            if (!await _connection.AccountAlbums.AnyAsync(i => i.AccountId == accountId && i.AlbumId == albumId))
+                await _connection.InsertAsync(new AccountAlbumRelationDto
+                {
+                    AccountId = accountId,
+                    AlbumId = albumId
+                });
+        }
+
+        public async Task AssingAlbumToEventAsync(Guid eventId, Guid albumId)
+        {
+            if (!await _connection.EventAlbums.AnyAsync(i => i.EventId == eventId && i.AlbumId == albumId))
+                await _connection.InsertAsync(new EventAlbumRelationDto
+                {
+                    EventId = eventId,
+                    AlbumId = albumId
+                });
         }
 
         public async Task<List<MediaAlbumDto>> GetAccountAlbumsAsync(Guid accountId)
@@ -63,7 +83,7 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
-        public async Task<List< MediaAlbumDto>> GetEventAlbumsAsync(Guid eventId)
+        public async Task<List<MediaAlbumDto>> GetEventAlbumsAsync(Guid eventId)
         {
             var result = await _connection.Albums.LoadWith(i => i.EventRelation)
                 .Where(i => i.EventRelation.EventId == eventId)
@@ -92,9 +112,9 @@ namespace EList.DbDataProvider.DataProviders
         {
             await _connection.InsertWithIdentityAsync(new AccountAvatarDto
             {
-                AccountId= accountId,
-                PhotoId= fileId,
-                AssignmentDate= DateTimeOffset.Now
+                AccountId = accountId,
+                PhotoId = fileId,
+                AssignmentDate = DateTimeOffset.Now
             });
         }
         #endregion

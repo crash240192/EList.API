@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.Models.Accounts;
 using EList.Models.Media;
 using EList.Repositories.Interfaces;
 
@@ -32,11 +33,12 @@ namespace EList.Repositories.Impl
 
         public async Task AssingAlbumToAccountAsync(Guid accountId, Guid albumId)
         { 
+            await _mediaDataProvider.AssingAlbumToAccountAsync(accountId, albumId);
         }
 
         public async Task AssingAlbumToEventAsync(Guid eventId, Guid albumId)
-        { 
-
+        {
+            await _mediaDataProvider.AssingAlbumToEventAsync(eventId, albumId);
         }
 
         public async Task<List<MediaAlbum>> GetAccountAlbumsAsync(Guid accountId)
