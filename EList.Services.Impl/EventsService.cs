@@ -33,6 +33,7 @@ namespace EList.Services.Impl
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IInvitationsRepository _invitationsRepository;
         private readonly IParticipationsRepository _participationsRepository;
+        private readonly IWalletsRepository _walletsRepository;
 
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
@@ -42,6 +43,7 @@ namespace EList.Services.Impl
             IMapper mapper,
             IInvitationsRepository invitationsRepository,
             IParticipationsRepository participationsRepository,
+            IWalletsRepository walletsRepository,
             IAccountDataHolder accountDataHolder)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
@@ -52,6 +54,7 @@ namespace EList.Services.Impl
             _invitationsRepository = invitationsRepository ?? throw new Exception(nameof(invitationsRepository));
             _participationsRepository = participationsRepository ?? throw new Exception(nameof(participationsRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+            _walletsRepository = walletsRepository ?? throw new Exception(nameof(walletsRepository));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -379,6 +382,14 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             //TODO: Сюда нужно поместить проверку на то что текущий пользователь может создавать событие с указанными параметрами и от имени указанных организаторов
+
+            //var eventsCount = await _eventsRepository.SearchEventsAsync(new EventsSearchRequest
+            //{
+            //    OrganizatorId = _accountDataHolder.AccountId,
+            //    EndTime = DateTimeOffset.UtcNow
+            //}, null);
+
+            //var tariffValidator = await _walletsRepository.GetAccountWalletAsync(_accountDataHolder.AccountId);
 
             var eventId = await _eventsRepository.CreateEventAsync(request.Event);
 

@@ -115,13 +115,18 @@ namespace EList.DbDataProvider.DataProviders
             #endregion
 
             #region parameters
-            List<Guid> eventParameterIds = null;
-
             if (request.AllowedGender != null)
-                eventParametersRequest = eventParametersRequest.Where(i => i.AllowedGender == request.AllowedGender);
+                eventsRequest = eventsRequest.Where(i => i.Parameters.AllowedGender == null || i.Parameters.AllowedGender == request.AllowedGender);
 
             if (request.Price != null)
-                eventParametersRequest = eventParametersRequest.Where(i => i.Cost <= request.Price);
+                eventsRequest = eventsRequest.Where(e => e.Parameters.Cost == null || e.Parameters.Cost <= request.Price);
+
+            // Отображение частных мероприятий
+            if (curAccountId != null)
+                eventsRequest = eventsRequest.Where(i => i.Parameters.Private != true
+                        || (i.Parameters.Private == true && i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId))
+                        || (i.Parameters.Private == true && i.Participants.Any(p => p.AccountId == curAccountId))
+                        || i.Organizator.AccountId == curAccountId);
             #endregion
 
             #region eventTypes
@@ -159,14 +164,6 @@ namespace EList.DbDataProvider.DataProviders
             {
                 eventsRequest = eventsRequest.Where(i => i.Participants.Any(p => p.AccountId == request.ParticipantId));
             }
-
-            // Отображение частных мероприятий
-            if (curAccountId != null)
-                eventsRequest = eventsRequest.Where(i => i.Parameters.Private != true
-                        || (i.Parameters.Private == true && i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId))
-                        || (i.Parameters.Private == true && i.Participants.Any(p => p.AccountId == curAccountId))
-                        || i.Organizator.AccountId == curAccountId);
-
             #endregion
 
             var totalCount = await eventsRequest.CountAsync();
