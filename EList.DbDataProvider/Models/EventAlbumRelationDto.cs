@@ -2,7 +2,7 @@
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("event_album_relation")]
+    [Table("event_album_rls")]
     public class EventAlbumRelationDto
     {
         [Column("id"), PrimaryKey, Identity]
