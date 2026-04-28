@@ -8,7 +8,7 @@
         /// <summary>
         /// Идентификатор альбома
         /// </summary>
-        public Guid Id { get; set; }
+        public Guid? Id { get; set; }
 
         /// <summary>
         /// Название альбома

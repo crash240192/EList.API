@@ -46,8 +46,8 @@ namespace EList.AutoMapperProfile
             //CreateMap<EventDto, Event>().ReverseMap().ForMember(dest => dest.Types, opt => opt.Ignore());
             CreateMap<Event, EventDto>().ReverseMap().ForMember(dest => dest.Types, opt => opt.Ignore());            
             CreateMap<EventAlbumParameters, EventAlbumParametersDto>().ReverseMap();
+            CreateMap<EventAlbumRequest, AlbumRequest>().ReverseMap();
             CreateMap<MediaAlbumDto, MediaAlbum>().ReverseMap();
-            CreateMap<EventAlbumRequest, MediaAlbumDto>().ReverseMap();
             CreateMap<Invitation, InvitationDto>().ReverseMap().ForMember(dest => dest.Inviter, opt => opt.Ignore());
             CreateMap<EventsRatingDto, EventsRating>().ReverseMap();
 
