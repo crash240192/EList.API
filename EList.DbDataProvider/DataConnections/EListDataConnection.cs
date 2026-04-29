@@ -46,6 +46,8 @@ namespace EList.DbDataProvider.DataConnections
         public ITable<InvitationDto> Invitations => this.GetTable<InvitationDto>();
         
         public ITable<MediaAlbumDto> Albums => this.GetTable<MediaAlbumDto>();
+        public ITable<FileAlbumRelationDto> AlbumFiles => this.GetTable<FileAlbumRelationDto>();
+
         public ITable<AccountAlbumRelationDto> AccountAlbums => this.GetTable<AccountAlbumRelationDto>();
         public ITable<EventAlbumRelationDto> EventAlbums => this.GetTable<EventAlbumRelationDto>();
         public ITable<AccountAvatarDto> AccountAvatars => this.GetTable<AccountAvatarDto>();

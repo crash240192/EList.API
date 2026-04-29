@@ -6,7 +6,6 @@ using EList.Models.Media;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
-using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 
 namespace EList.Services.Impl
@@ -142,6 +141,24 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<MediaAlbum>>(result);
+        }
+
+        public async Task<CommandResult<PagedList<AlbumFile>>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetAlbumFilesAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var result = await _mediaRepository.GetAlbumFilesAsync(albumId);
+
+            //if (authorizationInfo.AccountId != accountId)
+            {
+                //TODO: отобрать только те файлы, которые доступны для просмотра, с учетом доступности альбома
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<PagedList<AlbumFile>>(result);
         }
 
         //public async Task<CommandResult> SetEventAlbumParametersAsync(Guid token, EventAlbumParameters request)

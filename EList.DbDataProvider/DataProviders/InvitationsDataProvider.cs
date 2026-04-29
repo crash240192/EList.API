@@ -3,6 +3,7 @@ using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.SearchRequests;
 using LinqToDB;
 using LinqToDB.Async;
+using LinqToDB.Data;
 
 namespace EList.DbDataProvider.DataProviders
 {
@@ -28,7 +29,7 @@ namespace EList.DbDataProvider.DataProviders
                 var existingInvitations = await _connection.Invitations.Where(i => invitations.Any(inv => inv.EventId == i.EventId && inv.InvitedAccountId == i.InvitedAccountId)).ToListAsync();
                 invitations = invitations.Where(i => !existingInvitations.Any(inv => inv.InvitedAccountId == i.InvitedAccountId && inv.EventId == i.EventId)).ToList();
                 invitations.ForEach(i => i.CreationDate = DateTime.Now);
-                await _connection.InsertWithIdentityAsync(invitations);
+                await _connection.BulkCopyAsync(invitations);
             }
         }
 

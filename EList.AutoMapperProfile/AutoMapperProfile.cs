@@ -32,37 +32,41 @@ namespace EList.AutoMapperProfile
             //    .ForMember(x => x.RoleContext, o =>
             //        o.MapFrom(s => s.RoleContext));
 
-            CreateMap<PersonInfoDto, PersonInfo>().ReverseMap();
-            CreateMap<ContactTypeDto, ContactType>().ReverseMap();
-            CreateMap<ContactDataDto, ContactDataItem>().ReverseMap();
             CreateMap<AuthorizationDto, Authorization>().ReverseMap();
+
+            CreateMap<AccountDto, CreateAccountRequest>().ReverseMap();
             CreateMap<AccountDto, Account>().ReverseMap();
             CreateMap<AccountDto, AccountPublicData>().ReverseMap();
-            CreateMap<SystemNotificationDto, SystemNotification>().ReverseMap();
+            CreateMap<PersonInfoDto, PersonInfo>().ReverseMap();
+
+            CreateMap<ContactTypeDto, ContactType>().ReverseMap();
+            CreateMap<ContactDataDto, ContactDataItem>().ReverseMap();
+
             CreateMap<SubscriptionDto, Subscription>().ReverseMap();
+
+            CreateMap<SystemNotificationDto, SystemNotification>().ReverseMap();
+            
             CreateMap<EventCategoryDto, EventCategory>().ReverseMap();
             CreateMap<EventTypeDto, EventType>().ReverseMap();
             CreateMap<EventParametersDto, EventParameters>().ReverseMap();
-            //CreateMap<EventDto, Event>().ReverseMap().ForMember(dest => dest.Types, opt => opt.Ignore());
-            CreateMap<Event, EventDto>().ReverseMap().ForMember(dest => dest.Types, opt => opt.Ignore());            
+            CreateMap<Event, EventDto>().ReverseMap().ForMember(dest => dest.Types, opt => opt.Ignore());
+            CreateMap<EventsRatingDto, EventsRating>().ReverseMap();
+            CreateMap<EventOrganizatorDto, EventOrganizator>().ReverseMap();
+            CreateMap<EventParametersRequest, SetEventParametersRequest>().ReverseMap();
+            CreateMap<EventsSearchRequest, DbDataProvider.Models.SearchRequests.EventsSearchRequest>().ReverseMap();
+            CreateMap<EventParticipantsSearchRequest, DbDataProvider.Models.SearchRequests.EventParticipantsSearchRequest>().ReverseMap();
+            
+            CreateMap<Invitation, InvitationDto>().ReverseMap().ForMember(dest => dest.Inviter, opt => opt.Ignore());
+
             CreateMap<EventAlbumParameters, EventAlbumParametersDto>().ReverseMap();
             CreateMap<EventAlbumRequest, AlbumRequest>().ReverseMap();
             CreateMap<MediaAlbumDto, MediaAlbum>().ReverseMap();
-            CreateMap<Invitation, InvitationDto>().ReverseMap().ForMember(dest => dest.Inviter, opt => opt.Ignore());
-            CreateMap<EventsRatingDto, EventsRating>().ReverseMap();
-
+            CreateMap<FileAlbumRelationDto, AlbumFile>().ReverseMap();
+            
             CreateMap<TariffDto, Tariff>().ReverseMap();
             CreateMap<TariffValidatorDto, TariffValidator>().ReverseMap();
             CreateMap<WalletDto, Wallet>().ReverseMap();
 
-            CreateMap<AccountDto, CreateAccountRequest>().ReverseMap();
-            CreateMap<EventOrganizatorDto, EventOrganizator>().ReverseMap();
-
-            CreateMap<EventParametersRequest, SetEventParametersRequest>().ReverseMap();
-            CreateMap<EventsSearchRequest, DbDataProvider.Models.SearchRequests.EventsSearchRequest>().ReverseMap();
-            CreateMap<EventParticipantsSearchRequest, DbDataProvider.Models.SearchRequests.EventParticipantsSearchRequest>().ReverseMap();
-
-            //CreateMap<(Account, PersonInfo),>
             CreateMap<Models.Enums.Gender, DbDataProvider.Models.Enums.Gender>().ReverseMap();
             CreateMap<Models.Enums.SystemNotificationType, DbDataProvider.Models.Enums.SystemNotificationType>().ReverseMap();
         }

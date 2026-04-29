@@ -248,6 +248,37 @@ namespace EList.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Возвращает список файлов из указанного альбома
+        /// </summary>
+        /// <param name="albumId"></param>
+        /// <param name="pageIndex"></param>
+        /// <param name="pageSize"></param>
+        /// <returns></returns>
+        [HttpGet("albums/{albumId}/files")]
+        public async Task<CommandResult<PagedList<AlbumFile>>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetAlbumFilesAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _mediaService.GetAlbumFilesAsync(albumId, pageIndex, pageSize);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
 
         /// <summary>
         /// Получить список альбомов события
@@ -310,7 +341,7 @@ namespace EList.Api.Controllers
         //    }
         //}
 
-
+        #region account avatars
         /// <summary>
         /// Добавление новой аватарки
         /// </summary>
@@ -454,8 +485,10 @@ namespace EList.Api.Controllers
                 throw;
             }
         }
+        #endregion acccount avatars
 
 
+        #region organization avatars
         /// <summary>
         /// Добавление новой аватарки для организации
         /// </summary>
@@ -546,5 +579,6 @@ namespace EList.Api.Controllers
                 throw;
             }
         }
+        #endregion 
     }
 }

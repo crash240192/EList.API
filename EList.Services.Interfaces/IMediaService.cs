@@ -14,6 +14,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult<MediaAlbum>> GetAlbumAsync(Guid id);
         Task<CommandResult<List<MediaAlbum>>> GetAccountAlbumsAsync(Guid accountId);
         Task<CommandResult<List<MediaAlbum>>> GetEventAlbumsAsync(Guid eventId);
+        Task<CommandResult<PagedList<AlbumFile>>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null);
         //Task<CommandResult> SetEventAlbumParametersAsync(Guid token, EventAlbumParameters request);
 
         Task<CommandResult> SetNewAccountAvatarAsync(Guid fileId);

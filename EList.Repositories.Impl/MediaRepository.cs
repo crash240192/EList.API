@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.Models.Accounts;
@@ -62,6 +63,13 @@ namespace EList.Repositories.Impl
             var result = _mapper.Map<List<MediaAlbum>>(items);
             //var result = new PagedList<MediaAlbum>(items?.Count() ?? 0, albums, 1, items?.Count() ?? 0);
             return result;
+        }
+
+        public async Task<PagedList<AlbumFile>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
+        {
+            var files = await _mediaDataProvider.GetAlbumFilesAsync(albumId, pageIndex, pageSize);
+            var result = _mapper.Map<List<AlbumFile>>(files.Item2);
+            return new PagedList<AlbumFile>(files.Item1, result, pageIndex ?? 1, pageSize ?? files.Item1);
         }
 
         #region account avatars

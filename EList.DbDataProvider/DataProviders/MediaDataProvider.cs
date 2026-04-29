@@ -85,10 +85,26 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<List<MediaAlbumDto>> GetEventAlbumsAsync(Guid eventId)
         {
-            var result = await _connection.Albums.LoadWith(i => i.EventRelation)
+            var result = await _connection.Albums
+                .LoadWith(i => i.EventRelation)
                 .Where(i => i.EventRelation.EventId == eventId)
                 .ToListAsync();
             return result;
+        }
+
+        public async Task<(int, List<FileAlbumRelationDto>)> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
+        {
+            var request = _connection.AlbumFiles.Where(i => i.AlbumId == albumId);
+
+            var count = await request.CountAsync();
+
+            List<FileAlbumRelationDto> resultList;
+            if (pageSize != null && pageIndex != null)
+                resultList = await request.Skip(pageSize.Value * (pageIndex.Value)).Take(pageSize.Value).ToListAsync();
+            else
+                resultList = await request.ToListAsync();
+
+            return (count, resultList);
         }
 
         #region account avatars

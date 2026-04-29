@@ -68,8 +68,7 @@ namespace EList.Services.Impl
                 //TODO Проверить, является ли текущая организация организатором для данного мероприятия
             }
 
-            var eventParameters = await _eventsMetadataRepository.GetEventParametersAsync(request.EventId);
-            if (!eventParameters?.AllowUsersToInvite ?? false)
+            if (!curEvent.Parameters?.AllowUsersToInvite ?? false)
             {
                 var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(request.EventId);
                 if (!organizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)

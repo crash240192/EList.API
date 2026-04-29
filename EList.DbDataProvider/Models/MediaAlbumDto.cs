@@ -23,8 +23,8 @@ namespace EList.DbDataProvider.Models
         [Column("update_date")]
         public DateTimeOffset UpdateDate { get; set; }
 
-        [Association(ThisKey = nameof(Id), OtherKey = nameof(FileEventRelationDto.AlbumId))]
-        public List<FileEventRelationDto> Files { get; set; }
+        [Association(ThisKey = nameof(Id), OtherKey = nameof(FileAlbumRelationDto.AlbumId))]
+        public List<FileAlbumRelationDto> Files { get; set; }
 
         [Association(ThisKey = nameof(Id), OtherKey = nameof(EventAlbumParametersDto.AlbumId))]
         public EventAlbumParametersDto Parameters { get; set; }
