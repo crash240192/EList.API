@@ -35,5 +35,6 @@ namespace EList.Services.Interfaces
         Task<CommandResult> SetEventCoverImageAsync(Guid eventId, Guid? imageId);
         Task<CommandResult<Event>> GetEventAsync(Guid id);
         Task<CommandResult<PagedList<Event>?>> SearchEventsAsync(EventsSearchRequest request);
+        Task<CommandResult> CancelEventAsync(Guid eventId);
     }
 }

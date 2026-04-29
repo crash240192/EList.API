@@ -69,6 +69,7 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.Invitations)
                 .Where(i => request.StartTime != null ? i.EndTime >= request.StartTime : true)
                 .Where(i => request.EndTime != null ? i.EndTime <= request.EndTime : true)
+                .Where(i => request.Active ? i.Active == true : true)
                 .OrderBy(i => i.StartTime)
                 .AsQueryable();
             //.Where(i => request.LocationRange != null ? ;
@@ -171,6 +172,13 @@ namespace EList.DbDataProvider.DataProviders
             var resultList = await eventsRequest.Skip(request.PageSize * (request.PageIndex)).Take(request.PageSize).ToListAsync();
 
             return (totalCount, resultList);
+        }
+
+        public async Task CancelEventAsync(Guid eventId)
+        {
+            await _connection.Events.Where(i => i.Id == eventId)
+                .Set(i => i.Active, false)
+                .UpdateAsync();
         }
     }
 }

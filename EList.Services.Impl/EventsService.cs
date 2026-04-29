@@ -530,7 +530,7 @@ namespace EList.Services.Impl
             return new CommandResult<Event>(eventItem);
         }
 
-        public async Task<CommandResult<PagedList<Event>>> SearchEventsAsync(EventsSearchRequest request)
+        public async Task<CommandResult<PagedList<Event>?>> SearchEventsAsync(EventsSearchRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -540,7 +540,28 @@ namespace EList.Services.Impl
             var searchResult = await _eventsRepository.SearchEventsAsync(request, _accountDataHolder.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<PagedList<Event>>(searchResult);
+            return new CommandResult<PagedList<Event>?>(searchResult);
+        }
+
+        public async Task<CommandResult> CancelEventAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CancelEventAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var curEvent = _eventsRepository.GetEventAsync(eventId);
+            if (curEvent == null)            
+                return CommandResult.Fail(ErrorCode.EventNotFound, $"Мероприятие с id='{eventId} не найдено'");
+            
+            var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
+            if (!organizators?.Any(i => i.OrganizationId == _accountDataHolder.AccountId) ?? false)
+                return CommandResult.Fail(ErrorCode.AccessError, $"У вас нет доступа к редактированию текущего мероприятия'");
+
+            await _eventsRepository.CancelEventAsync(eventId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
         }
         #endregion
     }

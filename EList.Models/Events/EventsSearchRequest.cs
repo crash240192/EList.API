@@ -71,6 +71,11 @@ namespace EList.Models.Events
         public Gender? AllowedGender { get; set; }
 
         /// <summary>
+        /// Состояние мероприятия
+        /// </summary>
+        public bool Active { get; set; } = true;
+
+        /// <summary>
         /// Номер страницы
         /// </summary>
         public int PageIndex { get; set; } = 0;

@@ -88,5 +88,10 @@ namespace EList.Repositories.Impl
 
             return new PagedList<Event>(items.Item1, resultList, request.PageIndex, request.PageSize);
         }
+
+        public async Task CancelEventAsync(Guid eventId)
+        {
+            await _eventsDataProvider.CancelEventAsync(eventId);
+        }
     }
 }
