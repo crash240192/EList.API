@@ -1,8 +1,7 @@
 ﻿using AutoMapper;
-using EList.DbDataProvider.DataProviders;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
-using EList.Models.Events;
+using EList.Models.Enums;
 using EList.Models.EventsRating;
 using EList.Repositories.Interfaces;
 
@@ -20,18 +19,10 @@ namespace EList.Repositories.Impl
             _mapper = mapper;
         }
 
-        public async Task<Guid> CreateEventRatingAsync(EventsRating request)
+        public async Task<Guid> CreateEventRatingAsync(EventsRatingItem request)
         {
-            var mappedRequest = new EventsRatingDto
-            {
-                Id = request.Id,
-                AccountId = request.AccountId,
-                EventId = request.EventId,
-                Comment = request.Comment,
-                Value = request.Value,
-                RatingType = (DbDataProvider.Models.Enums.EventRatingType)request.RatingType
-                
-            };
+            var mappedRequest = _mapper.Map<EventsRatingDto>(request);
+
             var result = await _eventsRatingDataProvider.CreateEventRatingAsync(mappedRequest);
             return result;
         }
@@ -39,34 +30,18 @@ namespace EList.Repositories.Impl
         public async Task DeleteEventRatingAsync(Guid id)
         {
             await _eventsRatingDataProvider.DeleteEventRatingAsync(id);
-            
         }
 
-        public async Task UpdateEventRatingAsync(Guid id, int value)
+        public async Task UpdateEventRatingAsync(Guid id, int value, string comment)
         {
-            var mappedRequest = new EventsRatingDto
-            {
-                Value = value
-
-            };
-             await _eventsRatingDataProvider.UpdateEventRatingAsync(id, mappedRequest);
+            await _eventsRatingDataProvider.UpdateEventRatingAsync(id, value, comment);
         }
 
-        public async Task UpdateEventRatingAsync(Guid id, string comment)
+        public async Task<EventRating> GetEventRatingAcync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize)
         {
-            var mappedRequest = new EventsRatingDto
-            {
-                Comment = comment
-
-            };
-            await _eventsRatingDataProvider.UpdateEventRatingAsync(id, mappedRequest);
-        }
-
-        public async Task<List<EventsRating>> GetEventRatingAcync(Guid eventID)
-        {
-            var items = await _eventsRatingDataProvider.GetEventRatingAsync(eventID);
-            var result = _mapper.Map<List<EventsRating>>(items);
-            return result;
+            var items = await _eventsRatingDataProvider.GetEventRatingAsync(eventId, _mapper.Map<DbDataProvider.Models.Enums.EventRatingType>(eventRatingType), pageIndex, pageSize);
+            var resultList = _mapper.Map<List<EventsRatingItem>>(items.Item3);
+            return new EventRating(items.Item1, items.Item2, resultList, pageIndex ?? 1, pageSize ?? items.Item1);
         }
     }
 }

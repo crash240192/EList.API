@@ -7,10 +7,7 @@ namespace EList.DbDataProvider.Interfaces
     {
         Task<Guid> CreateEventRatingAsync(EventsRatingDto request); //создание нового голоса
         Task DeleteEventRatingAsync(Guid id); //удаление данных голосования
-        Task UpdateEventRatingAsync(Guid id, int value); //обновление оценки
-        Task UpdateEventRatingAsync(Guid id, string comment); //обновление комментария 
-        Task<List<EventsRatingDto>> GetEventRatingAsync(Guid eventID); //получение оценки определенного ивента
-        Task UpdateEventRatingAsync(Guid id, EventsRatingDto mappedRequest);
-
+        Task UpdateEventRatingAsync(Guid id, int value, string comment); //обновление оценки
+        Task<(int, double, List<EventsRatingDto>)> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize); //получение оценки определенного ивента
     }
 }

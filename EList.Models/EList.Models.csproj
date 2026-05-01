@@ -10,4 +10,8 @@
     <PackageReference Include="linq2db" Version="4.2.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\EList.Common\EList.Common\EList.Common.csproj" />
+  </ItemGroup>
+
 </Project>

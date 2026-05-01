@@ -1,5 +1,6 @@
 ﻿using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Models.Enums;
 using LinqToDB;
 using LinqToDB.Async;
 
@@ -13,7 +14,7 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<Guid> CreateEventRatingAsync(EventsRatingDto request)
         {
-            var result = (Guid) await _connection.InsertWithIdentityAsync(request);
+            var result = (Guid)await _connection.InsertWithIdentityAsync(request);
             return result;
         }
 
@@ -22,26 +23,28 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.EventsRating.DeleteAsync(i => i.Id == id);
         }
 
-        public async Task<List<EventsRatingDto>> GetEventRatingAsync(Guid eventID)
+        public async Task<(int, double, List<EventsRatingDto>)> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize)
         {
-            var result = await _connection.EventsRating.Where(i => i.EventId == eventID).ToListAsync();
-            return result;
+            var request = _connection.EventsRating.Where(i => i.EventId == eventId && i.RatingType == eventRatingType);
+            var total = await request.CountAsync();
+            var average = await request.AverageAsync(i => i.Value);
+
+            List<EventsRatingDto> result;
+            if (pageIndex != null && pageSize != null)
+                result = await request.Skip(pageSize.Value * (pageIndex.Value)).Take(pageSize.Value).ToListAsync();
+            else
+                result = await request.ToListAsync();
+
+            return (total, average, result);
         }
 
-        public async Task UpdateEventRatingAsync(Guid id, int value)
+        public async Task UpdateEventRatingAsync(Guid id, int value, string comment)
         {
-            //var localvalue = await _connection.EventsRating.FirstOrDefaultAsync(i => i.Id == id);
-            var localvalue = await _connection.EventsRating.Where(i => i.Id == id).Set(i => i.Value, value).UpdateAsync();
-        }
-
-        public async Task UpdateEventRatingAsync(Guid id, string comment)
-        {
-            var localvalue = await _connection.EventsRating.Where(i => i.Id == id).Set(i => i.Comment, comment).UpdateAsync();
-        }
-
-        public Task UpdateEventRatingAsync(Guid id, EventsRatingDto mappedRequest)
-        {
-            throw new NotImplementedException();
+            var localvalue = await _connection.EventsRating
+                .Where(i => i.Id == id)
+                .Set(i => i.Value, value)
+                .Set(i => i.Comment, comment)
+                .UpdateAsync();
         }
     }
 }

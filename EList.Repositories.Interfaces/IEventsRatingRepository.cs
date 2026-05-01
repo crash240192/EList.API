@@ -1,13 +1,13 @@
-﻿using EList.Models.EventsRating;
+﻿using EList.Models.Enums;
+using EList.Models.EventsRating;
 
 namespace EList.Repositories.Interfaces
 {
     public interface IEventsRatingRepository
     {
-        Task<Guid> CreateEventRatingAsync(EventsRating request); //создание нового голоса
+        Task<Guid> CreateEventRatingAsync(EventsRatingItem request); //создание нового голоса
         Task DeleteEventRatingAsync(Guid id); //удаление данных голосования
-        Task UpdateEventRatingAsync(Guid id, int value); //обновление оценки
-        Task UpdateEventRatingAsync(Guid id, string comment); //обновление комментария 
-        Task<List<EventsRating>> GetEventRatingAcync(Guid eventID); //получение оценки определенного ивента
+        Task UpdateEventRatingAsync(Guid id, int value, string comment); //обновление оценки
+        Task<EventRating> GetEventRatingAcync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize); //получение оценки определенного ивента
     }
 }
