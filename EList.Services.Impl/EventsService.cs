@@ -550,12 +550,12 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(CancelEventAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var curEvent = _eventsRepository.GetEventAsync(eventId);
+            var curEvent = await _eventsRepository.GetEventAsync(eventId);
             if (curEvent == null)            
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Мероприятие с id='{eventId} не найдено'");
             
             var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            if (!organizators?.Any(i => i.OrganizationId == _accountDataHolder.AccountId) ?? false)
+            if (!(organizators?.Any(i => i.Account.Id == _accountDataHolder.AccountId) ?? false))
                 return CommandResult.Fail(ErrorCode.AccessError, $"У вас нет доступа к редактированию текущего мероприятия'");
 
             await _eventsRepository.CancelEventAsync(eventId);
