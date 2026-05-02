@@ -1,4 +1,6 @@
-﻿using EList.Models.Enums;
+﻿using EList.Models.Accounts;
+using EList.Models.Enums;
+using EList.Models.Person;
 
 namespace EList.Models.EventsRating
 {
@@ -33,5 +35,8 @@ namespace EList.Models.EventsRating
         /// Тип голоса
         /// </summary>
         public EventRatingType RatingType { get; set; }
+
+        public Account Account { get; set; }
+        public PersonInfo PersonInfo { get; set; }
     }
 }

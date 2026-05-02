@@ -6,7 +6,7 @@ using LinqToDB.Async;
 
 namespace EList.DbDataProvider.DataProviders
 {
-    internal class EventsRatingDataProvider : DataProviderBase, IEventsRatingDataProvider
+    public class EventsRatingDataProvider : DataProviderBase, IEventsRatingDataProvider
     {
         public EventsRatingDataProvider(IDataConnectionProvider dataConnectionProvider) : base(dataConnectionProvider)
         {
@@ -25,17 +25,20 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<(int, double, List<EventsRatingDto>)> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize)
         {
-            var request = _connection.EventsRating.Where(i => i.EventId == eventId && i.RatingType == eventRatingType);
+            var request = _connection.EventsRating
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.PersonInfo)
+                .Where(i => i.EventId == eventId && i.RatingType == eventRatingType);
             var total = await request.CountAsync();
-            var average = await request.AverageAsync(i => i.Value);
+            var average = await request.AverageAsync(i => (double?)i.Value);
 
             List<EventsRatingDto> result;
             if (pageIndex != null && pageSize != null)
-                result = await request.Skip(pageSize.Value * (pageIndex.Value)).Take(pageSize.Value).ToListAsync();
+                result = await request.Skip(pageSize.Value * (pageIndex.Value - 1)).Take(pageSize.Value).ToListAsync();
             else
                 result = await request.ToListAsync();
 
-            return (total, average, result);
+            return (total, average ?? 0, result);
         }
 
         public async Task UpdateEventRatingAsync(Guid id, int value, string comment)

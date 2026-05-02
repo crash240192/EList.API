@@ -3,6 +3,7 @@ using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.Models.Enums;
 using EList.Models.EventsRating;
+using EList.Models.Person;
 using EList.Repositories.Interfaces;
 
 namespace EList.Repositories.Impl
@@ -40,7 +41,12 @@ namespace EList.Repositories.Impl
         public async Task<EventRating> GetEventRatingAcync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize)
         {
             var items = await _eventsRatingDataProvider.GetEventRatingAsync(eventId, _mapper.Map<DbDataProvider.Models.Enums.EventRatingType>(eventRatingType), pageIndex, pageSize);
-            var resultList = _mapper.Map<List<EventsRatingItem>>(items.Item3);
+            var resultList = items.Item3.Select(i =>
+            {
+                var result = _mapper.Map<EventsRatingItem>(i);
+                result.PersonInfo = _mapper.Map<PersonInfo>(i.Account.PersonInfo);
+                return result;
+            }).ToList();
             return new EventRating(items.Item1, items.Item2, resultList, pageIndex ?? 1, pageSize ?? items.Item1);
         }
     }

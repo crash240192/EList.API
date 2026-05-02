@@ -16,7 +16,7 @@ namespace EList.Services.Impl
     {
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IEventsRatingRepository _eventsRatingRepository;
-
+        private readonly IAccountDataHolder _accountDataHolder;
         #region logger
         private static readonly ILogger log = LogManager.GetCurrentClassLogger();
         private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
@@ -25,10 +25,12 @@ namespace EList.Services.Impl
 
         public EventsRatingService(
             ICorrelationIdProvider correlationIdProvider,
-            IEventsRatingRepository eventsRatingRepository)
+            IEventsRatingRepository eventsRatingRepository,
+            IAccountDataHolder accountDataHolder)
         {
             _correlationIdProvider = correlationIdProvider;
             _eventsRatingRepository = eventsRatingRepository;
+            _accountDataHolder = accountDataHolder;
         }   
 
         public async Task<CommandResult<EventRating>> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize)
@@ -59,6 +61,7 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(VoteAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            request.AccountId = _accountDataHolder.AccountId;
             var eventRating = await _eventsRatingRepository.CreateEventRatingAsync(request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);

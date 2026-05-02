@@ -38,6 +38,7 @@ namespace EList.DI
             mapper.AddScoped<IInvitationsDataProvider, InvitationsDataProvider>();
             mapper.AddScoped<IMediaDataProvider, MediaDataProvider>();
             mapper.AddScoped<IWalletsDataProvider, WalletsDataProvider>();
+            mapper.AddScoped<IEventsRatingDataProvider, EventsRatingDataProvider>();
 
             //Services
             mapper.AddScoped<IPersonsService, PersonService>();
@@ -52,6 +53,7 @@ namespace EList.DI
             mapper.AddScoped<IMediaService, MediaService>();
             mapper.AddScoped<IWalletsService, WalletsService>();
             mapper.AddScoped<IEventOrganizatorsService, EventOrganizatorsService>();
+            mapper.AddScoped<IEventsRatingService, EventsRatingService>();
 
             //Repositories
             mapper.AddScoped<IPersonsRepository, PersonsRepository>();
@@ -67,7 +69,7 @@ namespace EList.DI
             mapper.AddScoped<IInvitationsRepository, InvitationsRepository>();
             mapper.AddScoped<IMediaRepository, MediaRepository>();
             mapper.AddScoped<IWalletsRepository, WalletsRepository>();
-            mapper.AddScoped<IWalletsRepository, WalletsRepository>();
+            mapper.AddScoped<IEventsRatingRepository, EventsRatingRepository>();
 
             //Validators
             mapper.AddScoped<IPersonValidator, PersonValidator>();

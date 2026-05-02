@@ -2,19 +2,20 @@
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
+using EList.Models.Enums;
 using EList.Models.EventsRating;
-using EList.Services.Impl;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json.Linq;
 using NLog;
-using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 using TM.Schedule.API.Attributes;
 
 namespace EList.Api.Controllers
 {
+    /// <summary>
+    /// Контроллер для работы с рейтингом мероприятий и организаторов
+    /// </summary>
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
@@ -31,6 +32,12 @@ namespace EList.Api.Controllers
         private readonly IDataConnectionProvider _connectionProvider;
         private readonly IEventsRatingService _eventsRatingService;
 
+        /// <summary>
+        /// Конструктор контроллера рейтинга мероприятий и организаторов
+        /// </summary>
+        /// <param name="correlationIdProvider"></param>
+        /// <param name="connectionProvider"></param>
+        /// <param name="eventsRatingService"></param>
         public RatingController(ICorrelationIdProvider correlationIdProvider, 
             IDataConnectionProvider connectionProvider, 
             IEventsRatingService eventsRatingService)
@@ -40,8 +47,13 @@ namespace EList.Api.Controllers
             _eventsRatingService = eventsRatingService;
         }
 
+        /// <summary>
+        /// Проголосовать за мероприятие
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
         [HttpGet("events/vote")]
-        public async Task<CommandResult> VoteAsync(EventsRatingItem request)
+        public async Task<CommandResult<Guid>> VoteAsync(EventsRatingItem request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -50,8 +62,14 @@ namespace EList.Api.Controllers
             try
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
+                await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _eventsRatingService.VoteAsync(request);
+
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -67,9 +85,12 @@ namespace EList.Api.Controllers
         /// Рейтинг мероприятия
         /// </summary>
         /// <param name="eventId"></param>
+        /// <param name="eventRatingType"></param>
+        /// <param name="pageIndex"></param>
+        /// <param name="pageSize"></param>
         /// <returns></returns>
-        [HttpGet("events/{eventId}")]
-        public async Task<CommandResult<EventRating>> GetEventRatingAsync(Guid eventId)
+        [HttpGet("events/getRating")]
+        public async Task<CommandResult<EventRating>> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex = 1, int? pageSize = 20)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -79,7 +100,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _eventsRatingService.GetEventRatingAsync(eventId);
+                var result = await _eventsRatingService.GetEventRatingAsync(eventId, eventRatingType, pageIndex, pageSize);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;

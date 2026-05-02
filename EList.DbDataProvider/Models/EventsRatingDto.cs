@@ -1,4 +1,5 @@
 ﻿using EList.DbDataProvider.Models.Enums;
+using LinqToDB;
 using LinqToDB.Mapping;
 
 namespace EList.DbDataProvider.Models
@@ -21,7 +22,7 @@ namespace EList.DbDataProvider.Models
         [Column("value")]
         public int Value { get; set; }
 
-        [Column("rating_type")]
+        [Column("rating_type", DataType = DataType.Enum)]
         public EventRatingType RatingType { get; set; }
 
         [Association(ThisKey = nameof(AccountId), OtherKey = nameof(AccountDto.Id))]
