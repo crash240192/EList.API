@@ -79,6 +79,7 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Обновить параметры подписки на пользователя
         /// </summary>
+        /// <param name="accountId"></param>
         /// <param name="request"></param>
         /// <returns></returns>
         [HttpPut("update/{accountId}")]

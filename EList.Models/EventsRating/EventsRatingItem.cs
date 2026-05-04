@@ -36,7 +36,7 @@ namespace EList.Models.EventsRating
         /// </summary>
         public EventRatingType RatingType { get; set; }
 
-        public Account Account { get; set; }
+        public AccountPublicData Account { get; set; }
         public PersonInfo PersonInfo { get; set; }
     }
 }

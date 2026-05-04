@@ -7,7 +7,7 @@ namespace EList.Models.EventOrganizators
     {
         public Guid Id { get; set; }
         public Guid EventId { get; set; }
-        public Account? Account { get; set; }
+        public AccountPublicData? Account { get; set; }
         public PersonInfo? PersonInfo { get; set; }
         public Guid? OrganizationId { get; set; }
     }

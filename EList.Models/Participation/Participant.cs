@@ -5,7 +5,7 @@ namespace EList.Models.Participation
 {
     public class Participant
     {
-        public Account Account { get; set; }
+        public AccountPublicData Account { get; set; }
         public PersonInfo PersonInfo { get; set; }
     }
 }
