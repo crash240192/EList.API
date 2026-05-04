@@ -436,6 +436,24 @@ CREATE TABLE public.event_album_rls (
 	CONSTRAINT event_album_rls_media_albums_fk FOREIGN KEY (album_id) REFERENCES public.media_albums(id)
 );
 
+CREATE TABLE public.participants_white_list (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	event_id uuid NOT NULL,
+	account_id uuid NOT NULL,
+	CONSTRAINT participants_white_list_pk PRIMARY KEY (id),
+	CONSTRAINT participants_white_list_events_fk FOREIGN KEY (event_id) REFERENCES public.events(id),
+	CONSTRAINT participants_white_list_accounts_fk FOREIGN KEY (account_id) REFERENCES public.accounts(id)
+);
+
+CREATE TABLE public.participants_black_list (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	event_id uuid NOT NULL,
+	account_id uuid NOT NULL,
+	CONSTRAINT participants_black_list_pk PRIMARY KEY (id),
+	CONSTRAINT participants_black_list_events_fk FOREIGN KEY (event_id) REFERENCES public.events(id),
+	CONSTRAINT participants_black_list_accounts_fk FOREIGN KEY (account_id) REFERENCES public.accounts(id)
+);
+
 
 /*
 

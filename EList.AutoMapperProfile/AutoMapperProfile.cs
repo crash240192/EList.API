@@ -55,7 +55,10 @@ namespace EList.AutoMapperProfile
             CreateMap<EventParametersRequest, SetEventParametersRequest>().ReverseMap();
             CreateMap<EventsSearchRequest, DbDataProvider.Models.SearchRequests.EventsSearchRequest>().ReverseMap();
             CreateMap<EventParticipantsSearchRequest, DbDataProvider.Models.SearchRequests.EventParticipantsSearchRequest>().ReverseMap();
-            
+
+            CreateMap<ParticipantBlackListItem, ParticipantsBlackListItemDto>().ReverseMap();
+            CreateMap<ParticipantWhiteListItem, ParticipantsWhiteListItemDto>().ReverseMap();
+
             CreateMap<Invitation, InvitationDto>().ReverseMap().ForMember(dest => dest.Inviter, opt => opt.Ignore());
 
             CreateMap<EventAlbumParameters, EventAlbumParametersDto>().ReverseMap();
