@@ -29,7 +29,7 @@ namespace EList.Repositories.Impl
         public async Task<PagedList<Subscription>?> GetSubscriptionsAsync(Guid accountId)
         {
             var subscriptionsResult = await _subscriptionsDataProvider.GetSubscriptionsAsync(accountId);
-            var subscriptionsList = subscriptionsResult.Item2?.Select(i => new Subscription
+            var subscriptionsList = subscriptionsResult.Items?.Select(i => new Subscription
             {
                 NotifyEventCreated = i.NotifyEventCreated,
                 NotifyParticipated = i.NotifyParticipated,
@@ -37,12 +37,12 @@ namespace EList.Repositories.Impl
                 Subscriber = null,
                 SubscribedTo = new Subscriber
                 {
-                    Account = _mapper.Map<Account>(i.SubscribedTo),
+                    Account = _mapper.Map<AccountPublicData>(i.SubscribedTo),
                     PersonInfo = _mapper.Map<PersonInfo>(i.SubscribedTo.PersonInfo)
                 }
             })?.ToList();
 
-            var result = new PagedList<Subscription>(subscriptionsResult.Item1, subscriptionsList, 0, 0);
+            var result = new PagedList<Subscription>(subscriptionsResult.TotalCount, subscriptionsList, 0, 0);
 
             return result;
         }
@@ -64,19 +64,19 @@ namespace EList.Repositories.Impl
         { 
             var subscriptionsResult = await _subscriptionsDataProvider.GetSubscribersAsync(accountId);
 
-            var subscriptionsList = subscriptionsResult.Item2?.Select(i => new Subscription
+            var subscriptionsList = subscriptionsResult.Items?.Select(i => new Subscription
             {
                 NotifyEventCreated = i.NotifyEventCreated,
                 NotifyParticipated = i.NotifyParticipated,
                 NotifySubscribed = i.NotifySubscribed,
                 Subscriber = new Subscriber
                 {
-                    Account = _mapper.Map<Account>(i.Subscriber),
+                    Account = _mapper.Map<AccountPublicData>(i.Subscriber),
                     PersonInfo = _mapper.Map<PersonInfo>(i.Subscriber.PersonInfo)
                 },
                 SubscribedTo = null
             })?.ToList();
-            var result = new PagedList<Subscription>(subscriptionsResult.Item1, subscriptionsList, 0, 0);
+            var result = new PagedList<Subscription>(subscriptionsResult.TotalCount, subscriptionsList, 0, 0);
 
             return result;
         }

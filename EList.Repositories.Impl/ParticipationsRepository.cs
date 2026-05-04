@@ -36,13 +36,13 @@ namespace EList.Repositories.Impl
             var mappedRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.EventParticipantsSearchRequest>(request);
             var participantsResult = await _participationsDataProvider.GetEventParticipantsAsync(mappedRequest);
 
-            var resultList = participantsResult.Item2.Select(i => new Participant
+            var resultList = participantsResult.Items?.Select(i => new Participant
             {
-                Account = _mapper.Map<Account>(i),
+                Account = _mapper.Map<AccountPublicData>(i),
                 PersonInfo = _mapper.Map<PersonInfo>(i.PersonInfo)
             }).ToList();
 
-            return new PagedList<Participant>(participantsResult.Item1, resultList, request.PageIndex ?? 1, request.PageSize ?? participantsResult.Item1);
+            return new PagedList<Participant>(participantsResult.TotalCount, resultList, request.PageIndex ?? 1, request.PageSize ?? participantsResult.TotalCount);
         }
     }
 }

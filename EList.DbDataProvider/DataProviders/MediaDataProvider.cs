@@ -92,7 +92,7 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
-        public async Task<(int, List<FileAlbumRelationDto>)> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
+        public async Task<ListResponse<FileAlbumRelationDto>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
         {
             var request = _connection.AlbumFiles.Where(i => i.AlbumId == albumId);
 
@@ -100,11 +100,11 @@ namespace EList.DbDataProvider.DataProviders
 
             List<FileAlbumRelationDto> resultList;
             if (pageSize != null && pageIndex != null)
-                resultList = await request.Skip(pageSize.Value * (pageIndex.Value)).Take(pageSize.Value).ToListAsync();
+                resultList = await request.Skip(pageSize.Value * pageIndex.Value).Take(pageSize.Value).ToListAsync();
             else
                 resultList = await request.ToListAsync();
 
-            return (count, resultList);
+            return new ListResponse<FileAlbumRelationDto>(count, resultList);
         }
 
         #region account avatars

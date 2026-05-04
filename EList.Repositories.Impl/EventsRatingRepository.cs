@@ -41,13 +41,13 @@ namespace EList.Repositories.Impl
         public async Task<EventRating> GetEventRatingAcync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize)
         {
             var items = await _eventsRatingDataProvider.GetEventRatingAsync(eventId, _mapper.Map<DbDataProvider.Models.Enums.EventRatingType>(eventRatingType), pageIndex, pageSize);
-            var resultList = items.Item3.Select(i =>
+            var resultList = items.Items?.Select(i =>
             {
                 var result = _mapper.Map<EventsRatingItem>(i);
                 result.PersonInfo = _mapper.Map<PersonInfo>(i.Account.PersonInfo);
                 return result;
-            }).ToList();
-            return new EventRating(items.Item1, items.Item2, resultList, pageIndex ?? 1, pageSize ?? items.Item1);
+            })?.ToList();
+            return new EventRating(items.TotalCount, items.Value, resultList, pageIndex ?? 1, pageSize ?? items.TotalCount);
         }
     }
 }

@@ -60,7 +60,7 @@ namespace EList.Repositories.Impl
             };
             var items = await _invitationsDataProvider.SearchInvitationsAsync(mappedRequest);
 
-            var resultList = items.Item2?.Select(i =>
+            var resultList = items.Items?.Select(i =>
             {
                 var mappedItem = _mapper.Map<Invitation>(i);
                 mappedItem.Event = _mapper.Map<Event>(i.Event);
@@ -73,7 +73,7 @@ namespace EList.Repositories.Impl
                 return mappedItem;
             })?.ToList();
 
-            return new PagedList<Invitation>(items.Item1, resultList, request.PageIndex ?? 1, request.PageSize ?? items.Item1);
+            return new PagedList<Invitation>(items.TotalCount, resultList, request.PageIndex ?? 1, request.PageSize ?? items.TotalCount);
         }
 
         public async Task<Invitation> GetInvitationAsync(Guid invitationId)

@@ -55,7 +55,7 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.Invitations.DeleteAsync(i => i.EventId == eventId && i.InvitedAccountId == accountId);
         }
 
-        public async Task<(int, List<InvitationDto>)> SearchInvitationsAsync(InvitationsSearchRequest request)
+        public async Task<ListResponse<InvitationDto>> SearchInvitationsAsync(InvitationsSearchRequest request)
         {
             var invitationsRequest = _connection.Invitations
                 .LoadWith(i => i.Event)
@@ -88,11 +88,11 @@ namespace EList.DbDataProvider.DataProviders
 
             List<InvitationDto> resultList;
             if (request.PageSize != null && request.PageIndex != null)
-                resultList = await invitationsRequest.Skip(request.PageSize.Value * (request.PageIndex.Value)).Take(request.PageSize.Value).ToListAsync();
+                resultList = await invitationsRequest.Skip(request.PageSize.Value * request.PageIndex.Value).Take(request.PageSize.Value).ToListAsync();
             else
                 resultList = await invitationsRequest.ToListAsync();
 
-            return (totalCount, resultList);
+            return new ListResponse<InvitationDto>(totalCount, resultList);
         }
     }
 }

@@ -79,14 +79,14 @@ namespace EList.Repositories.Impl
             var mappedRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.EventsSearchRequest>(request);
             var items = await _eventsDataProvider.SearchEventsAsync(mappedRequest, curAccountId);
 
-            var resultList = items.Item2.Select(i =>
+            var resultList = items.Items?.Select(i =>
             {
                 var item = _mapper.Map<Event>(i);
                 item.Types = i.Types.Select(i => i.Type).Select(i => _mapper.Map<EventType>(i)).ToList();
                 return item;
             }).ToList();
 
-            return new PagedList<Event>(items.Item1, resultList, request.PageIndex, request.PageSize);
+            return new PagedList<Event>(items.TotalCount, resultList, request.PageIndex, request.PageSize);
         }
 
         public async Task CancelEventAsync(Guid eventId)

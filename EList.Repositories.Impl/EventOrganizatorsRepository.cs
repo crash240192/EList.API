@@ -49,7 +49,7 @@ namespace EList.Repositories.Impl
             var items = await _eventOrganizatorsDataProvider.GetByEventIdAsync(eventId);
             var result = items?.Select(i => new EventOrganizator
             {
-                Account = _mapper.Map<Account>(i.Account),
+                Account = _mapper.Map<AccountPublicData>(i.Account),
                 PersonInfo = _mapper.Map<PersonInfo>(i.Account.PersonInfo),
                 Id = i.Id,
                 EventId = eventId,

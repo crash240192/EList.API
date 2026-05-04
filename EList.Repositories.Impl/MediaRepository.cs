@@ -68,8 +68,8 @@ namespace EList.Repositories.Impl
         public async Task<PagedList<AlbumFile>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
         {
             var files = await _mediaDataProvider.GetAlbumFilesAsync(albumId, pageIndex, pageSize);
-            var result = _mapper.Map<List<AlbumFile>>(files.Item2);
-            return new PagedList<AlbumFile>(files.Item1, result, pageIndex ?? 1, pageSize ?? files.Item1);
+            var result = _mapper.Map<List<AlbumFile>>(files.Items);
+            return new PagedList<AlbumFile>(files.TotalCount, result, pageIndex ?? 1, pageSize ?? files.TotalCount);
         }
 
         #region account avatars

@@ -41,7 +41,11 @@ namespace EList.DbDataProvider.DataConnections
         public ITable<EventTypeRelationDto> EventTypeRelations => this.GetTable<EventTypeRelationDto>();
         public ITable<EventDto> Events => this.GetTable<EventDto>();
         public ITable<EventOrganizatorDto> Organizators => this.GetTable<EventOrganizatorDto>();
+        
         public ITable<ParticipationDto> Participations => this.GetTable<ParticipationDto>();
+        public ITable<ParticipantsBlackListItemDto> BlackList => this.GetTable<ParticipantsBlackListItemDto>();
+        public ITable<ParticipantsWhiteListItemDto> WhiteList => this.GetTable<ParticipantsWhiteListItemDto>();
+
         public ITable<EventsRatingDto> EventsRating => this.GetTable<EventsRatingDto>();
         public ITable<InvitationDto> Invitations => this.GetTable<InvitationDto>();
         

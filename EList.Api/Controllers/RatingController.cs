@@ -90,7 +90,7 @@ namespace EList.Api.Controllers
         /// <param name="pageSize"></param>
         /// <returns></returns>
         [HttpGet("events/getRating")]
-        public async Task<CommandResult<EventRating>> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex = 1, int? pageSize = 20)
+        public async Task<CommandResult<EventRating>> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex = 0, int? pageSize = 20)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();

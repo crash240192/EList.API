@@ -55,7 +55,7 @@ namespace EList.DbDataProvider.DataProviders
                 .UpdateAsync();
         }
 
-        public async Task<(int, List<EventDto>)> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId = null)
+        public async Task<ListResponse<EventDto>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId = null)
         {
             var eventParametersRequest = _connection.EventParameters.AsQueryable();
             var eventTypes = _connection.EventTypes.AsQueryable();
@@ -169,9 +169,9 @@ namespace EList.DbDataProvider.DataProviders
 
             var totalCount = await eventsRequest.CountAsync();
 
-            var resultList = await eventsRequest.Skip(request.PageSize * (request.PageIndex)).Take(request.PageSize).ToListAsync();
+            var resultList = await eventsRequest.Skip(request.PageSize * request.PageIndex).Take(request.PageSize).ToListAsync();
 
-            return (totalCount, resultList);
+            return new ListResponse<EventDto>(totalCount, resultList);
         }
 
         public async Task CancelEventAsync(Guid eventId)

@@ -11,7 +11,7 @@ namespace EList.DbDataProvider.DataProviders
         {
         }
 
-        public async Task<(int, List<SubscriptionDto>)> GetSubscriptionsAsync(Guid accountId)
+        public async Task<ListResponse<SubscriptionDto>> GetSubscriptionsAsync(Guid accountId)
         {
             var request = _connection.Subscriptions
                 //.LoadWith(i => i.Subscriber)
@@ -24,7 +24,7 @@ namespace EList.DbDataProvider.DataProviders
             var count = await request.CountAsync();
 
             var result = await request.ToListAsync();
-            return (count, result);
+            return new ListResponse<SubscriptionDto>(count, result);
         }
 
         public async Task<int> GetSubscriptionsCountAsync(Guid accountId)
@@ -43,13 +43,11 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
-        public async Task<(int, List<SubscriptionDto>)> GetSubscribersAsync(Guid accountId, bool? notifyParticipated = null, bool? notifyEventCreated = false, bool? notifySubscribed = false)
+        public async Task<ListResponse<SubscriptionDto>> GetSubscribersAsync(Guid accountId, bool? notifyParticipated = null, bool? notifyEventCreated = false, bool? notifySubscribed = false)
         {
             var request = _connection.Subscriptions
                 .LoadWith(i => i.Subscriber)
-                .ThenLoad(i => i.PersonInfo)
-                //.LoadWith(i => i.SubscribedTo)
-                //.ThenLoad(i => i.PersonInfo)                
+                .ThenLoad(i => i.PersonInfo)     
                 .OrderBy(i => i.Subscriber.Login)
                 .Where(i => i.SubscribedToId == accountId);
 
@@ -65,7 +63,7 @@ namespace EList.DbDataProvider.DataProviders
             var count = await request.CountAsync();
 
             var result = await request.ToListAsync();
-            return (count, result);
+            return new ListResponse<SubscriptionDto>(count, result);
         }
 
         public async Task<int> GetSubscribersCountAsync(Guid accountId)

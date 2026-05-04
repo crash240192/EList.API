@@ -8,6 +8,6 @@ namespace EList.DbDataProvider.Interfaces
     {
         Task<Guid> ParticipateAsync(Guid accountId, Guid eventId);
         Task LeaveEventAsync(Guid accountId, Guid eventId);
-        Task<(int, List<AccountDto>)> GetEventParticipantsAsync(EventParticipantsSearchRequest request);
+        Task<ListResponse<AccountDto>> GetEventParticipantsAsync(EventParticipantsSearchRequest request);
     }
 }

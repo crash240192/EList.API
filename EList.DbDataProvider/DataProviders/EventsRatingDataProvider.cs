@@ -23,7 +23,7 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.EventsRating.DeleteAsync(i => i.Id == id);
         }
 
-        public async Task<(int, double, List<EventsRatingDto>)> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize)
+        public async Task<ValuedListResponse<EventsRatingDto>> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize)
         {
             var request = _connection.EventsRating
                 .LoadWith(i => i.Account)
@@ -34,11 +34,11 @@ namespace EList.DbDataProvider.DataProviders
 
             List<EventsRatingDto> result;
             if (pageIndex != null && pageSize != null)
-                result = await request.Skip(pageSize.Value * (pageIndex.Value - 1)).Take(pageSize.Value).ToListAsync();
+                result = await request.Skip(pageSize.Value * pageIndex.Value).Take(pageSize.Value).ToListAsync();
             else
                 result = await request.ToListAsync();
 
-            return (total, average ?? 0, result);
+            return new ValuedListResponse<EventsRatingDto> (total, average, result);
         }
 
         public async Task UpdateEventRatingAsync(Guid id, int value, string comment)

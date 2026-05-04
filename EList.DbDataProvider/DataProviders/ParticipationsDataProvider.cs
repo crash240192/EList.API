@@ -46,7 +46,7 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
-        public async Task<(int, List<AccountDto>)> GetEventParticipantsAsync(EventParticipantsSearchRequest request)
+        public async Task<ListResponse<AccountDto>> GetEventParticipantsAsync(EventParticipantsSearchRequest request)
         {
             var accountsRequest = _connection.Participations
                 .LoadWith(i => i.Account)
@@ -97,11 +97,11 @@ namespace EList.DbDataProvider.DataProviders
 
             List<AccountDto> resultList;
             if (request.PageSize != null && request.PageIndex != null)
-                resultList = await accountsRequest.Skip(request.PageSize.Value * (request.PageIndex.Value)).Take(request.PageSize.Value).ToListAsync();
+                resultList = await accountsRequest.Skip(request.PageSize.Value * request.PageIndex.Value).Take(request.PageSize.Value).ToListAsync();
             else
                 resultList = await accountsRequest.ToListAsync();
 
-            return (count, resultList);
+            return new ListResponse<AccountDto>(count, resultList);
         }
     }
 }
