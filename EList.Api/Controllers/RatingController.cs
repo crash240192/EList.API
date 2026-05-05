@@ -52,7 +52,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
-        [HttpGet("events/vote")]
+        [HttpPost("events/vote")]
         public async Task<CommandResult<Guid>> VoteAsync(EventsRatingItem request)
         {
             var correlationId = _correlationIdProvider.Get();

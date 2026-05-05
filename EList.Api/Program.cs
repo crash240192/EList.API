@@ -38,8 +38,8 @@ builder.Services.AddSwaggerGen(c =>
             Description = "EList API"
         });
 
-        var xmlCommentsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EList.API.xml");
-        c.IncludeXmlComments(xmlCommentsPath);
+        //var xmlCommentsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EList.API.xml");
+        //c.IncludeXmlComments(xmlCommentsPath);
 
         var apiSecurityScheme = AuthenticationSecuritySchemeFilter.GetOpenApiSecurityScheme();
         c.AddSecurityDefinition(apiSecurityScheme.Reference.Id, apiSecurityScheme);
