@@ -1,4 +1,5 @@
-﻿using EList.Common.CorrelationId;
+﻿using System.Diagnostics;
+using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
@@ -8,7 +9,6 @@ using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NLog;
-using System.Diagnostics;
 using TM.Schedule.API.Attributes;
 
 namespace EList.Api.Controllers
@@ -46,7 +46,7 @@ namespace EList.Api.Controllers
             _connectionProvider = connectionProvider;
             _eventsRatingService = eventsRatingService;
         }
-
+        
         /// <summary>
         /// Проголосовать за мероприятие
         /// </summary>

@@ -38,8 +38,8 @@ builder.Services.AddSwaggerGen(c =>
             Description = "EList API"
         });
 
-        //var xmlCommentsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EList.API.xml");
-        //c.IncludeXmlComments(xmlCommentsPath);
+        var xmlCommentsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EList.API.xml");
+        c.IncludeXmlComments(xmlCommentsPath);
 
         var apiSecurityScheme = AuthenticationSecuritySchemeFilter.GetOpenApiSecurityScheme();
         c.AddSecurityDefinition(apiSecurityScheme.Reference.Id, apiSecurityScheme);
@@ -51,10 +51,12 @@ builder.Services.AddMvc();
 
 builder.Services.AddAuthentication("BasicAuthentication").AddScheme<AuthenticationSchemeOptions, AuthenticationHandler>("BasicAuthentication", null);
 
-ContainerConfigurator.Configure(builder.Services, new EListServiceMappingProvider() );
+ContainerConfigurator.Configure(builder.Services, new EListServiceMappingProvider());
 var mappingConfig = new MapperConfiguration(mc => { mc.AddProfile(new AutoMapperProfile()); });
 var mapper = mappingConfig.CreateMapper();
 builder.Services.AddSingleton(mapper);
+
+
 
 
 
@@ -62,33 +64,48 @@ var app = builder.Build();
 
 var pathBase = ConfigurationManager.AppSettings["pathBase"] ?? string.Empty;
 app.UsePathBase(pathBase);
-app.UseStaticFiles();
+app.UseSwagger(c => { c.SerializeAsV2 = true; });
+app.UseSwaggerUI(c => { c.SwaggerEndpoint($"{pathBase}/swagger/v1/swagger.json", "EList API v1"); });
 app.UseHttpsRedirection();
 app.UseRouting();
-app.UseCors(builder => builder.SetIsOriginAllowed(origin => true).AllowAnyMethod().AllowAnyHeader().AllowCredentials());
+app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseStaticFiles();
 
-app.UseMiddleware<ErrorHandlingMiddleware>();
-//app.UseMiddleware<CorrelationIdMiddleware>();
 
-app.UseEndpoints(endpoints =>
+app.UseCors(builder => builder.SetIsOriginAllowed(origin => true).AllowAnyMethod().AllowAnyHeader().AllowCredentials());
+//app.UseCors(builder =>
+//{
+//    if (ConfigurationManager.AppSettings.Contains("AllowedOrigins") &&
+//        ConfigurationManager.AppSettings["AllowedOrigins"].Length > 0 &&
+//        ConfigurationManager.AppSettings["AllowedOrigins"] != "*")
+//    {
+//        builder.WithOrigins(ConfigurationManager.AppSettings["AllowedOrigins"].Split(",").Select(x => x.Trim()).ToArray());
+//    }
+//    else
+//    {
+//        builder.AllowAnyOrigin();
+//    }
+//    builder.AllowAnyMethod()
+//        .AllowAnyHeader()
+//        .WithExposedHeaders("content-disposition");
+//});
+app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
+var minThreads = Convert.ToInt32(ConfigurationManager.AppSettings["minThreads"] ?? "0");
+if (minThreads > 0)
 {
-    endpoints.MapControllers();
-});
-
-//app.UseDeveloperExceptionPage();
-
-app.UseEndpoints(endpoints =>
-{
-    endpoints.MapControllers();
-});
+    ThreadPool.GetMinThreads(out int _, out int minIOC);
+    ThreadPool.SetMinThreads(minThreads, minIOC);
+}
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor |
     ForwardedHeaders.XForwardedProto
 });
+
+//app.UseDeveloperExceptionPage();
 
 IHostApplicationLifetime hostApplicationLifetime = app.Lifetime;
 var scope = app.Services.CreateScope();
@@ -108,17 +125,6 @@ app.Lifetime.ApplicationStopping.Register(() =>
     debtCollector.Stop();
 });
 
-app.UseHttpsRedirection();
-app.MapControllers();
-
-app.UseSwagger(c =>
-{
-    c.SerializeAsV2 = true;
-});
-
-app.UseSwaggerUI(c =>
-{
-    c.SwaggerEndpoint($"{pathBase}/swagger/v1/swagger.json", "EList API v1");
-});
-
 app.Run();
+
+

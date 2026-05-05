@@ -4,14 +4,7 @@ using EList.Common.Logger;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using FluentScheduler;
-//using Microsoft.Extensions.Hosting;
 using NLog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace EList.Services.Impl
 {
@@ -68,13 +61,13 @@ namespace EList.Services.Impl
 
             try
             {
-                logger.Info(correlationId, null, methodName, null, "Start method started", null);
+                logger.Info(correlationId, null, methodName, null, "StartDebtCollector method started", null);
 
                 if (!_active)
                     return;
 
                 if (_isStarted)
-                    throw new InvalidOperationException("BackgroundUploader is already started");
+                    throw new InvalidOperationException("DebtCollector is already started");
 
                 _isStarted = true;
 
@@ -88,7 +81,7 @@ namespace EList.Services.Impl
             }
             catch (Exception ex)
             {
-                logger.Error(correlationId, null, methodName, $"Failed to start BackgroundUploader: {ex.Message}", null, ex);
+                logger.Error(correlationId, null, methodName, $"Failed to start DebtCollector: {ex.Message}", null, ex);
             }
         }
 
@@ -99,7 +92,7 @@ namespace EList.Services.Impl
 
             try
             {
-                logger.Info(correlationId, null, methodName, null, "Stop method started", null);
+                logger.Info(correlationId, null, methodName, null, "StopDebtCollector method started", null);
 
                 JobManager.Stop();
                 _isStarted = false;
@@ -108,7 +101,7 @@ namespace EList.Services.Impl
             }
             catch (Exception ex)
             {
-                logger.Error(correlationId, null, methodName, $"Failed to stop BackgroundUploader: {ex.Message}", null, ex);
+                logger.Error(correlationId, null, methodName, $"Failed to stop DebtCollector: {ex.Message}", null, ex);
             }
         }
 
@@ -131,7 +124,7 @@ namespace EList.Services.Impl
             }
             catch (Exception ex)
             {
-                logger.Error(correlationId, null, methodName, $"Failed to stop BackgroundUploader: {ex.Message}", null, ex);
+                logger.Error(correlationId, null, methodName, $"Failed to stop DebtCollector: {ex.Message}", null, ex);
             }
         }
     }
