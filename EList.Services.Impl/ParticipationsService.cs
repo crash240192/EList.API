@@ -10,6 +10,7 @@ using EList.Models.Subscriptions;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
+using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 
 namespace EList.Services.Impl
@@ -30,6 +31,8 @@ namespace EList.Services.Impl
         private readonly INotificationsService _notificationsService;
         private readonly IInvitationsRepository _invitationsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
+        private readonly IParticipantsBWListRepository _participantsBWListRepository;
+        private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
 
         public ParticipationsService(ICorrelationIdProvider correlationIdProvider,
             IEventsRepository eventsRepository,
@@ -38,7 +41,9 @@ namespace EList.Services.Impl
             IParticipationsRepository participationRepository,
             INotificationsService notificationsService,
             IInvitationsRepository invitationsRepository,
-            IAccountDataHolder accountDataHolder)
+            IAccountDataHolder accountDataHolder,
+            IParticipantsBWListRepository participantsBWListRepository,
+            IEventOrganizatorsRepository eventOrganizatorsRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
@@ -46,6 +51,8 @@ namespace EList.Services.Impl
             _authorizationRepository = authorizationRepository ?? throw new ArgumentNullException(nameof(authorizationRepository));
             _participationRepository = participationRepository ?? throw new ArgumentNullException(nameof(participationRepository));
             _invitationsRepository = invitationsRepository ?? throw new ArgumentNullException(nameof(invitationsRepository));
+            _participantsBWListRepository = participantsBWListRepository ?? throw new ArgumentNullException(nameof(participantsBWListRepository));
+            _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -117,6 +124,104 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<Participant>>(result);
+        }
+        
+
+
+        public async Task<CommandResult<PagedList<ParticipantBlackListItem>>> GetEventBlackListAsync(Guid eventId, int? pageIndex, int? pageSize)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventBlackListAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var result = await _participantsBWListRepository.GetEventBlackListAsync(eventId, pageIndex, pageSize);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<PagedList<ParticipantBlackListItem>>(result);
+        }
+
+        public async Task<CommandResult<PagedList<ParticipantWhiteListItem>>> GetEventWhiteListAsync(Guid eventId, int? pageIndex, int? pageSize)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventWhiteListAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var result = await _participantsBWListRepository.GetEventWhiteListAsync(eventId, pageIndex, pageSize);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<PagedList<ParticipantWhiteListItem>>(result);
+        }
+
+
+        public async Task<CommandResult<Guid>> AddToBlackListAsync(Guid eventId, Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AddToBlackListAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
+            if (eventOrganizators?.Any(i => i.OrganizationId == accountId) ?? true)
+                return CommandResult<Guid>.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+
+            var result = await _participantsBWListRepository.AddToBlackListAsync(eventId, accountId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<Guid>(result);
+        }
+
+        public async Task<CommandResult<Guid>> AddToWhiteListAsync(Guid eventId, Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AddToWhiteListAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
+            if (eventOrganizators?.Any(i => i.OrganizationId == accountId) ?? true)
+                return CommandResult<Guid>.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+
+            var result = await _participantsBWListRepository.AddToWhiteListAsync(eventId, accountId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<Guid>(result);
+        }
+
+
+        public async Task<CommandResult> DeleteFromBlackListAsync(Guid eventId, Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteFromBlackListAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
+            if (eventOrganizators?.Any(i => i.OrganizationId == accountId) ?? true)
+                return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+
+            await _participantsBWListRepository.DeleteFromBlackListAsync(eventId, accountId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> DeleteFromWhiteListAsync(Guid eventId, Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteFromWhiteListAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
+            if (eventOrganizators?.Any(i => i.OrganizationId == accountId) ?? true)
+                return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+
+            await _participantsBWListRepository.DeleteFromWhiteListAsync(eventId, accountId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
         }
     }
 }

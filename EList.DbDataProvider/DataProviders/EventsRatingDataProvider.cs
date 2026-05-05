@@ -14,8 +14,21 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<Guid> CreateEventRatingAsync(EventsRatingDto request)
         {
-            var result = (Guid)await _connection.InsertWithIdentityAsync(request);
-            return result;
+            var existingRating = await _connection.EventsRating.FirstOrDefaultAsync(i => i.EventId == request.EventId && i.AccountId == request.AccountId && i.RatingType == request.RatingType);
+            if (existingRating != null)
+            {
+                var newRating = await _connection.EventsRating
+                .Where(i => i.Id == existingRating.Id)
+                .Set(i => i.Value, request.Value)
+                .Set(i => i.Comment, request.Comment)
+                .UpdateAsync();
+                return existingRating.Id;
+            }
+            else
+            {
+                var result = (Guid)await _connection.InsertWithIdentityAsync(request);
+                return result;
+            }
         }
 
         public async Task DeleteEventRatingAsync(Guid id)
@@ -38,7 +51,7 @@ namespace EList.DbDataProvider.DataProviders
             else
                 result = await request.ToListAsync();
 
-            return new ValuedListResponse<EventsRatingDto> (total, average, result);
+            return new ValuedListResponse<EventsRatingDto>(total, average, result);
         }
 
         public async Task UpdateEventRatingAsync(Guid id, int value, string comment)

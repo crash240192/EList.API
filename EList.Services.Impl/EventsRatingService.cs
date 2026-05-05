@@ -17,6 +17,7 @@ namespace EList.Services.Impl
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IEventsRatingRepository _eventsRatingRepository;
         private readonly IAccountDataHolder _accountDataHolder;
+        private readonly IEventsRepository _eventsRepository;
         #region logger
         private static readonly ILogger log = LogManager.GetCurrentClassLogger();
         private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
@@ -26,11 +27,13 @@ namespace EList.Services.Impl
         public EventsRatingService(
             ICorrelationIdProvider correlationIdProvider,
             IEventsRatingRepository eventsRatingRepository,
+            IEventsRepository eventsRepository,
             IAccountDataHolder accountDataHolder)
         {
             _correlationIdProvider = correlationIdProvider;
             _eventsRatingRepository = eventsRatingRepository;
             _accountDataHolder = accountDataHolder;
+            _eventsRepository = eventsRepository;
         }   
 
         public async Task<CommandResult<EventRating>> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize)
@@ -61,7 +64,16 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(VoteAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            request.AccountId = _accountDataHolder.AccountId;
+            var curEvent = await _eventsRepository.GetEventAsync(request.Id);
+            if (curEvent == null)
+                return CommandResult<Guid>.Fail(ErrorCode.EventNotFound, $"Событие {request.Id} не найдено");
+
+            if (curEvent.StartTime > DateTimeOffset.Now)
+                request.RatingType = EventRatingType.Summary;
+            else
+                request.RatingType = EventRatingType.Expectation;
+
+                request.AccountId = _accountDataHolder.AccountId;
             var eventRating = await _eventsRatingRepository.CreateEventRatingAsync(request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);

@@ -128,6 +128,185 @@ namespace EList.Api.Controllers
         }
 
 
-        // ??? получить количество участников события
+        #region blackList
+
+        /// <summary>
+        /// Получить чёрный список участников события
+        /// </summary>
+        /// <param name="eventId"></param>
+        /// <param name="pageIndex"></param>
+        /// <param name="pageSize"></param>
+        /// <returns></returns>
+        [HttpGet("blackList/{eventId}")]
+        public async Task<CommandResult<PagedList<ParticipantBlackListItem>>> GetEventBlackListAsync(Guid eventId, int? pageIndex, int? pageSize)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventBlackListAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _participationService.GetEventBlackListAsync(eventId, pageIndex, pageSize);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Получить белый список участников события
+        /// </summary>
+        /// <param name="eventId"></param>
+        /// <param name="pageIndex"></param>
+        /// <param name="pageSize"></param>
+        /// <returns></returns>
+        [HttpGet("whiteList/{eventId}")]
+        public async Task<CommandResult<PagedList<ParticipantWhiteListItem>>> GetEventWhiteListAsync(Guid eventId, int? pageIndex, int? pageSize)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventWhiteListAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _participationService.GetEventWhiteListAsync(eventId, pageIndex, pageSize);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+
+        /// <summary>
+        /// Добавить пользователя в чёрный список
+        /// </summary>
+        /// <param name="eventId"></param>
+        /// <param name="accountId"></param>
+        /// <returns></returns>
+        [HttpGet("blackList/addUser")]
+        public async Task<CommandResult<Guid>> AddToBlackListAsync(Guid eventId, Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AddToBlackListAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _participationService.AddToBlackListAsync(eventId, accountId);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Добавить пользователя в белый список
+        /// </summary>
+        /// <param name="eventId"></param>
+        /// <param name="accountId"></param>
+        /// <returns></returns>
+        [HttpGet("whiteList/addUser")]
+        public async Task<CommandResult<Guid>> AddToWhiteListAsync(Guid eventId, Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AddToWhiteListAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _participationService.AddToWhiteListAsync(eventId, accountId);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Удалить пользователя из чёрного списка
+        /// </summary>
+        /// <param name="eventId"></param>
+        /// <param name="accountId"></param>
+        /// <returns></returns>
+        [HttpGet("blackList/deleteUser")]
+        public async Task<CommandResult> DeleteFromBlackListAsync(Guid eventId, Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteFromBlackListAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _participationService.DeleteFromBlackListAsync(eventId, accountId);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Удалить пользователя из белого списка
+        /// </summary>
+        /// <param name="eventId"></param>
+        /// <param name="accountId"></param>
+        /// <returns></returns>
+        [HttpGet("whiteList/deleteUser")]
+        public async Task<CommandResult> DeleteFromWhiteListAsync(Guid eventId, Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteFromWhiteListAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _participationService.DeleteFromWhiteListAsync(eventId, accountId);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        #endregion
     }
 }

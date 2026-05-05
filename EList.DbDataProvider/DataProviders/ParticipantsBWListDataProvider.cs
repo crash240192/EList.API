@@ -14,6 +14,10 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<Guid> AddToBlackListAsync(Guid eventId, Guid accountId)
         {
+            var existingItem = await _connection.BlackList.FirstOrDefaultAsync(i =>  i.EventId == eventId && i.AccountId == accountId);
+            if (existingItem != null)
+                return existingItem.Id;
+            
             var result = (Guid) await _connection.InsertWithIdentityAsync(new ParticipantsBlackListItemDto
             {
                 EventId = eventId,
@@ -25,6 +29,10 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<Guid> AddToWhiteListAsync(Guid eventId, Guid accountId)
         {
+            var existingItem = await _connection.WhiteList.FirstOrDefaultAsync(i => i.EventId == eventId && i.AccountId == accountId);
+            if (existingItem != null)
+                return existingItem.Id;
+
             var result = (Guid)await _connection.InsertWithIdentityAsync(new ParticipantsWhiteListItemDto
             {
                 EventId = eventId,
