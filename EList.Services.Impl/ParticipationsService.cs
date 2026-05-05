@@ -68,7 +68,16 @@ namespace EList.Services.Impl
             if (curEvent == null)
                 return CommandResult<Guid?>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
-            //TODO: Реализовать проверку на наличие пользователя в чёрном списке
+            if (curEvent.Parameters.Private ?? false)
+            {
+                if (await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId))
+                    return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
+            }
+            else
+            {
+                if (await _participantsBWListRepository.IsUserInBlackListAsync(eventId, _accountDataHolder.AccountId))
+                    return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
+            }
 
             var result = await _participationRepository.ParticipateAsync(_accountDataHolder.AccountId, eventId);
 
@@ -125,7 +134,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<Participant>>(result);
         }
-        
+
 
 
         public async Task<CommandResult<PagedList<ParticipantBlackListItem>>> GetEventBlackListAsync(Guid eventId, int? pageIndex, int? pageSize)
@@ -163,7 +172,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            if (eventOrganizators?.Any(i => i.OrganizationId == accountId) ?? true)
+            if (eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
                 return CommandResult<Guid>.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             var result = await _participantsBWListRepository.AddToBlackListAsync(eventId, accountId);
@@ -180,7 +189,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            if (eventOrganizators?.Any(i => i.OrganizationId == accountId) ?? true)
+            if (eventOrganizators?.Any(i => i.OrganizationId == _accountDataHolder.AccountId) ?? true)
                 return CommandResult<Guid>.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             var result = await _participantsBWListRepository.AddToWhiteListAsync(eventId, accountId);
@@ -198,7 +207,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            if (eventOrganizators?.Any(i => i.OrganizationId == accountId) ?? true)
+            if (eventOrganizators?.Any(i => i.OrganizationId == _accountDataHolder.AccountId) ?? true)
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _participantsBWListRepository.DeleteFromBlackListAsync(eventId, accountId);
@@ -215,7 +224,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            if (eventOrganizators?.Any(i => i.OrganizationId == accountId) ?? true)
+            if (eventOrganizators?.Any(i => i.OrganizationId == _accountDataHolder.AccountId) ?? true)
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _participantsBWListRepository.DeleteFromWhiteListAsync(eventId, accountId);

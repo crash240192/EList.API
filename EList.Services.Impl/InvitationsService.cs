@@ -2,6 +2,8 @@
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
+using EList.Models.Accounts;
+using EList.Models.EventOrganizators;
 using EList.Models.Invitations;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
@@ -28,6 +30,7 @@ namespace EList.Services.Impl
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
         private readonly IParticipationsRepository _participationsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
+        private readonly IParticipantsBWListRepository _participantsBWListRepository;
 
         public InvitationsService(ICorrelationIdProvider correlationIdProvider,
             IAccountsRepository accountsRepository,
@@ -37,7 +40,8 @@ namespace EList.Services.Impl
             IInvitationsRepository invitationsRepository,
             IEventOrganizatorsRepository eventOrganizatorsRepository,
             IParticipationsRepository participationsRepository,
-            IAccountDataHolder accountDataHolder)
+            IAccountDataHolder accountDataHolder,
+            IParticipantsBWListRepository participantsBWListRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
@@ -47,6 +51,7 @@ namespace EList.Services.Impl
             _invitationsRepository = invitationsRepository ?? throw new ArgumentNullException(nameof(invitationsRepository));
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _participationsRepository = participationsRepository ?? throw new ArgumentNullException(nameof(participationsRepository));
+            _participantsBWListRepository = participantsBWListRepository ?? throw new ArgumentNullException(nameof(participantsBWListRepository));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -61,6 +66,18 @@ namespace EList.Services.Impl
             var curEvent = await _eventsRepository.GetEventAsync(request.EventId);
             if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Мероприятие с id='{request.EventId}' не найдено");
+
+            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(curEvent.Id);
+            if (!(eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId)) ?? true)
+            {
+                //TODO: Тут надо реализовать проверку что указанным пользователям можно выслать приглашения по black/white list
+                //if (curEvent.Parameters?.Private ?? false)
+                //{
+                //    if (await _participantsBWListRepository.IsUserInWhiteListAsync(request.AccountIds))
+                //}
+
+                //if (await _participantsBWListRepository.IsUserInBlackListAsync)
+            }
 
             if (request.InviterOrganizationId != null)
             {
@@ -167,7 +184,7 @@ namespace EList.Services.Impl
             var invitations = await _invitationsRepository.SearchInvitationsAsync(new InvitationsSearchRequest
             {
                 InvitedAccountIds = new List<Guid> { _accountDataHolder.AccountId },
-                PageIndex = pageIndex,  
+                PageIndex = pageIndex,
                 PageSize = pageSize,
             });
 
