@@ -45,7 +45,7 @@ namespace EList.Repositories.Impl
             var item = await _eventsDataProvider.GetEventAsync(id);
 
             var result = _mapper.Map<Event>(item);
-            result.Types = item.Types?.Select(i => _mapper.Map<EventType>(i.Type))?.ToList();
+            result.Types = item?.Types?.Select(i => _mapper.Map<EventType>(i.Type))?.ToList();
             return result;
         }
 

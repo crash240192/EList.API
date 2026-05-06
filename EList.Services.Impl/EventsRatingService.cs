@@ -46,7 +46,7 @@ namespace EList.Services.Impl
             var eventRating = await _eventsRatingRepository.GetEventRatingAcync(eventId, eventRatingType, pageIndex, pageSize);
 
             if (eventRating == null)
-                return CommandResult<EventRating>.Fail(ErrorCode.EventCategoryNotFound, "Категория события не найдена");
+                return CommandResult<EventRating>.Fail(ErrorCode.EventCategoryNotFound, "Рейтинг мероприятия пуст");
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<EventRating>(eventRating);
@@ -64,9 +64,9 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(VoteAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var curEvent = await _eventsRepository.GetEventAsync(request.Id);
+            var curEvent = await _eventsRepository.GetEventAsync(request.EventId);
             if (curEvent == null)
-                return CommandResult<Guid>.Fail(ErrorCode.EventNotFound, $"Событие {request.Id} не найдено");
+                return CommandResult<Guid>.Fail(ErrorCode.EventNotFound, $"Событие {request.EventId} не найдено");
 
             if (curEvent.StartTime > DateTimeOffset.Now)
                 request.RatingType = EventRatingType.Summary;
