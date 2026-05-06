@@ -43,6 +43,8 @@ namespace EList.AutoMapperProfile
             CreateMap<ContactDataDto, ContactDataItem>().ReverseMap();
 
             CreateMap<SubscriptionDto, Subscription>().ReverseMap();
+            CreateMap<DbDataProvider.Models.SearchRequests.SubscriptionsSearchRequest, SubscriptionsSearchRequest>().ReverseMap();
+            
 
             CreateMap<SystemNotificationDto, SystemNotification>().ReverseMap();
             

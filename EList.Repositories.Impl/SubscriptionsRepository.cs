@@ -2,6 +2,7 @@
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Models.SearchRequests;
 using EList.Models.Accounts;
 using EList.Models.Person;
 using EList.Models.Subscriptions;
@@ -26,9 +27,10 @@ namespace EList.Repositories.Impl
             await _subscriptionsDataProvider.SubscribeToAccountAsync(subscriberId, subscribeToId);
         }
 
-        public async Task<PagedList<Subscription>?> GetSubscriptionsAsync(Guid accountId)
+        public async Task<PagedList<Subscription>?> GetSubscriptionsAsync(Models.Subscriptions.SubscriptionsSearchRequest request)
         {
-            var subscriptionsResult = await _subscriptionsDataProvider.GetSubscriptionsAsync(accountId);
+            var mappedRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.SubscriptionsSearchRequest>(request);
+            var subscriptionsResult = await _subscriptionsDataProvider.GetSubscriptionsAsync(mappedRequest);
             var subscriptionsList = subscriptionsResult.Items?.Select(i => new Subscription
             {
                 NotifyEventCreated = i.NotifyEventCreated,
@@ -60,9 +62,11 @@ namespace EList.Repositories.Impl
             return result;
         }
 
-        public async Task<PagedList<Subscription>?> GetSubscribersAsync(Guid accountId, bool? notifyParticipated = null, bool? notifyEventCreated = false, bool? notifySubscribed = false)
-        { 
-            var subscriptionsResult = await _subscriptionsDataProvider.GetSubscribersAsync(accountId);
+        public async Task<PagedList<Subscription>?> GetSubscribersAsync(Models.Subscriptions.SubscriptionsSearchRequest request)
+        {
+            var mappedRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.SubscriptionsSearchRequest>(request);
+
+            var subscriptionsResult = await _subscriptionsDataProvider.GetSubscribersAsync(mappedRequest);
 
             var subscriptionsList = subscriptionsResult.Items?.Select(i => new Subscription
             {

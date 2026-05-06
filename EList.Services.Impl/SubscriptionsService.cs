@@ -62,7 +62,7 @@ namespace EList.Services.Impl
             await _subscriptionsRepository.SubscribeToAccountAsync(_accountDataHolder.AccountId, subscribeToId);
 
             //TODO: Уведомить подписчиков (у которых стоит флаг notify_subscriberd)
-            var getSubscription = await _subscriptionsRepository.GetSubscribersAsync(_accountDataHolder.AccountId, null, null, true);
+            //var getSubscription = await _subscriptionsRepository.GetSubscribersAsync(_accountDataHolder.AccountId, null, null, true);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -163,8 +163,6 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.SubscriptionAlreadyExists, "Подписка не найдена");
 
             await _subscriptionsRepository.DeleteSubscriptionAsync(_accountDataHolder.AccountId, subscribedToId);
-
-            var subscriptions = await _subscriptionsRepository.GetSubscribersAsync(_accountDataHolder.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
