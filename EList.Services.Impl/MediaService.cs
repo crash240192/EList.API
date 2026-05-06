@@ -248,8 +248,7 @@ namespace EList.Services.Impl
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetCurAccountAvatarAsync)}";
-
+            var methodName = $"{LOGGER_NAME}{nameof(GetAccountAvatarAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _mediaRepository.GetLastAccountAvatarAsync(accountId);
@@ -299,8 +298,7 @@ namespace EList.Services.Impl
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetCurAccountAvatarAsync)}";
-
+            var methodName = $"{LOGGER_NAME}{nameof(GetOrganizationAvatarAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _mediaRepository.GetLastOrganizationAvatarAsync(organizationId);
