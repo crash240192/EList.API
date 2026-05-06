@@ -211,7 +211,7 @@ namespace EList.Services.Impl
             if (result?.Any() ?? false)
                 return new CommandResult<List<Guid>?>(result);
 
-            return CommandResult<List<Guid>?>.Fail(ErrorCode.AccountAvatarsHistoryIsEmpty, "История аватаров аккаунта пуста");
+            return CommandResult<List<Guid>?>.OK(result);
         }
 
         public async Task<CommandResult<List<Guid>?>> GetAccountAvatarsAsync(Guid accountId)
@@ -226,10 +226,7 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
-            if (result?.Any() ?? false)
-                return new CommandResult<List<Guid>?>(result);
-
-            return CommandResult<List<Guid>?>.Fail(ErrorCode.AccountAvatarsHistoryIsEmpty, "История аватаров аккаунта пуста");
+            return CommandResult<List<Guid>?>.OK(result);
         }
 
         public async Task<CommandResult<Guid?>> GetCurAccountAvatarAsync()
@@ -244,10 +241,7 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
-            if (result != null)
-                return new CommandResult<Guid?>(result);
-
-            return CommandResult<Guid?>.Fail(ErrorCode.AccountAvatarsHistoryIsEmpty, "История аватаров аккаунта пуста");
+            return CommandResult<Guid?>.OK(result);
         }
 
         public async Task<CommandResult<Guid?>> GetAccountAvatarAsync(Guid accountId)
@@ -262,10 +256,7 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
-            if (result != null)
-                return new CommandResult<Guid?>(result);
-
-            return CommandResult<Guid?>.Fail(ErrorCode.AccountAvatarsHistoryIsEmpty, "История аватаров аккаунта пуста");
+            return CommandResult<Guid?>.OK(result);
         }
         #endregion
 
@@ -301,7 +292,7 @@ namespace EList.Services.Impl
             if (result?.Any() ?? false)
                 return new CommandResult<List<Guid>?>(result);
 
-            return CommandResult<List<Guid>?>.Fail(ErrorCode.OrganizationAvatarsHistoryIsEmpty, "История аватаров организации пуста");
+            return CommandResult<List<Guid>?>.OK(result);
         }
 
         public async Task<CommandResult<Guid?>> GetOrganizationAvatarAsync(Guid organizationId)
@@ -319,7 +310,7 @@ namespace EList.Services.Impl
             if (result != null)
                 return new CommandResult<Guid?>(result);
 
-            return CommandResult<Guid?>.Fail(ErrorCode.OrganizationAvatarsHistoryIsEmpty, "История аватаров организации пуста");
+            return CommandResult<Guid?>.OK(result);
         }
         #endregion
     }

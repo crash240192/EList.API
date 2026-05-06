@@ -172,7 +172,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(request.EventId);
-            if (eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
+            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _participantsBWListRepository.AddToBlackListAsync(request);
@@ -189,7 +189,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(request.EventId);
-            if (eventOrganizators?.Any(i => i.OrganizationId == _accountDataHolder.AccountId) ?? true)
+            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _participantsBWListRepository.AddToWhiteListAsync(request);
@@ -207,7 +207,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            if (eventOrganizators?.Any(i => i.OrganizationId == _accountDataHolder.AccountId) ?? true)
+            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _participantsBWListRepository.DeleteFromBlackListAsync(eventId, accountId);
@@ -224,7 +224,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            if (eventOrganizators?.Any(i => i.OrganizationId == _accountDataHolder.AccountId) ?? true)
+            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _participantsBWListRepository.DeleteFromWhiteListAsync(eventId, accountId);
