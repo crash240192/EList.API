@@ -5,7 +5,6 @@ using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.Models.Accounts;
 using EList.Models.Location;
-using EList.Services.Impl;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

@@ -56,10 +56,6 @@ var mappingConfig = new MapperConfiguration(mc => { mc.AddProfile(new AutoMapper
 var mapper = mappingConfig.CreateMapper();
 builder.Services.AddSingleton(mapper);
 
-
-
-
-
 var app = builder.Build();
 
 var pathBase = ConfigurationManager.AppSettings["pathBase"] ?? string.Empty;

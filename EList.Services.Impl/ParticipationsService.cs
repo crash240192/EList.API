@@ -164,38 +164,38 @@ namespace EList.Services.Impl
         }
 
 
-        public async Task<CommandResult<Guid>> AddToBlackListAsync(Guid eventId, Guid accountId)
+        public async Task<CommandResult> AddToBlackListAsync(AddUsersToBWListRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(AddToBlackListAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
+            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(request.EventId);
             if (eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
-                return CommandResult<Guid>.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+                return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
-            var result = await _participantsBWListRepository.AddToBlackListAsync(eventId, accountId);
+            await _participantsBWListRepository.AddToBlackListAsync(request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<Guid>(result);
+            return CommandResult.OK;
         }
 
-        public async Task<CommandResult<Guid>> AddToWhiteListAsync(Guid eventId, Guid accountId)
+        public async Task<CommandResult> AddToWhiteListAsync(AddUsersToBWListRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(AddToWhiteListAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
+            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(request.EventId);
             if (eventOrganizators?.Any(i => i.OrganizationId == _accountDataHolder.AccountId) ?? true)
-                return CommandResult<Guid>.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+                return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
-            var result = await _participantsBWListRepository.AddToWhiteListAsync(eventId, accountId);
+            await _participantsBWListRepository.AddToWhiteListAsync(request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<Guid>(result);
+            return CommandResult.OK;
         }
 
 

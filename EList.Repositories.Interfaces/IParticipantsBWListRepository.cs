@@ -5,8 +5,8 @@ namespace EList.Repositories.Interfaces
 {
     public interface IParticipantsBWListRepository
     {
-        Task<Guid> AddToBlackListAsync(Guid eventId, Guid accountId);
-        Task<Guid> AddToWhiteListAsync(Guid eventId, Guid accountId);
+        Task AddToBlackListAsync(AddUsersToBWListRequest request);
+        Task AddToWhiteListAsync(AddUsersToBWListRequest request);
 
         Task<bool> IsUserInBlackListAsync(Guid eventId, Guid accountId);
         Task<bool> IsUserInWhiteListAsync(Guid eventId, Guid accountId);

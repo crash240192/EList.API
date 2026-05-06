@@ -42,7 +42,7 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Подписаться на пользователя
         /// </summary>
-        /// <param name="request"></param>
+        /// <param name="accountId"></param>
         /// <returns></returns>
         [HttpGet("subscribe/{accountId}")]
         public async Task<CommandResult> SubscribeToAccountAsync(Guid accountId)
@@ -117,10 +117,10 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Отобразить подписки пользователя
         /// </summary>
-        /// <param name="accountId"></param>
+        /// <param name="request"></param>
         /// <returns></returns>
-        [HttpGet("getSubscriptions/{accountId}")]
-        public async Task<CommandResult<PagedList<Subscription>>> GetSubscriptionsAsync(Guid accountId)
+        [HttpPost("getSubscriptions")]
+        public async Task<CommandResult<PagedList<Subscription>>> GetSubscriptionsAsync(SubscriptionsSearchRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -130,7 +130,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _subscriptionsService.GetSubscriptionsAsync(accountId);
+                var result = await _subscriptionsService.GetSubscriptionsAsync(request);
                 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -175,10 +175,10 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Отобразить подписчиков пользователя
         /// </summary>
-        /// <param name="accountId"></param>
+        /// <param name="request"></param>
         /// <returns></returns>
-        [HttpGet("getSubscribers/{accountId}")]
-        public async Task<CommandResult<PagedList<Subscription>>> GetSubscribersAsync(Guid accountId)
+        [HttpPost("getSubscribers/")]
+        public async Task<CommandResult<PagedList<Subscription>>> GetSubscribersAsync(SubscriptionsSearchRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -188,7 +188,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _subscriptionsService.GetSubscribersAsync(accountId);
+                var result = await _subscriptionsService.GetSubscribersAsync(request);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 

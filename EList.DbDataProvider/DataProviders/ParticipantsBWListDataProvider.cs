@@ -2,6 +2,7 @@
 using EList.DbDataProvider.Models;
 using LinqToDB;
 using LinqToDB.Async;
+using LinqToDB.Data;
 
 namespace EList.DbDataProvider.DataProviders
 {
@@ -12,34 +13,38 @@ namespace EList.DbDataProvider.DataProviders
         { }
 
 
-        public async Task<Guid> AddToBlackListAsync(Guid eventId, Guid accountId)
+        public async Task AddToBlackListAsync(Guid eventId, List<Guid> accountIds)
         {
-            var existingItem = await _connection.BlackList.FirstOrDefaultAsync(i =>  i.EventId == eventId && i.AccountId == accountId);
-            if (existingItem != null)
-                return existingItem.Id;
-            
-            var result = (Guid) await _connection.InsertWithIdentityAsync(new ParticipantsBlackListItemDto
+            var existingItems = await _connection.BlackList
+                .Where(i => i.EventId == eventId && accountIds.Contains(i.AccountId))
+                .ToListAsync();
+
+            var accountsToInsert = accountIds.Where(accountId => !existingItems.Any(i => i.AccountId == accountId)).ToList();
+
+            var newItems = accountsToInsert.Select(accountId => new ParticipantsBlackListItemDto
             {
                 EventId = eventId,
                 AccountId = accountId
-            });
+            }).ToList();
 
-            return result;
+            await _connection.BulkCopyAsync(newItems);
         }
 
-        public async Task<Guid> AddToWhiteListAsync(Guid eventId, Guid accountId)
+        public async Task AddToWhiteListAsync(Guid eventId, List<Guid> accountIds)
         {
-            var existingItem = await _connection.WhiteList.FirstOrDefaultAsync(i => i.EventId == eventId && i.AccountId == accountId);
-            if (existingItem != null)
-                return existingItem.Id;
+            var existingItems = await _connection.WhiteList
+                .Where(i => i.EventId == eventId && accountIds.Contains(i.AccountId))
+                .ToListAsync();            
 
-            var result = (Guid)await _connection.InsertWithIdentityAsync(new ParticipantsWhiteListItemDto
+            var accountsToInsert = accountIds.Where(accountId => !existingItems.Any(i => i.AccountId == accountId)).ToList();
+
+            var newItems = accountsToInsert.Select(accountId => new ParticipantsWhiteListItemDto
             {
                 EventId = eventId,
                 AccountId = accountId
-            });
-
-            return result;
+            }).ToList();
+            
+            await _connection.BulkCopyAsync(newItems);
         }
 
 

@@ -19,16 +19,14 @@ namespace EList.Repositories.Impl
         }
 
 
-        public async Task<Guid> AddToBlackListAsync(Guid eventId, Guid accountId)
+        public async Task AddToBlackListAsync(AddUsersToBWListRequest request)
         {
-            var result = await _participantsBWListDataProvider.AddToBlackListAsync(eventId, accountId);
-            return result;
+            await _participantsBWListDataProvider.AddToBlackListAsync(request.EventId, request.AccountIds);
         }
 
-        public async Task<Guid> AddToWhiteListAsync(Guid eventId, Guid accountId)
+        public async Task AddToWhiteListAsync(AddUsersToBWListRequest request)
         {
-            var result = await _participantsBWListDataProvider.AddToWhiteListAsync(eventId, accountId);
-            return result;
+            await _participantsBWListDataProvider.AddToWhiteListAsync(request.EventId, request.AccountIds);
         }
 
 

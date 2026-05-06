@@ -4,8 +4,8 @@ namespace EList.DbDataProvider.Interfaces
 {
     public interface IParticipantsBWListDataProvider
     {
-        Task<Guid> AddToBlackListAsync(Guid eventId, Guid accountId);
-        Task<Guid> AddToWhiteListAsync(Guid eventId, Guid accountId);
+        Task AddToBlackListAsync(Guid eventId, List<Guid> accountIds);
+        Task AddToWhiteListAsync(Guid eventId, List<Guid> accountIds);
 
         Task<bool> IsUserInBlackListAsync(Guid eventId, Guid accountId);
         Task<bool> IsUserInWhiteListAsync(Guid eventId, Guid accountId);

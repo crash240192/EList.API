@@ -11,8 +11,8 @@ namespace EList.Services.Interfaces
 
         Task<CommandResult<PagedList<ParticipantBlackListItem>>> GetEventBlackListAsync(Guid eventId, int? pageIndex, int? pageSize);
         Task<CommandResult<PagedList<ParticipantWhiteListItem>>> GetEventWhiteListAsync(Guid eventId, int? pageIndex, int? pageSize);
-        Task<CommandResult<Guid>> AddToBlackListAsync(Guid eventId, Guid accountId);
-        Task<CommandResult<Guid>> AddToWhiteListAsync(Guid eventId, Guid accountId);
+        Task<CommandResult> AddToBlackListAsync(AddUsersToBWListRequest request);
+        Task<CommandResult> AddToWhiteListAsync(AddUsersToBWListRequest request);
         Task<CommandResult> DeleteFromBlackListAsync(Guid eventId, Guid accountId);
         Task<CommandResult> DeleteFromWhiteListAsync(Guid eventId, Guid accountId);
     }
