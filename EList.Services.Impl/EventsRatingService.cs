@@ -69,11 +69,11 @@ namespace EList.Services.Impl
                 return CommandResult<Guid>.Fail(ErrorCode.EventNotFound, $"Событие {request.EventId} не найдено");
 
             if (curEvent.StartTime > DateTimeOffset.Now)
-                request.RatingType = EventRatingType.Summary;
+                request.RatingType = EventRatingType.Expectation;            
             else
-                request.RatingType = EventRatingType.Expectation;
+                request.RatingType = EventRatingType.Summary;
 
-                request.AccountId = _accountDataHolder.AccountId;
+            request.AccountId = _accountDataHolder.AccountId;
             var eventRating = await _eventsRatingRepository.CreateEventRatingAsync(request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
