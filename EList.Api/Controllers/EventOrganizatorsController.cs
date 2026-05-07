@@ -78,7 +78,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _organizatorsService.GetByEventIdAsync(eventId);
+                var result = await _organizatorsService.AssignEventOrganizatorsAsync(eventId, accountIds);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;

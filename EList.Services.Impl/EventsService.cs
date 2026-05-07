@@ -331,8 +331,6 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(GetEventParametersByEventIdAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //TODO: Добавить сюда проверку на наличие события
-
             var eventItem = await _eventsRepository.GetEventAsync(eventId);
             if (eventItem == null)
                 return CommandResult<EventParameters?>.Fail(ErrorCode.EventParametersNotFound, $"Событие с id='{eventId}' не найдено");
@@ -357,6 +355,10 @@ namespace EList.Services.Impl
             var curEvent = await _eventsRepository.GetEventAsync(eventId);
             if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
+            if (!organizators?.Any(i => i.Account.Id == _accountDataHolder.AccountId) ?? true)
+                return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
 
             if (curEvent.EventParametersId == null)
             {
@@ -455,8 +457,6 @@ namespace EList.Services.Impl
             var eventItem = await _eventsRepository.GetEventAsync(eventId);
             if (eventItem == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
-
-            //var accountInfo = await _authorizationRepository.GetAuthorizationDataAsync(token);
 
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
 

@@ -27,6 +27,7 @@ namespace EList.Repositories.Impl
             await _subscriptionsDataProvider.SubscribeToAccountAsync(subscriberId, subscribeToId);
         }
 
+
         public async Task<PagedList<Subscription>?> GetSubscriptionsAsync(Models.Subscriptions.SubscriptionsSearchRequest request)
         {
             var mappedRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.SubscriptionsSearchRequest>(request);
@@ -46,19 +47,6 @@ namespace EList.Repositories.Impl
 
             var result = new PagedList<Subscription>(subscriptionsResult.TotalCount, subscriptionsList, 0, 0);
 
-            return result;
-        }
-
-        public async Task<int> GetSubscriptionsCountAsync(Guid accountId)
-        {
-            var result = await _subscriptionsDataProvider.GetSubscriptionsCountAsync(accountId);
-
-            return result;
-        }
-
-        public async Task<bool> IsSubscriptionExistAsync(Guid subscriberId, Guid subscribedToId)
-        {
-            var result = await _subscriptionsDataProvider.IsSubscriptionExistAsync(subscriberId, subscribedToId);
             return result;
         }
 
@@ -85,16 +73,33 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+
+        public async Task<int> GetSubscriptionsCountAsync(Guid accountId)
+        {
+            var result = await _subscriptionsDataProvider.GetSubscriptionsCountAsync(accountId);
+
+            return result;
+        }
+
         public async Task<int> GetSubscribersCountAsync(Guid accountId)
         { 
             var result = await _subscriptionsDataProvider.GetSubscribersCountAsync(accountId);
             return result;
         }
 
+
+        public async Task<bool> IsSubscriptionExistAsync(Guid subscriberId, Guid subscribedToId)
+        {
+            var result = await _subscriptionsDataProvider.IsSubscriptionExistAsync(subscriberId, subscribedToId);
+            return result;
+        }
+
+
         public async Task DeleteSubscriptionAsync(Guid subscriberId, Guid subscribedToId)
         {
             await _subscriptionsDataProvider.DeleteSubscriptionAsync(subscriberId, subscribedToId);
         }
+
 
         public async Task UpdateSubscriptionAsync(UpdateSubscriptionRequest request)
         {
