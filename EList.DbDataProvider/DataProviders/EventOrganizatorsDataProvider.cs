@@ -2,6 +2,7 @@
 using EList.DbDataProvider.Models;
 using LinqToDB;
 using LinqToDB.Async;
+using LinqToDB.Data;
 
 namespace EList.DbDataProvider.DataProviders
 {
@@ -54,7 +55,7 @@ namespace EList.DbDataProvider.DataProviders
                     EventId = eventId
                 })?.ToList();
 
-                var res = await _connection.InsertWithIdentityAsync(organizatorItems);
+                var res = await _connection.BulkCopyAsync(organizatorItems);
             }
         }
     }

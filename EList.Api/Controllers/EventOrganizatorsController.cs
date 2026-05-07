@@ -77,8 +77,14 @@ namespace EList.Api.Controllers
             try
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
+                await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _organizatorsService.AssignEventOrganizatorsAsync(eventId, accountIds);
+
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
