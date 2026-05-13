@@ -142,7 +142,7 @@ namespace EList.Repositories.Impl
             var mappedRequest = new EventParametersDto
             {
                 AgeLimit = request.AgeLimit,
-                AllowedGender = request.AllowedGender != null ? _mapper.Map<Gender>(request.AllowedGender) : null,
+                AllowedGender = _mapper.Map<Gender?>(request.AllowedGender),
                 MaxPersonsCount = request.MaxPersonsCount,
                 Private = request.Private,
                 AllowUsersToInvite = request.AllowUsersToInvite,
@@ -162,7 +162,7 @@ namespace EList.Repositories.Impl
             var mappedRequest = new EventParametersDto
             {
                 AgeLimit = request.AgeLimit,
-                AllowedGender = _mapper.Map<Gender>(request.AllowedGender),
+                AllowedGender = _mapper.Map<Gender?>(request.AllowedGender),
                 MaxPersonsCount = request.MaxPersonsCount,
                 Private = request.Private,
                 AllowUsersToInvite = request.AllowUsersToInvite,

@@ -395,20 +395,6 @@ namespace EList.Services.Impl
 
             var eventId = await _eventsRepository.CreateEventAsync(request.Event);
 
-            if (request.EventParameters != null)
-            {
-                var createEventParametersResult = await SetEventParametersAsync(eventId, request.EventParameters);
-
-                if (!createEventParametersResult.Success)
-                    return CommandResult<Guid?>.Fail(createEventParametersResult.ErrorCode, createEventParametersResult.Message);
-            }
-
-            await _eventsMetadataRepository.BindEventTypesAsync(eventId, request.EventTypes);
-
-            //TODO: присрать сюда accountId текущего пользователя
-
-            //var account = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
-
             #region Привязываем идентификаторы организаторов к событию
             if (request.OrganizatorAccountIds == null)
                 request.OrganizatorOrganizationIds = new List<Guid>();
@@ -425,6 +411,22 @@ namespace EList.Services.Impl
                 });
             }
             #endregion
+
+            if (request.EventParameters != null)
+            {
+                var createEventParametersResult = await SetEventParametersAsync(eventId, request.EventParameters);
+
+                if (!createEventParametersResult.Success)
+                    return CommandResult<Guid?>.Fail(createEventParametersResult.ErrorCode, createEventParametersResult.Message);
+            }
+
+            await _eventsMetadataRepository.BindEventTypesAsync(eventId, request.EventTypes);
+
+            //TODO: присрать сюда accountId текущего пользователя
+
+            //var account = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
+
+            
 
             //TODO: С организациями разберёмся позже 
 
