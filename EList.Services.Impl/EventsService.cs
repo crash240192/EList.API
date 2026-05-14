@@ -545,6 +545,19 @@ namespace EList.Services.Impl
             return new CommandResult<PagedList<Event>?>(searchResult);
         }
 
+        public async Task<CommandResult<PagedList<EventShort>?>> SearchEventsShortAsync(EventsSearchRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SearchEventsShortAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var searchResult = await _eventsRepository.SearchEventsShortAsync(request, _accountDataHolder.AccountId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<PagedList<EventShort>?>(searchResult);
+        }
+
         public async Task<CommandResult> CancelEventAsync(Guid eventId)
         {
             var correlationId = _correlationIdProvider.Get();

@@ -52,6 +52,7 @@ namespace EList.AutoMapperProfile
             CreateMap<EventTypeDto, EventType>().ReverseMap();
             CreateMap<EventParametersDto, EventParameters>().ReverseMap();
             CreateMap<Event, EventDto>().ReverseMap().ForMember(dest => dest.Types, opt => opt.Ignore());
+            CreateMap<EventDto, EventShort>().ReverseMap();
             CreateMap<EventsRatingDto, EventsRatingItem>().ReverseMap();
             CreateMap<EventOrganizatorDto, EventOrganizator>().ReverseMap();
             CreateMap<EventParametersRequest, SetEventParametersRequest>().ReverseMap();

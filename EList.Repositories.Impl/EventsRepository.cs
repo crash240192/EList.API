@@ -89,6 +89,21 @@ namespace EList.Repositories.Impl
             return new PagedList<Event>(items.TotalCount, resultList, request.PageIndex, request.PageSize);
         }
 
+        public async Task<PagedList<EventShort>> SearchEventsShortAsync(EventsSearchRequest request, Guid? curAccountId)
+        {
+            var mappedRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.EventsSearchRequest>(request);
+            var items = await _eventsDataProvider.SearchEventsAsync(mappedRequest, curAccountId);
+
+            var resultList = items.Items?.Select(i =>
+            {
+                var item = _mapper.Map<EventShort>(i);
+                item.Colors = i.Types?.Select(i => i.Type.EventCategory.Color)?.ToArray();
+                return item;
+            }).ToList();
+
+            return new PagedList<EventShort>(items.TotalCount, resultList, request.PageIndex, request.PageSize);
+        }
+
         public async Task CancelEventAsync(Guid eventId)
         {
             await _eventsDataProvider.CancelEventAsync(eventId);

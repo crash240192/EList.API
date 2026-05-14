@@ -671,6 +671,34 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Поиск мероприятий для отображений на карте
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        [HttpPost("search/short")]
+        public async Task<CommandResult<PagedList<EventShort>>> SearchEventsShortAsync(EventsSearchRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SearchEventsShortAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _eventsService.SearchEventsShortAsync(request);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Отмена мероприятия
         /// </summary>
         /// <param name="eventId"></param>
