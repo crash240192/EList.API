@@ -575,7 +575,7 @@ namespace EList.Services.Impl
 
             await _eventsRepository.CancelEventAsync(eventId);
 
-            await _invitationsRepository.CancelInvitationsAsync(eventId);
+            await _invitationsRepository.CancelAllInvitationsAsync(eventId);
             //Разослать уведомление что мероприятие было отменено
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);

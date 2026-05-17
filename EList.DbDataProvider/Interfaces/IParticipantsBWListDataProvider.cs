@@ -15,5 +15,8 @@ namespace EList.DbDataProvider.Interfaces
 
         Task<ListResponse<ParticipantsBlackListItemDto>> GetEventBlackListAsync(Guid eventId, int? pageIndex, int? pageSize);
         Task<ListResponse<ParticipantsWhiteListItemDto>> GetEventWhiteListAsync(Guid eventId, int? pageIndex, int? pageSize);
+
+        Task<int> BlackListPersonsCountAsync(Guid eventId);
+        Task<int> WhiteListPersonsCountAsync(Guid eventId);
     }
 }

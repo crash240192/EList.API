@@ -16,5 +16,8 @@ namespace EList.Repositories.Interfaces
 
         Task<PagedList<ParticipantBlackListItem>> GetEventBlackListAsync(Guid eventId, int? pageIndex, int? pageSize);
         Task<PagedList<ParticipantWhiteListItem>> GetEventWhiteListAsync(Guid eventId, int? pageIndex, int? pageSize);
+
+        Task<int> WhiteListPersonsCountAsync(Guid eventId);
+        Task<int> BlackListPersonsCountAsync(Guid eventId);
     }
 }

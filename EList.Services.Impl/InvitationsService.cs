@@ -1,14 +1,13 @@
-﻿using EList.Common.CorrelationId;
+﻿using System.Diagnostics;
+using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
-using EList.Models.Accounts;
-using EList.Models.EventOrganizators;
 using EList.Models.Invitations;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using NLog;
-using System.Diagnostics;
 
 namespace EList.Services.Impl
 {
@@ -100,11 +99,24 @@ namespace EList.Services.Impl
             if (curEvent.Parameters?.MaxPersonsCount > 0)
             {
                 var participantsCount = await _participationsRepository.GetParticipantsCountAsync(curEvent.Id);
-                if (participantsCount>= curEvent.Parameters.MaxPersonsCount)
-                    return CommandResult.Fail(ErrorCode.EventFull, $"В мероприятии уже участвует максимальное количество человек");
+                if (participantsCount >= curEvent.Parameters.MaxPersonsCount)
+                    return CommandResult.Fail(ErrorCode.EventIsFull, $"В мероприятии уже участвует максимальное количество человек");
             }
 
-            //TODO: Осуществить проверку для каждого пользователя, можно ли его пригласить в указанный ивент, исходя из параметров этого ивента
+            if (curEvent.Parameters?.Private ?? false)
+            {
+                var whiteListCount = await _participantsBWListRepository.WhiteListPersonsCountAsync(curEvent.Id);
+                if (whiteListCount > 0)
+                {
+                    if (!await _participantsBWListRepository.IsUserInWhiteListAsync(curEvent.Id, _accountDataHolder.AccountId))
+                        return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
+                }
+            }
+            else
+            {
+                if (await _participantsBWListRepository.IsUserInBlackListAsync(curEvent.Id, _accountDataHolder.AccountId))
+                    return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
+            }
 
             await _invitationsRepository.CreateInvitationsAsync(request, _accountDataHolder.AccountId);
 
@@ -124,12 +136,33 @@ namespace EList.Services.Impl
             if (invitation == null)
                 return CommandResult.Fail(ErrorCode.InvitationNotFound, $"Приглашение с id='{invitationId}' не найдено");
 
-            var eventItem = await _eventsRepository.GetEventAsync(invitation.EventId);
-            if (eventItem == null)
+            var curEvent = await _eventsRepository.GetEventAsync(invitation.EventId);
+            if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Мероприятие с id='{invitation.EventId}' не найдено");
 
-            if (eventItem.Active == false)
+            if (curEvent.Active == false)
                 return CommandResult.Fail(ErrorCode.EventCancelled, $"Мероприятие было отменено");
+
+            if (curEvent.Parameters.Private ?? false)
+            {
+                if (!await _participantsBWListRepository.IsUserInWhiteListAsync(curEvent.Id, _accountDataHolder.AccountId))
+                    return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
+            }
+            else
+            {
+                if (await _participantsBWListRepository.IsUserInBlackListAsync(curEvent.Id, _accountDataHolder.AccountId))
+                    return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
+            }
+
+            if (curEvent.Parameters?.MaxPersonsCount > 0)
+            {
+                var participantsCount = await _participationsRepository.GetParticipantsCountAsync(curEvent.Id);
+                if (participantsCount >= curEvent.Parameters.MaxPersonsCount)
+                    return CommandResult.Fail(ErrorCode.EventIsFull, $"В мероприятии уже участвует максимальное количество человек");
+            }
+
+            if (invitation.InvitedAccountId != _accountDataHolder.AccountId)
+                return CommandResult.Fail(ErrorCode.AccessError, $"У текущего пользователя нет доступа для взаимодействия с этим приглашением");
 
             await _participationsRepository.ParticipateAsync(_accountDataHolder.AccountId, invitation.EventId);
 

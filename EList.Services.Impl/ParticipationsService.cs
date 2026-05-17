@@ -73,8 +73,18 @@ namespace EList.Services.Impl
 
             if (curEvent.Parameters.Private ?? false)
             {
-                if (await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId))
-                    return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
+                var whiteListCount = await _participantsBWListRepository.WhiteListPersonsCountAsync(eventId);
+                if (whiteListCount == 0)
+                {// если белый список пуст, проверяем приглашения
+                    var isUserInvited = await _invitationsRepository.IsUserInvitatedAsync(eventId, _accountDataHolder.AccountId);
+                    if (!isUserInvited)
+                        return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Принять участие в закрытом мероприятии можно только по приглашению");
+                }
+                else
+                {
+                    if (!await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId))
+                        return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
+                }
             }
             else
             {
@@ -86,7 +96,7 @@ namespace EList.Services.Impl
             {
                 var participationsCount = await _participationRepository.GetParticipantsCountAsync(eventId);
                 if (participationsCount >= curEvent.Parameters.MaxPersonsCount)
-                    return CommandResult<Guid?>.Fail(ErrorCode.EventFull, "В мероприятии уже участвует максимальное количество человек");
+                    return CommandResult<Guid?>.Fail(ErrorCode.EventIsFull, "В мероприятии уже участвует максимальное количество человек");
             }
 
             var result = await _participationRepository.ParticipateAsync(_accountDataHolder.AccountId, eventId);

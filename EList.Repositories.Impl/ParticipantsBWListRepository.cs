@@ -66,6 +66,17 @@ namespace EList.Repositories.Impl
             return new PagedList<ParticipantWhiteListItem>(whiteList.TotalCount, resultList, pageIndex ?? 0, pageSize ?? whiteList.TotalCount);
         }
 
+        public async Task<int> WhiteListPersonsCountAsync(Guid eventId)
+        {
+            var result = await WhiteListPersonsCountAsync(eventId);
+            return result;
+        }
+
+        public async Task<int> BlackListPersonsCountAsync(Guid eventId)
+        {
+            var result = await BlackListPersonsCountAsync(eventId);
+            return result;
+        }
 
         public async Task<bool> IsUserInBlackListAsync(Guid eventId, Guid accountId)
         {
