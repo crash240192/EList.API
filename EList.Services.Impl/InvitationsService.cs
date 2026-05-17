@@ -6,7 +6,6 @@ using EList.Common.Support;
 using EList.Models.Invitations;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
-using Microsoft.Extensions.Logging;
 using NLog;
 
 namespace EList.Services.Impl
