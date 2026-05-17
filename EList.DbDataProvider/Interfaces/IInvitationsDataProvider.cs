@@ -9,6 +9,7 @@ namespace EList.DbDataProvider.Interfaces
         Task CreateInvitationsAsync(List<InvitationDto> invitations);
         Task<InvitationDto> GetInvitationAsync(Guid id);
         Task<InvitationDto> GetInvitationAsync(Guid invitedAccountId, Guid eventId);
+        Task<bool> IsUserInvitatedAsync(Guid accountId, Guid eventId);
         Task<ListResponse<InvitationDto>> SearchInvitationsAsync(InvitationsSearchRequest request);
         Task DeleteInvitationAsync(Guid id);
         Task CancelInvitationsAsync(Guid eventId);

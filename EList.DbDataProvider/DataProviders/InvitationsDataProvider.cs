@@ -45,6 +45,12 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<bool> IsUserInvitatedAsync(Guid accountId, Guid eventId)
+        {
+            var result = await _connection.Invitations.AnyAsync(i => i.InvitedAccountId == accountId && i.EventId == eventId);
+            return result;
+        }
+
         public async Task DeleteInvitationAsync(Guid id)
         {
             await _connection.Invitations.DeleteAsync(i => i.Id == id);
