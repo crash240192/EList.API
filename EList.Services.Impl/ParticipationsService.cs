@@ -68,6 +68,9 @@ namespace EList.Services.Impl
             if (curEvent == null)
                 return CommandResult<Guid?>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
+            if (curEvent.Active == false)
+                return CommandResult<Guid?>.Fail(ErrorCode.EventCancelled, "Мероприятие было отменено");
+
             if (curEvent.Parameters.Private ?? false)
             {
                 if (await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId))
@@ -77,6 +80,13 @@ namespace EList.Services.Impl
             {
                 if (await _participantsBWListRepository.IsUserInBlackListAsync(eventId, _accountDataHolder.AccountId))
                     return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
+            }
+
+            if (curEvent.Parameters?.MaxPersonsCount > 0)
+            {
+                var participationsCount = await _participationRepository.GetParticipantsCountAsync(eventId);
+                if (participationsCount >= curEvent.Parameters.MaxPersonsCount)
+                    return CommandResult<Guid?>.Fail(ErrorCode.EventFull, "В мероприятии уже участвует максимальное количество человек");
             }
 
             var result = await _participationRepository.ParticipateAsync(_accountDataHolder.AccountId, eventId);

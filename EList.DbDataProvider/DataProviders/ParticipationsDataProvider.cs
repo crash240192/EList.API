@@ -103,5 +103,12 @@ namespace EList.DbDataProvider.DataProviders
 
             return new ListResponse<AccountDto>(count, resultList);
         }
+
+        public async Task<int> GetParticipantsCountAsync(Guid eventId)
+        {
+            var count = await _connection.Participations.Where(i => i.EventId == eventId)
+                .CountAsync();
+            return count;
+        }
     }
 }

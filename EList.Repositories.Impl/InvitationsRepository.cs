@@ -42,6 +42,11 @@ namespace EList.Repositories.Impl
             await _invitationsDataProvider.DeleteInvitationAsync(id);
         }
 
+        public async Task CancelInvitationsAsync(Guid eventId)
+        {
+            await _invitationsDataProvider.CancelInvitationsAsync(eventId);
+        }
+
         public async Task DeleteInvitationAsync(Guid eventId, Guid accountId)
         {
             await _invitationsDataProvider.DeleteInvitationAsync(eventId, accountId);

@@ -50,6 +50,11 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.Invitations.DeleteAsync(i => i.Id == id);
         }
 
+        public async Task CancelInvitationsAsync(Guid eventId)
+        {
+            await _connection.Invitations.DeleteAsync(i => i.EventId == eventId);
+        }
+
         public async Task DeleteInvitationAsync(Guid eventId, Guid accountId)
         {
             await _connection.Invitations.DeleteAsync(i => i.EventId == eventId && i.InvitedAccountId == accountId);

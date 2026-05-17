@@ -8,6 +8,7 @@ namespace EList.Repositories.Interfaces
         Task CreateInvitationsAsync(CreateInvitationsRequest request, Guid inviterAccountId);
         Task<PagedList<Invitation>> SearchInvitationsAsync(Models.Invitations.InvitationsSearchRequest request);
         Task DeleteInvitationAsync(Guid id);
+        Task CancelInvitationsAsync(Guid eventId);
         Task DeleteInvitationAsync(Guid eventId, Guid accountId);
         Task <Invitation> GetInvitationAsync(Guid invitationId);
         Task<Invitation> GetInvitationAsync(Guid invitedAccountId, Guid eventId);

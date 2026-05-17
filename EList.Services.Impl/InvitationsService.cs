@@ -94,6 +94,16 @@ namespace EList.Services.Impl
                 //TODO Сделать аналогичную проверку для организаций
             }
 
+            if (curEvent.Active == false)
+                return CommandResult.Fail(ErrorCode.EventCancelled, $"Мероприятие было отменено");
+
+            if (curEvent.Parameters?.MaxPersonsCount > 0)
+            {
+                var participantsCount = await _participationsRepository.GetParticipantsCountAsync(curEvent.Id);
+                if (participantsCount>= curEvent.Parameters.MaxPersonsCount)
+                    return CommandResult.Fail(ErrorCode.EventFull, $"В мероприятии уже участвует максимальное количество человек");
+            }
+
             //TODO: Осуществить проверку для каждого пользователя, можно ли его пригласить в указанный ивент, исходя из параметров этого ивента
 
             await _invitationsRepository.CreateInvitationsAsync(request, _accountDataHolder.AccountId);
@@ -113,6 +123,13 @@ namespace EList.Services.Impl
             var invitation = await _invitationsRepository.GetInvitationAsync(invitationId);
             if (invitation == null)
                 return CommandResult.Fail(ErrorCode.InvitationNotFound, $"Приглашение с id='{invitationId}' не найдено");
+
+            var eventItem = await _eventsRepository.GetEventAsync(invitation.EventId);
+            if (eventItem == null)
+                return CommandResult.Fail(ErrorCode.EventNotFound, $"Мероприятие с id='{invitation.EventId}' не найдено");
+
+            if (eventItem.Active == false)
+                return CommandResult.Fail(ErrorCode.EventCancelled, $"Мероприятие было отменено");
 
             await _participationsRepository.ParticipateAsync(_accountDataHolder.AccountId, invitation.EventId);
 
