@@ -53,7 +53,7 @@ namespace EList.DbDataProvider.Models
         public EventsRatingDto Rating { get; set; }
 
         [Association(ThisKey = nameof(Id), OtherKey = nameof(EventOrganizatorDto.EventId))]
-        public EventOrganizatorDto Organizator { get; set; }
+        public List<EventOrganizatorDto> Organizators { get; set; }
 
         [Association(ThisKey = nameof(Id), OtherKey = nameof(ParticipationDto.EventId))]
         public List<ParticipationDto> Participants { get; set; }
