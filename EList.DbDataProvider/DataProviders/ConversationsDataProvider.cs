@@ -15,8 +15,16 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<Guid> CreateConversationAsync(ConversationDto conversation)
         {
+            conversation.CreateDate = DateTimeOffset.Now;
+            conversation.UpdateDate = DateTimeOffset.Now;
             var result = (Guid)await _connection.InsertWithIdentityAsync(conversation);
             return result;
+        }
+
+        public async Task<MessageDto> GetMessageAsync(Guid messageId)
+        {
+            var message = await _connection.Messages.FirstOrDefaultAsync(i => i.Id == messageId);
+            return message;
         }
 
         public async Task DeleteConversationAsync(Guid conversationId)
@@ -30,14 +38,20 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.Messages.DeleteAsync(i => i.Id == messageId);
         }
 
-        public async Task<List<ConversationDto>> GetAccountConversationsAsync(Guid accountId)
+        public async Task<List<ConversationDto>> GetAccountConversationsAsync(Guid accountId, bool personalOnly)
         {
-            var conversations = await _connection.Messages
+            var request = _connection.Messages
                 .LoadWith(i => i.Conversation)
                 .Where(i => i.AccountId == accountId)
                 .Select(i => i.Conversation)
-                .DistinctBy(i => i.Id)
-                .ToListAsync();
+                .DistinctBy(i => i.Id);
+
+            if (personalOnly)
+                request = request.Where(i => i.EventId == null);
+
+            request = request.OrderBy(i => i.CreateDate);
+
+            var conversations = await request.ToListAsync();
             return conversations;
         }
 
@@ -52,7 +66,8 @@ namespace EList.DbDataProvider.DataProviders
             var query = _connection.Messages
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.PersonInfo)
-                .Where(i => i.ConversationId == conversationId);
+                .Where(i => i.ConversationId == conversationId)
+                .OrderBy(i => i.CreateDate);
             var count = await query.CountAsync();
             
             var result = await query.ToPagedQuery(pageIndex, pageSize).ToListAsync();
@@ -70,7 +85,8 @@ namespace EList.DbDataProvider.DataProviders
             var query = _connection.Messages
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.PersonInfo)
-                .Where(i => i.ReplyTo == messageId);
+                .Where(i => i.ReplyTo == messageId)
+                .OrderBy(i => i.CreateDate);
             var count = await query.CountAsync();
 
             var result = await query.ToPagedQuery(pageIndex, pageSize).ToListAsync();
@@ -83,12 +99,15 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.Conversations.Where(i => i.Id == conversation.Id)
                 .Set(i => i.EventId, conversation.Id)
                 .Set(i => i.Name, conversation.Name)
+                .Set(i => i.UpdateDate, DateTimeOffset.Now)
                 .UpdateAsync();
         }
 
 
         public async Task<Guid> CreateMessageAsync(MessageDto message)
         {
+            message.CreateDate = DateTimeOffset.Now;
+            message.UpdateDate = DateTimeOffset.Now;
             var result = (Guid)await _connection.InsertWithIdentityAsync(message);
 
             if (message.ReplyTo != null)
@@ -103,8 +122,9 @@ namespace EList.DbDataProvider.DataProviders
         {
             var existingMessage = await _connection.Messages.FirstAsync(i => i.Id == message.Id);
             await _connection.Messages.Where(i => i.Id == message.Id)
-                .Set(i => i.Message, message.Message)
+                .Set(i => i.MessageText, message.MessageText)
                 .Set(i => i.ReplyTo, message.ReplyTo)
+                .Set(i => i.UpdateDate, DateTimeOffset.Now)
                 .UpdateAsync();
 
             if (existingMessage.ReplyTo != message.ReplyTo)

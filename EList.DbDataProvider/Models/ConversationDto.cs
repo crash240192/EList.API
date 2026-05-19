@@ -13,5 +13,11 @@ namespace EList.DbDataProvider.Models
 
         [Column("event_id")]
         public Guid? EventId { get; set; }
+
+        [Column("create_date")]
+        public DateTimeOffset CreateDate { get; set; }
+
+        [Column("update_date")]
+        public DateTimeOffset UpdateDate { get; set; }
     }
 }

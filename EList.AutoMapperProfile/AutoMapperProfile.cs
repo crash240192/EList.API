@@ -16,6 +16,7 @@ using EList.Models.Subscriptions;
 using EList.Models.EventsRating;
 using EList.Models.Wallets;
 using EList.Models.Participation;
+using EList.Models.Conversations;
 
 namespace EList.AutoMapperProfile
 {
@@ -72,6 +73,11 @@ namespace EList.AutoMapperProfile
             CreateMap<TariffDto, Tariff>().ReverseMap();
             CreateMap<TariffValidatorDto, TariffValidator>().ReverseMap();
             CreateMap<WalletDto, Wallet>().ReverseMap();
+
+            CreateMap<MessageDto, Message>().ReverseMap();
+            CreateMap<MessageRequest, MessageDto>().ReverseMap();
+            CreateMap<ConversationDto, Conversation>().ReverseMap();
+            CreateMap<ConversationRequest, ConversationDto>().ReverseMap();
 
             CreateMap<Models.Enums.Gender, DbDataProvider.Models.Enums.Gender>().ReverseMap();
             CreateMap<Models.Enums.SystemNotificationType, DbDataProvider.Models.Enums.SystemNotificationType>().ReverseMap();

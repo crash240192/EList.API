@@ -12,7 +12,7 @@ namespace EList.DbDataProvider.Models
         public Guid ConversationId { get; set; }
 
         [Column("message_text")]
-        public string Message { get; set; }
+        public string MessageText { get; set; }
 
         [Column("replied")]
         public bool Replied { get; set; }
@@ -26,7 +26,13 @@ namespace EList.DbDataProvider.Models
         [Column("reply_to")]
         public Guid? ReplyTo { get; set; }
 
-        
+        [Column("create_date")]
+        public DateTimeOffset CreateDate { get; set; }
+
+        [Column("update_date")]
+        public DateTimeOffset UpdateDate { get; set; }
+
+
         [Association (ThisKey = nameof (AccountId), OtherKey = nameof(AccountDto.Id))]
         public AccountDto Account { get; set; }
 
