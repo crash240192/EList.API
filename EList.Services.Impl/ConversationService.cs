@@ -187,7 +187,10 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var existingMessage = await _conversationsRepository.GetMessageAsync(message.Id);
+            if (message.Id == null)
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, $"Не указан идентификатор сообщения");
+
+            var existingMessage = await _conversationsRepository.GetMessageAsync(message.Id.Value);
             if (existingMessage == null)
                 return CommandResult.Fail(ErrorCode.MessageNotFound, $"Сообщение с id='{message.Id}' не найдено");
 

@@ -1,6 +1,7 @@
 ﻿using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.Enums;
+using EList.Models.EventsRating;
 using LinqToDB;
 using LinqToDB.Async;
 
@@ -52,6 +53,12 @@ namespace EList.DbDataProvider.DataProviders
                 result = await request.ToListAsync();
 
             return new ValuedListResponse<EventsRatingDto>(total, average, result);
+        }
+
+        public async Task<EventsRatingDto?> GetRatingItemAsync(Guid itemId)
+        {
+            var item = await _connection.EventsRating.FirstOrDefaultAsync(i => i.Id == itemId);
+            return item;
         }
 
         public async Task UpdateEventRatingAsync(Guid id, int value, string comment)

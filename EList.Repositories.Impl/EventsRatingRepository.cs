@@ -49,5 +49,12 @@ namespace EList.Repositories.Impl
             })?.ToList();
             return new EventRating(items.TotalCount, items.Value, resultList, pageIndex ?? 1, pageSize ?? items.TotalCount);
         }
+
+        public async Task<EventsRatingItem?> GetRatingItemAsync(Guid itemId)
+        {
+            var item = await _eventsRatingDataProvider.GetRatingItemAsync(itemId);
+            var mappedResult = _mapper.Map<EventsRatingItem?>(item);
+            return mappedResult;
+        }
     }
 }

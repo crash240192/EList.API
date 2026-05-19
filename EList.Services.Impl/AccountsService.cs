@@ -61,7 +61,7 @@ namespace EList.Services.Impl
             //TODO: Валидация контактных данных
             var existingAccount = await _accountsRepository.GetAccountAsync(request.Login);
             if (existingAccount != null)
-                return CommandResult<Guid?>.Fail(ErrorCode.DublicaeAccount, "Указанный логин уже занят");
+                return CommandResult<Guid?>.Fail(ErrorCode.DublicateAccount, "Указанный логин уже занят");
 
             if (request.Password != request.PasswordConfirmation)
                 return CommandResult<Guid?>.Fail(ErrorCode.PasswordsDontMatch, "Пароль и подтверждение пароля не совпадают");
