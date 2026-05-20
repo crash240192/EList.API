@@ -58,12 +58,9 @@ namespace EList.Api.Controllers
                 
                 var result = await _subscriptionsService.SubscribeToAccountAsync(accountId);
                 if (!result.Success)
-                {
                     await _connectionProvider.RollbackTransactionAsync();
-                    return CommandResult.Fail(result.ErrorCode, result.Message);
-                }
-
-                await _connectionProvider.CommitTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -71,6 +68,7 @@ namespace EList.Api.Controllers
             }
             catch (Exception ex)
             {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
@@ -96,12 +94,9 @@ namespace EList.Api.Controllers
                 
                 var result = await _subscriptionsService.UpdateSubscriptionAsync(accountId, request);
                 if (!result.Success)
-                {
                     await _connectionProvider.RollbackTransactionAsync();
-                    return CommandResult.Fail(result.ErrorCode, result.Message);
-                }
-
-                await _connectionProvider.CommitTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -109,6 +104,7 @@ namespace EList.Api.Controllers
             }
             catch (Exception ex)
             {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
@@ -249,12 +245,9 @@ namespace EList.Api.Controllers
 
                 var result = await _subscriptionsService.DeleteSubscriptionAsync(accountId);
                 if (!result.Success)
-                {
                     await _connectionProvider.RollbackTransactionAsync();
-                    return CommandResult.Fail(result.ErrorCode, result.Message);
-                }
-
-                await _connectionProvider.CommitTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -262,6 +255,7 @@ namespace EList.Api.Controllers
             }
             catch (Exception ex)
             {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }

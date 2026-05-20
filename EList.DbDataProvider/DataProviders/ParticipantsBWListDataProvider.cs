@@ -1,5 +1,6 @@
 ﻿using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.Models.Accounts;
 using LinqToDB;
 using LinqToDB.Async;
 using LinqToDB.Data;
@@ -58,6 +59,12 @@ namespace EList.DbDataProvider.DataProviders
         {
             var result = await _connection.WhiteList.AnyAsync(i => i.EventId == eventId && i.AccountId == accountId);
             return result;
+        }
+
+        public async Task<bool> IsWhiteListEmptyAsync(Guid eventId)
+        {
+            var result = await _connection.WhiteList.AnyAsync(i => i.EventId == eventId);
+            return !result;
         }
 
 
@@ -119,6 +126,20 @@ namespace EList.DbDataProvider.DataProviders
         public async Task<int> WhiteListPersonsCountAsync(Guid eventId)
         {
             var result = await _connection.WhiteList.Where(i => i.EventId != eventId).CountAsync();
+            return result;
+        }
+
+        public async Task<List<Guid>> FilterUsersNotInWhiteListAsync(Guid eventId, List<Guid> accountIds)
+        {
+            var result = await _connection.WhiteList.Where(i => i.EventId == eventId && accountIds.Contains(i.AccountId))
+                .Select(i => i.AccountId).ToListAsync();
+            return result;
+        }
+
+        public async Task<List<Guid>> FilterUsersNotInBlackListAsync(Guid eventId, List<Guid> accountIds)
+        {
+            var result = await _connection.BlackList.Where(i => i.EventId == eventId && accountIds.Contains(i.AccountId))
+                .Select(i => i.AccountId).ToListAsync();
             return result;
         }
     }

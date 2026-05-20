@@ -68,13 +68,13 @@ namespace EList.Repositories.Impl
 
         public async Task<int> WhiteListPersonsCountAsync(Guid eventId)
         {
-            var result = await WhiteListPersonsCountAsync(eventId);
+            var result = await _participantsBWListDataProvider.WhiteListPersonsCountAsync(eventId);
             return result;
         }
 
         public async Task<int> BlackListPersonsCountAsync(Guid eventId)
         {
-            var result = await BlackListPersonsCountAsync(eventId);
+            var result = await _participantsBWListDataProvider.BlackListPersonsCountAsync(eventId);
             return result;
         }
 
@@ -87,6 +87,24 @@ namespace EList.Repositories.Impl
         public async Task<bool> IsUserInWhiteListAsync(Guid eventId, Guid accountId)
         {
             var result = await _participantsBWListDataProvider.IsUserInWhiteListAsync(eventId, accountId);
+            return result;
+        }
+
+        public async Task<bool> IsWhiteListEmptyAsync(Guid eventId)
+        {   
+            var result = await _participantsBWListDataProvider.IsWhiteListEmptyAsync(eventId);
+            return result;
+        }
+
+        public async Task<List<Guid>> FilterUsersNotInWhiteListAsync(Guid eventId, List<Guid> accountIds)
+        {
+            var result = await _participantsBWListDataProvider.FilterUsersNotInWhiteListAsync(eventId, accountIds);
+            return result;
+        }
+
+        public async Task<List<Guid>> FilterUsersNotInBlackListAsync(Guid eventId, List<Guid> accountIds)
+        {
+            var result = await _participantsBWListDataProvider.FilterUsersNotInBlackListAsync(eventId, accountIds);
             return result;
         }
     }

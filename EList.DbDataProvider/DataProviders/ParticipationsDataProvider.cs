@@ -46,6 +46,12 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<bool> IsUserParticipatedAsync(Guid accountId, Guid eventId)
+        {
+            var result = await _connection.Participations.AnyAsync(i => i.AccountId == accountId && eventId == i.EventId);
+            return result;
+        }
+
         public async Task<ListResponse<AccountDto>> GetEventParticipantsAsync(EventParticipantsSearchRequest request)
         {
             var accountsRequest = _connection.Participations

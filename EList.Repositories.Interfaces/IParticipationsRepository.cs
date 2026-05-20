@@ -9,6 +9,7 @@ namespace EList.Repositories.Interfaces
         Task<Guid> ParticipateAsync(Guid accountId, Guid eventId);
         Task LeaveEventAsync(Guid accountId, Guid eventId);
         Task<PagedList<Participant>> GetEventParticipantsAsync(EventParticipantsSearchRequest request);
+        Task<bool> IsUserParticipatedAsync(Guid accountId, Guid eventId);
         Task<int> GetParticipantsCountAsync(Guid eventId);
     }
 }

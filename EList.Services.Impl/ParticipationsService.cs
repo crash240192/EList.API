@@ -197,6 +197,8 @@ namespace EList.Services.Impl
 
             await _participantsBWListRepository.AddToBlackListAsync(request);
 
+            //TODO: Удалить все приглашения на это мероприятие пользователям из черного списка
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
@@ -213,6 +215,8 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _participantsBWListRepository.AddToWhiteListAsync(request);
+
+            //TODO: Проверить все приглашения на это мероприятие и пользователям не из белого списка удалить приглашения
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

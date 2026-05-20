@@ -34,7 +34,7 @@ namespace EList.Services.Impl
         private readonly IInvitationsRepository _invitationsRepository;
         private readonly IParticipationsRepository _participationsRepository;
         private readonly IWalletsRepository _walletsRepository;
-
+        private readonly IParticipantsBWListRepository _participantsBWListRepository;
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
             IEventsRepository eventsRepository,
@@ -44,7 +44,8 @@ namespace EList.Services.Impl
             IInvitationsRepository invitationsRepository,
             IParticipationsRepository participationsRepository,
             IWalletsRepository walletsRepository,
-            IAccountDataHolder accountDataHolder)
+            IAccountDataHolder accountDataHolder,
+            IParticipantsBWListRepository participantsBWListRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
@@ -53,6 +54,7 @@ namespace EList.Services.Impl
             _authorizationRepository = authorizationRepository ?? throw new Exception(nameof(authorizationRepository));
             _invitationsRepository = invitationsRepository ?? throw new Exception(nameof(invitationsRepository));
             _participationsRepository = participationsRepository ?? throw new Exception(nameof(participationsRepository));
+            _participantsBWListRepository = participantsBWListRepository ?? throw new Exception(nameof(participantsBWListRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
             _walletsRepository = walletsRepository ?? throw new Exception(nameof(walletsRepository));
             _accountDataHolder = accountDataHolder;
@@ -135,13 +137,15 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(GetEventTypesByEventIdAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //TODO: Добавить сюда проверку на наличие события
+            var curEvent = await _eventsRepository.GetEventAsync(eventId);
+            if (curEvent == null)
+                return CommandResult<List<EventType>?>.Fail(ErrorCode.EventNotFound, "Событие не найдено");
 
             var result = await _eventsMetadataRepository.GetEventTypesByEventIdAsync(eventId);
-            result.ForEach(i => i.Name = Localizator.GetProperty(i.LocalizationPath, i.Name));
+            result?.ForEach(i => i.Name = Localizator.GetProperty(i.LocalizationPath, i.Name));
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<List<EventType>>(result);
+            return new CommandResult<List<EventType>?>(result);
         }
 
         public async Task<CommandResult<List<EventType>?>> GetEventTypesByCategoryIdAsync(Guid categoryId)
@@ -150,14 +154,15 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(GetEventTypesByCategoryIdAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-            //TODO: Добавить сюда проверку на наличие события
-
+            
+            var category = await _eventsMetadataRepository.GetEventCategoryAsync(categoryId);
+            if (category == null)
+                return CommandResult<List<EventType>?>.Fail(ErrorCode.EventNotFound, "Событие не найдено");
             var result = await _eventsMetadataRepository.GetEventTypesByCategoryIdAsync(categoryId);
-            result.ForEach(i => i.Name = Localizator.GetProperty(i.LocalizationPath, i.Name));
+            result?.ForEach(i => i.Name = Localizator.GetProperty(i.LocalizationPath, i.Name));
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<List<EventType>>(result);
+            return new CommandResult<List<EventType>?>(result);
         }
 
         public async Task<CommandResult> UpdateEventTypeAsync(Guid id, EventTypeRequest request)
@@ -426,7 +431,7 @@ namespace EList.Services.Impl
 
             //var account = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
 
-            
+
 
             //TODO: С организациями разберёмся позже 
 
@@ -499,7 +504,7 @@ namespace EList.Services.Impl
             return new CommandResult<Guid?>(eventId);
         }
 
-        public async Task<CommandResult<Event>> GetEventAsync(Guid id)
+        public async Task<CommandResult<Event>> GetEventAsync(Guid eventId)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -508,23 +513,39 @@ namespace EList.Services.Impl
 
             //TODO: Добавить проверку на то что пользователю вообще доступно это событие
 
-            var eventItem = await _eventsRepository.GetEventAsync(id);
+            var eventItem = await _eventsRepository.GetEventAsync(eventId);
 
             if (eventItem == null)
-                return CommandResult<Event>.Fail(ErrorCode.EventNotFound, $"Событие с id='{id}' не найдено");
+                return CommandResult<Event>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
-            if (eventItem.Parameters?.Private == true)
+            var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
+            var isOrganizator = organizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? false;
+
+            if (!isOrganizator)
             {
-                var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(id);
-                if (!organizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
+                if (eventItem.Parameters?.Private == true)
                 {
-                    var participants = await _participationsRepository.GetEventParticipantsAsync(new EventParticipantsSearchRequest { EventId = id });
-                    if (!participants.Result?.Any(p => p.Account.Id == _accountDataHolder.AccountId) ?? true)
+                    var isUserInWhiteList = await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId);
+                    if (!isUserInWhiteList)
                     {
-                        var invitation = await _invitationsRepository.GetInvitationAsync(_accountDataHolder.AccountId, id);
-                        if (invitation == null)
-                            return CommandResult<Event>.Fail(ErrorCode.InvitationNotFound, "Посещать закрытые мероприятия можно только приглашению");
+                        var whiteListIsEmpty = await _participantsBWListRepository.IsWhiteListEmptyAsync(eventId);
+                        if (whiteListIsEmpty)
+                        {
+                            var isUserParticipated = await _participationsRepository.IsUserParticipatedAsync(_accountDataHolder.AccountId, eventId);
+                            if (!isUserParticipated)
+                            {
+                                var invitation = await _invitationsRepository.GetInvitationAsync(_accountDataHolder.AccountId, eventId);
+                                if (invitation == null)
+                                    return CommandResult<Event>.Fail(ErrorCode.InvitationNotFound, "Посещать закрытые мероприятия можно только приглашению");
+                            }
+                        }
                     }
+                }
+                else
+                {
+                    var isUserInBlackList = await _participantsBWListRepository.IsUserInBlackListAsync(eventId, _accountDataHolder.AccountId);
+                    if (isUserInBlackList)
+                        return CommandResult<Event>.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
                 }
             }
 
@@ -566,9 +587,9 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var curEvent = await _eventsRepository.GetEventAsync(eventId);
-            if (curEvent == null)            
+            if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Мероприятие с id='{eventId} не найдено'");
-            
+
             var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
             if (!(organizators?.Any(i => i.Account.Id == _accountDataHolder.AccountId) ?? false))
                 return CommandResult.Fail(ErrorCode.AccessError, $"У вас нет доступа к редактированию текущего мероприятия'");

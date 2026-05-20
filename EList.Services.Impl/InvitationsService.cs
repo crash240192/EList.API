@@ -61,12 +61,18 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            if (request.AccountIds?.Any() ?? true)
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Список пользователей пуст");
+
             var curEvent = await _eventsRepository.GetEventAsync(request.EventId);
             if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Мероприятие с id='{request.EventId}' не найдено");
 
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(curEvent.Id);
-            if (!(eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId)) ?? true)
+
+            var isOrganizator = eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? false;
+
+            if (!isOrganizator)
             {
                 //TODO: Тут надо реализовать проверку что указанным пользователям можно выслать приглашения по black/white list
                 //if (curEvent.Parameters?.Private ?? false)
@@ -83,7 +89,7 @@ namespace EList.Services.Impl
                 //TODO Проверить, является ли текущая организация организатором для данного мероприятия
             }
 
-            if (!curEvent.Parameters?.AllowUsersToInvite ?? false)
+            if (!curEvent.Parameters?.AllowUsersToInvite ?? false && !isOrganizator)
             {
                 var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(request.EventId);
                 if (!organizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
@@ -102,25 +108,37 @@ namespace EList.Services.Impl
                     return CommandResult.Fail(ErrorCode.EventIsFull, $"В мероприятии уже участвует максимальное количество человек");
             }
 
+            #region filterInvitations
+            var someInvitationsFiltered = false;
+            var message = string.Empty;
             if (curEvent.Parameters?.Private ?? false)
             {
-                var whiteListCount = await _participantsBWListRepository.WhiteListPersonsCountAsync(curEvent.Id);
-                if (whiteListCount > 0)
+                var whiteListIsEmpty = await _participantsBWListRepository.IsWhiteListEmptyAsync(curEvent.Id);
+                if (!whiteListIsEmpty)
                 {
-                    if (!await _participantsBWListRepository.IsUserInWhiteListAsync(curEvent.Id, _accountDataHolder.AccountId))
-                        return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
+                    var filteredAccounts = await _participantsBWListRepository.FilterUsersNotInWhiteListAsync(curEvent.Id, request.AccountIds);
+                    someInvitationsFiltered = filteredAccounts.Count() != request.AccountIds.Count();
+                    if (someInvitationsFiltered)
+                        message = "Некоторых пользователей нет в белом списках. Им не удалось отправить приглашение";
                 }
             }
             else
             {
-                if (await _participantsBWListRepository.IsUserInBlackListAsync(curEvent.Id, _accountDataHolder.AccountId))
-                    return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
+                var filteredAccounts = await _participantsBWListRepository.FilterUsersNotInBlackListAsync(curEvent.Id, request.AccountIds);
+                someInvitationsFiltered = filteredAccounts.Count() != request.AccountIds.Count();
+                if (someInvitationsFiltered)
+                    message = "Некоторые пользователи находятся в чёрном списке. Им не удалось отправить приглашение";
             }
+            #endregion
 
             await _invitationsRepository.CreateInvitationsAsync(request, _accountDataHolder.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return CommandResult.OK;
+            
+            var result = CommandResult.OK;
+            if (someInvitationsFiltered)
+                result.Message = message;
+            return result;
         }
 
         public async Task<CommandResult> AcceptAsync(Guid invitationId)

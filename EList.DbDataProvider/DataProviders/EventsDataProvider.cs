@@ -118,14 +118,23 @@ namespace EList.DbDataProvider.DataProviders
             if (request.AllowedGender != null)
                 eventsRequest = eventsRequest.Where(i => i.Parameters.AllowedGender == null || i.Parameters.AllowedGender == request.AllowedGender);
 
+            //Добавить сюда проверку что пользователь без пола или запрещённого пола не может видеть мероприятие
+
             if (request.Price != null)
                 eventsRequest = eventsRequest.Where(e => e.Parameters.Cost == null || e.Parameters.Cost <= request.Price);
 
             // Отображение частных мероприятий
+            // для черных списков - показывать если пользователь не в черных списках или он организатор
+            // для белых списков - показывать, если пользователь в белом списке, или белый список пуст, или он организатор, или он уже участник
             if (curAccountId != null)
-                eventsRequest = eventsRequest.Where(i => i.Parameters.Private != true
-                        || (i.Parameters.Private == true && i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId))
-                        || (i.Parameters.Private == true && i.Participants.Any(p => p.AccountId == curAccountId))
+                eventsRequest = eventsRequest.Where(i => 
+                        (i.Parameters.Private == true && 
+                                i.WhiteList.Any(p => p.AccountId == curAccountId) 
+                                || (i.WhiteList.Count() == 0 && 
+                                    (i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId))
+                                    || i.Participants.Any(p => p.AccountId == curAccountId))
+                        )
+                        || (i.Parameters.Private != true && (!i.BlackList.Any(p => p.AccountId == curAccountId)))
                         || i.Organizators.Any(o => o.AccountId == curAccountId));
             #endregion
 

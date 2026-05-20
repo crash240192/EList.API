@@ -45,6 +45,12 @@ namespace EList.Repositories.Impl
             return new PagedList<Participant>(participantsResult.TotalCount, resultList, request.PageIndex ?? 1, request.PageSize ?? participantsResult.TotalCount);
         }
 
+        public async Task<bool> IsUserParticipatedAsync(Guid accountId, Guid eventId)
+        {
+            var result = await _participationsDataProvider.IsUserParticipatedAsync(accountId, eventId);
+            return result;
+        }
+
         public async Task<int> GetParticipantsCountAsync(Guid eventId)
         {
             var result = await _participationsDataProvider.GetParticipantsCountAsync(eventId);

@@ -57,18 +57,16 @@ namespace EList.Api.Controllers
 
                 var result = await _personService.CreatePersonInfoAsync(request);
                 if (!result.Success)
-                {
                     await _connectionProvider.RollbackTransactionAsync();
-                    return CommandResult<Guid?>.Fail(result.ErrorCode, result.Message);
-                }
-
-                await _connectionProvider.CommitTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
             catch (Exception ex)
             {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }

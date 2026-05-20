@@ -10,6 +10,10 @@ namespace EList.Repositories.Interfaces
 
         Task<bool> IsUserInBlackListAsync(Guid eventId, Guid accountId);
         Task<bool> IsUserInWhiteListAsync(Guid eventId, Guid accountId);
+        Task<bool> IsWhiteListEmptyAsync(Guid eventId);
+
+        Task<List<Guid>> FilterUsersNotInWhiteListAsync(Guid eventId, List<Guid> accountIds);
+        Task<List<Guid>> FilterUsersNotInBlackListAsync(Guid eventId, List<Guid> accountIds);
 
         Task DeleteFromBlackListAsync(Guid eventId, Guid accountId);
         Task DeleteFromWhiteListAsync(Guid eventId, Guid accountId);
