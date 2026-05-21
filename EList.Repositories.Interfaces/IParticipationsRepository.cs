@@ -1,6 +1,5 @@
 ﻿using EList.Common.Models;
 using EList.Models.Participation;
-using EList.Models.Subscriptions;
 
 namespace EList.Repositories.Interfaces
 {
@@ -8,6 +7,8 @@ namespace EList.Repositories.Interfaces
     {
         Task<Guid> ParticipateAsync(Guid accountId, Guid eventId);
         Task LeaveEventAsync(Guid accountId, Guid eventId);
+        Task DropParticipationsAsync(Guid eventId, List<Guid> accountIds);
+        Task DropAllParticipationsExceptThisUsersAsync(Guid eventId, List<Guid> accountIds);
         Task<PagedList<Participant>> GetEventParticipantsAsync(EventParticipantsSearchRequest request);
         Task<bool> IsUserParticipatedAsync(Guid accountId, Guid eventId);
         Task<int> GetParticipantsCountAsync(Guid eventId);

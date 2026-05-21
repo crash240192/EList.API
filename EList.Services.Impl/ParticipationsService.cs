@@ -191,13 +191,18 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(AddToBlackListAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            if (!request.AccountIds?.Any() ?? true)
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Список пользователей не указан");
+
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(request.EventId);
             if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _participantsBWListRepository.AddToBlackListAsync(request);
+            await _invitationsRepository.DeleteInvitationAsync(request.EventId, request.AccountIds);
+            await _participationRepository.DropParticipationsAsync(request.EventId, request.AccountIds);
 
-            //TODO: Удалить все приглашения на это мероприятие пользователям из черного списка
+            //TODO: Сформировать удаление о том что пользователя исключили, если он участвовал в мероприятии или у него было приглашение
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -210,13 +215,18 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(AddToWhiteListAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            if (!request.AccountIds?.Any() ?? true)
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Список пользователей не указан");
+
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(request.EventId);
             if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _participantsBWListRepository.AddToWhiteListAsync(request);
+            await _invitationsRepository.CancelAllInvitationsExceptThisUsersAsync(request.EventId, request.AccountIds);
+            await _participationRepository.DropAllParticipationsExceptThisUsersAsync(request.EventId, request.AccountIds);
 
-            //TODO: Проверить все приглашения на это мероприятие и пользователям не из белого списка удалить приглашения
+            //TODO: Сформировать удаление о том что пользователя исключили, если он участвовал в мероприятии или у него было приглашение
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

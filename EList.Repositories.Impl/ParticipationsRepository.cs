@@ -5,7 +5,6 @@ using EList.Models.Accounts;
 using EList.Models.Participation;
 using EList.Models.Person;
 using EList.Repositories.Interfaces;
-using NetTopologySuite.Index.HPRtree;
 
 namespace EList.Repositories.Impl
 {
@@ -24,6 +23,16 @@ namespace EList.Repositories.Impl
         public async Task LeaveEventAsync(Guid accountId, Guid eventId)
         {
             await _participationsDataProvider.LeaveEventAsync(accountId, eventId);
+        }
+
+        public async Task DropParticipationsAsync(Guid eventId, List<Guid> accountIds)
+        {
+            await _participationsDataProvider.DropParticipationsAsync(eventId, accountIds);
+        }
+
+        public async Task DropAllParticipationsExceptThisUsersAsync(Guid eventId, List<Guid> accountIds)
+        {
+            await _participationsDataProvider.DropAllParticipationsExceptThisUsersAsync(eventId, accountIds);
         }
 
         public async Task<Guid> ParticipateAsync(Guid accountId, Guid eventId)

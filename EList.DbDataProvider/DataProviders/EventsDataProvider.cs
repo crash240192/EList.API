@@ -127,15 +127,35 @@ namespace EList.DbDataProvider.DataProviders
             // для черных списков - показывать если пользователь не в черных списках или он организатор
             // для белых списков - показывать, если пользователь в белом списке, или белый список пуст, или он организатор, или он уже участник
             if (curAccountId != null)
-                eventsRequest = eventsRequest.Where(i => 
-                        (i.Parameters.Private == true && 
-                                i.WhiteList.Any(p => p.AccountId == curAccountId) 
-                                || (i.WhiteList.Count() == 0 && 
-                                    (i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId))
-                                    || i.Participants.Any(p => p.AccountId == curAccountId))
+                eventsRequest = eventsRequest
+                        .LoadWith(i => i.BlackList)
+                        .LoadWith(i => i.WhiteList)
+                    .Where(i =>
+                        (i.Parameters.Private == true &&
+                                (
+                                    (i.WhiteList.Any(p => p.AccountId == curAccountId) || i.WhiteList.Count() == 0) 
+                                    &&
+                                    (i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId) || i.Participants.Any(p => p.AccountId == curAccountId))
+                                )
                         )
                         || (i.Parameters.Private != true && (!i.BlackList.Any(p => p.AccountId == curAccountId)))
                         || i.Organizators.Any(o => o.AccountId == curAccountId));
+
+            //отображение с учетом белых и черных списков
+            if (curAccountId != null)
+            {
+
+                //eventsRequest = eventsRequest
+                //    .LoadWith(i => i.BlackList)
+                //    .LoadWith(i => i.WhiteList)
+                //    .Where(i => (i.Parameters.Private != true 
+                //                    && (!i.BlackList.Any(p => p.AccountId == curAccountId) 
+                //                        || i.Organizators.Any(o => o.AccountId == curAccountId)))
+                //                ||
+                //                (i.Parameters.Private == true 
+                //                    && (i.WhiteList.Any(p => p.AccountId == curAccountId)
+                //                        || i.Organizators.Any(o => o.AccountId == curAccountId))));
+            }
             #endregion
 
             #region eventTypes

@@ -25,6 +25,16 @@ namespace EList.DbDataProvider.DataProviders
             }
         }
 
+        public async Task DropParticipationsAsync(Guid eventId, List<Guid> accountIds)
+        {
+            await _connection.Participations.DeleteAsync(i => i.EventId == eventId && accountIds.Contains(i.AccountId));
+        }
+
+        public async Task DropAllParticipationsExceptThisUsersAsync(Guid eventId, List<Guid> accountIds)
+        {
+            await _connection.Participations.DeleteAsync(i => i.EventId == eventId && !accountIds.Contains(i.AccountId));
+        }
+
         public async Task<Guid> ParticipateAsync(Guid accountId, Guid eventId)
         {
             var existingParticipation = await _connection.Participations.FirstOrDefaultAsync(i => i.AccountId == accountId && eventId == i.EventId);

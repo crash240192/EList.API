@@ -61,7 +61,7 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            if (request.AccountIds?.Any() ?? true)
+            if (!request.AccountIds?.Any() ?? true)
                 return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Список пользователей пуст");
 
             var curEvent = await _eventsRepository.GetEventAsync(request.EventId);

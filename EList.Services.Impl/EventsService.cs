@@ -536,8 +536,12 @@ namespace EList.Services.Impl
                             {
                                 var invitation = await _invitationsRepository.GetInvitationAsync(_accountDataHolder.AccountId, eventId);
                                 if (invitation == null)
-                                    return CommandResult<Event>.Fail(ErrorCode.InvitationNotFound, "Посещать закрытые мероприятия можно только приглашению");
+                                    return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Посещать закрытые мероприятия можно только приглашению");
                             }
+                        }
+                        else
+                        {
+                            return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Посещать закрытые мероприятия можно только приглашению");
                         }
                     }
                 }
@@ -545,7 +549,7 @@ namespace EList.Services.Impl
                 {
                     var isUserInBlackList = await _participantsBWListRepository.IsUserInBlackListAsync(eventId, _accountDataHolder.AccountId);
                     if (isUserInBlackList)
-                        return CommandResult<Event>.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
+                        return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Организатор добавил вас в чёрный список мероприятия");
                 }
             }
 

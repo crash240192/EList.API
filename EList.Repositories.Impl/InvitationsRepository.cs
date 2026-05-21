@@ -47,9 +47,19 @@ namespace EList.Repositories.Impl
             await _invitationsDataProvider.CancelInvitationsAsync(eventId);
         }
 
+        public async Task CancelAllInvitationsExceptThisUsersAsync(Guid eventId, List<Guid> invitedAccountIds)
+        {
+            await _invitationsDataProvider.CancelAllInvitationsExceptThisUsersAsync(eventId, invitedAccountIds);
+        }
+
         public async Task DeleteInvitationAsync(Guid eventId, Guid accountId)
         {
             await _invitationsDataProvider.DeleteInvitationAsync(eventId, accountId);
+        }
+
+        public async Task DeleteInvitationAsync(Guid eventId, List<Guid> accountIds)
+        {
+            await _invitationsDataProvider.DeleteInvitationAsync(eventId, accountIds);
         }
 
         public async Task<PagedList<Invitation>> SearchInvitationsAsync(InvitationsSearchRequest request)
@@ -85,6 +95,13 @@ namespace EList.Repositories.Impl
         {
             var invitation = await _invitationsDataProvider.GetInvitationAsync(invitationId);
             var result = _mapper.Map<Invitation>(invitation);
+            return result;
+        }
+
+        public async Task<List<Invitation>?> GetAllEventInvitationsAsync(Guid eventId)
+        {
+            var invitations = await _invitationsDataProvider.GetAllEventInvitationsAsync(eventId);
+            var result = _mapper.Map<List<Invitation>?>(invitations);
             return result;
         }
 
