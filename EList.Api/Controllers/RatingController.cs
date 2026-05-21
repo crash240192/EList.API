@@ -147,7 +147,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="itemId"></param>
         /// <returns></returns>
-        [HttpDelete("events/delete/{eventId}")]
+        [HttpDelete("events/delete/{itemId}")]
         public async Task<CommandResult> DeleteAsync(Guid itemId)
         {
             var correlationId = _correlationIdProvider.Get();
