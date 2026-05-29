@@ -7,7 +7,6 @@ using EList.Models.EventsRating;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
-using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 
 namespace EList.Services.Impl
@@ -46,7 +45,7 @@ namespace EList.Services.Impl
             var eventRating = await _eventsRatingRepository.GetEventRatingAcync(eventId, eventRatingType, pageIndex, pageSize);
 
             if (eventRating == null)
-                return CommandResult<EventRating>.Fail(ErrorCode.EventCategoryNotFound, "Категория события не найдена");
+                return CommandResult<EventRating>.Fail(ErrorCode.EventCategoryNotFound, "Рейтинг мероприятия пуст");
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<EventRating>(eventRating);
@@ -54,7 +53,28 @@ namespace EList.Services.Impl
 
         public Task<CommandResult<int?>> GetOrganizatorRatingAsync(Guid accountId)
         {
+            //TODO: Реализовать получение суммарного рейтинга организатора
             throw new NotImplementedException();
+        }
+
+        public async Task<CommandResult> DeleteAsync(Guid itemId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var item = await _eventsRatingRepository.GetRatingItemAsync(itemId);
+            if (item == null)
+                return CommandResult.Fail(ErrorCode.RatingItemNotFound, $"Оценка с указанным id='{itemId}' не найдена");
+
+            if (item.AccountId != _accountDataHolder.AccountId)
+                return CommandResult.Fail(ErrorCode.AccessError, $"Нельзя удалять оценку другого пользователя");
+
+            await _eventsRatingRepository.DeleteEventRatingAsync(itemId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
         }
 
         public async Task<CommandResult<Guid>> VoteAsync(EventsRatingItem request)
@@ -64,16 +84,16 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(VoteAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var curEvent = await _eventsRepository.GetEventAsync(request.Id);
+            var curEvent = await _eventsRepository.GetEventAsync(request.EventId);
             if (curEvent == null)
-                return CommandResult<Guid>.Fail(ErrorCode.EventNotFound, $"Событие {request.Id} не найдено");
+                return CommandResult<Guid>.Fail(ErrorCode.EventNotFound, $"Событие {request.EventId} не найдено");
 
             if (curEvent.StartTime > DateTimeOffset.Now)
-                request.RatingType = EventRatingType.Summary;
+                request.RatingType = EventRatingType.Expectation;            
             else
-                request.RatingType = EventRatingType.Expectation;
+                request.RatingType = EventRatingType.Summary;
 
-                request.AccountId = _accountDataHolder.AccountId;
+            request.AccountId = _accountDataHolder.AccountId;
             var eventRating = await _eventsRatingRepository.CreateEventRatingAsync(request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);

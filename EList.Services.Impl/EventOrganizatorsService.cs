@@ -6,6 +6,7 @@ using EList.Models.EventOrganizators;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
+using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 
 namespace EList.Services.Impl
@@ -22,16 +23,19 @@ namespace EList.Services.Impl
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IEventOrganizatorsRepository _organizatorsRepository;
+        private readonly ISubscriptionsRepository _subscriptionsRepository;
 
         public EventOrganizatorsService(ICorrelationIdProvider correlationIdProvider,
             IEventsRepository eventsRepository,
             IAccountDataHolder accountDataHolder,
-            IEventOrganizatorsRepository organizatorsRepository)
+            IEventOrganizatorsRepository organizatorsRepository,
+            ISubscriptionsRepository subscriptionsRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _accountDataHolder = accountDataHolder;
             _organizatorsRepository = organizatorsRepository ?? throw new ArgumentNullException(nameof(organizatorsRepository));
+            _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
         }
 
         public async Task<CommandResult<List<EventOrganizator>>> GetByEventIdAsync(Guid eventId)
@@ -66,7 +70,9 @@ namespace EList.Services.Impl
             if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
-            //TODO: Реализовать проверку, доступен ли пользователю просмотр списка участников
+            var eventOrganizators = await _organizatorsRepository.GetByEventIdAsync(eventId);
+            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
+                return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _organizatorsRepository.AssignAsync(eventId, accountIds);
 

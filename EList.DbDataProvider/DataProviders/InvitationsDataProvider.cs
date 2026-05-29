@@ -39,9 +39,21 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<List<InvitationDto>?> GetAllEventInvitationsAsync(Guid eventId)
+        {
+            var result = await _connection.Invitations.Where(i => i.EventId == eventId).ToListAsync();
+            return result;
+        }
+
         public async Task<InvitationDto> GetInvitationAsync(Guid invitedAccountId, Guid eventId)
         {
             var result = await _connection.Invitations.FirstOrDefaultAsync(i => i.InvitedAccountId == invitedAccountId && i.EventId == eventId);
+            return result;
+        }
+
+        public async Task<bool> IsUserInvitatedAsync(Guid accountId, Guid eventId)
+        {
+            var result = await _connection.Invitations.AnyAsync(i => i.InvitedAccountId == accountId && i.EventId == eventId);
             return result;
         }
 
@@ -50,9 +62,24 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.Invitations.DeleteAsync(i => i.Id == id);
         }
 
+        public async Task CancelInvitationsAsync(Guid eventId)
+        {
+            await _connection.Invitations.DeleteAsync(i => i.EventId == eventId);
+        }
+
+        public async Task CancelAllInvitationsExceptThisUsersAsync(Guid eventId, List<Guid> invitedAccountIds)
+        {
+            await _connection.Invitations.DeleteAsync(i => i.EventId == eventId && !invitedAccountIds.Contains(i.InvitedAccountId));
+        }
+
         public async Task DeleteInvitationAsync(Guid eventId, Guid accountId)
         {
             await _connection.Invitations.DeleteAsync(i => i.EventId == eventId && i.InvitedAccountId == accountId);
+        }
+
+        public async Task DeleteInvitationAsync(Guid eventId, List<Guid> accountIds)
+        {
+            await _connection.Invitations.DeleteAsync(i => i.EventId == eventId && accountIds.Contains(i.InvitedAccountId));
         }
 
         public async Task<ListResponse<InvitationDto>> SearchInvitationsAsync(InvitationsSearchRequest request)

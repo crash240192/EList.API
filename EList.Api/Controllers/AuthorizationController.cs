@@ -42,8 +42,7 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Авторизация пользователя
         /// </summary>
-        /// <param name="login"></param>
-        /// <param name="password"></param>
+        /// <param name="request"></param>
         /// <returns></returns>
         [AllowAnonymous]
         [HttpPost]
@@ -74,7 +73,6 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Активация зарегистрированного токена
         /// </summary>
-        /// <param name="accountId"></param>
         /// <param name="activationKey"></param>
         /// <returns></returns>
         [HttpGet("activate")]
@@ -93,16 +91,17 @@ namespace EList.Api.Controllers
 
                 var result = await _authorizationService.ActivateTokenAsync(activationKey, clientHash);
 
-                await _connectionProvider.CommitTransactionAsync();
-
                 if (!result.Success)
-                    return CommandResult.Fail(result.ErrorCode, result.Message);
+                    await _connectionProvider.RollbackTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
             catch (Exception ex)
             {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
@@ -111,8 +110,6 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Проверка авторизации
         /// </summary>
-        /// <param name="accountId"></param>
-        /// <param name="activationKey"></param>
         /// <returns></returns>
         [HttpGet("check")]
         public async Task<CommandResult> CheckAuthorizationAsync()

@@ -68,15 +68,35 @@ namespace EList.Services.Impl
             if (curEvent == null)
                 return CommandResult<Guid?>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
+            if (curEvent.Active == false)
+                return CommandResult<Guid?>.Fail(ErrorCode.EventCancelled, "Мероприятие было отменено");
+
             if (curEvent.Parameters.Private ?? false)
             {
-                if (await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId))
-                    return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
+                var whiteListCount = await _participantsBWListRepository.WhiteListPersonsCountAsync(eventId);
+                if (whiteListCount == 0)
+                {// если белый список пуст, проверяем приглашения
+                    var isUserInvited = await _invitationsRepository.IsUserInvitatedAsync(eventId, _accountDataHolder.AccountId);
+                    if (!isUserInvited)
+                        return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Принять участие в закрытом мероприятии можно только по приглашению");
+                }
+                else
+                {
+                    if (!await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId))
+                        return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
+                }
             }
             else
             {
                 if (await _participantsBWListRepository.IsUserInBlackListAsync(eventId, _accountDataHolder.AccountId))
                     return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
+            }
+
+            if (curEvent.Parameters?.MaxPersonsCount > 0)
+            {
+                var participationsCount = await _participationRepository.GetParticipantsCountAsync(eventId);
+                if (participationsCount >= curEvent.Parameters.MaxPersonsCount)
+                    return CommandResult<Guid?>.Fail(ErrorCode.EventIsFull, "В мероприятии уже участвует максимальное количество человек");
             }
 
             var result = await _participationRepository.ParticipateAsync(_accountDataHolder.AccountId, eventId);
@@ -164,38 +184,79 @@ namespace EList.Services.Impl
         }
 
 
-        public async Task<CommandResult<Guid>> AddToBlackListAsync(Guid eventId, Guid accountId)
+        public async Task<CommandResult<List<Guid>>> GetEventBlackListShortAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventBlackListShortAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var result = await _participantsBWListRepository.GetEventBlackListShortAsync(eventId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<Guid>>(result);
+        }
+
+        public async Task<CommandResult<List<Guid>>> GetEventWhiteListShortAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventWhiteListShortAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var result = await _participantsBWListRepository.GetEventWhiteListShortAsync(eventId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<Guid>>(result);
+        }
+
+
+        public async Task<CommandResult> AddToBlackListAsync(AddUsersToBWListRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(AddToBlackListAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            if (eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
-                return CommandResult<Guid>.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+            if (!request.AccountIds?.Any() ?? true)
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Список пользователей не указан");
 
-            var result = await _participantsBWListRepository.AddToBlackListAsync(eventId, accountId);
+            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(request.EventId);
+            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
+                return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+
+            await _participantsBWListRepository.AddToBlackListAsync(request);
+            await _invitationsRepository.DeleteInvitationAsync(request.EventId, request.AccountIds);
+            await _participationRepository.DropParticipationsAsync(request.EventId, request.AccountIds);
+
+            //TODO: Сформировать удаление о том что пользователя исключили, если он участвовал в мероприятии или у него было приглашение
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<Guid>(result);
+            return CommandResult.OK;
         }
 
-        public async Task<CommandResult<Guid>> AddToWhiteListAsync(Guid eventId, Guid accountId)
+        public async Task<CommandResult> AddToWhiteListAsync(AddUsersToBWListRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(AddToWhiteListAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            if (eventOrganizators?.Any(i => i.OrganizationId == _accountDataHolder.AccountId) ?? true)
-                return CommandResult<Guid>.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+            if (!request.AccountIds?.Any() ?? true)
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Список пользователей не указан");
 
-            var result = await _participantsBWListRepository.AddToWhiteListAsync(eventId, accountId);
+            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(request.EventId);
+            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
+                return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+
+            await _participantsBWListRepository.AddToWhiteListAsync(request);
+            await _invitationsRepository.CancelAllInvitationsExceptThisUsersAsync(request.EventId, request.AccountIds);
+            await _participationRepository.DropAllParticipationsExceptThisUsersAsync(request.EventId, request.AccountIds);
+
+            //TODO: Сформировать удаление о том что пользователя исключили, если он участвовал в мероприятии или у него было приглашение
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<Guid>(result);
+            return CommandResult.OK;
         }
 
 
@@ -207,7 +268,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            if (eventOrganizators?.Any(i => i.OrganizationId == _accountDataHolder.AccountId) ?? true)
+            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _participantsBWListRepository.DeleteFromBlackListAsync(eventId, accountId);
@@ -224,7 +285,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            if (eventOrganizators?.Any(i => i.OrganizationId == _accountDataHolder.AccountId) ?? true)
+            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _participantsBWListRepository.DeleteFromWhiteListAsync(eventId, accountId);

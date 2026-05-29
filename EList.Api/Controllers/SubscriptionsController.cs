@@ -42,7 +42,7 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Подписаться на пользователя
         /// </summary>
-        /// <param name="request"></param>
+        /// <param name="accountId"></param>
         /// <returns></returns>
         [HttpGet("subscribe/{accountId}")]
         public async Task<CommandResult> SubscribeToAccountAsync(Guid accountId)
@@ -58,12 +58,9 @@ namespace EList.Api.Controllers
                 
                 var result = await _subscriptionsService.SubscribeToAccountAsync(accountId);
                 if (!result.Success)
-                {
                     await _connectionProvider.RollbackTransactionAsync();
-                    return CommandResult.Fail(result.ErrorCode, result.Message);
-                }
-
-                await _connectionProvider.CommitTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -71,6 +68,7 @@ namespace EList.Api.Controllers
             }
             catch (Exception ex)
             {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
@@ -96,12 +94,9 @@ namespace EList.Api.Controllers
                 
                 var result = await _subscriptionsService.UpdateSubscriptionAsync(accountId, request);
                 if (!result.Success)
-                {
                     await _connectionProvider.RollbackTransactionAsync();
-                    return CommandResult.Fail(result.ErrorCode, result.Message);
-                }
-
-                await _connectionProvider.CommitTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -109,6 +104,7 @@ namespace EList.Api.Controllers
             }
             catch (Exception ex)
             {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
@@ -117,10 +113,10 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Отобразить подписки пользователя
         /// </summary>
-        /// <param name="accountId"></param>
+        /// <param name="request"></param>
         /// <returns></returns>
-        [HttpGet("getSubscriptions/{accountId}")]
-        public async Task<CommandResult<PagedList<Subscription>>> GetSubscriptionsAsync(Guid accountId)
+        [HttpPost("getSubscriptions")]
+        public async Task<CommandResult<PagedList<Subscription>>> GetSubscriptionsAsync(SubscriptionsSearchRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -130,7 +126,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _subscriptionsService.GetSubscriptionsAsync(accountId);
+                var result = await _subscriptionsService.GetSubscriptionsAsync(request);
                 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -175,10 +171,10 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Отобразить подписчиков пользователя
         /// </summary>
-        /// <param name="accountId"></param>
+        /// <param name="request"></param>
         /// <returns></returns>
-        [HttpGet("getSubscribers/{accountId}")]
-        public async Task<CommandResult<PagedList<Subscription>>> GetSubscribersAsync(Guid accountId)
+        [HttpPost("getSubscribers/")]
+        public async Task<CommandResult<PagedList<Subscription>>> GetSubscribersAsync(SubscriptionsSearchRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -188,7 +184,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _subscriptionsService.GetSubscribersAsync(accountId);
+                var result = await _subscriptionsService.GetSubscribersAsync(request);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -249,12 +245,9 @@ namespace EList.Api.Controllers
 
                 var result = await _subscriptionsService.DeleteSubscriptionAsync(accountId);
                 if (!result.Success)
-                {
                     await _connectionProvider.RollbackTransactionAsync();
-                    return CommandResult.Fail(result.ErrorCode, result.Message);
-                }
-
-                await _connectionProvider.CommitTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -262,6 +255,7 @@ namespace EList.Api.Controllers
             }
             catch (Exception ex)
             {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }

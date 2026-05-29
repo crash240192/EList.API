@@ -14,7 +14,7 @@ namespace EList.DbDataProvider.Models
         [Column("account_id")]
         public Guid AccountId { get; set; }
 
-        [Association(ThisKey = nameof(Id), OtherKey = nameof(AccountDto.Id))]
+        [Association(ThisKey = nameof(AccountId), OtherKey = nameof(AccountDto.Id))]
         public AccountDto Account { get; set; }
     }
 }

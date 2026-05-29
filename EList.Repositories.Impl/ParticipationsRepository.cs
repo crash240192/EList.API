@@ -5,7 +5,6 @@ using EList.Models.Accounts;
 using EList.Models.Participation;
 using EList.Models.Person;
 using EList.Repositories.Interfaces;
-using NetTopologySuite.Index.HPRtree;
 
 namespace EList.Repositories.Impl
 {
@@ -26,6 +25,16 @@ namespace EList.Repositories.Impl
             await _participationsDataProvider.LeaveEventAsync(accountId, eventId);
         }
 
+        public async Task DropParticipationsAsync(Guid eventId, List<Guid> accountIds)
+        {
+            await _participationsDataProvider.DropParticipationsAsync(eventId, accountIds);
+        }
+
+        public async Task DropAllParticipationsExceptThisUsersAsync(Guid eventId, List<Guid> accountIds)
+        {
+            await _participationsDataProvider.DropAllParticipationsExceptThisUsersAsync(eventId, accountIds);
+        }
+
         public async Task<Guid> ParticipateAsync(Guid accountId, Guid eventId)
         {
             return await _participationsDataProvider.ParticipateAsync(accountId, eventId);
@@ -43,6 +52,18 @@ namespace EList.Repositories.Impl
             }).ToList();
 
             return new PagedList<Participant>(participantsResult.TotalCount, resultList, request.PageIndex ?? 1, request.PageSize ?? participantsResult.TotalCount);
+        }
+
+        public async Task<bool> IsUserParticipatedAsync(Guid accountId, Guid eventId)
+        {
+            var result = await _participationsDataProvider.IsUserParticipatedAsync(accountId, eventId);
+            return result;
+        }
+
+        public async Task<int> GetParticipantsCountAsync(Guid eventId)
+        {
+            var result = await _participationsDataProvider.GetParticipantsCountAsync(eventId);
+            return result;
         }
     }
 }

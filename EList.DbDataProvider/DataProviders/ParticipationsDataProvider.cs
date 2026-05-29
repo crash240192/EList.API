@@ -25,6 +25,16 @@ namespace EList.DbDataProvider.DataProviders
             }
         }
 
+        public async Task DropParticipationsAsync(Guid eventId, List<Guid> accountIds)
+        {
+            await _connection.Participations.DeleteAsync(i => i.EventId == eventId && accountIds.Contains(i.AccountId));
+        }
+
+        public async Task DropAllParticipationsExceptThisUsersAsync(Guid eventId, List<Guid> accountIds)
+        {
+            await _connection.Participations.DeleteAsync(i => i.EventId == eventId && !accountIds.Contains(i.AccountId));
+        }
+
         public async Task<Guid> ParticipateAsync(Guid accountId, Guid eventId)
         {
             var existingParticipation = await _connection.Participations.FirstOrDefaultAsync(i => i.AccountId == accountId && eventId == i.EventId);
@@ -43,6 +53,12 @@ namespace EList.DbDataProvider.DataProviders
                 result = existingParticipation.Id;
             }
 
+            return result;
+        }
+
+        public async Task<bool> IsUserParticipatedAsync(Guid accountId, Guid eventId)
+        {
+            var result = await _connection.Participations.AnyAsync(i => i.AccountId == accountId && eventId == i.EventId);
             return result;
         }
 
@@ -102,6 +118,13 @@ namespace EList.DbDataProvider.DataProviders
                 resultList = await accountsRequest.ToListAsync();
 
             return new ListResponse<AccountDto>(count, resultList);
+        }
+
+        public async Task<int> GetParticipantsCountAsync(Guid eventId)
+        {
+            var count = await _connection.Participations.Where(i => i.EventId == eventId)
+                .CountAsync();
+            return count;
         }
     }
 }

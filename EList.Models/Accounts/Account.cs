@@ -56,6 +56,11 @@ namespace EList.Models.Accounts
         /// Идентификатор кошелька
         /// </summary>
         public Guid? WalletId { get; set; }
+
+        /// <summary>
+        /// Идентификатор аватарки
+        /// </summary>
+        public Guid? AvatarId { get; set; }
     }
 
     /// <summary>
@@ -77,5 +82,10 @@ namespace EList.Models.Accounts
         /// Логин
         /// </summary>
         public string Login { get; set; }
+
+        /// <summary>
+        /// Идентификатор аватарки
+        /// </summary>
+        public Guid? AvatarId { get; set; }
     }
 }

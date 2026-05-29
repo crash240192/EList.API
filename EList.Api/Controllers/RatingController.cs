@@ -9,6 +9,7 @@ using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NLog;
+using Org.BouncyCastle.Asn1.Ocsp;
 using TM.Schedule.API.Attributes;
 
 namespace EList.Api.Controllers
@@ -76,6 +77,7 @@ namespace EList.Api.Controllers
             }
             catch (Exception ex)
             {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
@@ -135,6 +137,41 @@ namespace EList.Api.Controllers
             }
             catch (Exception ex)
             {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Удалить оценку
+        /// </summary>
+        /// <param name="itemId"></param>
+        /// <returns></returns>
+        [HttpDelete("events/delete/{itemId}")]
+        public async Task<CommandResult> DeleteAsync(Guid itemId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                await _connectionProvider.StartNewTransactionAsync();
+
+                var result = await _eventsRatingService.DeleteAsync(itemId);
+
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }

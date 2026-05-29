@@ -61,5 +61,8 @@ namespace EList.DbDataProvider.DataConnections
         public ITable<TariffDto> Tariffs => this.GetTable<TariffDto>();
         public ITable<TariffValidatorDto> TariffValidators => this.GetTable<TariffValidatorDto>();
         public ITable<OrganizationDto> Organizations => this.GetTable<OrganizationDto>();
+
+        public ITable<ConversationDto> Conversations => this.GetTable<ConversationDto>();
+        public ITable<MessageDto> Messages => this.GetTable<MessageDto>();
     }
 }

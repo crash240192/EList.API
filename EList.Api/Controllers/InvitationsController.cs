@@ -55,14 +55,11 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
                 var result = await _invitationsService.CreateAsync(request);
                 if (!result.Success)
-                {
                     await _connectionProvider.RollbackTransactionAsync();
-                    return CommandResult.Fail(result.ErrorCode, result.Message);
-                }
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return CommandResult.OK;
-
+                else
+                    await _connectionProvider.CommitTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);                
+                return result;
             }
             catch (Exception ex)
             {
@@ -85,18 +82,15 @@ namespace EList.Api.Controllers
 
             try
             {
-                await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _invitationsService.GetUserInvitationsAsync(pageIndex, pageSize);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
-
             }
             catch (Exception ex)
             {
-                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
@@ -120,14 +114,11 @@ namespace EList.Api.Controllers
 
                 var result = await _invitationsService.AcceptAsync(invitationId);
                 if (!result.Success)
-                {
                     await _connectionProvider.RollbackTransactionAsync();
-                    return CommandResult.Fail(result.ErrorCode, result.Message);
-                }
-
+                else
+                    await _connectionProvider.CommitTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return CommandResult.OK;
-
+                return result;
             }
             catch (Exception ex)
             {
@@ -155,14 +146,11 @@ namespace EList.Api.Controllers
 
                 var result = await _invitationsService.DeclineAsync(invitationId);
                 if (!result.Success)
-                {
                     await _connectionProvider.RollbackTransactionAsync();
-                    return CommandResult.Fail(result.ErrorCode, result.Message);
-                }
-
+                else
+                    await _connectionProvider.CommitTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return CommandResult.OK;
-
+                return result;
             }
             catch (Exception ex)
             {
@@ -190,13 +178,11 @@ namespace EList.Api.Controllers
 
                 var result = await _invitationsService.CancelInvitationAsync(invitationId);
                 if (!result.Success)
-                {
                     await _connectionProvider.RollbackTransactionAsync();
-                    return CommandResult.Fail(result.ErrorCode, result.Message);
-                }
-
+                else
+                    await _connectionProvider.CommitTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return CommandResult.OK;
+                return result;
 
             }
             catch (Exception ex)
@@ -220,18 +206,15 @@ namespace EList.Api.Controllers
 
             try
             {
-                await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _invitationsService.SearchAsync(request);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
-
             }
             catch (Exception ex)
             {
-                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }

@@ -16,6 +16,7 @@ using EList.Models.Subscriptions;
 using EList.Models.EventsRating;
 using EList.Models.Wallets;
 using EList.Models.Participation;
+using EList.Models.Conversations;
 
 namespace EList.AutoMapperProfile
 {
@@ -43,6 +44,8 @@ namespace EList.AutoMapperProfile
             CreateMap<ContactDataDto, ContactDataItem>().ReverseMap();
 
             CreateMap<SubscriptionDto, Subscription>().ReverseMap();
+            CreateMap<DbDataProvider.Models.SearchRequests.SubscriptionsSearchRequest, SubscriptionsSearchRequest>().ReverseMap();
+            
 
             CreateMap<SystemNotificationDto, SystemNotification>().ReverseMap();
             
@@ -50,6 +53,7 @@ namespace EList.AutoMapperProfile
             CreateMap<EventTypeDto, EventType>().ReverseMap();
             CreateMap<EventParametersDto, EventParameters>().ReverseMap();
             CreateMap<Event, EventDto>().ReverseMap().ForMember(dest => dest.Types, opt => opt.Ignore());
+            CreateMap<EventDto, EventShort>().ReverseMap();
             CreateMap<EventsRatingDto, EventsRatingItem>().ReverseMap();
             CreateMap<EventOrganizatorDto, EventOrganizator>().ReverseMap();
             CreateMap<EventParametersRequest, SetEventParametersRequest>().ReverseMap();
@@ -69,6 +73,11 @@ namespace EList.AutoMapperProfile
             CreateMap<TariffDto, Tariff>().ReverseMap();
             CreateMap<TariffValidatorDto, TariffValidator>().ReverseMap();
             CreateMap<WalletDto, Wallet>().ReverseMap();
+
+            CreateMap<MessageDto, Message>().ReverseMap();
+            CreateMap<MessageRequest, MessageDto>().ReverseMap();
+            CreateMap<ConversationDto, Conversation>().ReverseMap();
+            CreateMap<ConversationRequest, ConversationDto>().ReverseMap();
 
             CreateMap<Models.Enums.Gender, DbDataProvider.Models.Enums.Gender>().ReverseMap();
             CreateMap<Models.Enums.SystemNotificationType, DbDataProvider.Models.Enums.SystemNotificationType>().ReverseMap();

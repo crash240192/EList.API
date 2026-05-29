@@ -1,10 +1,9 @@
-﻿using EList.DbDataProvider.Interfaces;
+﻿using EList.DbDataProvider.Extensions;
+using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.SearchRequests;
 using LinqToDB;
 using LinqToDB.Async;
-using LinqToDB.Data;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace EList.DbDataProvider.DataProviders
 {
@@ -60,7 +59,7 @@ namespace EList.DbDataProvider.DataProviders
             var eventParametersRequest = _connection.EventParameters.AsQueryable();
             var eventTypes = _connection.EventTypes.AsQueryable();
             var eventsRequest = _connection.Events
-                .LoadWith(i => i.Organizator)
+                .LoadWith(i => i.Organizators)
                 .LoadWith(i => i.Parameters)
                 .LoadWith(i => i.Participants)
                 .LoadWith(i => i.Types)
@@ -119,15 +118,44 @@ namespace EList.DbDataProvider.DataProviders
             if (request.AllowedGender != null)
                 eventsRequest = eventsRequest.Where(i => i.Parameters.AllowedGender == null || i.Parameters.AllowedGender == request.AllowedGender);
 
+            //Добавить сюда проверку что пользователь без пола или запрещённого пола не может видеть мероприятие
+
             if (request.Price != null)
                 eventsRequest = eventsRequest.Where(e => e.Parameters.Cost == null || e.Parameters.Cost <= request.Price);
 
             // Отображение частных мероприятий
+            // для черных списков - показывать если пользователь не в черных списках или он организатор
+            // для белых списков - показывать, если пользователь в белом списке, или белый список пуст, или он организатор, или он уже участник
             if (curAccountId != null)
-                eventsRequest = eventsRequest.Where(i => i.Parameters.Private != true
-                        || (i.Parameters.Private == true && i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId))
-                        || (i.Parameters.Private == true && i.Participants.Any(p => p.AccountId == curAccountId))
-                        || i.Organizator.AccountId == curAccountId);
+                eventsRequest = eventsRequest
+                        .LoadWith(i => i.BlackList)
+                        .LoadWith(i => i.WhiteList)
+                    .Where(i =>
+                        (i.Parameters.Private == true &&
+                                (
+                                    (i.WhiteList.Any(p => p.AccountId == curAccountId) || i.WhiteList.Count() == 0) 
+                                    &&
+                                    (i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId) || i.Participants.Any(p => p.AccountId == curAccountId))
+                                )
+                        )
+                        || (i.Parameters.Private != true && (!i.BlackList.Any(p => p.AccountId == curAccountId)))
+                        || i.Organizators.Any(o => o.AccountId == curAccountId));
+
+            //отображение с учетом белых и черных списков
+            if (curAccountId != null)
+            {
+
+                //eventsRequest = eventsRequest
+                //    .LoadWith(i => i.BlackList)
+                //    .LoadWith(i => i.WhiteList)
+                //    .Where(i => (i.Parameters.Private != true 
+                //                    && (!i.BlackList.Any(p => p.AccountId == curAccountId) 
+                //                        || i.Organizators.Any(o => o.AccountId == curAccountId)))
+                //                ||
+                //                (i.Parameters.Private == true 
+                //                    && (i.WhiteList.Any(p => p.AccountId == curAccountId)
+                //                        || i.Organizators.Any(o => o.AccountId == curAccountId))));
+            }
             #endregion
 
             #region eventTypes
@@ -157,9 +185,9 @@ namespace EList.DbDataProvider.DataProviders
             if (request.OrganizatorId != null)
             {
                 if (request.ParticipantId != null)
-                    eventsRequest = eventsRequest.Where(i => i.Organizator.AccountId == request.OrganizatorId || i.Participants.Any(p => p.AccountId == request.ParticipantId));
+                    eventsRequest = eventsRequest.Where(i => i.Organizators.Any(o => o.AccountId == request.OrganizatorId) || i.Participants.Any(p => p.AccountId == request.ParticipantId));
                 else
-                    eventsRequest = eventsRequest.Where(i => i.Organizator.AccountId == request.OrganizatorId);
+                    eventsRequest = eventsRequest.Where(i => i.Organizators.Any(o => o.AccountId == request.OrganizatorId));
             }
             else if (request.ParticipantId != null)
             {
@@ -169,7 +197,7 @@ namespace EList.DbDataProvider.DataProviders
 
             var totalCount = await eventsRequest.CountAsync();
 
-            var resultList = await eventsRequest.Skip(request.PageSize * request.PageIndex).Take(request.PageSize).ToListAsync();
+            var resultList = await eventsRequest.ToPagedQuery(request.PageIndex, request.PageSize).ToListAsync();
 
             return new ListResponse<EventDto>(totalCount, resultList);
         }

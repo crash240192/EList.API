@@ -157,7 +157,7 @@ namespace EList.Services.Impl
         }
 
 
-        public async Task<CommandResult<Guid?>> CreateAccountWalletAsync()
+        public async Task<CommandResult<Guid?>> CreateAccountWalletAsync(Guid? accountId = null)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -165,7 +165,7 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var account = await _accountsRepository.GetAccountAsync(_accountDataHolder.AccountId);
+            var account = await _accountsRepository.GetAccountAsync(accountId ?? _accountDataHolder.AccountId);
 
             if (account.WalletId == null)
             {

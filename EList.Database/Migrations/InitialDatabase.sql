@@ -455,6 +455,40 @@ CREATE TABLE public.participants_black_list (
 );
 
 
+CREATE TABLE public.conversation (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	event_id uuid NULL,
+	"name" varchar NULL,
+	create_date timestamptz DEFAULT NOW() NOT NULL,
+	update_date timestamptz DEFAULT NOW() NOT NULL,
+	CONSTRAINT conversation_pk PRIMARY KEY (id),
+	CONSTRAINT conversation_events_fk FOREIGN KEY (event_id) REFERENCES public.events(id)
+);
+CREATE INDEX conversation_event_id_idx ON public.conversation (event_id);
+
+CREATE TABLE public.message (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	conversation_id uuid NOT NULL,
+	message_text text NULL,
+	account_id uuid NULL,
+	organization_id uuid NULL,
+	reply_to uuid NULL,
+	replied bool DEFAULT false NOT NULL,
+	create_date timestamptz DEFAULT NOW() NOT NULL,
+	update_date timestamptz DEFAULT NOW() NOT NULL,
+	CONSTRAINT message_pk PRIMARY KEY (id),
+	CONSTRAINT message_accounts_fk FOREIGN KEY (account_id) REFERENCES public.accounts(id),
+	CONSTRAINT message_organizations_fk FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+	CONSTRAINT message_message_fk FOREIGN KEY (reply_to) REFERENCES public.message(id),
+	CONSTRAINT message_conversation_fk FOREIGN KEY (conversation_id) REFERENCES public.conversation(id)
+);
+CREATE INDEX message_account_id_idx ON public.message (account_id);
+CREATE INDEX message_reply_to_idx ON public.message (reply_to);
+CREATE INDEX message_organization_id_idx ON public.message (organization_id);
+CREATE INDEX message_conversation_id_idx ON public.message (conversation_id);
+
+
+
 /*
 
 create table public.photo_account_rls(

@@ -2,6 +2,7 @@
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.Models.Participation;
+using EList.Models.Person;
 using EList.Repositories.Interfaces;
 
 namespace EList.Repositories.Impl
@@ -19,16 +20,14 @@ namespace EList.Repositories.Impl
         }
 
 
-        public async Task<Guid> AddToBlackListAsync(Guid eventId, Guid accountId)
+        public async Task AddToBlackListAsync(AddUsersToBWListRequest request)
         {
-            var result = await _participantsBWListDataProvider.AddToBlackListAsync(eventId, accountId);
-            return result;
+            await _participantsBWListDataProvider.AddToBlackListAsync(request.EventId, request.AccountIds);
         }
 
-        public async Task<Guid> AddToWhiteListAsync(Guid eventId, Guid accountId)
+        public async Task AddToWhiteListAsync(AddUsersToBWListRequest request)
         {
-            var result = await _participantsBWListDataProvider.AddToWhiteListAsync(eventId, accountId);
-            return result;
+            await _participantsBWListDataProvider.AddToWhiteListAsync(request.EventId, request.AccountIds);
         }
 
 
@@ -46,17 +45,51 @@ namespace EList.Repositories.Impl
         public async Task<PagedList<ParticipantBlackListItem>> GetEventBlackListAsync(Guid eventId, int? pageIndex, int? pageSize)
         {
             var blackList = await _participantsBWListDataProvider.GetEventBlackListAsync(eventId, pageIndex, pageSize);
-            var resultList = _mapper.Map<List<ParticipantBlackListItem>>(blackList.Items);
+            var resultList = blackList.Items?.Select(i =>
+            {
+                var result = _mapper.Map<ParticipantBlackListItem>(i);
+                result.PersonInfo = _mapper.Map<PersonInfo>(i.Account?.PersonInfo);
+                return result;
+            }).ToList();
             return new PagedList<ParticipantBlackListItem>(blackList.TotalCount, resultList, pageIndex ?? 0, pageSize ?? blackList.TotalCount);
         }
 
         public async Task<PagedList<ParticipantWhiteListItem>> GetEventWhiteListAsync(Guid eventId, int? pageIndex, int? pageSize)
         {
-            var blackList = await _participantsBWListDataProvider.GetEventWhiteListAsync(eventId, pageIndex, pageSize);
-            var resultList = _mapper.Map<List<ParticipantWhiteListItem>>(blackList.Items);
-            return new PagedList<ParticipantWhiteListItem>(blackList.TotalCount, resultList, pageIndex ?? 0, pageSize ?? blackList.TotalCount);
+            var whiteList = await _participantsBWListDataProvider.GetEventWhiteListAsync(eventId, pageIndex, pageSize);
+            var resultList = whiteList.Items?.Select(i =>
+            {
+                var result = _mapper.Map<ParticipantWhiteListItem>(i);
+                result.PersonInfo = _mapper.Map<PersonInfo>(i.Account?.PersonInfo);
+                return result;
+            }).ToList();
+            return new PagedList<ParticipantWhiteListItem>(whiteList.TotalCount, resultList, pageIndex ?? 0, pageSize ?? whiteList.TotalCount);
         }
 
+        public async Task<List<Guid>> GetEventBlackListShortAsync(Guid eventId)
+        {
+            var result = await _participantsBWListDataProvider.GetEventBlackListShortAsync(eventId);
+            return result;
+        }
+
+        public async Task<List<Guid>> GetEventWhiteListShortAsync(Guid eventId)
+        {
+            var result = await _participantsBWListDataProvider.GetEventWhiteListShortAsync(eventId);
+            return result;
+        }
+
+
+        public async Task<int> WhiteListPersonsCountAsync(Guid eventId)
+        {
+            var result = await _participantsBWListDataProvider.WhiteListPersonsCountAsync(eventId);
+            return result;
+        }
+
+        public async Task<int> BlackListPersonsCountAsync(Guid eventId)
+        {
+            var result = await _participantsBWListDataProvider.BlackListPersonsCountAsync(eventId);
+            return result;
+        }
 
         public async Task<bool> IsUserInBlackListAsync(Guid eventId, Guid accountId)
         {
@@ -67,6 +100,24 @@ namespace EList.Repositories.Impl
         public async Task<bool> IsUserInWhiteListAsync(Guid eventId, Guid accountId)
         {
             var result = await _participantsBWListDataProvider.IsUserInWhiteListAsync(eventId, accountId);
+            return result;
+        }
+
+        public async Task<bool> IsWhiteListEmptyAsync(Guid eventId)
+        {   
+            var result = await _participantsBWListDataProvider.IsWhiteListEmptyAsync(eventId);
+            return result;
+        }
+
+        public async Task<List<Guid>> FilterUsersNotInWhiteListAsync(Guid eventId, List<Guid> accountIds)
+        {
+            var result = await _participantsBWListDataProvider.FilterUsersNotInWhiteListAsync(eventId, accountIds);
+            return result;
+        }
+
+        public async Task<List<Guid>> FilterUsersNotInBlackListAsync(Guid eventId, List<Guid> accountIds)
+        {
+            var result = await _participantsBWListDataProvider.FilterUsersNotInBlackListAsync(eventId, accountIds);
             return result;
         }
     }
