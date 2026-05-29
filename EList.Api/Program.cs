@@ -16,6 +16,7 @@ using ConfigurationManager = EList.Common.Configuration.ConfigurationManager;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<WebSocketConnectionManager>();
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
@@ -67,6 +68,10 @@ app.UsePathBase(pathBase);
 app.UseSwagger(c => { c.SerializeAsV2 = true; });
 app.UseSwaggerUI(c => { c.SwaggerEndpoint($"{pathBase}/swagger/v1/swagger.json", "EList API v1"); });
 app.UseHttpsRedirection();
+app.UseWebSockets(new WebSocketOptions
+{
+    KeepAliveInterval = TimeSpan.FromSeconds(30)
+});
 app.UseRouting();
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseAuthentication();
