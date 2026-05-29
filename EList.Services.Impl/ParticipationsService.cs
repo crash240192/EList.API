@@ -184,6 +184,33 @@ namespace EList.Services.Impl
         }
 
 
+        public async Task<CommandResult<List<Guid>>> GetEventBlackListShortAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventBlackListShortAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var result = await _participantsBWListRepository.GetEventBlackListShortAsync(eventId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<Guid>>(result);
+        }
+
+        public async Task<CommandResult<List<Guid>>> GetEventWhiteListShortAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventWhiteListShortAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var result = await _participantsBWListRepository.GetEventWhiteListShortAsync(eventId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<Guid>>(result);
+        }
+
+
         public async Task<CommandResult> AddToBlackListAsync(AddUsersToBWListRequest request)
         {
             var correlationId = _correlationIdProvider.Get();

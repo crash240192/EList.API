@@ -201,6 +201,62 @@ namespace EList.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Черный список участников события
+        /// </summary>
+        /// <param name="eventId"></param>
+        /// <returns></returns>
+        [HttpGet("blackList/{eventId}/short")]
+        public async Task<CommandResult<List<Guid>>> GetEventBlackListShortAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventBlackListAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _participationService.GetEventBlackListShortAsync(eventId);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Получить белый список участников события
+        /// </summary>
+        /// <param name="eventId"></param>
+        /// <returns></returns>
+        [HttpGet("whiteList/{eventId}/short")]
+        public async Task<CommandResult<List<Guid>>> GetEventWhiteListShortAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventWhiteListShortAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _participationService.GetEventWhiteListShortAsync(eventId);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
 
         /// <summary>
         /// Добавить пользователя в чёрный список

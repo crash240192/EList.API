@@ -66,6 +66,19 @@ namespace EList.Repositories.Impl
             return new PagedList<ParticipantWhiteListItem>(whiteList.TotalCount, resultList, pageIndex ?? 0, pageSize ?? whiteList.TotalCount);
         }
 
+        public async Task<List<Guid>> GetEventBlackListShortAsync(Guid eventId)
+        {
+            var result = await _participantsBWListDataProvider.GetEventBlackListShortAsync(eventId);
+            return result;
+        }
+
+        public async Task<List<Guid>> GetEventWhiteListShortAsync(Guid eventId)
+        {
+            var result = await _participantsBWListDataProvider.GetEventWhiteListShortAsync(eventId);
+            return result;
+        }
+
+
         public async Task<int> WhiteListPersonsCountAsync(Guid eventId)
         {
             var result = await _participantsBWListDataProvider.WhiteListPersonsCountAsync(eventId);

@@ -30,7 +30,7 @@ namespace EList.Services.Impl
         private readonly INotificationsService _notificationsService;
         private readonly IEncryptionTool _encryptionTool;
         private readonly IAccountDataHolder _accountDataHolder;
-
+        private readonly IWalletsService _walletsService;
         public AccountsService(ICorrelationIdProvider correlationIdProvider,
             IAccountsRepository accountsRepository,
             IAuthorizationRepository authorizationRepository,
@@ -38,6 +38,7 @@ namespace EList.Services.Impl
             IUserDataValidator userDataValidationService,
             INotificationsService notificationsService,
             IEncryptionTool encryptionTool,
+            IWalletsService walletsService,
             IAccountDataHolder accountDataHolder)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
@@ -47,6 +48,7 @@ namespace EList.Services.Impl
             _userDataValidationService = userDataValidationService ?? throw new ArgumentNullException(nameof(userDataValidationService));
             _encryptionTool = encryptionTool ?? throw new ArgumentNullException(nameof(encryptionTool));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
+            _walletsService = walletsService ?? throw new ArgumentNullException(nameof(walletsService));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -88,6 +90,8 @@ namespace EList.Services.Impl
             await _contactsRepository.BindAccountAndContactAsync(accountId, contactId);
 
             //await _notificationsService.NotifyUserByContactAsync(SystemNotificationType.AccountCreated);
+
+            await _walletsService.CreateAccountWalletAsync(accountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(accountId);

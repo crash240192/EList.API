@@ -117,6 +117,19 @@ namespace EList.DbDataProvider.DataProviders
             return new ListResponse<ParticipantsWhiteListItemDto>(count, resultList);
         }
 
+        public async Task<List<Guid>> GetEventBlackListShortAsync(Guid eventId)
+        {
+            var result = await _connection.BlackList.Where(i => i.EventId == eventId).Select(i => i.AccountId).ToListAsync();
+            return result;
+        }
+
+        public async Task<List<Guid>> GetEventWhiteListShortAsync(Guid eventId)
+        {
+            var result = await _connection.WhiteList.Where(i => i.EventId == eventId).Select(i => i.AccountId).ToListAsync();
+            return result;
+        }
+
+
         public async Task<int> BlackListPersonsCountAsync(Guid eventId)
         {
             var result = await _connection.BlackList.Where(i => i.EventId != eventId).CountAsync();

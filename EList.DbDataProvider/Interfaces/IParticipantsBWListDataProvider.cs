@@ -1,4 +1,5 @@
-﻿using EList.DbDataProvider.Models;
+﻿using EList.DbDataProvider.DataProviders;
+using EList.DbDataProvider.Models;
 
 namespace EList.DbDataProvider.Interfaces
 {
@@ -19,6 +20,9 @@ namespace EList.DbDataProvider.Interfaces
 
         Task<ListResponse<ParticipantsBlackListItemDto>> GetEventBlackListAsync(Guid eventId, int? pageIndex, int? pageSize);
         Task<ListResponse<ParticipantsWhiteListItemDto>> GetEventWhiteListAsync(Guid eventId, int? pageIndex, int? pageSize);
+
+        Task<List<Guid>> GetEventBlackListShortAsync(Guid eventId);
+        Task<List<Guid>> GetEventWhiteListShortAsync(Guid eventId);
 
         Task<int> BlackListPersonsCountAsync(Guid eventId);
         Task<int> WhiteListPersonsCountAsync(Guid eventId);
