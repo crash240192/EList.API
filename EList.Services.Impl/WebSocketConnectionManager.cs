@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 
-namespace EList.Api.Infrastructure
+namespace EList.Services.Impl
 {
     /// <summary>
     /// Менеджер WebSocket-соединений.

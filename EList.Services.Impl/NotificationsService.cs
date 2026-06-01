@@ -4,6 +4,7 @@ using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
 using EList.Common.TemplateParser;
+using EList.Models.Accounts;
 using EList.Models.Enums;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
@@ -12,6 +13,13 @@ using EList.Smtp;
 using NLog;
 using System.Diagnostics;
 using System.Net.Mail;
+using System.Net.Sockets;
+using System.Net.WebSockets;
+using System.Text.Json;
+using System.Text;
+using EList.Models.Notifications;
+using Microsoft.AspNetCore.Mvc;
+using NLog.Web.LayoutRenderers;
 
 namespace EList.Services.Impl
 {
@@ -23,34 +31,279 @@ namespace EList.Services.Impl
         private const string LOGGER_NAME = "EList.Services.Impl.NotificationsService.";
         #endregion
 
+        private readonly WebSocketConnectionManager _connectionManager;
         private readonly ICorrelationIdProvider _correlationIdProvider;
-        private readonly IContactsRepository _contactsRepository;
-        private readonly ISmtpClient _smtpClient;
-        private readonly INotificationsRepository _notificationsRepository;
-        private readonly IAuthorizationRepository _authorizationRepository;
-        private readonly ITemplateParser _templateParser;
-        private readonly ISmsClient _smsClient;
         private readonly IAccountDataHolder _accountDataHolder;
-
-        public NotificationsService(ICorrelationIdProvider correlationIdProvider,
-            IContactsRepository contactsRepository,
-            ISmtpClient smtpClient,
-            INotificationsRepository notificationsRepository,
-            IAuthorizationRepository authorizationRepository,
-            ITemplateParser templateParser,
-            ISmsClient smsClient,
-            IAccountDataHolder accountDataHolder)
+        private readonly INotificationsRepository _notificationsRepository;
+        public NotificationsService(
+            WebSocketConnectionManager connectionManager,
+            ICorrelationIdProvider correlationIdProvider,
+            IAccountDataHolder accountDataHolder,
+            INotificationsRepository notificationsRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
-            _contactsRepository = contactsRepository ?? throw new ArgumentNullException(nameof(contactsRepository));
-            _smtpClient = smtpClient ?? throw new ArgumentNullException(nameof(smtpClient));
             _notificationsRepository = notificationsRepository ?? throw new ArgumentNullException(nameof(notificationsRepository));
-            _authorizationRepository = authorizationRepository ?? throw new ArgumentNullException(nameof(authorizationRepository));
-            _templateParser = templateParser ?? throw new ArgumentNullException(nameof(templateParser));
-            _smsClient = smsClient ?? throw new ArgumentNullException(nameof(smsClient));
+            _connectionManager = connectionManager;
             _accountDataHolder = accountDataHolder;
         }
 
+
+
+        public async Task<CommandResult> AddConnectionAsync(Guid accountId, WebSocket socket)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AddConnectionAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            _connectionManager.AddConnection(accountId, socket);
+
+            var connectionId = _connectionManager.AddConnection(accountId, socket);
+
+            logger.Debug(correlationId, null, methodName,
+                $"WebSocket connected: accountId={accountId}, connectionId={connectionId}", null);
+
+            var notifications = await _notificationsRepository.GetUnreadedUserNotificationsAsync(accountId);
+
+            foreach (var notification in notifications)
+            {
+                await SendNotificationAsync(socket, notification);
+            }
+
+            // Цикл чтения сообщений от клиента (удерживает соединение открытым)
+            await ReceiveLoopAsync(socket, accountId, connectionId, correlationId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> AddConnectionAsync(WebSocket socket)
+        {
+            var accountId = _accountDataHolder.AccountId;
+            return await AddConnectionAsync(accountId, socket);
+        }
+
+        public CommandResult<ConnectionStats> GetConnectionStats()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetConnectionStats)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var result = new CommandResult<ConnectionStats>(new ConnectionStats
+            {
+                ConnectedAccountCounts = _connectionManager.ConnectedAccountsCount,
+                TotalConnectionsCount = _connectionManager.TotalConnectionsCount
+            });
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return result;
+        }
+
+        public async Task<CommandResult> HandleNewNotification(Notification notification)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(HandleNewNotification)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            notification.Id = await _notificationsRepository.CreateNotificationAsync(notification);
+
+            var sendToUserResult = await SendToUserAsync(notification.AccountId, notification);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return sendToUserResult;
+        }
+
+        public async Task<CommandResult> SendToUserAsync(Guid accountId, Notification notification)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(SendToUserAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var sockets = _connectionManager.GetConnections(accountId).ToList();
+
+            if (!sockets.Any())
+            {
+                logger.Debug(correlationId, null, methodName,
+                    $"No active connections for accountId={accountId}", null);
+                return CommandResult.Fail(ErrorCode.NoActiveSocketConnections, "Нет активных соединений для данного аккаунта");
+            }
+
+            var sent = 0;
+            foreach (var socket in sockets)
+            {
+                try
+                {
+                    await SendNotificationAsync(socket, notification);
+                    sent++;
+                }
+                catch (WebSocketException ex)
+                {
+                    logger.Error(correlationId, null, methodName,
+                        $"Failed to send to one connection: {ex.Message}", null, ex, null);
+                }
+            }
+
+            logger.Debug(correlationId, null, methodName,
+                $"Notification sent to accountId={accountId}, delivered to {sent}/{sockets.Count} connections", null);
+
+            return CommandResult.OK;
+            //return Ok(new { success = true, connectionsDelivered = sent, connectionsTotal = sockets.Count });
+        }
+
+        /// <summary>
+        /// Отправить уведомление всем подключённым WebSocket-клиентам (broadcast).
+        /// </summary>
+        /// <param name="request">Тело уведомления</param>
+        public async Task<CommandResult> BroadcastAsync(Notification request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(BroadcastAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var allSockets = _connectionManager.GetAllConnections().ToList();
+
+            if (!allSockets.Any())
+                return CommandResult.Fail(ErrorCode.NoActiveSocketConnections, "Нет подключённых клиентов");
+
+            var sent = 0;
+            foreach (var socket in allSockets)
+            {
+                try
+                {
+                    await SendNotificationAsync(socket, request);
+                    sent++;
+                }
+                catch (WebSocketException ex)
+                {
+                    logger.Error(correlationId, null, methodName,
+                        $"Failed to send broadcast to one connection: {ex.Message}", null, ex, null);
+                }
+            }
+
+            logger.Debug(correlationId, null, methodName,
+                $"Broadcast sent to {sent}/{allSockets.Count} connections", null);
+
+            return CommandResult.OK;
+        }
+
+
+        /// <summary>
+        /// Цикл чтения входящих сообщений от клиента.
+        /// Поддерживает ping/pong и graceful-закрытие.
+        /// </summary>
+        private async Task ReceiveLoopAsync(WebSocket socket, Guid accountId, string connectionId, string correlationId)
+        {
+            var methodName = $"{LOGGER_NAME}{nameof(ReceiveLoopAsync)}";
+            var buffer = new byte[4 * 1024];
+
+            try
+            {
+                while (socket.State == WebSocketState.Open)
+                {
+                    var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        logger.Debug(correlationId, null, methodName,
+                            $"Client requested close: accountId={accountId}", null);
+
+                        await socket.CloseAsync(
+                            WebSocketCloseStatus.NormalClosure,
+                            "Закрытие по запросу клиента",
+                            CancellationToken.None);
+                        break;
+                    }
+
+                    if (result.MessageType == WebSocketMessageType.Text)
+                    {
+                        var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                        await HandleClientMessageAsync(socket, message, accountId, correlationId);
+                    }
+                }
+            }
+            catch (WebSocketException ex)
+            {
+                logger.Error(correlationId, null, methodName,
+                    $"WebSocket error: accountId={accountId}, error={ex.Message}", null, ex, null);
+            }
+            finally
+            {
+                _connectionManager.RemoveConnection(accountId, connectionId);
+                logger.Debug(correlationId, null, methodName,
+                    $"WebSocket disconnected: accountId={accountId}, connectionId={connectionId}", null);
+            }
+        }
+
+        /// <summary>
+        /// Обработка входящего сообщения от клиента.
+        /// Сейчас поддерживает только ping → pong.
+        /// Сюда можно добавлять свои типы сообщений.
+        /// </summary>
+        private async Task HandleClientMessageAsync(WebSocket socket, string rawMessage, Guid accountId, string correlationId)
+        {
+            var methodName = $"{LOGGER_NAME}{nameof(HandleClientMessageAsync)}";
+
+            try
+            {
+                using var doc = JsonDocument.Parse(rawMessage);
+                var type = doc.RootElement.TryGetProperty("type", out var typeProp)
+                    ? typeProp.GetString()
+                    : null;
+
+                switch (type)
+                {
+                    case "ping":
+                        await SendNotificationAsync(socket, new { type = "pong", timestamp = DateTimeOffset.UtcNow });
+                        break;
+
+                    default:
+                        logger.Debug(correlationId, null, methodName,
+                            $"Unknown message type '{type}' from accountId={accountId}", null);
+                        await SendNotificationAsync(socket, new
+                        {
+                            type = "error",
+                            message = $"Неизвестный тип сообщения: '{type}'"
+                        });
+                        break;
+                }
+            }
+            catch (JsonException)
+            {
+                await SendNotificationAsync(socket, new
+                {
+                    type = "error",
+                    message = "Некорректный JSON"
+                });
+            }
+        }
+
+        private static async Task SendNotificationAsync(WebSocket socket, object data)
+        {
+            if (socket.State != WebSocketState.Open)
+                return;
+
+            var json = JsonSerializer.Serialize(data, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = false
+            });
+
+            var bytes = Encoding.UTF8.GetBytes(json);
+            await socket.SendAsync(
+                new ArraySegment<byte>(bytes),
+                WebSocketMessageType.Text,
+                endOfMessage: true,
+                CancellationToken.None);
+        }
+
+
+        /*
         public async Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -58,8 +311,6 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(NotifyUserByContactAsync)}";
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-            var tokenData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
 
             var contacts = await _contactsRepository.GetAccountContactsAsync(tokenData.AccountId);
 
@@ -99,6 +350,6 @@ namespace EList.Services.Impl
             }
 
             return CommandResult.Fail(ErrorCode.UnableToNotifyUser, "Не удалось уведомить пользователя");
-        }
+        }*/
     }
 }

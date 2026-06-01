@@ -16,7 +16,6 @@ using ConfigurationManager = EList.Common.Configuration.ConfigurationManager;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddSingleton<WebSocketConnectionManager>();
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
@@ -69,7 +68,19 @@ app.UseWebSockets(new WebSocketOptions
     KeepAliveInterval = TimeSpan.FromSeconds(30)
 });
 app.UseRouting();
+
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/ws") &&
+        context.Request.Query.TryGetValue("token", out var token))
+    {
+        context.Request.Headers["Authorization"] = token.ToString();
+    }
+    await next();
+});
+
 app.UseMiddleware<ErrorHandlingMiddleware>();
+app.UseMiddleware<WebSocketsTokenHandlerMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseStaticFiles();

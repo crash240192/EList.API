@@ -1,10 +1,22 @@
-﻿using EList.Common.Models;
+﻿using System.Net.WebSockets;
+using EList.Common.Models;
 using EList.Models.Enums;
+using EList.Models.Notifications;
+using Microsoft.AspNetCore.Mvc;
 
 namespace EList.Services.Interfaces
 {
     public interface INotificationsService
     {
-        Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType);
+        Task<CommandResult> AddConnectionAsync(Guid accountId, WebSocket socket);
+        Task<CommandResult> AddConnectionAsync(WebSocket socket);
+
+        CommandResult<ConnectionStats> GetConnectionStats();
+
+        Task<CommandResult> SendToUserAsync(Guid accountId, Notification notification);
+        Task<CommandResult> BroadcastAsync(Notification request);
+
+
+        //Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType);
     }
 }

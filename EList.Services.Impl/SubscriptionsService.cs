@@ -24,7 +24,7 @@ namespace EList.Services.Impl
         private readonly IAuthorizationRepository _authorizationRepository;
         private readonly IContactsRepository _contactsRepository;
         private readonly IUserDataValidator _userDataValidationService;
-        private readonly INotificationsService _notificationsService;
+        private readonly ISystemNotificationsService _notificationsService;
         private readonly ISubscriptionsRepository _subscriptionsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         public SubscriptionsService(ICorrelationIdProvider correlationIdProvider,
@@ -32,7 +32,7 @@ namespace EList.Services.Impl
             IAuthorizationRepository authorizationRepository,
             IContactsRepository contactsRepository,
             IUserDataValidator userDataValidationService,
-            INotificationsService notificationsService,
+            ISystemNotificationsService notificationsService,
             ISubscriptionsRepository subscriptionsRepository,
             IAccountDataHolder accountDataHolder)
         {

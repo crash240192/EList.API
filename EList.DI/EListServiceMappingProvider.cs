@@ -47,7 +47,7 @@ namespace EList.DI
             mapper.AddScoped<IContactsService, ContactDataService>();
             mapper.AddScoped<IAuthorizationService, AuthorizationService>();
             mapper.AddScoped<IAccountsService, AccountsService>();
-            mapper.AddScoped<INotificationsService, NotificationsService>();
+            mapper.AddScoped<ISystemNotificationsService, SystemNotificationsService>();
             mapper.AddScoped<ISubscriptionsService, SubscriptionsService>();
             mapper.AddScoped<IEventsService, EventsService>();
             mapper.AddScoped<IParticipationsService, ParticipationsService>();
@@ -57,6 +57,9 @@ namespace EList.DI
             mapper.AddScoped<IEventOrganizatorsService, EventOrganizatorsService>();
             mapper.AddScoped<IEventsRatingService, EventsRatingService>();
             mapper.AddScoped<IConversationService, ConversationService>();
+            mapper.AddScoped<INotificationsService, NotificationsService>();
+
+            mapper.AddSingleton<WebSocketConnectionManager>();
 
             //Repositories
             mapper.AddScoped<IPersonsRepository, PersonsRepository>();

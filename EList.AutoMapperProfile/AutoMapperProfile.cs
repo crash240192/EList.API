@@ -1,22 +1,20 @@
 ﻿using AutoMapper;
 using EList.DbDataProvider.Models;
-using EList.DbDataProvider.Models.Enums;
 using EList.Models.Accounts;
 using EList.Models.Authorization;
 using EList.Models.ContactData;
-using EList.Models.Enums;
+using EList.Models.Conversations;
 using EList.Models.EventOrganizators;
 using EList.Models.Events;
 using EList.Models.Events.EventMetadata;
+using EList.Models.EventsRating;
 using EList.Models.Invitations;
 using EList.Models.Media;
 using EList.Models.Notifications;
+using EList.Models.Participation;
 using EList.Models.Person;
 using EList.Models.Subscriptions;
-using EList.Models.EventsRating;
 using EList.Models.Wallets;
-using EList.Models.Participation;
-using EList.Models.Conversations;
 
 namespace EList.AutoMapperProfile
 {
@@ -48,7 +46,8 @@ namespace EList.AutoMapperProfile
             
 
             CreateMap<SystemNotificationDto, SystemNotification>().ReverseMap();
-            
+            CreateMap<NotificationDto, Notification>().ReverseMap();
+
             CreateMap<EventCategoryDto, EventCategory>().ReverseMap();
             CreateMap<EventTypeDto, EventType>().ReverseMap();
             CreateMap<EventParametersDto, EventParameters>().ReverseMap();

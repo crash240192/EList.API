@@ -28,7 +28,7 @@ namespace EList.Services.Impl
         private readonly IAccountsRepository _accountsRepository;
         private readonly IAuthorizationRepository _authorizationRepository;
         private readonly IParticipationsRepository _participationRepository;
-        private readonly INotificationsService _notificationsService;
+        private readonly ISystemNotificationsService _notificationsService;
         private readonly IInvitationsRepository _invitationsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
@@ -39,7 +39,7 @@ namespace EList.Services.Impl
             IAccountsRepository accountsRepository,
             IAuthorizationRepository authorizationRepository,
             IParticipationsRepository participationRepository,
-            INotificationsService notificationsService,
+            ISystemNotificationsService notificationsService,
             IInvitationsRepository invitationsRepository,
             IAccountDataHolder accountDataHolder,
             IParticipantsBWListRepository participantsBWListRepository,

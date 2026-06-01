@@ -27,7 +27,7 @@ namespace EList.Services.Impl
         private readonly IAuthorizationRepository _authorizationRepository;
         private readonly IContactsRepository _contactsRepository;
         private readonly IUserDataValidator _userDataValidationService;
-        private readonly INotificationsService _notificationsService;
+        private readonly ISystemNotificationsService _notificationsService;
         private readonly IEncryptionTool _encryptionTool;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IWalletsService _walletsService;
@@ -36,7 +36,7 @@ namespace EList.Services.Impl
             IAuthorizationRepository authorizationRepository,
             IContactsRepository contactsRepository,
             IUserDataValidator userDataValidationService,
-            INotificationsService notificationsService,
+            ISystemNotificationsService notificationsService,
             IEncryptionTool encryptionTool,
             IWalletsService walletsService,
             IAccountDataHolder accountDataHolder)

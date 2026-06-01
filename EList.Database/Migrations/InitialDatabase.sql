@@ -488,6 +488,24 @@ CREATE INDEX message_organization_id_idx ON public.message (organization_id);
 CREATE INDEX message_conversation_id_idx ON public.message (conversation_id);
 
 
+CREATE TABLE public.notifications (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	account_id uuid NOT NULL,
+	related_account_id uuid NULL,
+	"type" varchar(50) NULL,
+	event_id uuid NULL,
+	title varchar(100) NULL,
+	message varchar(255) NULL,
+	created_at timestamptz DEFAULT NOW() NOT NULL,
+	read_at timestamptz NULL,
+	"data" jsonb NULL,
+	CONSTRAINT notifications_pk PRIMARY KEY (id),
+	CONSTRAINT notifications_account_fk FOREIGN KEY (account_id) REFERENCES public.accounts(id),
+	CONSTRAINT notifications_related_account_fk FOREIGN KEY (related_account_id) REFERENCES public.accounts(id),
+	CONSTRAINT notifications_event_fk FOREIGN KEY (event_id) REFERENCES public.events(id)
+);
+
+
 
 /*
 

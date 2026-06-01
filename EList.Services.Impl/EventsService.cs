@@ -35,6 +35,7 @@ namespace EList.Services.Impl
         private readonly IParticipationsRepository _participationsRepository;
         private readonly IWalletsRepository _walletsRepository;
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
+        private readonly INotificationsService _notificationsService;
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
             IEventsRepository eventsRepository,
@@ -45,7 +46,8 @@ namespace EList.Services.Impl
             IParticipationsRepository participationsRepository,
             IWalletsRepository walletsRepository,
             IAccountDataHolder accountDataHolder,
-            IParticipantsBWListRepository participantsBWListRepository)
+            IParticipantsBWListRepository participantsBWListRepository,
+            INotificationsService notificationsService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
@@ -57,6 +59,7 @@ namespace EList.Services.Impl
             _participantsBWListRepository = participantsBWListRepository ?? throw new Exception(nameof(participantsBWListRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
             _walletsRepository = walletsRepository ?? throw new Exception(nameof(walletsRepository));
+            _notificationsService = notificationsService ?? throw new Exception(nameof(notificationsService));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -449,6 +452,17 @@ namespace EList.Services.Impl
             //    }
             //}
             //#endregion
+
+            var notify = _notificationsService.SendToUserAsync(_accountDataHolder.AccountId, new Models.Notifications.Notification
+            {
+                CreatedAt = DateTime.UtcNow,
+                EventId=eventId,
+                RelatedAccountId = _accountDataHolder.AccountId,
+                Message = "У вас тут новое событие завелось",
+                Id = Guid.NewGuid(),
+                Title = "Новое событие",
+                Type = "нвесбтие"
+            });
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(eventId);
