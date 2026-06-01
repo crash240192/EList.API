@@ -102,10 +102,10 @@ namespace EList.Services.Impl
             return result;
         }
 
-        public async Task<CommandResult> HandleNewNotification(Notification notification)
+        public async Task<CommandResult> HandleNewNotificationAsync(Notification notification)
         {
             var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(HandleNewNotification)}";
+            var methodName = $"{LOGGER_NAME}{nameof(HandleNewNotificationAsync)}";
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
@@ -115,6 +115,34 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return sendToUserResult;
+        }
+
+        public async Task<CommandResult> ReadNotificationAsync(Guid notificationId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(ReadNotificationAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            await _notificationsRepository.ReadNotificationAsync(notificationId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> ReadAllUserNotificationsAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(ReadAllUserNotificationsAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var accountId = _accountDataHolder.AccountId;
+
+            await _notificationsRepository.ReadAllUserNotificationsAsync(accountId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
         }
 
         public async Task<CommandResult> SendToUserAsync(Guid accountId, Notification notification)

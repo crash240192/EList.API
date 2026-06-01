@@ -13,9 +13,13 @@ namespace EList.Services.Interfaces
 
         CommandResult<ConnectionStats> GetConnectionStats();
 
+        Task<CommandResult> HandleNewNotificationAsync(Notification notification);
         Task<CommandResult> SendToUserAsync(Guid accountId, Notification notification);
         Task<CommandResult> BroadcastAsync(Notification request);
 
+
+        Task<CommandResult> ReadNotificationAsync(Guid notificationId);
+        Task<CommandResult> ReadAllUserNotificationsAsync();
 
         //Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType);
     }

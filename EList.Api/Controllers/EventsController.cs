@@ -540,9 +540,7 @@ namespace EList.Api.Controllers
                 var result = await _eventsService.CreateEventAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
-
+                
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }

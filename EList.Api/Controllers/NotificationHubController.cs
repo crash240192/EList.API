@@ -50,10 +50,6 @@ namespace EList.Api.Controllers
             _accountDataHolder = accountDataHolder;
         }
 
-        // ──────────────────────────────────────────────
-        //  1. WebSocket-эндпоинт: подключение клиента
-        // ──────────────────────────────────────────────
-
         /// <summary>
         /// Установить WebSocket-соединение для получения уведомлений.
         ///
@@ -146,5 +142,58 @@ namespace EList.Api.Controllers
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return result;
         }
+
+
+        /// <summary>
+        /// Отметить оповещение как прочитанное
+        /// </summary>
+        [HttpGet("read/{notificationId}")]
+        public async Task<CommandResult> ReadNotificationAsync(Guid notificationId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(ReadNotificationAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var result = await _notificationService.ReadNotificationAsync(notificationId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return result;
+        }
+
+        /// <summary>
+        /// Отметить все оповещения пользователя как прочитанные
+        /// </summary>
+        [HttpGet("read/all")]
+        public async Task<CommandResult> ReadAllUserNotificationsAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(ReadAllUserNotificationsAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var result = await _notificationService.ReadAllUserNotificationsAsync();
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return result;
+        }
+
+
+        ///// <summary>
+        ///// Отметить все оповещения пользователя как прочитанные
+        ///// </summary>
+        //[HttpGet("read/all")]
+        //public async Task<CommandResult<PagedList<Notification>>> ReadAllUserNotificationsAsync()
+        //{
+        //    var correlationId = _correlationIdProvider.Get();
+        //    var methodName = $"{LOGGER_NAME}{nameof(ReadAllUserNotificationsAsync)}";
+        //    var execTime = Stopwatch.StartNew();
+        //    logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+        //    var result = await _notificationService.ReadAllUserNotificationsAsync();
+
+        //    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+        //    return result;
+        //}
     }
 }
