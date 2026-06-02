@@ -20,6 +20,8 @@ using System.Text;
 using EList.Models.Notifications;
 using Microsoft.AspNetCore.Mvc;
 using NLog.Web.LayoutRenderers;
+using EList.Common.Threading;
+using System.Collections.Concurrent;
 
 namespace EList.Services.Impl
 {
@@ -35,6 +37,7 @@ namespace EList.Services.Impl
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly INotificationsRepository _notificationsRepository;
+        
         public NotificationsService(
             WebSocketConnectionManager connectionManager,
             ICorrelationIdProvider correlationIdProvider,
@@ -221,6 +224,58 @@ namespace EList.Services.Impl
         }
 
 
+
+
+
+        #region structured notifications
+
+        public async Task<CommandResult> NotifyEventCreatedAsync(Guid creatorId, Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(BroadcastAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var subscribers = await _notificationsRepository.SearchSubscribersEventCreatedAsync(creatorId);
+
+            if (subscribers?.Any() ?? false)
+            {
+                var newNotifications = new ConcurrentQueue<Notification>(subscribers.Select(i => new Notification
+                {
+                    AccountId = i,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = "",
+                    Title = "Новое событие",
+                    RelatedAccountId = creatorId,
+                    Type = "event_created"
+                }));
+
+                var task = new Task(async () => {
+                    while (newNotifications.TryDequeue(out var notification))
+                    {
+                        await HandleNewNotificationAsync(notification);
+                    }
+                });
+
+                var tasks = new List<Task>();
+                for (int i = 0; i < 10; i++)
+                {
+                    tasks.Add(task);
+                }
+                tasks.ForEach(t => t.Start());
+                await Task.WhenAll(tasks.ToArray());
+            }
+            return CommandResult.OK;
+        }
+
+
+        #endregion
+
+
+
+
+        #region private
         /// <summary>
         /// Цикл чтения входящих сообщений от клиента.
         /// Поддерживает ping/pong и graceful-закрытие.
@@ -329,7 +384,7 @@ namespace EList.Services.Impl
                 endOfMessage: true,
                 CancellationToken.None);
         }
-
+        #endregion
 
         /*
         public async Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType)

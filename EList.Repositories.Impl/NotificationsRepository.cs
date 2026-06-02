@@ -55,5 +55,15 @@ namespace EList.Repositories.Impl
             await _notificationsDataProvider.ReadNotificationAsync(notificationId);
         }
         #endregion
+
+
+        #region searchAcceptors
+
+        public async Task<List<Guid>> SearchSubscribersEventCreatedAsync(Guid creatorId)
+        {
+            var result = await _notificationsDataProvider.SearchSubscribersEventCreatedAsync(creatorId);
+            return result;
+        }
+        #endregion
     }
 }

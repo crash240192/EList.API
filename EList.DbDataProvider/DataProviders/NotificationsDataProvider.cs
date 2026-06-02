@@ -1,7 +1,6 @@
 ﻿using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.Enums;
-using EList.Models.Notifications;
 using LinqToDB;
 using LinqToDB.Async;
 
@@ -42,6 +41,19 @@ namespace EList.DbDataProvider.DataProviders
         public async Task<Guid> CreateNotificationAsync(NotificationDto notification)
         {
             var result = (Guid) await _connection.InsertWithIdentityAsync(notification);
+            return result;
+        }
+
+
+
+
+        public async Task<List<Guid>> SearchSubscribersEventCreatedAsync(Guid creatorId)
+        {
+            var result = await _connection.Subscriptions
+                .Where(i => i.SubscribedToId == creatorId)
+                .Select(i => i.SubscriberId)
+                .ToListAsync();
+
             return result;
         }
     }

@@ -50,6 +50,18 @@ namespace EList.Services.Impl
         }
 
         /// <summary>
+        /// Получить все активные сокеты перечисленных аккаунтов
+        /// </summary>
+        public IEnumerable<WebSocket> GetConnections(List<Guid> accountIds)
+        {
+            var sockets = _connections.Where(i => accountIds.Contains(i.Key))
+                ?.SelectMany(i => i.Value.Values)
+                ?.Where(i => i.State == WebSocketState.Open);
+           
+            return sockets ?? Enumerable.Empty<WebSocket>();
+        }
+
+        /// <summary>
         /// Получить все активные сокеты всех аккаунтов (для broadcast)
         /// </summary>
         public IEnumerable<WebSocket> GetAllConnections()

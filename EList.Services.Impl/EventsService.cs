@@ -453,17 +453,8 @@ namespace EList.Services.Impl
             //}
             //#endregion
 
-            var notify = _notificationsService.HandleNewNotificationAsync(new Models.Notifications.Notification
-            {
-                CreatedAt = DateTime.UtcNow,
-                EventId=eventId,
-                AccountId = _accountDataHolder.AccountId,
-                RelatedAccountId = _accountDataHolder.AccountId,
-                Message = "У вас тут новое событие завелось",
-                Id = Guid.NewGuid(),
-                Title = "Новое событие",
-                Type = "нве сбтие"
-            });
+
+            await _notificationsService.NotifyEventCreatedAsync(_accountDataHolder.AccountId, eventId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(eventId);

@@ -18,6 +18,7 @@ namespace EList.DbDataProvider.Models.SearchRequests
         public string Name { get; set; }
         public Gender? Gender { get; set; }
         public int? Age { get; set; }
+
         public int? PageIndex { get; set; }
         public int? PageSize { get; set; }
     }
