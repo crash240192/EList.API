@@ -22,6 +22,7 @@ using Microsoft.AspNetCore.Mvc;
 using NLog.Web.LayoutRenderers;
 using EList.Common.Threading;
 using System.Collections.Concurrent;
+using EList.Common.Configuration;
 
 namespace EList.Services.Impl
 {
@@ -37,7 +38,9 @@ namespace EList.Services.Impl
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly INotificationsRepository _notificationsRepository;
-        
+
+        private readonly int tasksCount = 10;
+
         public NotificationsService(
             WebSocketConnectionManager connectionManager,
             ICorrelationIdProvider correlationIdProvider,
@@ -48,6 +51,9 @@ namespace EList.Services.Impl
             _notificationsRepository = notificationsRepository ?? throw new ArgumentNullException(nameof(notificationsRepository));
             _connectionManager = connectionManager;
             _accountDataHolder = accountDataHolder;
+
+            if (ConfigurationManager.AppSettings.ContainsSection("notificationService:userNotifications:threadsCount"))
+                tasksCount = int.Parse(ConfigurationManager.AppSettings["notificationService:userNotifications:threadsCount"]);
         }
 
 
@@ -245,13 +251,13 @@ namespace EList.Services.Impl
                     AccountId = i,
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
-                    Message = "",
+                    Message = "asdfasfdasfdasfdasdfasdf",
                     Title = "Новое событие",
                     RelatedAccountId = creatorId,
                     Type = "event_created"
                 }));
 
-                var workerCount = Math.Min(10, newNotifications.Count);
+                var workerCount = Math.Min(tasksCount, newNotifications.Count);
                 var tasks = Enumerable.Range(0, workerCount).Select(_ => Task.Run(async () =>
                 {
                     while (newNotifications.TryDequeue(out var notification))
