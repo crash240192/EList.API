@@ -3,6 +3,7 @@ using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.Enums;
 using LinqToDB;
 using LinqToDB.Async;
+using LinqToDB.Data;
 
 namespace EList.DbDataProvider.DataProviders
 {
@@ -42,6 +43,20 @@ namespace EList.DbDataProvider.DataProviders
         {
             var result = (Guid) await _connection.InsertWithIdentityAsync(notification);
             return result;
+        }
+
+        public async Task CreateNotificationsAsync(List<NotificationDto> notifications)
+        {
+            foreach (var n in notifications)
+            {
+                if (n.Id == Guid.Empty)
+                    n.Id = Guid.NewGuid();
+            }
+
+            await _connection.BulkCopyAsync(new BulkCopyOptions
+            {
+                BulkCopyType = BulkCopyType.MultipleRows
+            }, notifications);
         }
 
 

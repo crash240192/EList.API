@@ -38,6 +38,12 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task CreateNotificationsAsync(List<Notification> notifications)
+        {
+            var mapped = _mapper.Map<List<NotificationDto>>(notifications);
+            await _notificationsDataProvider.CreateNotificationsAsync(mapped);
+        }
+
         public async Task<List<Notification>?> GetUnreadedUserNotificationsAsync(Guid accountId)
         {
             var notifications = await _notificationsDataProvider.GetUnreadedUserNotificationsAsync(accountId);

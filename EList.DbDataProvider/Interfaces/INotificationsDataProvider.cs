@@ -12,6 +12,7 @@ namespace EList.DbDataProvider.Interfaces
         Task ReadAllUserNotificationsAsync(Guid accountId);
 
         Task<Guid> CreateNotificationAsync(NotificationDto notification);
+        Task CreateNotificationsAsync(List<NotificationDto> notifications);
 
 
         Task<List<Guid>> SearchSubscribersEventCreatedAsync(Guid creatorId);

@@ -11,6 +11,7 @@ namespace EList.Repositories.Interfaces
         Task ReadNotificationAsync(Guid notificationId);
         Task ReadAllUserNotificationsAsync(Guid accountId);
         Task<Guid> CreateNotificationAsync(Notification notification);
+        Task CreateNotificationsAsync(List<Notification> notifications);
 
 
         Task<List<Guid>> SearchSubscribersEventCreatedAsync(Guid creatorId);

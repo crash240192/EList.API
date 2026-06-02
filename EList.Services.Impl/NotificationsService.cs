@@ -21,8 +21,6 @@ using EList.Models.Notifications;
 using Microsoft.AspNetCore.Mvc;
 using NLog.Web.LayoutRenderers;
 using System.Collections.Concurrent;
-using Microsoft.Extensions.DependencyInjection;
-using EList.Common.Configuration;
 
 namespace EList.Services.Impl
 {
@@ -38,24 +36,17 @@ namespace EList.Services.Impl
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly INotificationsRepository _notificationsRepository;
-        private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly int tasksCount = 10;
 
         public NotificationsService(
             WebSocketConnectionManager connectionManager,
             ICorrelationIdProvider correlationIdProvider,
             IAccountDataHolder accountDataHolder,
-            INotificationsRepository notificationsRepository,
-            IServiceScopeFactory serviceScopeFactory)
+            INotificationsRepository notificationsRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _notificationsRepository = notificationsRepository ?? throw new ArgumentNullException(nameof(notificationsRepository));
-            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
             _connectionManager = connectionManager;
             _accountDataHolder = accountDataHolder;
-
-            if (ConfigurationManager.AppSettings.ContainsSection("notificationService:userNotifications:threadsCount"))
-                tasksCount = int.Parse(ConfigurationManager.AppSettings["notificationService:userNotifications:threadsCount"]);
         }
 
 
@@ -240,7 +231,7 @@ namespace EList.Services.Impl
         public async Task<CommandResult> NotifyEventCreatedAsync(Guid creatorId, Guid eventId)
         {
             var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(BroadcastAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventCreatedAsync)}";
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
@@ -248,32 +239,25 @@ namespace EList.Services.Impl
 
             if (subscribers?.Any() ?? false)
             {
-                var newNotifications = new ConcurrentQueue<Notification>(subscribers.Select(i => new Notification
+                var notifications = subscribers.Select(subscriberId => new Notification
                 {
-                    AccountId = i,
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
-                    Message = "asdfasfdasfdasfdasdfasdf",
+                    Message = "",
                     Title = "Новое событие",
                     RelatedAccountId = creatorId,
                     Type = "event_created"
-                }));
+                }).ToList();
 
-                var workerCount = Math.Min(tasksCount, newNotifications.Count);
-                var tasks = Enumerable.Range(0, workerCount).Select(_ => Task.Run(async () =>
-                {
-                    using var scope = _serviceScopeFactory.CreateScope();
-                    var scopedRepo = scope.ServiceProvider.GetRequiredService<INotificationsRepository>();
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
 
-                    while (newNotifications.TryDequeue(out var notification))
-                    {
-                        notification.Id = await scopedRepo.CreateNotificationAsync(notification);
-                        await SendToUserAsync(notification.AccountId, notification);
-                    }
-                }));
-
-                await Task.WhenAll(tasks);
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
             }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
 
