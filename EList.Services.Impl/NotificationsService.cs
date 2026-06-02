@@ -20,8 +20,8 @@ using System.Text;
 using EList.Models.Notifications;
 using Microsoft.AspNetCore.Mvc;
 using NLog.Web.LayoutRenderers;
-using EList.Common.Threading;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EList.Services.Impl
 {
@@ -37,15 +37,18 @@ namespace EList.Services.Impl
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly INotificationsRepository _notificationsRepository;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         
         public NotificationsService(
             WebSocketConnectionManager connectionManager,
             ICorrelationIdProvider correlationIdProvider,
             IAccountDataHolder accountDataHolder,
-            INotificationsRepository notificationsRepository)
+            INotificationsRepository notificationsRepository,
+            IServiceScopeFactory serviceScopeFactory)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _notificationsRepository = notificationsRepository ?? throw new ArgumentNullException(nameof(notificationsRepository));
+            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
             _connectionManager = connectionManager;
             _accountDataHolder = accountDataHolder;
         }
@@ -254,9 +257,13 @@ namespace EList.Services.Impl
                 var workerCount = Math.Min(10, newNotifications.Count);
                 var tasks = Enumerable.Range(0, workerCount).Select(_ => Task.Run(async () =>
                 {
+                    using var scope = _serviceScopeFactory.CreateScope();
+                    var scopedRepo = scope.ServiceProvider.GetRequiredService<INotificationsRepository>();
+
                     while (newNotifications.TryDequeue(out var notification))
                     {
-                        await HandleNewNotificationAsync(notification);
+                        notification.Id = await scopedRepo.CreateNotificationAsync(notification);
+                        await SendToUserAsync(notification.AccountId, notification);
                     }
                 }));
 
