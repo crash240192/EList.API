@@ -251,20 +251,16 @@ namespace EList.Services.Impl
                     Type = "event_created"
                 }));
 
-                var task = new Task(async () => {
+                var workerCount = Math.Min(10, newNotifications.Count);
+                var tasks = Enumerable.Range(0, workerCount).Select(_ => Task.Run(async () =>
+                {
                     while (newNotifications.TryDequeue(out var notification))
                     {
                         await HandleNewNotificationAsync(notification);
                     }
-                });
+                }));
 
-                var tasks = new List<Task>();
-                for (int i = 0; i < 10; i++)
-                {
-                    tasks.Add(task);
-                }
-                tasks.ForEach(t => t.Start());
-                await Task.WhenAll(tasks.ToArray());
+                await Task.WhenAll(tasks);
             }
             return CommandResult.OK;
         }
