@@ -61,8 +61,6 @@ namespace EList.Api.Controllers
                 var result = await _walletsService.CreateTariffAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -96,8 +94,6 @@ namespace EList.Api.Controllers
                 var result = await _walletsService.UpdateTariffAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return CommandResult.OK;
@@ -220,8 +216,6 @@ namespace EList.Api.Controllers
                 var result = await _walletsService.CreateTariffValidatorAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -256,8 +250,6 @@ namespace EList.Api.Controllers
                 var result = await _walletsService.UpdateTariffValidatorAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return CommandResult.OK;
@@ -336,7 +328,6 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Создание кошелька аккаунта
         /// </summary>
-        /// <param name="request"></param>
         /// <returns></returns>
         [HttpGet("create")]
         public async Task<CommandResult<Guid?>> CreateAccountWalletAsync()
@@ -353,8 +344,6 @@ namespace EList.Api.Controllers
                 var result = await _walletsService.CreateAccountWalletAsync();
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -388,8 +377,6 @@ namespace EList.Api.Controllers
                 var result = await _walletsService.CreateOrganizationWalletAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -422,8 +409,6 @@ namespace EList.Api.Controllers
                 var result = await _walletsService.SetWalletTariffAsync(walletId, tariffId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;

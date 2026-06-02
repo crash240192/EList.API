@@ -59,8 +59,6 @@ namespace EList.Api.Controllers
                 var result = await _subscriptionsService.SubscribeToAccountAsync(accountId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -95,8 +93,6 @@ namespace EList.Api.Controllers
                 var result = await _subscriptionsService.UpdateSubscriptionAsync(accountId, request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -246,8 +242,6 @@ namespace EList.Api.Controllers
                 var result = await _subscriptionsService.DeleteSubscriptionAsync(accountId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
