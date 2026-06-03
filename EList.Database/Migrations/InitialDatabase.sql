@@ -295,6 +295,7 @@ CREATE TABLE public.invitations (
 	invited_id uuid NOT NULL,
 	event_id uuid NOT NULL,
 	creation_date timestamptz NOT NULL,
+	viewed bool DEFAULT false NOT NULL,
 	CONSTRAINT invitation_pk PRIMARY KEY (id),
 	CONSTRAINT invitation_event_fk FOREIGN KEY (event_id) REFERENCES public.events(id),
 	CONSTRAINT invitation_inviter_fk FOREIGN KEY (inviter_id) REFERENCES public.accounts(id),
