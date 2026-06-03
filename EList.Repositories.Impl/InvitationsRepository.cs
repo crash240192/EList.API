@@ -31,7 +31,8 @@ namespace EList.Repositories.Impl
                 EventId = request.EventId,
                 InvitedAccountId = i,
                 InviterOrganizationId = request.InviterOrganizationId,
-                InviterAccountId = inviterAccountId
+                InviterAccountId = inviterAccountId,
+                Viewed = false
             })?.ToList();
 
             await _invitationsDataProvider.CreateInvitationsAsync(invitationItems);
@@ -70,6 +71,7 @@ namespace EList.Repositories.Impl
                 InvitedAccountIds = request.InvitedAccountIds,
                 InviterAccountIds = request.InviterAccountIds,
                 InviterOrgIds = request.InviterOrgIds,
+                Viewed = request.Viewed,
                 PageIndex = request.PageIndex,
                 PageSize = request.PageSize,
             };
@@ -91,11 +93,22 @@ namespace EList.Repositories.Impl
             return new PagedList<Invitation>(items.TotalCount, resultList, request.PageIndex ?? 1, request.PageSize ?? items.TotalCount);
         }
 
+        public async Task<int> GetNotViewedInvitationsCountAsync(Guid accountId)
+        {
+            var result = await _invitationsDataProvider.GetNotViewedInvitationsCountAsync(accountId);
+            return result;
+        }
+
         public async Task<Invitation> GetInvitationAsync(Guid invitationId)
         {
             var invitation = await _invitationsDataProvider.GetInvitationAsync(invitationId);
             var result = _mapper.Map<Invitation>(invitation);
             return result;
+        }
+
+        public async Task ViewInvitationAsync(Guid invitationId)
+        {
+            await _invitationsDataProvider.ViewInvitationAsync(invitationId);
         }
 
         public async Task<List<Invitation>?> GetAllEventInvitationsAsync(Guid eventId)

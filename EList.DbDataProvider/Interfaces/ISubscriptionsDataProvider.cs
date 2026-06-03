@@ -7,6 +7,7 @@ namespace EList.DbDataProvider.Interfaces
     {
         Task<ListResponse<SubscriptionDto>> GetSubscriptionsAsync(SubscriptionsSearchRequest request);
         Task<ListResponse<SubscriptionDto>> GetSubscribersAsync(SubscriptionsSearchRequest request);
+        Task<List<Guid>> GetSubscribersIdsAsync(SubscriptionsSearchRequest request);
         Task<int> GetSubscriptionsCountAsync(Guid accountId);
         Task<int> GetSubscribersCountAsync(Guid accountId);
         Task<Guid> SubscribeToAccountAsync(Guid subscriberId, Guid subscribeToId);

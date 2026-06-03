@@ -21,6 +21,7 @@ using EList.Models.Notifications;
 using Microsoft.AspNetCore.Mvc;
 using NLog.Web.LayoutRenderers;
 using System.Collections.Concurrent;
+using EList.Models.Events;
 
 namespace EList.Services.Impl
 {
@@ -36,15 +37,18 @@ namespace EList.Services.Impl
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly INotificationsRepository _notificationsRepository;
+        private readonly IEventsRepository _eventsRepository;
 
         public NotificationsService(
             WebSocketConnectionManager connectionManager,
             ICorrelationIdProvider correlationIdProvider,
             IAccountDataHolder accountDataHolder,
-            INotificationsRepository notificationsRepository)
+            INotificationsRepository notificationsRepository,
+            IEventsRepository eventsRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _notificationsRepository = notificationsRepository ?? throw new ArgumentNullException(nameof(notificationsRepository));
+            _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _connectionManager = connectionManager;
             _accountDataHolder = accountDataHolder;
         }
@@ -236,6 +240,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var subscribers = await _notificationsRepository.SearchSubscribersEventCreatedAsync(creatorId);
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
 
             if (subscribers?.Any() ?? false)
             {
@@ -245,10 +250,11 @@ namespace EList.Services.Impl
                     AccountId = subscriberId,
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
-                    Message = "",
+                    Message = eventData.Name,
                     Title = "Новое событие",
                     RelatedAccountId = creatorId,
-                    Type = "event_created"
+                    Type = UserNotificationType.EventCreated,
+                    Data = new EventShort(eventData)
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -261,6 +267,39 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
+        public async Task<CommandResult> NotifyEventCreatedAsync(Guid creatorId, Guid eventId, List<Guid> subscribers)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventCreatedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+
+            if (subscribers?.Any() ?? false)
+            {
+                var notifications = subscribers.Select(subscriberId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = eventData.Name,
+                    Title = "Новое событие",
+                    RelatedAccountId = creatorId,
+                    Type = UserNotificationType.EventCreated,
+                    Data = new EventShort(eventData)
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
 
         #endregion
 

@@ -31,5 +31,25 @@ namespace EList.Models.Events
         /// Список идентификаторов организаций-организаторов мероприятия
         /// </summary>
         public List<Guid> OrganizatorOrganizationIds { get; set; }
+
+        /// <summary>
+        /// Автоприглашение всех подписчиков
+        /// </summary>
+        public bool InviteAllSubscribers { get; set; } = false;
+
+        /// <summary>
+        /// Список пользователей, которым нужно выслать приглашения
+        /// </summary>
+        public List<Guid> InviteUsers { get; set; }
+
+        /// <summary>
+        /// Черный список участников
+        /// </summary>
+        public List<Guid> BlackList { get; set; }
+
+        /// <summary>
+        /// Белый список участников
+        /// </summary>
+        public List<Guid> WhiteList { get; set; }
     }
 }

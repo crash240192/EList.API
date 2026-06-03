@@ -20,6 +20,9 @@ namespace EList.DbDataProvider.Models
         [Column("event_id")]
         public Guid EventId { get; set; }
 
+        [Column("viewed")]
+        public bool Viewed { get; set; } = false;
+
         [Column("creation_date")]
         public DateTimeOffset CreationDate { get; set; }
 

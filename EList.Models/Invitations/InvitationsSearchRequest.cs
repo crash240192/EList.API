@@ -26,6 +26,11 @@
         public List<Guid>? EventIds { get; set; }
 
         /// <summary>
+        /// Флаг просмотренных приглашений
+        /// </summary>
+        public bool? Viewed { get; set; }
+
+        /// <summary>
         /// Размер страницы
         /// </summary>
         public int? PageSize { get; set; }

@@ -29,6 +29,7 @@ namespace EList.Services.Impl
         private readonly IParticipationsRepository _participationsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
+        private readonly INotificationsService _notificationsService;
 
         public InvitationsService(ICorrelationIdProvider correlationIdProvider,
             IAccountsRepository accountsRepository,
@@ -39,7 +40,8 @@ namespace EList.Services.Impl
             IEventOrganizatorsRepository eventOrganizatorsRepository,
             IParticipationsRepository participationsRepository,
             IAccountDataHolder accountDataHolder,
-            IParticipantsBWListRepository participantsBWListRepository)
+            IParticipantsBWListRepository participantsBWListRepository,
+            INotificationsService notificationsService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
@@ -50,6 +52,7 @@ namespace EList.Services.Impl
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _participationsRepository = participationsRepository ?? throw new ArgumentNullException(nameof(participationsRepository));
             _participantsBWListRepository = participantsBWListRepository ?? throw new ArgumentNullException(nameof(participantsBWListRepository));
+            _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -91,9 +94,7 @@ namespace EList.Services.Impl
 
             if (!curEvent.Parameters?.AllowUsersToInvite ?? false && !isOrganizator)
             {
-                var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(request.EventId);
-                if (!organizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
-                    return CommandResult.Fail(ErrorCode.AccessError, $"Приглашения на текущее события запрещены администратором");
+                return CommandResult.Fail(ErrorCode.AccessError, $"Приглашения на текущее события запрещены администратором");
 
                 //TODO Сделать аналогичную проверку для организаций
             }
@@ -118,6 +119,7 @@ namespace EList.Services.Impl
                 {
                     var filteredAccounts = await _participantsBWListRepository.FilterUsersNotInWhiteListAsync(curEvent.Id, request.AccountIds);
                     someInvitationsFiltered = filteredAccounts.Count() != request.AccountIds.Count();
+                    request.AccountIds = filteredAccounts;
                     if (someInvitationsFiltered)
                         message = "Некоторых пользователей нет в белом списках. Им не удалось отправить приглашение";
                 }
@@ -126,6 +128,7 @@ namespace EList.Services.Impl
             {
                 var filteredAccounts = await _participantsBWListRepository.FilterUsersNotInBlackListAsync(curEvent.Id, request.AccountIds);
                 someInvitationsFiltered = filteredAccounts.Count() != request.AccountIds.Count();
+                request.AccountIds = filteredAccounts;
                 if (someInvitationsFiltered)
                     message = "Некоторые пользователи находятся в чёрном списке. Им не удалось отправить приглашение";
             }
@@ -133,8 +136,10 @@ namespace EList.Services.Impl
 
             await _invitationsRepository.CreateInvitationsAsync(request, _accountDataHolder.AccountId);
 
+            // TODO: Выслать уведомления о приглашениях
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            
+
             var result = CommandResult.OK;
             if (someInvitationsFiltered)
                 result.Message = message;
@@ -271,6 +276,50 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<Invitation>>(invitations);
+        }
+
+        public async Task<CommandResult<int>> GetNotViewedInvitationsCountAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(ViewInvitationAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var notViewedInvitationsCount = await _invitationsRepository.GetNotViewedInvitationsCountAsync(_accountDataHolder.AccountId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<int>(notViewedInvitationsCount);
+        }
+
+        public async Task<CommandResult> ViewInvitationAsync(Guid invitationId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(ViewInvitationAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var invitation = await _invitationsRepository.GetInvitationAsync(invitationId);
+            if (invitation == null)
+                return CommandResult.Fail(ErrorCode.InvitationNotFound, $"Приглашение с id='{invitationId}' не найдено");
+
+            if (invitation.InviterAccountId != _accountDataHolder.AccountId)
+            {
+                if (invitation.InviterOrganizationId != null)
+                {
+                    //TODO: Проверить, является ли текущий пользователь администратором организации, если она указана
+                }
+                else
+                {
+                    return CommandResult.Fail(ErrorCode.AccessError, $"Пометить приглашение прочитанным может только приглашённый");
+                }
+            }
+
+            await _invitationsRepository.ViewInvitationAsync(invitationId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
         }
     }
 }

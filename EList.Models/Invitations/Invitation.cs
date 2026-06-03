@@ -39,6 +39,11 @@ namespace EList.Models.Invitations
         /// </summary>
         public DateTimeOffset CreationDate { get; set; }
 
+        /// <summary>
+        /// Флаг что приглашение было просмотрено
+        /// </summary>
+        public bool Viewed { get; set; }    
+
         public Inviter Inviter { get; set; }
 
         public Event Event { get; set; }

@@ -27,9 +27,8 @@
 
         /// <summary>
         /// тип уведомления 
-        /// TODO: (надо будет переделать на enum)
         /// </summary>
-        public string? Type { get; set; }
+        public UserNotificationType? Type { get; set; }
 
         /// <summary>
         /// Заголовок уведомления

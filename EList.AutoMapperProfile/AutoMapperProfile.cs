@@ -43,10 +43,10 @@ namespace EList.AutoMapperProfile
 
             CreateMap<SubscriptionDto, Subscription>().ReverseMap();
             CreateMap<DbDataProvider.Models.SearchRequests.SubscriptionsSearchRequest, SubscriptionsSearchRequest>().ReverseMap();
-            
 
             CreateMap<SystemNotificationDto, SystemNotification>().ReverseMap();
-            CreateMap<NotificationDto, Notification>().ReverseMap();
+            CreateMap<NotificationDto, Notification>().ForMember(dest => dest.Type, opt => opt.MapFrom(src => (UserNotificationType?)src.Type));
+            CreateMap<Notification, NotificationDto>().ForMember(dest => dest.Type, opt => opt.MapFrom(src => (int?)src.Type));
 
             CreateMap<EventCategoryDto, EventCategory>().ReverseMap();
             CreateMap<EventTypeDto, EventType>().ReverseMap();
@@ -68,7 +68,7 @@ namespace EList.AutoMapperProfile
             CreateMap<EventAlbumRequest, AlbumRequest>().ReverseMap();
             CreateMap<MediaAlbumDto, MediaAlbum>().ReverseMap();
             CreateMap<FileAlbumRelationDto, AlbumFile>().ReverseMap();
-            
+
             CreateMap<TariffDto, Tariff>().ReverseMap();
             CreateMap<TariffValidatorDto, TariffValidator>().ReverseMap();
             CreateMap<WalletDto, Wallet>().ReverseMap();

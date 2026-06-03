@@ -39,6 +39,19 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<int> GetNotViewedInvitationsCountAsync(Guid accountId)
+        {
+            var result = await _connection.Invitations.Where(i => i.InvitedAccountId == accountId && i.Viewed == false).CountAsync();
+            return result;
+        }
+
+        public async Task ViewInvitationAsync(Guid invitationId)
+        {
+            await _connection.Invitations.Where(i => i.Id == invitationId)
+                .Set(i => i.Viewed, true)
+                .UpdateAsync();
+        }
+
         public async Task<List<InvitationDto>?> GetAllEventInvitationsAsync(Guid eventId)
         {
             var result = await _connection.Invitations.Where(i => i.EventId == eventId).ToListAsync();

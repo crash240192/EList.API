@@ -47,12 +47,8 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task CreateNotificationsAsync(List<NotificationDto> notifications)
         {
-            foreach (var n in notifications)
-            {
-                if (n.Id == Guid.Empty)
-                    n.Id = Guid.NewGuid();
-            }
-
+            notifications.Where(i => i.Id == Guid.Empty)?.ToList().ForEach(i => i.Id = Guid.NewGuid());
+            
             await _connection.BulkCopyAsync(new BulkCopyOptions
             {
                 BulkCopyType = BulkCopyType.MultipleRows

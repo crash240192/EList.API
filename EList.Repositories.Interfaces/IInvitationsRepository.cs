@@ -12,7 +12,9 @@ namespace EList.Repositories.Interfaces
         Task CancelAllInvitationsExceptThisUsersAsync(Guid eventId, List<Guid> invitedAccountIds);
         Task DeleteInvitationAsync(Guid eventId, Guid accountId);
         Task DeleteInvitationAsync(Guid eventId, List<Guid> accountIds);
+        Task<int> GetNotViewedInvitationsCountAsync(Guid accountId);
         Task <Invitation> GetInvitationAsync(Guid invitationId);
+        Task ViewInvitationAsync(Guid invitationId);
         Task<List<Invitation>?> GetAllEventInvitationsAsync(Guid eventId);
         Task<Invitation> GetInvitationAsync(Guid invitedAccountId, Guid eventId);
         Task<bool> IsUserInvitatedAsync(Guid accountId, Guid eventId);

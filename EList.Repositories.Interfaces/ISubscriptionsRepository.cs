@@ -9,6 +9,7 @@ namespace EList.Repositories.Interfaces
         Task<PagedList<Subscription>?> GetSubscriptionsAsync(SubscriptionsSearchRequest request);
         Task<int> GetSubscriptionsCountAsync(Guid accountId);
         Task<PagedList<Subscription>?> GetSubscribersAsync(SubscriptionsSearchRequest request);
+        Task<List<Guid>> GetSubscribersIdsAsync(Models.Subscriptions.SubscriptionsSearchRequest request);
         Task<int> GetSubscribersCountAsync(Guid accountId);
         Task<bool> IsSubscriptionExistAsync(Guid subscriberId, Guid subscribedToId);        
         Task DeleteSubscriptionAsync(Guid subscriberId, Guid subscribedToId);

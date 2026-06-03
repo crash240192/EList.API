@@ -8,6 +8,7 @@ using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NLog;
+using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 using TM.Schedule.API.Attributes;
 
@@ -58,7 +59,7 @@ namespace EList.Api.Controllers
                     await _connectionProvider.RollbackTransactionAsync();
                 else
                     await _connectionProvider.CommitTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);                
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
             catch (Exception ex)
@@ -209,6 +210,65 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _invitationsService.SearchAsync(request);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Получить количество непросмотренных приглашений
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("notViewedCount")]
+        public async Task<CommandResult<int>> GetNotViewedInvitationsCountAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetNotViewedInvitationsCountAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _invitationsService.GetNotViewedInvitationsCountAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Пометить как просмотренное
+        /// </summary>
+        /// <param name="invitationId"></param>
+        /// <returns></returns>
+        [HttpGet("markViewed/{invitationId}")]
+        public async Task<CommandResult> ViewInvitationAsync(Guid invitationId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(ViewInvitationAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                await _connectionProvider.StartNewTransactionAsync();
+
+                var result = await _invitationsService.ViewInvitationAsync(invitationId);
+
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;

@@ -7,10 +7,27 @@ namespace EList.Models.Events
     /// </summary>
     public class EventShort
     {
+        public EventShort() { }
+
+        public EventShort(Event eventData) 
+        {
+            Id = eventData.Id;
+            Name = eventData.Name;
+            Latitude = eventData.Latitude;
+            Longitude = eventData.Longitude;
+            StartTime = eventData.StartTime;
+            Colors = eventData.Types?.Select(i => i.EventCategory.Color)?.ToArray();
+        }   
+
         /// <summary>
         /// Идентификатор
         /// </summary>
         public Guid Id { get; set; }
+
+        /// <summary>
+        /// Дата начала мероприятия
+        /// </summary>
+        public DateTimeOffset? StartTime { get; set; }
 
         /// <summary>
         /// Название события

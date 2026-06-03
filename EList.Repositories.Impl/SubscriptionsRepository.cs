@@ -73,6 +73,13 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task<List<Guid>> GetSubscribersIdsAsync(Models.Subscriptions.SubscriptionsSearchRequest request)
+        {
+            var mappedRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.SubscriptionsSearchRequest>(request);
+
+            var result = await _subscriptionsDataProvider.GetSubscribersIdsAsync(mappedRequest);
+            return result;
+        }
 
         public async Task<int> GetSubscriptionsCountAsync(Guid accountId)
         {

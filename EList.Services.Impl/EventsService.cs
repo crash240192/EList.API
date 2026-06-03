@@ -1,4 +1,5 @@
-﻿using AutoMapper;
+﻿using System.Diagnostics;
+using AutoMapper;
 using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
@@ -12,7 +13,6 @@ using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
 using Org.BouncyCastle.Ocsp;
-using System.Diagnostics;
 
 namespace EList.Services.Impl
 {
@@ -32,10 +32,13 @@ namespace EList.Services.Impl
         private readonly IMapper _mapper;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IInvitationsRepository _invitationsRepository;
+        private readonly IInvitationsService _invitationService;
         private readonly IParticipationsRepository _participationsRepository;
         private readonly IWalletsRepository _walletsRepository;
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
         private readonly INotificationsService _notificationsService;
+        private readonly ISubscriptionsRepository _subscriptionsRepository;
+
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
             IEventsRepository eventsRepository,
@@ -47,7 +50,9 @@ namespace EList.Services.Impl
             IWalletsRepository walletsRepository,
             IAccountDataHolder accountDataHolder,
             IParticipantsBWListRepository participantsBWListRepository,
-            INotificationsService notificationsService)
+            INotificationsService notificationsService,
+            IInvitationsService invitationService,
+            ISubscriptionsRepository subscriptionsRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
@@ -55,6 +60,8 @@ namespace EList.Services.Impl
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _authorizationRepository = authorizationRepository ?? throw new Exception(nameof(authorizationRepository));
             _invitationsRepository = invitationsRepository ?? throw new Exception(nameof(invitationsRepository));
+            _subscriptionsRepository = subscriptionsRepository ?? throw new Exception(nameof(subscriptionsRepository));
+            _invitationService = invitationService ?? throw new Exception(nameof(invitationService));
             _participationsRepository = participationsRepository ?? throw new Exception(nameof(participationsRepository));
             _participantsBWListRepository = participantsBWListRepository ?? throw new Exception(nameof(participantsBWListRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
@@ -157,7 +164,7 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(GetEventTypesByCategoryIdAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
-            
+
             var category = await _eventsMetadataRepository.GetEventCategoryAsync(categoryId);
             if (category == null)
                 return CommandResult<List<EventType>?>.Fail(ErrorCode.EventNotFound, "Событие не найдено");
@@ -430,11 +437,76 @@ namespace EList.Services.Impl
 
             await _eventsMetadataRepository.BindEventTypesAsync(eventId, request.EventTypes);
 
-            //TODO: присрать сюда accountId текущего пользователя
+            #region Автоматическое заполнение белого списка для частного мероприятия
+            var isPrivate = request.EventParameters?.Private == true;
+            if (isPrivate && (request.WhiteList?.Any() ?? false))
+            {
+                await _participantsBWListRepository.AddToWhiteListAsync(new AddUsersToBWListRequest
+                {
+                    AccountIds = request.WhiteList,
+                    EventId = eventId
+                });
+            }
+            #endregion
 
-            //var account = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
+            #region Автоматическое заполнение черного списка
+            if (!isPrivate && (request.BlackList?.Any() ?? false))
+            {
+                await _participantsBWListRepository.AddToBlackListAsync(new AddUsersToBWListRequest
+                {
+                    AccountIds = request.BlackList,
+                    EventId = eventId
+                });
+            }
+            #endregion
 
+            #region автоматическая рассылка приглашений
+            var usersToInvite = new List<Guid>();
+            var subscribersList = new List<Guid>();
+            if (isPrivate)
+            {
+                if (request.InviteAllSubscribers)
+                {
+                    usersToInvite = request.WhiteList;
+                }
+                else
+                {
+                    usersToInvite = request.InviteUsers;
+                    
+                    if (request.WhiteList?.Any() ?? false)
+                        usersToInvite = usersToInvite?.Where(i => request.WhiteList?.Contains(i) ?? false)?.ToList();
+                }
+            }
+            else
+            {
+                subscribersList = await _subscriptionsRepository.GetSubscribersIdsAsync(new Models.Subscriptions.SubscriptionsSearchRequest
+                {
+                    AccountId = _accountDataHolder.AccountId,
+                    notifyEventCreated = true,
+                });
 
+                if (request.InviteAllSubscribers)   
+                    usersToInvite = subscribersList;
+                else
+                    usersToInvite = request.InviteUsers;
+
+                usersToInvite = usersToInvite?.Where(i => !request.BlackList?.Contains(i) ?? true).ToList();
+            }
+
+            if (usersToInvite?.Any() ?? false)
+            {
+                await _invitationService.CreateAsync(new Models.Invitations.CreateInvitationsRequest
+                {
+                    AccountIds = usersToInvite,
+                    EventId = eventId
+                });
+            }
+            #endregion
+
+            if (!isPrivate)
+            {
+                await _notificationsService.NotifyEventCreatedAsync(_accountDataHolder.AccountId, eventId);
+            }
 
             //TODO: С организациями разберёмся позже 
 
@@ -454,7 +526,7 @@ namespace EList.Services.Impl
             //#endregion
 
 
-            await _notificationsService.NotifyEventCreatedAsync(_accountDataHolder.AccountId, eventId);
+            //
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(eventId);

@@ -104,6 +104,25 @@ namespace EList.DbDataProvider.DataProviders
             return new ListResponse<SubscriptionDto>(count, result);
         }
 
+        public async Task<List<Guid>> GetSubscribersIdsAsync(SubscriptionsSearchRequest request)
+        {
+            var subscriptionsRequest = _connection.Subscriptions
+                .Where(i => i.SubscribedToId == request.AccountId);
+
+            if (request.NotifyParticipated != null)
+                subscriptionsRequest = subscriptionsRequest.Where(i => i.NotifyParticipated == request.NotifyParticipated);
+
+            if (request.NotifyEventCreated != null)
+                subscriptionsRequest = subscriptionsRequest.Where(i => i.NotifyEventCreated == request.NotifyEventCreated);
+
+            if (request.NotifySubscribed != null)
+                subscriptionsRequest = subscriptionsRequest.Where(i => i.NotifySubscribed == request.NotifySubscribed);
+
+            var result = await subscriptionsRequest.Select(i => i.SubscriberId).ToListAsync();
+
+            return result;
+        }
+
         public async Task<int> GetSubscribersCountAsync(Guid accountId)
         {
             var result = await _connection.Subscriptions

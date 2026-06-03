@@ -11,5 +11,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult> DeclineAsync(Guid invitationId);
         Task<CommandResult> CancelInvitationAsync(Guid invitationId);
         Task<CommandResult<PagedList<Invitation>>> SearchAsync(InvitationsSearchRequest request);
+        Task<CommandResult<int>> GetNotViewedInvitationsCountAsync();
+        Task<CommandResult> ViewInvitationAsync(Guid invitationId);
     }
 }
