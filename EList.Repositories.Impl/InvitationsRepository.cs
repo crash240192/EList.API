@@ -106,6 +106,20 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task<Invitation> GetFullInvitationAsync(Guid invitationId)
+        {
+            var item = await _invitationsDataProvider.GetFullInvitationAsync(invitationId);
+            var result = _mapper.Map<Invitation>(item);
+            result.Inviter = new Inviter
+            {
+                Account = _mapper.Map<AccountPublicData>(item.Inviter),
+                PersonInfo = _mapper.Map<PersonInfo>(item.Inviter.PersonInfo)
+            };
+            //TODO: Добавить сюда информацию о мероприятии result.Event
+
+            return result;
+        }
+
         public async Task ViewInvitationAsync(Guid invitationId)
         {
             await _invitationsDataProvider.ViewInvitationAsync(invitationId);

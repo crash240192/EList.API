@@ -71,7 +71,7 @@ namespace EList.Services.Impl
 
             var tokenSearchResult = await _authorizationRepository.GetAuthorizationDataAsync(account.Id, clientHash);
 
-            _accountDataHolder.AccountId = account.Id;
+            _accountDataHolder.Account = account;
 
             var result = new AuthorizationResponse();
             var commandResult = new CommandResult<AuthorizationResponse>(result);

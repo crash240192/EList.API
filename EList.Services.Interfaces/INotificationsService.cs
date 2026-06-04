@@ -24,6 +24,7 @@ namespace EList.Services.Interfaces
 
         Task<CommandResult> NotifyEventCreatedAsync(Guid creatorId, Guid eventId);
         Task<CommandResult> NotifyEventCreatedAsync(Guid creatorId, Guid eventId, List<Guid> subscribers);
+        Task<CommandResult> NotifyUsersInvitedAsync(Guid creatorId, Guid eventId, List<Guid> subscribers);
         //Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType);
     }
 }

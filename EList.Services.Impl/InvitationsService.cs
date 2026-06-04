@@ -304,18 +304,9 @@ namespace EList.Services.Impl
             if (invitation == null)
                 return CommandResult.Fail(ErrorCode.InvitationNotFound, $"Приглашение с id='{invitationId}' не найдено");
 
-            if (invitation.InviterAccountId != _accountDataHolder.AccountId)
-            {
-                if (invitation.InviterOrganizationId != null)
-                {
-                    //TODO: Проверить, является ли текущий пользователь администратором организации, если она указана
-                }
-                else
-                {
-                    return CommandResult.Fail(ErrorCode.AccessError, $"Пометить приглашение прочитанным может только приглашённый");
-                }
-            }
-
+            if (invitation.InvitedAccountId != _accountDataHolder.AccountId)
+                return CommandResult.Fail(ErrorCode.AccessError, $"Пометить приглашение прочитанным может только приглашённый");
+            
             await _invitationsRepository.ViewInvitationAsync(invitationId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);

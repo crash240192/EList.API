@@ -71,11 +71,11 @@ namespace EList.Services.Impl
             request.Password = _encryptionTool.CalculateStringHash(request.Password);
 
             var accountId = await _accountsRepository.CreateAccountAsync(request);
-
+            var account = await _accountsRepository.GetAccountAsync(accountId);
             var tokenId = await _authorizationRepository.CreateTokenAsync(accountId, clientHash);
 
             _accountDataHolder.Token = tokenId;
-            _accountDataHolder.AccountId = accountId;
+            _accountDataHolder.Account = account;
 
             var tokenInfo = await _authorizationRepository.GetAuthorizationDataAsync(tokenId);
 

@@ -1,8 +1,13 @@
-﻿namespace EList.Services.Interfaces
+﻿using EList.Models.Accounts;
+using EList.Models.Person;
+
+namespace EList.Services.Interfaces
 {
     public interface IAccountDataHolder
     {
         Guid Token { get; set; }
-        Guid AccountId { get; set; }
+        Account Account { get; set; }
+        PersonInfo? PersonInfo { get; set; }
+        Guid AccountId { get; }
     }
 }

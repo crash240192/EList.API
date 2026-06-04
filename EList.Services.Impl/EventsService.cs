@@ -472,7 +472,7 @@ namespace EList.Services.Impl
                 else
                 {
                     usersToInvite = request.InviteUsers;
-                    
+
                     if (request.WhiteList?.Any() ?? false)
                         usersToInvite = usersToInvite?.Where(i => request.WhiteList?.Contains(i) ?? false)?.ToList();
                 }
@@ -485,29 +485,29 @@ namespace EList.Services.Impl
                     notifyEventCreated = true,
                 });
 
-                if (request.InviteAllSubscribers)   
+                if (request.InviteAllSubscribers)
                     usersToInvite = subscribersList;
                 else
                     usersToInvite = request.InviteUsers;
 
                 usersToInvite = usersToInvite?.Where(i => !request.BlackList?.Contains(i) ?? true).ToList();
+                subscribersList = subscribersList?.Where(i => !usersToInvite?.Contains(i) ?? false)?.ToList();
             }
 
             if (usersToInvite?.Any() ?? false)
             {
-                await _invitationService.CreateAsync(new Models.Invitations.CreateInvitationsRequest
+                await _invitationsRepository.CreateInvitationsAsync(new Models.Invitations.CreateInvitationsRequest
                 {
                     AccountIds = usersToInvite,
                     EventId = eventId
-                });
+                }, _accountDataHolder.AccountId);
+                await _notificationsService.NotifyUsersInvitedAsync(_accountDataHolder.AccountId, eventId, usersToInvite);
             }
             #endregion
 
             if (!isPrivate)
-            {
-                await _notificationsService.NotifyEventCreatedAsync(_accountDataHolder.AccountId, eventId);
-            }
-
+                await _notificationsService.NotifyEventCreatedAsync(_accountDataHolder.AccountId, eventId, subscribersList);
+            
             //TODO: С организациями разберёмся позже 
 
             //#region привязываем идентификаторы организаций к событию
@@ -525,8 +525,6 @@ namespace EList.Services.Impl
             //}
             //#endregion
 
-
-            //
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(eventId);

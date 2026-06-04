@@ -1,4 +1,5 @@
-﻿using EList.Models.Enums;
+﻿using System.Text.Json.Serialization;
+using EList.Models.Enums;
 
 namespace EList.Models.Person
 {
@@ -41,5 +42,14 @@ namespace EList.Models.Person
         /// Дата рождения
         /// </summary>
         public DateTime? BirthDate { get; set; }
+
+        [JsonIgnore]
+        public string FIO
+        {
+            get
+            {
+                return $"{LastName} {FirstName}";
+            }
+        }
     }
 }

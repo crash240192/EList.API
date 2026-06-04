@@ -8,6 +8,7 @@ namespace EList.DbDataProvider.Interfaces
         Task CreateInvitationsAsync(InvitationDto invitation);
         Task CreateInvitationsAsync(List<InvitationDto> invitations);
         Task<InvitationDto> GetInvitationAsync(Guid id);
+        Task<InvitationDto> GetFullInvitationAsync(Guid id);
         Task<int> GetNotViewedInvitationsCountAsync(Guid accountId);
         Task ViewInvitationAsync(Guid invitationId);
         Task<List<InvitationDto>?> GetAllEventInvitationsAsync(Guid eventId);

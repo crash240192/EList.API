@@ -22,6 +22,7 @@ namespace EList.Api.Infrastructure
         private readonly IAccountsService _accountsService;
         private readonly IEncryptionTool _encryptionTool;
         private readonly IAccountDataHolder _accountDataHolder;
+        private readonly IPersonsService _personsService;
 
         /// <summary>
         /// Инициализация хендлера
@@ -34,6 +35,7 @@ namespace EList.Api.Infrastructure
             [NotNull] IAuthorizationService authorizationService,
             [NotNull] IAccountsService accountsService,
             IEncryptionTool encryptionTool,
+            IPersonsService personsService,
             IAccountDataHolder accountDataHolder) : base(options, logger, encoder, clock)
         {
             _authorizationService = authorizationService ?? throw new ArgumentNullException(nameof(authorizationService));
@@ -104,7 +106,8 @@ namespace EList.Api.Infrastructure
                     return AuthenticateResult.Fail("Account inavailable");
                 }
 
-                _accountDataHolder.AccountId = account.Result.Id;
+                _accountDataHolder.Account = account.Result;
+                _accountDataHolder.PersonInfo = (await _personsService.GetPersonInfoByAccountIdAsync(account.Result.Id))?.Result;
 
                 if (!authorizationItem.Result.Active && (Request.Path != "/api/authorization/activate" && Request.Path != "/api/authorization/sendActivationCode"))
                 {

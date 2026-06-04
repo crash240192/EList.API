@@ -39,6 +39,23 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<InvitationDto> GetFullInvitationAsync(Guid id)
+        {
+            var result = await _connection.Invitations
+                .LoadWith(i => i.Event)
+                .ThenLoad(i => i.Parameters)
+                .LoadWith(i => i.Event)
+                .ThenLoad(i => i.Types)
+                .ThenLoad(i => i.Type)
+                .ThenLoad(i => i.EventCategory)
+                .LoadWith(i => i.Inviter)
+                .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Invited)
+                .ThenLoad(i => i.PersonInfo)
+                .FirstOrDefaultAsync(i => i.Id == id);
+            return result;
+        }
+
         public async Task<int> GetNotViewedInvitationsCountAsync(Guid accountId)
         {
             var result = await _connection.Invitations.Where(i => i.InvitedAccountId == accountId && i.Viewed == false).CountAsync();

@@ -1,27 +1,16 @@
-﻿using EList.Common.CorrelationId;
-using EList.Common.Extensions;
+﻿using System.Diagnostics;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
-using EList.Common.TemplateParser;
-using EList.Models.Accounts;
-using EList.Models.Enums;
+using EList.Models.Events;
+using EList.Models.Notifications;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
-using EList.Sms;
-using EList.Smtp;
 using NLog;
-using System.Diagnostics;
-using System.Net.Mail;
-using System.Net.Sockets;
-using System.Net.WebSockets;
-using System.Text.Json;
-using System.Text;
-using EList.Models.Notifications;
-using Microsoft.AspNetCore.Mvc;
-using NLog.Web.LayoutRenderers;
-using System.Collections.Concurrent;
-using EList.Models.Events;
 
 namespace EList.Services.Impl
 {
@@ -38,17 +27,24 @@ namespace EList.Services.Impl
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly INotificationsRepository _notificationsRepository;
         private readonly IEventsRepository _eventsRepository;
+        private readonly IInvitationsRepository _invitationsRepository;
 
+        private string curAccountFullString => !string.IsNullOrWhiteSpace(_accountDataHolder.PersonInfo?.FIO)
+                ? $"{_accountDataHolder.PersonInfo?.FIO} ({_accountDataHolder.Account.Login})"
+                : $"{_accountDataHolder.Account.Login}";
+        
         public NotificationsService(
             WebSocketConnectionManager connectionManager,
             ICorrelationIdProvider correlationIdProvider,
             IAccountDataHolder accountDataHolder,
             INotificationsRepository notificationsRepository,
-            IEventsRepository eventsRepository)
+            IEventsRepository eventsRepository,
+            IInvitationsRepository invitationsRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _notificationsRepository = notificationsRepository ?? throw new ArgumentNullException(nameof(notificationsRepository));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
+            _invitationsRepository = invitationsRepository ?? throw new ArgumentNullException(nameof(invitationsRepository));
             _connectionManager = connectionManager;
             _accountDataHolder = accountDataHolder;
         }
@@ -267,6 +263,7 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
+
         public async Task<CommandResult> NotifyEventCreatedAsync(Guid creatorId, Guid eventId, List<Guid> subscribers)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -284,10 +281,45 @@ namespace EList.Services.Impl
                     AccountId = subscriberId,
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
-                    Message = eventData.Name,
+                    Message = $"{curAccountFullString} создал новое мероприятие",
                     Title = "Новое событие",
                     RelatedAccountId = creatorId,
                     Type = UserNotificationType.EventCreated,
+                    Data = new EventShort(eventData)
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+
+        public async Task<CommandResult> NotifyUsersInvitedAsync(Guid inviterId, Guid eventId, List<Guid> subscribers)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyUsersInvitedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+            
+            if (subscribers?.Any() ?? false)
+            {
+                var notifications = subscribers.Select(subscriberId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"{curAccountFullString} приглашает вас на {eventData.Name}",
+                    Title = "У вас новое приглашение", //TODO: Реализовать "вася пупкин приглашает вас на ...."
+                    RelatedAccountId = inviterId,
+                    Type = UserNotificationType.NewInvitation,
                     Data = new EventShort(eventData)
                 }).ToList();
 
