@@ -61,8 +61,6 @@ namespace EList.Api.Controllers
                 var result = await _eventsService.CreateEventCategoryAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -95,8 +93,6 @@ namespace EList.Api.Controllers
                 var result = await _eventsService.UpdateEventCategoryAsync(id, request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -129,8 +125,6 @@ namespace EList.Api.Controllers
                 var result = await _eventsService.DeleteEventCategoryAsync(id);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -221,8 +215,6 @@ namespace EList.Api.Controllers
                 var result = await _eventsService.CreateEventTypeAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -255,8 +247,6 @@ namespace EList.Api.Controllers
                 var result = await _eventsService.UpdateEventTypeAsync(id, request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -289,8 +279,6 @@ namespace EList.Api.Controllers
                 var result = await _eventsService.DeleteEventTypeAsync(id);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -436,8 +424,6 @@ namespace EList.Api.Controllers
                 var result = await _eventsService.SetEventTypesAsync(eventId, typeids);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -502,8 +488,6 @@ namespace EList.Api.Controllers
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -573,8 +557,6 @@ namespace EList.Api.Controllers
                 var result = await _eventsService.SetEventCoverImageAsync(eventId, imageId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -607,8 +589,6 @@ namespace EList.Api.Controllers
                 var result = await _eventsService.UpdateEventAsync(id, request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -728,8 +708,6 @@ namespace EList.Api.Controllers
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;

@@ -60,8 +60,6 @@ namespace EList.Api.Controllers.ContactData
                 var result = await _contactDataService.CreateContactTypeAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -123,8 +121,6 @@ namespace EList.Api.Controllers.ContactData
                 var result = await _contactDataService.UpdateContactTypeAsync(id, request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -189,8 +185,7 @@ namespace EList.Api.Controllers.ContactData
                 var result = await _contactDataService.CreateContactAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
+
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
@@ -250,8 +245,6 @@ namespace EList.Api.Controllers.ContactData
                 var result = await _contactDataService.UpdateContactAsync(id, request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 

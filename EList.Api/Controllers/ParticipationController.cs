@@ -60,8 +60,6 @@ namespace EList.Api.Controllers
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -95,8 +93,6 @@ namespace EList.Api.Controllers
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -279,8 +275,6 @@ namespace EList.Api.Controllers
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -314,8 +308,6 @@ namespace EList.Api.Controllers
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -350,8 +342,6 @@ namespace EList.Api.Controllers
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -386,8 +376,6 @@ namespace EList.Api.Controllers
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                else
-                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
