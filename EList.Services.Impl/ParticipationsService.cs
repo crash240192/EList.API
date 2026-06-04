@@ -28,22 +28,26 @@ namespace EList.Services.Impl
         private readonly IAccountsRepository _accountsRepository;
         private readonly IAuthorizationRepository _authorizationRepository;
         private readonly IParticipationsRepository _participationRepository;
-        private readonly ISystemNotificationsService _notificationsService;
+        private readonly ISystemNotificationsService _systemNotificationsService;
         private readonly IInvitationsRepository _invitationsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
+        private readonly ISubscriptionsRepository _subscriptionsRepository;
+        private readonly INotificationsService _notificationsService;
 
         public ParticipationsService(ICorrelationIdProvider correlationIdProvider,
             IEventsRepository eventsRepository,
             IAccountsRepository accountsRepository,
             IAuthorizationRepository authorizationRepository,
             IParticipationsRepository participationRepository,
-            ISystemNotificationsService notificationsService,
+            ISystemNotificationsService SystemNotificationsService,
             IInvitationsRepository invitationsRepository,
             IAccountDataHolder accountDataHolder,
             IParticipantsBWListRepository participantsBWListRepository,
-            IEventOrganizatorsRepository eventOrganizatorsRepository)
+            IEventOrganizatorsRepository eventOrganizatorsRepository,
+            ISubscriptionsRepository subscriptionsRepository,
+            INotificationsService notificationsService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
@@ -53,6 +57,8 @@ namespace EList.Services.Impl
             _invitationsRepository = invitationsRepository ?? throw new ArgumentNullException(nameof(invitationsRepository));
             _participantsBWListRepository = participantsBWListRepository ?? throw new ArgumentNullException(nameof(participantsBWListRepository));
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
+            _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
+            _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -111,6 +117,8 @@ namespace EList.Services.Impl
                 thisEventInvitations.Result.ForEach(async i => await _invitationsRepository.DeleteInvitationAsync(eventId, _accountDataHolder.AccountId));
             }
 
+            await _notificationsService.NotifyParticipatedAsync(eventId);
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(result);
         }
@@ -130,6 +138,8 @@ namespace EList.Services.Impl
             //TODO: Реализовать проверку на то что пользователь является инициатором события
 
             await _participationRepository.LeaveEventAsync(_accountDataHolder.AccountId, eventId);
+
+            await _notificationsService.NotifyEventLeftAsync(eventId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

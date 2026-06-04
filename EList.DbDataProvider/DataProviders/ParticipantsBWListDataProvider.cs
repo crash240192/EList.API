@@ -35,7 +35,7 @@ namespace EList.DbDataProvider.DataProviders
         {
             var existingItems = await _connection.WhiteList
                 .Where(i => i.EventId == eventId && accountIds.Contains(i.AccountId))
-                .ToListAsync();            
+                .ToListAsync();
 
             var accountsToInsert = accountIds.Where(accountId => !existingItems.Any(i => i.AccountId == accountId)).ToList();
 
@@ -44,14 +44,14 @@ namespace EList.DbDataProvider.DataProviders
                 EventId = eventId,
                 AccountId = accountId
             }).ToList();
-            
+
             await _connection.BulkCopyAsync(newItems);
         }
 
 
         public async Task<bool> IsUserInBlackListAsync(Guid eventId, Guid accountId)
         {
-            var result = await _connection.BlackList.AnyAsync(i => i.EventId == eventId &&i.AccountId == accountId);
+            var result = await _connection.BlackList.AnyAsync(i => i.EventId == eventId && i.AccountId == accountId);
             return result;
         }
 
@@ -142,17 +142,23 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
-        public async Task<List<Guid>> FilterUsersNotInWhiteListAsync(Guid eventId, List<Guid> accountIds)
+        public async Task<List<Guid>> FilterUsersByWhiteListAsync(Guid eventId, List<Guid> accountIds)
         {
-            var result = await _connection.WhiteList.Where(i => i.EventId == eventId && accountIds.Contains(i.AccountId))
+            var whiteListUsers = await _connection.WhiteList.Where(i => i.EventId == eventId)
                 .Select(i => i.AccountId).ToListAsync();
-            return result;
+            if (whiteListUsers.Any())
+            {
+                var result = accountIds?.Where(i => whiteListUsers?.Contains(i) ?? false).ToList();
+                return result;
+            }
+            return accountIds;
         }
 
-        public async Task<List<Guid>> FilterUsersNotInBlackListAsync(Guid eventId, List<Guid> accountIds)
+        public async Task<List<Guid>> FilterUsersByBlackListAsync(Guid eventId, List<Guid> accountIds)
         {
-            var result = await _connection.BlackList.Where(i => i.EventId == eventId && accountIds.Contains(i.AccountId))
+            var blackListUsers = await _connection.BlackList.Where(i => i.EventId == eventId)
                 .Select(i => i.AccountId).ToListAsync();
+            var result = accountIds?.Where(i => !blackListUsers?.Contains(i) ?? true)?.ToList();
             return result;
         }
     }

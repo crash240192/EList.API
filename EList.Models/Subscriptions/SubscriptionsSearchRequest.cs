@@ -5,9 +5,9 @@
         public Guid AccountId { get; set; }
         public string Name { get; set; }
 
-        public bool? notifyParticipated { get; set; }
-        public bool? notifyEventCreated { get; set; } 
-        public bool? notifySubscribed { get; set; }
+        public bool? NotifyParticipated { get; set; }
+        public bool? NotifyEventCreated { get; set; } 
+        public bool? NotifySubscribed { get; set; }
 
         public int? PageIndes { get; set; }
         public int? PageSize { get; set; }

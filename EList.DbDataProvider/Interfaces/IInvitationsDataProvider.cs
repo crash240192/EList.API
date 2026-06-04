@@ -11,6 +11,7 @@ namespace EList.DbDataProvider.Interfaces
         Task<InvitationDto> GetFullInvitationAsync(Guid id);
         Task<int> GetNotViewedInvitationsCountAsync(Guid accountId);
         Task ViewInvitationAsync(Guid invitationId);
+        Task ViewAllInvitationsAsync(Guid accountId);
         Task<List<InvitationDto>?> GetAllEventInvitationsAsync(Guid eventId);
         Task<InvitationDto> GetInvitationAsync(Guid invitedAccountId, Guid eventId);
         Task<bool> IsUserInvitatedAsync(Guid accountId, Guid eventId);

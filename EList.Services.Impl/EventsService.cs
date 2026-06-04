@@ -32,7 +32,6 @@ namespace EList.Services.Impl
         private readonly IMapper _mapper;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IInvitationsRepository _invitationsRepository;
-        private readonly IInvitationsService _invitationService;
         private readonly IParticipationsRepository _participationsRepository;
         private readonly IWalletsRepository _walletsRepository;
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
@@ -51,7 +50,6 @@ namespace EList.Services.Impl
             IAccountDataHolder accountDataHolder,
             IParticipantsBWListRepository participantsBWListRepository,
             INotificationsService notificationsService,
-            IInvitationsService invitationService,
             ISubscriptionsRepository subscriptionsRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
@@ -61,7 +59,6 @@ namespace EList.Services.Impl
             _authorizationRepository = authorizationRepository ?? throw new Exception(nameof(authorizationRepository));
             _invitationsRepository = invitationsRepository ?? throw new Exception(nameof(invitationsRepository));
             _subscriptionsRepository = subscriptionsRepository ?? throw new Exception(nameof(subscriptionsRepository));
-            _invitationService = invitationService ?? throw new Exception(nameof(invitationService));
             _participationsRepository = participationsRepository ?? throw new Exception(nameof(participationsRepository));
             _participantsBWListRepository = participantsBWListRepository ?? throw new Exception(nameof(participantsBWListRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
@@ -482,7 +479,7 @@ namespace EList.Services.Impl
                 subscribersList = await _subscriptionsRepository.GetSubscribersIdsAsync(new Models.Subscriptions.SubscriptionsSearchRequest
                 {
                     AccountId = _accountDataHolder.AccountId,
-                    notifyEventCreated = true,
+                    NotifyEventCreated = true,
                 });
 
                 if (request.InviteAllSubscribers)
@@ -491,7 +488,7 @@ namespace EList.Services.Impl
                     usersToInvite = request.InviteUsers;
 
                 usersToInvite = usersToInvite?.Where(i => !request.BlackList?.Contains(i) ?? true).ToList();
-                subscribersList = subscribersList?.Where(i => !usersToInvite?.Contains(i) ?? false)?.ToList();
+                subscribersList = subscribersList?.Where(i => !usersToInvite?.Contains(i) ?? true)?.ToList();
             }
 
             if (usersToInvite?.Any() ?? false)
@@ -501,12 +498,12 @@ namespace EList.Services.Impl
                     AccountIds = usersToInvite,
                     EventId = eventId
                 }, _accountDataHolder.AccountId);
-                await _notificationsService.NotifyUsersInvitedAsync(_accountDataHolder.AccountId, eventId, usersToInvite);
+                await _notificationsService.NotifyUsersInvitedAsync(eventId, usersToInvite);
             }
             #endregion
 
             if (!isPrivate)
-                await _notificationsService.NotifyEventCreatedAsync(_accountDataHolder.AccountId, eventId, subscribersList);
+                await _notificationsService.NotifyEventCreatedAsync(eventId, subscribersList);
             
             //TODO: С организациями разберёмся позже 
 
@@ -549,6 +546,8 @@ namespace EList.Services.Impl
             //TODO: Если у ивента организатором является какая-то компания, проверить, является ли accountId её участником
 
             await _eventsRepository.UpdateEventAsync(eventId, request);
+
+            await _notificationsService.NotifyEventUpdatedAsync(eventId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(eventId);
@@ -677,7 +676,8 @@ namespace EList.Services.Impl
             await _eventsRepository.CancelEventAsync(eventId);
 
             await _invitationsRepository.CancelAllInvitationsAsync(eventId);
-            //Разослать уведомление что мероприятие было отменено
+
+            await _notificationsService.NotifyEventCancelledAsync(eventId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

@@ -109,15 +109,15 @@ namespace EList.Repositories.Impl
             return result;
         }
 
-        public async Task<List<Guid>> FilterUsersNotInWhiteListAsync(Guid eventId, List<Guid> accountIds)
+        public async Task<List<Guid>> FilterUsersByWhiteListAsync(Guid eventId, List<Guid> accountIds)
         {
-            var result = await _participantsBWListDataProvider.FilterUsersNotInWhiteListAsync(eventId, accountIds);
+            var result = await _participantsBWListDataProvider.FilterUsersByWhiteListAsync(eventId, accountIds);
             return result;
         }
 
-        public async Task<List<Guid>> FilterUsersNotInBlackListAsync(Guid eventId, List<Guid> accountIds)
+        public async Task<List<Guid>> FilterUsersByBlackListAsync(Guid eventId, List<Guid> accountIds)
         {
-            var result = await _participantsBWListDataProvider.FilterUsersNotInBlackListAsync(eventId, accountIds);
+            var result = await _participantsBWListDataProvider.FilterUsersByBlackListAsync(eventId, accountIds);
             return result;
         }
     }

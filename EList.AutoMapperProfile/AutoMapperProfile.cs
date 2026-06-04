@@ -15,6 +15,8 @@ using EList.Models.Participation;
 using EList.Models.Person;
 using EList.Models.Subscriptions;
 using EList.Models.Wallets;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace EList.AutoMapperProfile
 {
@@ -45,8 +47,12 @@ namespace EList.AutoMapperProfile
             CreateMap<DbDataProvider.Models.SearchRequests.SubscriptionsSearchRequest, SubscriptionsSearchRequest>().ReverseMap();
 
             CreateMap<SystemNotificationDto, SystemNotification>().ReverseMap();
-            CreateMap<NotificationDto, Notification>().ForMember(dest => dest.Type, opt => opt.MapFrom(src => (UserNotificationType?)src.Type));
-            CreateMap<Notification, NotificationDto>().ForMember(dest => dest.Type, opt => opt.MapFrom(src => (int?)src.Type));
+            CreateMap<NotificationDto, Notification>()
+                .ForMember(dest => dest.Type, opt => opt.MapFrom(src => (UserNotificationType?)src.Type))
+                .ForMember(dest => dest.Data, opt => opt.MapFrom(src => !string.IsNullOrWhiteSpace(src.Data) ? JObject.Parse(src.Data) : null));
+            CreateMap<Notification, NotificationDto>()
+                .ForMember(dest => dest.Type, opt => opt.MapFrom(src => (int?)src.Type))
+                .ForMember(dest => dest.Data, opt => opt.MapFrom(src => src.Data != null ? JObject.FromObject(src.Data).ToString() : null));
 
             CreateMap<EventCategoryDto, EventCategory>().ReverseMap();
             CreateMap<EventTypeDto, EventType>().ReverseMap();

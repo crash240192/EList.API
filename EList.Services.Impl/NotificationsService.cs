@@ -8,6 +8,7 @@ using EList.Common.Models;
 using EList.Common.Support;
 using EList.Models.Events;
 using EList.Models.Notifications;
+using EList.Models.Subscriptions;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
@@ -28,29 +29,37 @@ namespace EList.Services.Impl
         private readonly INotificationsRepository _notificationsRepository;
         private readonly IEventsRepository _eventsRepository;
         private readonly IInvitationsRepository _invitationsRepository;
+        private readonly IParticipationsRepository _participationsRepository;
+        private readonly IAccountsRepository _accountsRepository;
+        private readonly IPersonsRepository _personsRepository;
+        private readonly ISubscriptionsRepository _subscriptionsRepository;
 
-        private string curAccountFullString => !string.IsNullOrWhiteSpace(_accountDataHolder.PersonInfo?.FIO)
-                ? $"{_accountDataHolder.PersonInfo?.FIO} ({_accountDataHolder.Account.Login})"
-                : $"{_accountDataHolder.Account.Login}";
-        
         public NotificationsService(
             WebSocketConnectionManager connectionManager,
             ICorrelationIdProvider correlationIdProvider,
             IAccountDataHolder accountDataHolder,
             INotificationsRepository notificationsRepository,
             IEventsRepository eventsRepository,
-            IInvitationsRepository invitationsRepository)
+            IInvitationsRepository invitationsRepository,
+            IParticipationsRepository participationsRepository,
+            IAccountsRepository accountsRepository,
+            IPersonsRepository personsRepository,
+            ISubscriptionsRepository subscriptionsRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _notificationsRepository = notificationsRepository ?? throw new ArgumentNullException(nameof(notificationsRepository));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _invitationsRepository = invitationsRepository ?? throw new ArgumentNullException(nameof(invitationsRepository));
+            _participationsRepository = participationsRepository ?? throw new ArgumentNullException(nameof(participationsRepository));
+            _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
+            _personsRepository = personsRepository ?? throw new ArgumentException(nameof(personsRepository));
+            _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
             _connectionManager = connectionManager;
             _accountDataHolder = accountDataHolder;
         }
 
 
-
+        #region main logic
         public async Task<CommandResult> AddConnectionAsync(Guid accountId, WebSocket socket)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -104,6 +113,12 @@ namespace EList.Services.Impl
             return result;
         }
 
+
+        /// <summary>
+        /// Обработчик уведомления (сохранение в базу и отправка пользователю)
+        /// </summary>
+        /// <param name="notification"></param>
+        /// <returns></returns>
         public async Task<CommandResult> HandleNewNotificationAsync(Notification notification)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -119,34 +134,12 @@ namespace EList.Services.Impl
             return sendToUserResult;
         }
 
-        public async Task<CommandResult> ReadNotificationAsync(Guid notificationId)
-        {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(ReadNotificationAsync)}";
-            var execTime = Stopwatch.StartNew();
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-            await _notificationsRepository.ReadNotificationAsync(notificationId);
-
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return CommandResult.OK;
-        }
-
-        public async Task<CommandResult> ReadAllUserNotificationsAsync()
-        {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(ReadAllUserNotificationsAsync)}";
-            var execTime = Stopwatch.StartNew();
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-            var accountId = _accountDataHolder.AccountId;
-
-            await _notificationsRepository.ReadAllUserNotificationsAsync(accountId);
-
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return CommandResult.OK;
-        }
-
+        /// <summary>
+        /// Отправка уведомления конкретному пользователю
+        /// </summary>
+        /// <param name="accountId"></param>
+        /// <param name="notification"></param>
+        /// <returns></returns>
         public async Task<CommandResult> SendToUserAsync(Guid accountId, Notification notification)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -222,20 +215,59 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
+        /// <summary>
+        /// Пометить уведомление как прочитанное
+        /// </summary>
+        /// <param name="notificationId"></param>
+        /// <returns></returns>
+        public async Task<CommandResult> ReadNotificationAsync(Guid notificationId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(ReadNotificationAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            await _notificationsRepository.ReadNotificationAsync(notificationId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        /// <summary>
+        /// Пометить все уведомления как прочитанные
+        /// </summary>
+        /// <returns></returns>
+        public async Task<CommandResult> ReadAllUserNotificationsAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(ReadAllUserNotificationsAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var accountId = _accountDataHolder.AccountId;
+
+            await _notificationsRepository.ReadAllUserNotificationsAsync(accountId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        #endregion main logic
 
 
 
 
         #region structured notifications
 
-        public async Task<CommandResult> NotifyEventCreatedAsync(Guid creatorId, Guid eventId)
+        #region event
+        public async Task<CommandResult> NotifyEventCreatedAsync(Guid eventId)
         {
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(NotifyEventCreatedAsync)}";
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var subscribers = await _notificationsRepository.SearchSubscribersEventCreatedAsync(creatorId);
+            var subscribers = await _notificationsRepository.SearchSubscribersEventCreatedAsync(_accountDataHolder.AccountId);
             var eventData = await _eventsRepository.GetEventAsync(eventId);
 
             if (subscribers?.Any() ?? false)
@@ -246,9 +278,9 @@ namespace EList.Services.Impl
                     AccountId = subscriberId,
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
-                    Message = eventData.Name,
+                    Message = $"{_accountDataHolder.AccountNameFullString} создал новое событие \"{eventData.Name}\"",
                     Title = "Новое событие",
-                    RelatedAccountId = creatorId,
+                    RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.EventCreated,
                     Data = new EventShort(eventData)
                 }).ToList();
@@ -263,8 +295,7 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
-
-        public async Task<CommandResult> NotifyEventCreatedAsync(Guid creatorId, Guid eventId, List<Guid> subscribers)
+        public async Task<CommandResult> NotifyEventCreatedAsync(Guid eventId, List<Guid> subscribers)
         {
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(NotifyEventCreatedAsync)}";
@@ -281,9 +312,9 @@ namespace EList.Services.Impl
                     AccountId = subscriberId,
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
-                    Message = $"{curAccountFullString} создал новое мероприятие",
+                    Message = $"{_accountDataHolder.AccountNameFullString} создал новое мероприятие {eventData.Name}",
                     Title = "Новое событие",
-                    RelatedAccountId = creatorId,
+                    RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.EventCreated,
                     Data = new EventShort(eventData)
                 }).ToList();
@@ -297,9 +328,81 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
+        
+        public async Task<CommandResult> NotifyEventUpdatedAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventUpdatedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var participants = await _participationsRepository.GetEventParticipantIdsAsync(eventId);
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+
+            if (participants?.Any() ?? false)
+            {
+                var notifications = participants.Select(subscriberId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"В событии \"{eventData.Name}\" обновление",
+                    Title = "Событие было обновлено",
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.EventUpdated,
+                    Data = new EventShort(eventData)
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> NotifyEventCancelledAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventCancelledAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var participants = await _participationsRepository.GetEventParticipantIdsAsync(eventId);
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+
+            if (participants?.Any() ?? false)
+            {
+                var notifications = participants.Select(subscriberId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"Событие \"{eventData.Name}\" было отменено",
+                    Title = "Отмена события",
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.EventCancelled,
+                    Data = new EventShort(eventData)
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+        #endregion event
 
 
-        public async Task<CommandResult> NotifyUsersInvitedAsync(Guid inviterId, Guid eventId, List<Guid> subscribers)
+        #region invitation
+        public async Task<CommandResult> NotifyUsersInvitedAsync(Guid eventId, List<Guid> subscribers)
         {
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(NotifyUsersInvitedAsync)}";
@@ -316,9 +419,9 @@ namespace EList.Services.Impl
                     AccountId = subscriberId,
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
-                    Message = $"{curAccountFullString} приглашает вас на {eventData.Name}",
-                    Title = "У вас новое приглашение", //TODO: Реализовать "вася пупкин приглашает вас на ...."
-                    RelatedAccountId = inviterId,
+                    Message = $"{_accountDataHolder.AccountNameFullString} приглашает вас на \"{eventData.Name}\"",
+                    Title = null, 
+                    RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.NewInvitation,
                     Data = new EventShort(eventData)
                 }).ToList();
@@ -332,8 +435,223 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
+        #endregion invitation
 
-        #endregion
+
+        #region participation
+        public async Task<CommandResult> NotifyParticipatedAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyParticipatedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+            var subscribers = await _subscriptionsRepository.GetSubscribersIdsAsync(new SubscriptionsSearchRequest
+            {
+                AccountId = _accountDataHolder.AccountId,
+                NotifyParticipated = true
+            });
+
+            if (subscribers?.Any() ?? false)
+            {
+                var notifications = subscribers.Select(subscriberId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"{_accountDataHolder.AccountNameFullString} принял участие в \"{eventData.Name}\"",
+                    Title = null, 
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.Participated,
+                    Data = new EventShort(eventData)
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> NotifyEventLeftAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventLeftAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+            var subscribers = await _subscriptionsRepository.GetSubscribersIdsAsync(new SubscriptionsSearchRequest
+            {
+                AccountId = _accountDataHolder.AccountId,
+                NotifyParticipated = true
+            });
+
+            if (subscribers?.Any() ?? false)
+            {
+                var notifications = subscribers.Select(subscriberId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"{_accountDataHolder.AccountNameFullString} покинул событие \"{eventData.Name}\"",
+                    Title = null,
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.EventLeft,
+                    Data = new EventShort(eventData)
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+        #endregion participation
+
+
+        #region subscription
+        public async Task<CommandResult> NotifySubscribedAsync(Guid subscribedToId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifySubscribedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var subscribedTo = await _accountsRepository.GetAccountAsync(subscribedToId);
+            var subscribedToPerson = await _personsRepository.GetPersonInfoAsync(subscribedToId);
+            var subscribedToAccountFullString = !string.IsNullOrWhiteSpace(subscribedToPerson?.FIO)
+                ? $"{subscribedToPerson.FIO} ({subscribedTo?.Login})"
+                : $"{subscribedTo?.Login}";
+
+            #region уведомляем всех, кроме того, на кого подписались
+            var subscribers = await _subscriptionsRepository.GetSubscribersIdsAsync(new SubscriptionsSearchRequest
+            {
+                AccountId = _accountDataHolder.AccountId,
+                NotifySubscribed = true
+            });
+            subscribers = subscribers?.Where(i => i != subscribedToId)?.ToList();
+
+            if (subscribers?.Any() ?? false)
+            {
+                var notifications = subscribers.Select(subscriberId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
+                    EventId = null,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"{_accountDataHolder.AccountNameFullString} подписался на {subscribedToAccountFullString}",
+                    Title = null, 
+                    RelatedAccountId = subscribedToId,
+                    Type = UserNotificationType.RelatedPersonSubscribed,
+                    Data = subscribedTo
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+            #endregion
+
+            #region уведомляем того, на кого подписались
+            var notification = new Notification
+            {
+                Id = Guid.NewGuid(),
+                AccountId = subscribedToId,
+                EventId = null,
+                CreatedAt = DateTime.UtcNow,
+                Message = $"На вас подписался {_accountDataHolder.AccountNameFullString}",
+                Title = $"У вас новый подписчик",
+                RelatedAccountId = _accountDataHolder.AccountId,
+                Type = UserNotificationType.NewSubscription,
+                Data = _accountDataHolder.Account,
+            };
+
+            await _notificationsRepository.CreateNotificationAsync(notification);
+            await SendToUserAsync(subscribedToId, notification);   
+            #endregion
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> NotifyUnsubscribedAsync(Guid unsubscribedFromId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyUnsubscribedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var unsubscribedFrom = await _accountsRepository.GetAccountAsync(unsubscribedFromId);
+            var personUnsubscribedFrom = await _personsRepository.GetPersonInfoAsync(unsubscribedFromId);
+            var unsubscribedFromAccountFullString = !string.IsNullOrWhiteSpace(personUnsubscribedFrom?.FIO)
+                ? $"{personUnsubscribedFrom.FIO} ({unsubscribedFrom?.Login})"
+                : $"{unsubscribedFrom?.Login}";
+
+            #region уведомляем всех, кроме того, от кого отписались
+            var subscribers = await _subscriptionsRepository.GetSubscribersIdsAsync(new SubscriptionsSearchRequest
+            {
+                AccountId = _accountDataHolder.AccountId,
+                NotifySubscribed = true
+            });
+            subscribers = subscribers?.Where(i => i != unsubscribedFromId)?.ToList();
+
+            if (subscribers?.Any() ?? false)
+            {
+                var notifications = subscribers.Select(subscriberId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
+                    EventId = null,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"{_accountDataHolder.AccountNameFullString} отписался от {unsubscribedFromAccountFullString}",
+                    Title = null,
+                    RelatedAccountId = unsubscribedFromId,
+                    Type = UserNotificationType.RelatedPersonUnsubscribed,
+                    Data = unsubscribedFrom
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+            #endregion
+
+            #region уведомляем того, от кого отписались
+            var notification = new Notification
+            {
+                Id = Guid.NewGuid(),
+                AccountId = unsubscribedFromId,
+                EventId = null,
+                CreatedAt = DateTime.UtcNow,
+                Message = $"{_accountDataHolder.AccountNameFullString} отписался от вас",
+                Title = $"От вас отписались",
+                RelatedAccountId = _accountDataHolder.AccountId,
+                Type = UserNotificationType.Unsubscribed,
+                Data = _accountDataHolder.Account,
+            };
+
+            await _notificationsRepository.CreateNotificationAsync(notification);
+            await SendToUserAsync(unsubscribedFromId, notification);
+            #endregion
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+        #endregion subscription
+
+        #endregion structured notifications
 
 
 
@@ -447,7 +765,7 @@ namespace EList.Services.Impl
                 endOfMessage: true,
                 CancellationToken.None);
         }
-        #endregion
+        #endregion private
 
         /*
         public async Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType)

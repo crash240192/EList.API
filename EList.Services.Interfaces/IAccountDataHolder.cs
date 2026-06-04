@@ -9,5 +9,7 @@ namespace EList.Services.Interfaces
         Account Account { get; set; }
         PersonInfo? PersonInfo { get; set; }
         Guid AccountId { get; }
+
+        string AccountNameFullString { get; }
     }
 }

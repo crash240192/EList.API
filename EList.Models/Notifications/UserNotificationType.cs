@@ -7,13 +7,13 @@
         EventCancelled = 2,
         EventFinished = 3,
 
-        Subscribed = 10,
-        Unsubsceibed = 11,
+        NewSubscription = 10,
+        Unsubscribed = 11,
         RelatedPersonSubscribed = 12,
         RelatedPersonUnsubscribed = 13,
 
         Participated = 20,
-        Unparticipated = 21,
+        EventLeft = 21,
 
         MessageReplied = 31,
 

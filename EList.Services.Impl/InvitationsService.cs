@@ -117,7 +117,7 @@ namespace EList.Services.Impl
                 var whiteListIsEmpty = await _participantsBWListRepository.IsWhiteListEmptyAsync(curEvent.Id);
                 if (!whiteListIsEmpty)
                 {
-                    var filteredAccounts = await _participantsBWListRepository.FilterUsersNotInWhiteListAsync(curEvent.Id, request.AccountIds);
+                    var filteredAccounts = await _participantsBWListRepository.FilterUsersByWhiteListAsync(curEvent.Id, request.AccountIds);
                     someInvitationsFiltered = filteredAccounts.Count() != request.AccountIds.Count();
                     request.AccountIds = filteredAccounts;
                     if (someInvitationsFiltered)
@@ -126,7 +126,7 @@ namespace EList.Services.Impl
             }
             else
             {
-                var filteredAccounts = await _participantsBWListRepository.FilterUsersNotInBlackListAsync(curEvent.Id, request.AccountIds);
+                var filteredAccounts = await _participantsBWListRepository.FilterUsersByBlackListAsync(curEvent.Id, request.AccountIds);
                 someInvitationsFiltered = filteredAccounts.Count() != request.AccountIds.Count();
                 request.AccountIds = filteredAccounts;
                 if (someInvitationsFiltered)
@@ -136,7 +136,7 @@ namespace EList.Services.Impl
 
             await _invitationsRepository.CreateInvitationsAsync(request, _accountDataHolder.AccountId);
 
-            // TODO: Выслать уведомления о приглашениях
+            await _notificationsService.NotifyUsersInvitedAsync(request.EventId, request.AccountIds);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
@@ -308,6 +308,20 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AccessError, $"Пометить приглашение прочитанным может только приглашённый");
             
             await _invitationsRepository.ViewInvitationAsync(invitationId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> ViewAllInvitationsAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(ViewAllInvitationsAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            await _invitationsRepository.ViewAllInvitationsAsync(_accountDataHolder.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

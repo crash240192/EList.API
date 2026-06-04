@@ -125,6 +125,11 @@ namespace EList.Repositories.Impl
             await _invitationsDataProvider.ViewInvitationAsync(invitationId);
         }
 
+        public async Task ViewAllInvitationsAsync(Guid accountId)
+        {
+            await _invitationsDataProvider.ViewAllInvitationsAsync(accountId);
+        }
+
         public async Task<List<Invitation>?> GetAllEventInvitationsAsync(Guid eventId)
         {
             var invitations = await _invitationsDataProvider.GetAllEventInvitationsAsync(eventId);

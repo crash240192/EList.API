@@ -2,8 +2,10 @@ using System.Diagnostics;
 using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
+using EList.DbDataProvider.Interfaces;
 using EList.Models.Accounts;
 using EList.Models.Notifications;
+using EList.Services.Impl;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -38,16 +40,19 @@ namespace EList.Api.Controllers
         private readonly INotificationsService _notificationService;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IAccountDataHolder _accountDataHolder;
+        private readonly IDataConnectionProvider _connectionProvider;
 
         public NotificationHubController(
             INotificationsService notificationService,
             ICorrelationIdProvider correlationIdProvider,
             IAccountDataHolder accountDataHolder,
-            INotificationsService notificationsService)
+            INotificationsService notificationsService,
+            IDataConnectionProvider connectionProvider)
         {
             _notificationService = notificationService;
             _correlationIdProvider = correlationIdProvider;
             _accountDataHolder = accountDataHolder;
+            _connectionProvider = connectionProvider;
         }
 
         /// <summary>
@@ -70,19 +75,32 @@ namespace EList.Api.Controllers
             var methodName = $"{LOGGER_NAME}{nameof(ConnectWebSocket)}";
             var execTime = Stopwatch.StartNew();
 
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-            if (!HttpContext.WebSockets.IsWebSocketRequest)
+            try
             {
-                logger.Debug(correlationId, null, methodName, "Rejected non-WebSocket request", null);
-                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await HttpContext.Response.WriteAsync("Ожидается WebSocket-соединение");
-                return;
-            }
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                await _connectionProvider.StartNewTransactionAsync();
 
-            var socket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-            await _notificationService.AddConnectionAsync(socket);
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                if (!HttpContext.WebSockets.IsWebSocketRequest)
+                {
+                    logger.Debug(correlationId, null, methodName, "Rejected non-WebSocket request", null);
+                    HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                    await HttpContext.Response.WriteAsync("Ожидается WebSocket-соединение");
+                    return;
+                }
+
+                var socket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+                var result = await _notificationService.AddConnectionAsync(socket);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
         }
 
         /// <summary>
@@ -153,12 +171,24 @@ namespace EList.Api.Controllers
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(ReadNotificationAsync)}";
             var execTime = Stopwatch.StartNew();
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                await _connectionProvider.StartNewTransactionAsync();
 
-            var result = await _notificationService.ReadNotificationAsync(notificationId);
+                var result = await _notificationService.ReadNotificationAsync(notificationId);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
 
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return result;
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
         }
 
         /// <summary>
@@ -170,12 +200,24 @@ namespace EList.Api.Controllers
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(ReadAllUserNotificationsAsync)}";
             var execTime = Stopwatch.StartNew();
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                await _connectionProvider.StartNewTransactionAsync();
 
-            var result = await _notificationService.ReadAllUserNotificationsAsync();
+                var result = await _notificationService.ReadAllUserNotificationsAsync();
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
 
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return result;
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
         }
 
 

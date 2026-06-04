@@ -26,10 +26,16 @@ namespace EList.DbDataProvider.DataProviders
         {
             if (invitations?.Any() ?? false)
             {
-                var existingInvitations = await _connection.Invitations.Where(i => invitations.Any(inv => inv.EventId == i.EventId && inv.InvitedAccountId == i.InvitedAccountId)).ToListAsync();
+                var existingInvitationsQuery = _connection.Invitations.Where(i => invitations.Any(inv => inv.EventId == i.EventId && inv.InvitedAccountId == i.InvitedAccountId));
+                var existingInvitations = await existingInvitationsQuery.ToListAsync();
                 invitations = invitations.Where(i => !existingInvitations.Any(inv => inv.InvitedAccountId == i.InvitedAccountId && inv.EventId == i.EventId)).ToList();
                 invitations.ForEach(i => i.CreationDate = DateTime.Now);
                 await _connection.BulkCopyAsync(invitations);
+
+                await existingInvitationsQuery
+                    .Set(i => i.CreationDate, DateTime.Now)
+                    .Set(i => i.Viewed, false)
+                    .UpdateAsync();
             }
         }
 
@@ -65,6 +71,13 @@ namespace EList.DbDataProvider.DataProviders
         public async Task ViewInvitationAsync(Guid invitationId)
         {
             await _connection.Invitations.Where(i => i.Id == invitationId)
+                .Set(i => i.Viewed, true)
+                .UpdateAsync();
+        }
+
+        public async Task ViewAllInvitationsAsync(Guid accountId)
+        {
+            await _connection.Invitations.Where(i => i.InvitedAccountId == accountId)
                 .Set(i => i.Viewed, true)
                 .UpdateAsync();
         }

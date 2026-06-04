@@ -1,4 +1,5 @@
 ﻿using LinqToDB.Mapping;
+using Newtonsoft.Json.Linq;
 
 
 namespace EList.DbDataProvider.Models
@@ -33,8 +34,8 @@ namespace EList.DbDataProvider.Models
         [Column("read_at")]
         public DateTimeOffset? ReadAt { get; set; }
 
-        [Column("data")]
-        public object? Data { get; set; }
+        [Column("data"), DataType("jsonb")]
+        public string? Data { get; set; }
 
 
         [Association(ThisKey = nameof(EventId), OtherKey = nameof(EventDto.Id))]

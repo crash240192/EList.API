@@ -1,8 +1,6 @@
 ﻿using System.Net.WebSockets;
 using EList.Common.Models;
-using EList.Models.Enums;
 using EList.Models.Notifications;
-using Microsoft.AspNetCore.Mvc;
 
 namespace EList.Services.Interfaces
 {
@@ -10,7 +8,6 @@ namespace EList.Services.Interfaces
     {
         Task<CommandResult> AddConnectionAsync(Guid accountId, WebSocket socket);
         Task<CommandResult> AddConnectionAsync(WebSocket socket);
-
         CommandResult<ConnectionStats> GetConnectionStats();
 
         Task<CommandResult> HandleNewNotificationAsync(Notification notification);
@@ -22,9 +19,19 @@ namespace EList.Services.Interfaces
         Task<CommandResult> ReadAllUserNotificationsAsync();
 
 
-        Task<CommandResult> NotifyEventCreatedAsync(Guid creatorId, Guid eventId);
-        Task<CommandResult> NotifyEventCreatedAsync(Guid creatorId, Guid eventId, List<Guid> subscribers);
-        Task<CommandResult> NotifyUsersInvitedAsync(Guid creatorId, Guid eventId, List<Guid> subscribers);
+        Task<CommandResult> NotifyEventCreatedAsync(Guid eventId);
+        Task<CommandResult> NotifyEventCreatedAsync(Guid eventId, List<Guid> subscribers);
+        Task<CommandResult> NotifyEventUpdatedAsync(Guid eventId);
+        Task<CommandResult> NotifyEventCancelledAsync(Guid eventId);
+
+        Task<CommandResult> NotifyUsersInvitedAsync(Guid eventId, List<Guid> subscribers);
+
+        Task<CommandResult> NotifyParticipatedAsync(Guid eventId);
+        Task<CommandResult> NotifyEventLeftAsync(Guid eventId);
+
+
+        Task<CommandResult> NotifySubscribedAsync(Guid subscribedToId);
+        Task<CommandResult> NotifyUnsubscribedAsync(Guid unsubscribedFromId);
         //Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType);
     }
 }

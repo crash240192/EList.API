@@ -42,6 +42,7 @@ namespace EList.Api.Infrastructure
             _encryptionTool = encryptionTool ?? throw new ArgumentNullException(nameof(encryptionTool));
             _accountsService = accountsService ?? throw new ArgumentNullException(nameof(accountsService));
             _accountDataHolder= accountDataHolder ?? throw new ArgumentNullException(nameof(accountDataHolder));
+            _personsService = personsService ?? throw new ArgumentNullException(nameof(personsService));
         }
 
         /// <summary>

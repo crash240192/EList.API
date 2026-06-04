@@ -275,6 +275,39 @@ namespace EList.Api.Controllers
             }
             catch (Exception ex)
             {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+        
+        /// <summary>
+        /// Пометить все как просмотренное
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("markViewed/all")]
+        public async Task<CommandResult> ViewAllInvitationsAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(ViewAllInvitationsAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                await _connectionProvider.StartNewTransactionAsync();
+
+                var result = await _invitationsService.ViewAllInvitationsAsync();
+
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }

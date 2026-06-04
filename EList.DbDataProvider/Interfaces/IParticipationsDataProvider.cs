@@ -11,6 +11,7 @@ namespace EList.DbDataProvider.Interfaces
         Task DropAllParticipationsExceptThisUsersAsync(Guid eventId, List<Guid> accountIds);
         Task<bool> IsUserParticipatedAsync(Guid accountId, Guid eventId);
         Task<ListResponse<AccountDto>> GetEventParticipantsAsync(EventParticipantsSearchRequest request);
+        Task<List<Guid>> GetEventParticipantIdsAsync(Guid eventId);
         Task<int> GetParticipantsCountAsync(Guid eventId);
     }
 }

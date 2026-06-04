@@ -16,6 +16,7 @@ namespace EList.Repositories.Interfaces
         Task<Invitation> GetInvitationAsync(Guid invitationId);
         Task<Invitation> GetFullInvitationAsync(Guid invitationId);
         Task ViewInvitationAsync(Guid invitationId);
+        Task ViewAllInvitationsAsync(Guid accountId);
         Task<List<Invitation>?> GetAllEventInvitationsAsync(Guid eventId);
         Task<Invitation> GetInvitationAsync(Guid invitedAccountId, Guid eventId);
         Task<bool> IsUserInvitatedAsync(Guid accountId, Guid eventId);

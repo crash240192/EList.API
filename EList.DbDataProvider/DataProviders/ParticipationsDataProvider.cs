@@ -120,6 +120,19 @@ namespace EList.DbDataProvider.DataProviders
             return new ListResponse<AccountDto>(count, resultList);
         }
 
+
+        public async Task<List<Guid>> GetEventParticipantIdsAsync(Guid eventId)
+        {
+            var result = await _connection.Participations
+                .Where(i => eventId == i.EventId)
+                .OrderBy(i => i.Account.Login)
+                .Select(i => i.Account.Id)
+                .ToListAsync();
+
+            return result;
+        }
+
+
         public async Task<int> GetParticipantsCountAsync(Guid eventId)
         {
             var count = await _connection.Participations.Where(i => i.EventId == eventId)

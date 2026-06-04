@@ -24,25 +24,28 @@ namespace EList.Services.Impl
         private readonly IAuthorizationRepository _authorizationRepository;
         private readonly IContactsRepository _contactsRepository;
         private readonly IUserDataValidator _userDataValidationService;
-        private readonly ISystemNotificationsService _notificationsService;
+        private readonly ISystemNotificationsService _systemNotificationsService;
         private readonly ISubscriptionsRepository _subscriptionsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
+        private readonly INotificationsService _notificationsService;
         public SubscriptionsService(ICorrelationIdProvider correlationIdProvider,
             IAccountsRepository accountsRepository,
             IAuthorizationRepository authorizationRepository,
             IContactsRepository contactsRepository,
             IUserDataValidator userDataValidationService,
-            ISystemNotificationsService notificationsService,
+            ISystemNotificationsService systemNotificationsService,
             ISubscriptionsRepository subscriptionsRepository,
-            IAccountDataHolder accountDataHolder)
+            IAccountDataHolder accountDataHolder,
+            INotificationsService notificationsService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _authorizationRepository = authorizationRepository ?? throw new ArgumentNullException(nameof(authorizationRepository));
             _contactsRepository = contactsRepository ?? throw new ArgumentNullException(nameof(contactsRepository));
             _userDataValidationService = userDataValidationService ?? throw new ArgumentNullException(nameof(userDataValidationService));
-            _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
+            _systemNotificationsService = systemNotificationsService ?? throw new ArgumentNullException(nameof(systemNotificationsService));
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
+            _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -61,8 +64,7 @@ namespace EList.Services.Impl
 
             await _subscriptionsRepository.SubscribeToAccountAsync(_accountDataHolder.AccountId, subscribeToId);
 
-            //TODO: Уведомить подписчиков (у которых стоит флаг notify_subscriberd)
-            //var getSubscription = await _subscriptionsRepository.GetSubscribersAsync(_accountDataHolder.AccountId, null, null, true);
+            await _notificationsService.NotifySubscribedAsync(subscribeToId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -163,6 +165,8 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.SubscriptionAlreadyExists, "Подписка не найдена");
 
             await _subscriptionsRepository.DeleteSubscriptionAsync(_accountDataHolder.AccountId, subscribedToId);
+
+            await _notificationsService.NotifyUnsubscribedAsync(subscribedToId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

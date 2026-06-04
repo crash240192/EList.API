@@ -10,5 +10,15 @@ namespace EList.Services.Impl
         public Account Account { get; set; }
         public PersonInfo? PersonInfo { get; set; }
         public Guid AccountId => Account.Id;
+
+        public string AccountNameFullString
+        {
+            get
+            { 
+                return !string.IsNullOrWhiteSpace(PersonInfo?.FIO)
+                ? $"{PersonInfo?.FIO} ({Account.Login})"
+                : $"{Account.Login}";
+            }
+        } 
     }
 }

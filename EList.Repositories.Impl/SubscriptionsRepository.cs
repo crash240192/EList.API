@@ -42,10 +42,11 @@ namespace EList.Repositories.Impl
                 {
                     Account = _mapper.Map<AccountPublicData>(i.SubscribedTo),
                     PersonInfo = _mapper.Map<PersonInfo>(i.SubscribedTo.PersonInfo)
-                }
+                },
+                Id = i.Id
             })?.ToList();
 
-            var result = new PagedList<Subscription>(subscriptionsResult.TotalCount, subscriptionsList, 0, 0);
+            var result = new PagedList<Subscription>(subscriptionsResult?.TotalCount ?? 0, subscriptionsList, 0, 0);
 
             return result;
         }
@@ -115,6 +116,8 @@ namespace EList.Repositories.Impl
                 NotifyEventCreated = request.NotifyEventCreated,
                 NotifyParticipated = request.NotifyParticipated,
                 NotifySubscribed = request.NotifySubscribed,
+                SubscribedToId = request.SubscribedToId,
+                SubscriberId = request.SubscriberId
             };
             await _subscriptionsDataProvider.UpdateSubscriptionAsync(mappedRequest);
         }
