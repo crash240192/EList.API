@@ -15,7 +15,7 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task CreateInvitationsAsync(InvitationDto invitation)
         {
-            if (!_connection.Invitations.Any(i => i.EventId == invitation.Id && i.InvitedAccountId == invitation.InvitedAccountId))
+            if (!await _connection.Invitations.AnyAsync(i => i.EventId == invitation.Id && i.InvitedAccountId == invitation.InvitedAccountId))
             {
                 invitation.CreationDate = DateTime.Now;
                 await _connection.InsertWithIdentityAsync(invitation);
@@ -138,7 +138,7 @@ namespace EList.DbDataProvider.DataProviders
                 .ThenLoad(i => i.PersonInfo)
                 .LoadWith(i => i.Invited)
                 .ThenLoad(i => i.PersonInfo)
-                .OrderBy(i => i.CreationDate)
+                .OrderByDescending(i => i.CreationDate)
                 .AsQueryable();
 
             if (request.InviterOrgIds?.Any() ?? false)
