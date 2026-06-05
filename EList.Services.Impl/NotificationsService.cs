@@ -677,10 +677,13 @@ namespace EList.Services.Impl
                         logger.Debug(correlationId, null, methodName,
                             $"Client requested close: accountId={accountId}", null);
 
-                        await socket.CloseAsync(
-                            WebSocketCloseStatus.NormalClosure,
-                            "Закрытие по запросу клиента",
-                            CancellationToken.None);
+                        if (socket.State == WebSocketState.CloseReceived)
+                        {
+                            await socket.CloseOutputAsync(
+                                WebSocketCloseStatus.NormalClosure,
+                                "Закрытие по запросу клиента",
+                                CancellationToken.None);
+                        }
                         break;
                     }
 
@@ -693,12 +696,18 @@ namespace EList.Services.Impl
             }
             catch (WebSocketException ex)
             {
-                logger.Error(correlationId, null, methodName,
-                    $"WebSocket error: accountId={accountId}, error={ex.Message}", null, ex, null);
+                logger.Warn(correlationId, null, methodName,
+                    $"WebSocket connection lost: accountId={accountId}, reason={ex.Message}", null);
             }
             finally
             {
                 _connectionManager.RemoveConnection(accountId, connectionId);
+
+                if (socket.State != WebSocketState.Closed && socket.State != WebSocketState.Aborted)
+                {
+                    try { socket.Abort(); } catch { }
+                }
+
                 logger.Debug(correlationId, null, methodName,
                     $"WebSocket disconnected: accountId={accountId}, connectionId={connectionId}", null);
             }
