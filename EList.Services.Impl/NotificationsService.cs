@@ -68,8 +68,6 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            _connectionManager.AddConnection(accountId, socket);
-
             var connectionId = _connectionManager.AddConnection(accountId, socket);
 
             logger.Debug(correlationId, null, methodName,

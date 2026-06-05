@@ -75,32 +75,20 @@ namespace EList.Api.Controllers
             var methodName = $"{LOGGER_NAME}{nameof(ConnectWebSocket)}";
             var execTime = Stopwatch.StartNew();
 
-            try
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (!HttpContext.WebSockets.IsWebSocketRequest)
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-                await _connectionProvider.StartNewTransactionAsync();
-
-                if (!HttpContext.WebSockets.IsWebSocketRequest)
-                {
-                    logger.Debug(correlationId, null, methodName, "Rejected non-WebSocket request", null);
-                    HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                    await HttpContext.Response.WriteAsync("Ожидается WebSocket-соединение");
-                    return;
-                }
-
-                var socket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-                var result = await _notificationService.AddConnectionAsync(socket);
-                if (!result.Success)
-                    await _connectionProvider.RollbackTransactionAsync();
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                logger.Debug(correlationId, null, methodName, "Rejected non-WebSocket request", null);
+                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await HttpContext.Response.WriteAsync("Ожидается WebSocket-соединение");
+                return;
             }
-            catch (Exception ex)
-            {
-                await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+
+            var socket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+            await _notificationService.AddConnectionAsync(socket);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
         }
 
         /// <summary>
