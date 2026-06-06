@@ -33,6 +33,8 @@ namespace EList.Services.Impl
         private readonly IAccountsRepository _accountsRepository;
         private readonly IPersonsRepository _personsRepository;
         private readonly ISubscriptionsRepository _subscriptionsRepository;
+        private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
+        private readonly IEventsRatingRepository _eventsRatingRepository;
 
         public NotificationsService(
             WebSocketConnectionManager connectionManager,
@@ -44,7 +46,9 @@ namespace EList.Services.Impl
             IParticipationsRepository participationsRepository,
             IAccountsRepository accountsRepository,
             IPersonsRepository personsRepository,
-            ISubscriptionsRepository subscriptionsRepository)
+            ISubscriptionsRepository subscriptionsRepository,
+            IEventOrganizatorsRepository eventOrganizatorsRepository,
+            IEventsRatingRepository eventsRatingRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _notificationsRepository = notificationsRepository ?? throw new ArgumentNullException(nameof(notificationsRepository));
@@ -54,6 +58,8 @@ namespace EList.Services.Impl
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _personsRepository = personsRepository ?? throw new ArgumentException(nameof(personsRepository));
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
+            _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
+            _eventsRatingRepository = eventsRatingRepository ?? throw new ArgumentNullException(nameof(eventsRatingRepository));
             _connectionManager = connectionManager;
             _accountDataHolder = accountDataHolder;
         }
@@ -648,6 +654,185 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
         #endregion subscription
+
+        #region BWlist
+        public async Task<CommandResult> NotifyAddedToBlackListAsync(Guid eventId, List<Guid> blackList)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyAddedToBlackListAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+            
+            if (blackList?.Any() ?? false)
+            {
+                var notifications = blackList.Select(subscriberId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"Вас добавили в чёрный список мероприятия \"{eventData.Name}\"",
+                    Title = null,
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.AddedToBlackList,
+                    Data = new EventShort(eventData)
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> NotifyNotInWhiteListAsync(Guid eventId, List<Guid> notInWhiteList)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyNotInWhiteListAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+
+            if (notInWhiteList?.Any() ?? false)
+            {
+                var notifications = notInWhiteList.Select(subscriberId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"Вы не попали в белый список закрытого мероприятия \"{eventData.Name}\"",
+                    Title = null,
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.NotInWhiteList,
+                    Data = new EventShort(eventData)
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+        #endregion BWlist
+
+        #region event rating
+        public async Task<CommandResult> NotifyNewEventRatingAsync(Guid eventId, Guid ratingItem)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyNewEventRatingAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+            var organizators = await _eventOrganizatorsRepository.GetByEventIdShortAsync(eventId);
+            var rating = await _eventsRatingRepository.GetRatingItemAsync(ratingItem);
+
+            if (organizators?.Any() ?? false)
+            {
+                var notifications = organizators.Where(i => i != null).Select(organizatorId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = organizatorId.Value,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"{_accountDataHolder.AccountNameFullString} оценил мероприятие \"{eventData.Name}\"",
+                    Title = "Новая оценка у мероприятия",
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.NewEventRating,
+                    Data = rating
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> NotifyEventRatingChangedAsync(Guid eventId, Guid ratingItem)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventRatingChangedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+            var organizators = await _eventOrganizatorsRepository.GetByEventIdShortAsync(eventId);
+            var rating = await _eventsRatingRepository.GetRatingItemAsync(ratingItem);
+
+            if (organizators?.Any() ?? false)
+            {
+                var notifications = organizators.Where(i => i != null).Select(organizatorId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = organizatorId.Value,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"{_accountDataHolder.AccountNameFullString} изменил свою оценку мероприятия \"{eventData.Name}\"",
+                    Title = "Оценка мероприятия изменилась",
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.EventRatingChanged,
+                    Data = rating
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> NotifyEventRatingDeletedAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventRatingDeletedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+            var organizators = await _eventOrganizatorsRepository.GetByEventIdShortAsync(eventId);
+
+            if (organizators?.Any() ?? false)
+            {
+                var notifications = organizators.Where(i => i != null).Select(organizatorId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = organizatorId.Value,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"{_accountDataHolder.AccountNameFullString} удалил свою оценку мероприятия \"{eventData.Name}\"",
+                    Title = "Оценка мероприятия изменилась",
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.EventRatingDeleted
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+        #endregion
+
 
         #endregion structured notifications
 

@@ -10,6 +10,7 @@ namespace EList.Repositories.Interfaces
         Task DeleteInvitationAsync(Guid id);
         Task CancelAllInvitationsAsync(Guid eventId);
         Task CancelAllInvitationsExceptThisUsersAsync(Guid eventId, List<Guid> invitedAccountIds);
+        Task CancelAllInvitationsExceptWhiteListAsync(Guid eventId);
         Task DeleteInvitationAsync(Guid eventId, Guid accountId);
         Task DeleteInvitationAsync(Guid eventId, List<Guid> accountIds);
         Task<int> GetNotViewedInvitationsCountAsync(Guid accountId);

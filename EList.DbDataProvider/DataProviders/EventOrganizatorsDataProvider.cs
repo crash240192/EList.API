@@ -35,11 +35,20 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<List<EventOrganizatorDto>> GetByEventIdAsync(Guid eventId)
         {
-            var events = await _connection.Organizators
+            var organizators = await _connection.Organizators
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.PersonInfo)
                 .Where(i => i.EventId == eventId).ToListAsync();
-            return events;
+            return organizators;
+        }
+
+        public async Task<List<Guid?>> GetByEventIdShortAsync(Guid eventId)
+        {
+            var organizatorIds = await _connection.Organizators
+                .Where(i => i.EventId == eventId)
+                .Select(i => i.AccountId)
+                .ToListAsync();
+            return organizatorIds;
         }
 
         public async Task AssignAsync(Guid eventId, List<Guid> accountIds)

@@ -21,7 +21,12 @@
         AddedToWhiteList = 42,
         RemovedFromBlackList = 43,
         RemovedFromWhiteList = 44,
+        NotInWhiteList = 45,
 
         NewInvitation = 51,
+
+        NewEventRating = 60,
+        EventRatingChanged = 61,
+        EventRatingDeleted = 62
     }
 }

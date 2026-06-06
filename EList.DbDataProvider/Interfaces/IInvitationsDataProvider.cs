@@ -19,6 +19,7 @@ namespace EList.DbDataProvider.Interfaces
         Task DeleteInvitationAsync(Guid id);
         Task CancelInvitationsAsync(Guid eventId);
         Task CancelAllInvitationsExceptThisUsersAsync(Guid eventId, List<Guid> accountIds);
+        Task CancelAllInvitationsExceptWhiteListAsync(Guid eventId);
         Task DeleteInvitationAsync(Guid eventId, Guid accountId);
         Task DeleteInvitationAsync(Guid eventId, List<Guid> accountIds);
     }

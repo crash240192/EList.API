@@ -58,6 +58,12 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task<List<Guid?>> GetByEventIdShortAsync(Guid eventId)
+        {
+            var organizators = await _eventOrganizatorsDataProvider.GetByEventIdShortAsync(eventId);
+            return organizators;
+        }
+
         public async Task<EventOrganizator?> GetByIdAsync(Guid id)
         {
             var item = await _eventOrganizatorsDataProvider.GetByIdAsync(id);

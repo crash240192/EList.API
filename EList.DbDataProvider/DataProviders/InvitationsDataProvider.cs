@@ -115,6 +115,12 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.Invitations.DeleteAsync(i => i.EventId == eventId && !invitedAccountIds.Contains(i.InvitedAccountId));
         }
 
+        public async Task CancelAllInvitationsExceptWhiteListAsync(Guid eventId)
+        {
+            var whiteList = await _connection.WhiteList.Where(i => i.EventId == eventId).Select(i => i.AccountId).ToListAsync();
+            await _connection.Invitations.DeleteAsync(i => i.EventId == eventId && !whiteList.Contains(i.InvitedAccountId));
+        }
+
         public async Task DeleteInvitationAsync(Guid eventId, Guid accountId)
         {
             await _connection.Invitations.DeleteAsync(i => i.EventId == eventId && i.InvitedAccountId == accountId);

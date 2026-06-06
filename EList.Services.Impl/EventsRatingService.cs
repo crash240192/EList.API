@@ -17,6 +17,8 @@ namespace EList.Services.Impl
         private readonly IEventsRatingRepository _eventsRatingRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IEventsRepository _eventsRepository;
+        private readonly INotificationsService _notificationsService;
+
         #region logger
         private static readonly ILogger log = LogManager.GetCurrentClassLogger();
         private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
@@ -27,12 +29,14 @@ namespace EList.Services.Impl
             ICorrelationIdProvider correlationIdProvider,
             IEventsRatingRepository eventsRatingRepository,
             IEventsRepository eventsRepository,
-            IAccountDataHolder accountDataHolder)
+            IAccountDataHolder accountDataHolder,
+            INotificationsService notificationsService)
         {
             _correlationIdProvider = correlationIdProvider;
             _eventsRatingRepository = eventsRatingRepository;
             _accountDataHolder = accountDataHolder;
             _eventsRepository = eventsRepository;
+            _notificationsService = notificationsService;
         }   
 
         public async Task<CommandResult<EventRating>> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize)
@@ -73,6 +77,8 @@ namespace EList.Services.Impl
 
             await _eventsRatingRepository.DeleteEventRatingAsync(itemId);
 
+            await _notificationsService.NotifyEventRatingDeletedAsync(item.EventId);
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
@@ -95,6 +101,8 @@ namespace EList.Services.Impl
 
             request.AccountId = _accountDataHolder.AccountId;
             var eventRating = await _eventsRatingRepository.CreateEventRatingAsync(request);
+
+            await _notificationsService.NotifyNewEventRatingAsync(request.EventId, eventRating);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid>(eventRating);

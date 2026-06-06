@@ -32,6 +32,15 @@ namespace EList.Services.Interfaces
 
         Task<CommandResult> NotifySubscribedAsync(Guid subscribedToId);
         Task<CommandResult> NotifyUnsubscribedAsync(Guid unsubscribedFromId);
+
+        Task<CommandResult> NotifyAddedToBlackListAsync(Guid eventId, List<Guid> blackList);
+        Task<CommandResult> NotifyNotInWhiteListAsync(Guid eventId, List<Guid> notInWhiteList);
+
+
+        Task<CommandResult> NotifyNewEventRatingAsync(Guid eventId, Guid ratingItem);
+        Task<CommandResult> NotifyEventRatingChangedAsync(Guid eventId, Guid ratingItem);
+        Task<CommandResult> NotifyEventRatingDeletedAsync(Guid eventId);
+
         //Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType);
     }
 }

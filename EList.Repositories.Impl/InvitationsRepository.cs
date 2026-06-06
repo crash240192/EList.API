@@ -53,6 +53,11 @@ namespace EList.Repositories.Impl
             await _invitationsDataProvider.CancelAllInvitationsExceptThisUsersAsync(eventId, invitedAccountIds);
         }
 
+        public async Task CancelAllInvitationsExceptWhiteListAsync(Guid eventId)
+        {
+            await _invitationsDataProvider.CancelAllInvitationsExceptWhiteListAsync(eventId);
+        }
+
         public async Task DeleteInvitationAsync(Guid eventId, Guid accountId)
         {
             await _invitationsDataProvider.DeleteInvitationAsync(eventId, accountId);
