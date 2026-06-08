@@ -11,9 +11,11 @@ namespace EList.DbDataProvider.Interfaces
         Task<List<ContactTypeDto>> GetAllContactTypesAsync();
 
         Task<Guid> CreateContactAsync(ContactDataDto request);
+        Task<bool> CheckContactIsEmptyAsync(string contactValue, Guid contactType);
         Task UpdateContactAsync(ContactDataDto request);
         Task BindAccountAndContactAsync(Guid accountId, Guid contactId);
         Task<ContactDataDto?> GetAccountContactAsync(Guid id);
+        Task<ContactDataDto?> GetContactAsync(string contactValue);
         Task<ContactDataDto?> GetAuthorizationContactAsync(Guid accountId);
         Task<List<ContactDataDto>?> GetAccountContactsAsync(Guid accountId);
     }

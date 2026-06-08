@@ -139,7 +139,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet("sendActivationCode")]
-        public async Task<CommandResult> SendActivationCodeAsync()
+        public async Task<CommandResult<string>> SendActivationCodeAsync()
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();

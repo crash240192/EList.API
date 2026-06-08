@@ -29,6 +29,7 @@ namespace EList.Api.Controllers
     /// </summary>
     [ApiController]
     [Route("/api/notifications")]
+    [Authorize]
     public class NotificationHubController : ControllerBase
     {
         #region logger

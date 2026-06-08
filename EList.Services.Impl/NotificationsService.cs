@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
-using System.Text.Json;
 using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
@@ -12,6 +11,7 @@ using EList.Models.Notifications;
 using EList.Models.Subscriptions;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using NLog;
 
@@ -288,7 +288,7 @@ namespace EList.Services.Impl
                     Title = "Новое событие",
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.EventCreated,
-                    Data = JObject.FromObject(new EventShort(eventData))
+                    Data = new EventShort(eventData)
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -323,7 +323,7 @@ namespace EList.Services.Impl
                     Title = "Событие было обновлено",
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.EventUpdated,
-                    Data = JObject.FromObject(new EventShort(eventData))
+                    Data = new EventShort(eventData)
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -358,7 +358,7 @@ namespace EList.Services.Impl
                     Title = "Отмена события",
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.EventCancelled,
-                    Data = JObject.FromObject(new EventShort(eventData))
+                    Data = new EventShort(eventData)
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -395,7 +395,7 @@ namespace EList.Services.Impl
                     Title = null,
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.NewInvitation,
-                    Data = JObject.FromObject(new EventShort(eventData))
+                    Data = new EventShort(eventData)
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -437,7 +437,7 @@ namespace EList.Services.Impl
                     Title = null,
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.Participated,
-                    Data = JObject.FromObject(new EventShort(eventData))
+                    Data = new EventShort(eventData)
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -476,7 +476,7 @@ namespace EList.Services.Impl
                     Title = null,
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.EventLeft,
-                    Data = JObject.FromObject(new EventShort(eventData))
+                    Data = new EventShort(eventData)
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -525,7 +525,7 @@ namespace EList.Services.Impl
                     Title = null,
                     RelatedAccountId = subscribedToId,
                     Type = UserNotificationType.RelatedPersonSubscribed,
-                    Data = JObject.FromObject(subscribedTo)
+                    Data = subscribedTo
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -546,7 +546,7 @@ namespace EList.Services.Impl
                 Title = $"У вас новый подписчик",
                 RelatedAccountId = _accountDataHolder.AccountId,
                 Type = UserNotificationType.NewSubscription,
-                Data = JObject.FromObject(new AccountPublicData(_accountDataHolder.Account)),
+                Data = new AccountPublicData(_accountDataHolder.Account),
             };
 
             await _notificationsRepository.CreateNotificationAsync(notification);
@@ -590,7 +590,7 @@ namespace EList.Services.Impl
                     Title = null,
                     RelatedAccountId = unsubscribedFromId,
                     Type = UserNotificationType.RelatedPersonUnsubscribed,
-                    Data = JObject.FromObject(unsubscribedFrom)
+                    Data = unsubscribedFrom
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -611,7 +611,7 @@ namespace EList.Services.Impl
                 Title = $"От вас отписались",
                 RelatedAccountId = _accountDataHolder.AccountId,
                 Type = UserNotificationType.Unsubscribed,
-                Data = JObject.FromObject(new AccountPublicData(_accountDataHolder.Account)),
+                Data = new AccountPublicData(_accountDataHolder.Account),
             };
 
             await _notificationsRepository.CreateNotificationAsync(notification);
@@ -645,7 +645,7 @@ namespace EList.Services.Impl
                     Title = null,
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.AddedToBlackList,
-                    Data = JObject.FromObject(new EventShort(eventData))
+                    Data = new EventShort(eventData)
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -679,7 +679,7 @@ namespace EList.Services.Impl
                     Title = null,
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.NotInWhiteList,
-                    Data = JObject.FromObject(new EventShort(eventData))
+                    Data = new EventShort(eventData)
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -717,7 +717,7 @@ namespace EList.Services.Impl
                     Title = "Новая оценка у мероприятия",
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.NewEventRating,
-                    Data = JObject.FromObject(rating)
+                    Data = rating
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -753,7 +753,7 @@ namespace EList.Services.Impl
                     Title = "Оценка мероприятия изменилась",
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.EventRatingChanged,
-                    Data = JObject.FromObject(rating)
+                    Data = rating
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -875,27 +875,28 @@ namespace EList.Services.Impl
 
             try
             {
-                using var doc = JsonDocument.Parse(rawMessage);
-                var type = doc.RootElement.TryGetProperty("type", out var typeProp)
-                    ? typeProp.GetString()
-                    : null;
+                var json = new JObject(rawMessage);
+                //using var doc = JsonDocument.Parse(rawMessage);
+                //var type = doc.RootElement.TryGetProperty("type", out var typeProp)
+                //    ? typeProp.GetString()
+                //    : null;
 
-                switch (type)
-                {
-                    case "ping":
-                        await SendNotificationAsync(socket, new { type = "pong", timestamp = DateTimeOffset.UtcNow });
-                        break;
+                //switch (type)
+                //{
+                //    case "ping":
+                //        await SendNotificationAsync(socket, new { type = "pong", timestamp = DateTimeOffset.UtcNow });
+                //        break;
 
-                    default:
-                        logger.Debug(correlationId, null, methodName,
-                            $"Unknown message type '{type}' from accountId={accountId}", null);
-                        await SendNotificationAsync(socket, new
-                        {
-                            type = "error",
-                            message = $"Неизвестный тип сообщения: '{type}'"
-                        });
-                        break;
-                }
+                //    default:
+                //        logger.Debug(correlationId, null, methodName,
+                //            $"Unknown message type '{type}' from accountId={accountId}", null);
+                //        await SendNotificationAsync(socket, new
+                //        {
+                //            type = "error",
+                //            message = $"Неизвестный тип сообщения: '{type}'"
+                //        });
+                //        break;
+                //}
             }
             catch (JsonException)
             {
@@ -912,11 +913,12 @@ namespace EList.Services.Impl
             if (socket.State != WebSocketState.Open)
                 return;
 
-            var json = JsonSerializer.Serialize(data, new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = false
-            });
+            var json = JsonConvert.SerializeObject(data);
+            //var json = JsonSerializer.Serialize(data, new JsonSerializerOptions
+            //{
+            //    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            //    WriteIndented = false
+            //});
 
             var bytes = Encoding.UTF8.GetBytes(json);
             await socket.SendAsync(

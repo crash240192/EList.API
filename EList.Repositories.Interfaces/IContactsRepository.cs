@@ -10,9 +10,11 @@ namespace EList.Repositories.Interfaces
         Task UpdateContactTypeAsync(Guid id, ContactTypeRequest request);
 
         Task<Guid> CreateContactAsync(ContactRequest request);
+        Task<bool> CheckContactIsEmptyAsync(string contactValue, Guid contactType);
         Task UpdateContactAsync(Guid id, ContactRequest request);
         Task BindAccountAndContactAsync(Guid accountId, Guid contactId);
         Task<ContactDataItem?> GetAccountContactAsync(Guid id);
+        Task<ContactDataItem?> GetContactAsync(string contactValue);
         Task<ContactDataItem?> GetAuthorizationContactAsync(Guid accountId);
         Task<List<ContactDataItem>> GetAccountContactsAsync(Guid accountId);
     }

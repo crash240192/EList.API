@@ -10,6 +10,7 @@ using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using EList.Validators.Interfaces;
 using NLog;
+using NLog.Web.LayoutRenderers;
 using System.Diagnostics;
 
 namespace EList.Services.Impl
@@ -71,6 +72,10 @@ namespace EList.Services.Impl
 
             if (request.Password != request.PasswordConfirmation)
                 return CommandResult<Guid?>.Fail(ErrorCode.PasswordsDontMatch, "Пароль и подтверждение пароля не совпадают");
+
+            var existingContact = await _contactsRepository.CheckContactIsEmptyAsync(request.AuthorizationContactValue, request.AuthorizationContactType);
+            if (!existingContact) 
+                return CommandResult<Guid?>.Fail(ErrorCode.AuthorizationContactIsNotEmpty, $"Аккаунт, зарегистрированный на {request.AuthorizationContactValue}, уже существует");
 
             request.Password = _encryptionTool.CalculateStringHash(request.Password);
 
