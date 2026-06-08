@@ -66,6 +66,8 @@ namespace EList.DbDataProvider.DataProviders
             var query = _connection.Messages
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.Avatars)
                 .Where(i => i.ConversationId == conversationId)
                 .OrderBy(i => i.CreateDate);
             var count = await query.CountAsync();
@@ -85,6 +87,8 @@ namespace EList.DbDataProvider.DataProviders
             var query = _connection.Messages
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.Avatars)
                 .Where(i => i.ReplyTo == messageId)
                 .OrderBy(i => i.CreateDate);
             var count = await query.CountAsync();

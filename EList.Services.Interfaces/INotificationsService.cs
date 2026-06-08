@@ -19,8 +19,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult> ReadAllUserNotificationsAsync();
 
 
-        Task<CommandResult> NotifyEventCreatedAsync(Guid eventId);
-        Task<CommandResult> NotifyEventCreatedAsync(Guid eventId, List<Guid> subscribers);
+        Task<CommandResult> NotifyEventCreatedAsync(Guid eventId, List<Guid> subscribers = null);
         Task<CommandResult> NotifyEventUpdatedAsync(Guid eventId);
         Task<CommandResult> NotifyEventCancelledAsync(Guid eventId);
 
@@ -37,9 +36,9 @@ namespace EList.Services.Interfaces
         Task<CommandResult> NotifyNotInWhiteListAsync(Guid eventId, List<Guid> notInWhiteList);
 
 
-        Task<CommandResult> NotifyNewEventRatingAsync(Guid eventId, Guid ratingItem);
-        Task<CommandResult> NotifyEventRatingChangedAsync(Guid eventId, Guid ratingItem);
-        Task<CommandResult> NotifyEventRatingDeletedAsync(Guid eventId);
+        Task<CommandResult> NotifyNewEventRatingAsync(Guid eventId, Guid ratingItem, List<Guid> organizators = null);
+        Task<CommandResult> NotifyEventRatingChangedAsync(Guid eventId, Guid ratingItem, List<Guid> organizators = null);
+        Task<CommandResult> NotifyEventRatingDeletedAsync(Guid eventId, List<Guid> organizators = null);
 
         //Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType);
     }

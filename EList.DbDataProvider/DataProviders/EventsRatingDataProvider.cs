@@ -42,6 +42,8 @@ namespace EList.DbDataProvider.DataProviders
             var request = _connection.EventsRating
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.Avatars)
                 .Where(i => i.EventId == eventId && i.RatingType == eventRatingType);
             var total = await request.CountAsync();
             var average = await request.AverageAsync(i => (double?)i.Value);

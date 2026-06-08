@@ -294,6 +294,34 @@ namespace EList.Api.Controllers.ContactData
         }
 
         /// <summary>
+        /// Возвращает авторизационный контакт пользователя
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("getAuthorizationContact")]
+        public async Task<CommandResult<ContactDataItem>> GetAuthorizationContactAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetAuthorizationContactAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _contactDataService.GetAuthorizationContactAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Возвращает список всех записей контактных данных указанного пользователя
         /// </summary>
         /// <returns></returns>

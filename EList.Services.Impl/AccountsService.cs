@@ -110,8 +110,8 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _accountsRepository.GetAccountAsync(accountId);
-            if (result != null)
-                result.AvatarId = await _mediaRepository.GetLastAccountAvatarAsync(accountId);
+            //if (result != null)
+            //    result.AvatarId = await _mediaRepository.GetLastAccountAvatarAsync(accountId);
             
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Account?>(result);
@@ -128,9 +128,8 @@ namespace EList.Services.Impl
             var authorizationInfo = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
 
             var result = await _accountsRepository.GetAccountAsync(authorizationInfo.AccountId);
-
-            if (result != null)
-                result.AvatarId = await _mediaRepository.GetLastAccountAvatarAsync(authorizationInfo.AccountId);
+            //if (result != null)
+            //    result.AvatarId = await _mediaRepository.GetLastAccountAvatarAsync(authorizationInfo.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Account?>(result);

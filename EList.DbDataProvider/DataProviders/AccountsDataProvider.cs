@@ -19,13 +19,17 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<AccountDto?> GetAccountAsync(Guid id)
         {
-            var result = await _connection.Accounts.FirstOrDefaultAsync(i => i.Id == id);
+            var result = await _connection.Accounts
+                .LoadWith(i => i.Avatars)
+                .FirstOrDefaultAsync(i => i.Id == id);
             return result;
         }
 
         public async Task<AccountDto?> GetAccountAsync(string login)
         {
-            var result = await _connection.Accounts.FirstOrDefaultAsync(i => i.Login == login);
+            var result = await _connection.Accounts
+                .LoadWith(i => i.Avatars)
+                .FirstOrDefaultAsync(i => i.Login == login);
             return result;
         }
 

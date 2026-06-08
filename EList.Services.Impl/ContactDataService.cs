@@ -185,6 +185,24 @@ namespace EList.Services.Impl
             return new CommandResult<List<ContactDataItem>?>(contacts);
         }
 
+        public async Task<CommandResult<ContactDataItem>> GetAuthorizationContactAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetAuthorizationContactAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var account = await _accountsRepository.GetAccountAsync(_accountDataHolder.AccountId);
+            if (account == null)
+                return CommandResult<ContactDataItem>.Fail(ErrorCode.AccountNotFound, $"Аккаунт с id='{_accountDataHolder.AccountId}' не найден");
+
+            var contact = await _contactDataRepository.GetAuthorizationContactAsync(_accountDataHolder.AccountId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<ContactDataItem>(contact);
+        }
+
         public async Task<CommandResult<List<ContactDataItem>?>> GetAccountContactsAsync()
         {
             var correlationId = _correlationIdProvider.Get();

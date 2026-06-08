@@ -1,4 +1,6 @@
-﻿namespace EList.Models.Notifications
+﻿using Newtonsoft.Json.Linq;
+
+namespace EList.Models.Notifications
 {
     /// <summary>
     /// Модель запроса на отправку уведомления

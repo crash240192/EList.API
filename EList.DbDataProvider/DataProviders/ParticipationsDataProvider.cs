@@ -73,6 +73,8 @@ namespace EList.DbDataProvider.DataProviders
             var accountsRequest = _connection.Participations
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.Avatars)
                 .Where(i => request.EventId == i.EventId)                
                 .OrderBy(i => i.Account.Login)
                 .Select(i => i.Account);

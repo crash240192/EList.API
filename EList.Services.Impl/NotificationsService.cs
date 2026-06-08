@@ -6,11 +6,13 @@ using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
+using EList.Models.Accounts;
 using EList.Models.Events;
 using EList.Models.Notifications;
 using EList.Models.Subscriptions;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
+using Newtonsoft.Json.Linq;
 using NLog;
 
 namespace EList.Services.Impl
@@ -264,48 +266,14 @@ namespace EList.Services.Impl
         #region structured notifications
 
         #region event
-        public async Task<CommandResult> NotifyEventCreatedAsync(Guid eventId)
+        public async Task<CommandResult> NotifyEventCreatedAsync(Guid eventId, List<Guid> subscribers = null)
         {
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(NotifyEventCreatedAsync)}";
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var subscribers = await _notificationsRepository.SearchSubscribersEventCreatedAsync(_accountDataHolder.AccountId);
-            var eventData = await _eventsRepository.GetEventAsync(eventId);
-
-            if (subscribers?.Any() ?? false)
-            {
-                var notifications = subscribers.Select(subscriberId => new Notification
-                {
-                    Id = Guid.NewGuid(),
-                    AccountId = subscriberId,
-                    EventId = eventId,
-                    CreatedAt = DateTime.UtcNow,
-                    Message = $"{_accountDataHolder.AccountNameFullString} создал новое событие \"{eventData.Name}\"",
-                    Title = "Новое событие",
-                    RelatedAccountId = _accountDataHolder.AccountId,
-                    Type = UserNotificationType.EventCreated,
-                    Data = new EventShort(eventData)
-                }).ToList();
-
-                await _notificationsRepository.CreateNotificationsAsync(notifications);
-
-                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
-                await Task.WhenAll(wsTasks);
-            }
-
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return CommandResult.OK;
-        }
-
-        public async Task<CommandResult> NotifyEventCreatedAsync(Guid eventId, List<Guid> subscribers)
-        {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventCreatedAsync)}";
-            var execTime = Stopwatch.StartNew();
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
+            subscribers ??= await _notificationsRepository.SearchSubscribersEventCreatedAsync(_accountDataHolder.AccountId);
             var eventData = await _eventsRepository.GetEventAsync(eventId);
 
             if (subscribers?.Any() ?? false)
@@ -320,7 +288,7 @@ namespace EList.Services.Impl
                     Title = "Новое событие",
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.EventCreated,
-                    Data = new EventShort(eventData)
+                    Data = JObject.FromObject(new EventShort(eventData))
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -332,7 +300,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
-        
+
         public async Task<CommandResult> NotifyEventUpdatedAsync(Guid eventId)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -355,7 +323,7 @@ namespace EList.Services.Impl
                     Title = "Событие было обновлено",
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.EventUpdated,
-                    Data = new EventShort(eventData)
+                    Data = JObject.FromObject(new EventShort(eventData))
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -390,7 +358,7 @@ namespace EList.Services.Impl
                     Title = "Отмена события",
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.EventCancelled,
-                    Data = new EventShort(eventData)
+                    Data = JObject.FromObject(new EventShort(eventData))
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -414,7 +382,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventData = await _eventsRepository.GetEventAsync(eventId);
-            
+
             if (subscribers?.Any() ?? false)
             {
                 var notifications = subscribers.Select(subscriberId => new Notification
@@ -424,10 +392,10 @@ namespace EList.Services.Impl
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
                     Message = $"{_accountDataHolder.AccountNameFullString} приглашает вас на \"{eventData.Name}\"",
-                    Title = null, 
+                    Title = null,
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.NewInvitation,
-                    Data = new EventShort(eventData)
+                    Data = JObject.FromObject(new EventShort(eventData))
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -466,10 +434,10 @@ namespace EList.Services.Impl
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
                     Message = $"{_accountDataHolder.AccountNameFullString} принял участие в \"{eventData.Name}\"",
-                    Title = null, 
+                    Title = null,
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.Participated,
-                    Data = new EventShort(eventData)
+                    Data = JObject.FromObject(new EventShort(eventData))
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -508,7 +476,7 @@ namespace EList.Services.Impl
                     Title = null,
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.EventLeft,
-                    Data = new EventShort(eventData)
+                    Data = JObject.FromObject(new EventShort(eventData))
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -554,10 +522,10 @@ namespace EList.Services.Impl
                     EventId = null,
                     CreatedAt = DateTime.UtcNow,
                     Message = $"{_accountDataHolder.AccountNameFullString} подписался на {subscribedToAccountFullString}",
-                    Title = null, 
+                    Title = null,
                     RelatedAccountId = subscribedToId,
                     Type = UserNotificationType.RelatedPersonSubscribed,
-                    Data = subscribedTo
+                    Data = JObject.FromObject(subscribedTo)
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -578,11 +546,11 @@ namespace EList.Services.Impl
                 Title = $"У вас новый подписчик",
                 RelatedAccountId = _accountDataHolder.AccountId,
                 Type = UserNotificationType.NewSubscription,
-                Data = _accountDataHolder.Account,
+                Data = JObject.FromObject(new AccountPublicData(_accountDataHolder.Account)),
             };
 
             await _notificationsRepository.CreateNotificationAsync(notification);
-            await SendToUserAsync(subscribedToId, notification);   
+            await SendToUserAsync(subscribedToId, notification);
             #endregion
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -622,7 +590,7 @@ namespace EList.Services.Impl
                     Title = null,
                     RelatedAccountId = unsubscribedFromId,
                     Type = UserNotificationType.RelatedPersonUnsubscribed,
-                    Data = unsubscribedFrom
+                    Data = JObject.FromObject(unsubscribedFrom)
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -643,7 +611,7 @@ namespace EList.Services.Impl
                 Title = $"От вас отписались",
                 RelatedAccountId = _accountDataHolder.AccountId,
                 Type = UserNotificationType.Unsubscribed,
-                Data = _accountDataHolder.Account,
+                Data = JObject.FromObject(new AccountPublicData(_accountDataHolder.Account)),
             };
 
             await _notificationsRepository.CreateNotificationAsync(notification);
@@ -664,7 +632,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventData = await _eventsRepository.GetEventAsync(eventId);
-            
+
             if (blackList?.Any() ?? false)
             {
                 var notifications = blackList.Select(subscriberId => new Notification
@@ -677,7 +645,7 @@ namespace EList.Services.Impl
                     Title = null,
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.AddedToBlackList,
-                    Data = new EventShort(eventData)
+                    Data = JObject.FromObject(new EventShort(eventData))
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -711,7 +679,7 @@ namespace EList.Services.Impl
                     Title = null,
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.NotInWhiteList,
-                    Data = new EventShort(eventData)
+                    Data = JObject.FromObject(new EventShort(eventData))
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -726,7 +694,7 @@ namespace EList.Services.Impl
         #endregion BWlist
 
         #region event rating
-        public async Task<CommandResult> NotifyNewEventRatingAsync(Guid eventId, Guid ratingItem)
+        public async Task<CommandResult> NotifyNewEventRatingAsync(Guid eventId, Guid ratingItem, List<Guid> organizators = null)
         {
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(NotifyNewEventRatingAsync)}";
@@ -734,7 +702,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventData = await _eventsRepository.GetEventAsync(eventId);
-            var organizators = await _eventOrganizatorsRepository.GetByEventIdShortAsync(eventId);
+            organizators ??= (await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(eventId))?.ToList();
             var rating = await _eventsRatingRepository.GetRatingItemAsync(ratingItem);
 
             if (organizators?.Any() ?? false)
@@ -742,14 +710,14 @@ namespace EList.Services.Impl
                 var notifications = organizators.Where(i => i != null).Select(organizatorId => new Notification
                 {
                     Id = Guid.NewGuid(),
-                    AccountId = organizatorId.Value,
+                    AccountId = organizatorId,
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
                     Message = $"{_accountDataHolder.AccountNameFullString} оценил мероприятие \"{eventData.Name}\"",
                     Title = "Новая оценка у мероприятия",
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.NewEventRating,
-                    Data = rating
+                    Data = JObject.FromObject(rating)
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -762,7 +730,7 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
-        public async Task<CommandResult> NotifyEventRatingChangedAsync(Guid eventId, Guid ratingItem)
+        public async Task<CommandResult> NotifyEventRatingChangedAsync(Guid eventId, Guid ratingItem, List<Guid> organizators = null)
         {
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(NotifyEventRatingChangedAsync)}";
@@ -770,7 +738,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventData = await _eventsRepository.GetEventAsync(eventId);
-            var organizators = await _eventOrganizatorsRepository.GetByEventIdShortAsync(eventId);
+            organizators ??= (await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(eventId))?.ToList();
             var rating = await _eventsRatingRepository.GetRatingItemAsync(ratingItem);
 
             if (organizators?.Any() ?? false)
@@ -778,14 +746,14 @@ namespace EList.Services.Impl
                 var notifications = organizators.Where(i => i != null).Select(organizatorId => new Notification
                 {
                     Id = Guid.NewGuid(),
-                    AccountId = organizatorId.Value,
+                    AccountId = organizatorId,
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
                     Message = $"{_accountDataHolder.AccountNameFullString} изменил свою оценку мероприятия \"{eventData.Name}\"",
                     Title = "Оценка мероприятия изменилась",
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.EventRatingChanged,
-                    Data = rating
+                    Data = JObject.FromObject(rating)
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -798,7 +766,7 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
-        public async Task<CommandResult> NotifyEventRatingDeletedAsync(Guid eventId)
+        public async Task<CommandResult> NotifyEventRatingDeletedAsync(Guid eventId, List<Guid> organizators = null)
         {
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(NotifyEventRatingDeletedAsync)}";
@@ -806,14 +774,14 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventData = await _eventsRepository.GetEventAsync(eventId);
-            var organizators = await _eventOrganizatorsRepository.GetByEventIdShortAsync(eventId);
+            organizators ??= (await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(eventId))?.ToList();
 
             if (organizators?.Any() ?? false)
             {
                 var notifications = organizators.Where(i => i != null).Select(organizatorId => new Notification
                 {
                     Id = Guid.NewGuid(),
-                    AccountId = organizatorId.Value,
+                    AccountId = organizatorId,
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
                     Message = $"{_accountDataHolder.AccountNameFullString} удалил свою оценку мероприятия \"{eventData.Name}\"",

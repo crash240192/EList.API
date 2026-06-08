@@ -15,5 +15,6 @@ namespace EList.Services.Interfaces
         Task<CommandResult<ContactDataItem?>> GetAccountContactAsync(Guid id);
         Task<CommandResult<List<ContactDataItem>?>> GetAccountContactsAsync(Guid accountId);
         Task<CommandResult<List<ContactDataItem>?>> GetAccountContactsAsync();
+        Task<CommandResult<ContactDataItem>> GetAuthorizationContactAsync();
     }
 }
