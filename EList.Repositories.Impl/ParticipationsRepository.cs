@@ -35,6 +35,11 @@ namespace EList.Repositories.Impl
             await _participationsDataProvider.DropAllParticipationsExceptThisUsersAsync(eventId, accountIds);
         }
 
+        public async Task DropAllParticipationsExceptWhiteListAsync(Guid eventId)
+        {
+            await _participationsDataProvider.DropAllParticipationsExceptWhiteListAsync(eventId);
+        }
+
         public async Task<Guid> ParticipateAsync(Guid accountId, Guid eventId)
         {
             return await _participationsDataProvider.ParticipateAsync(accountId, eventId);

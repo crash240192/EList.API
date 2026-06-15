@@ -9,6 +9,7 @@ namespace EList.DbDataProvider.Interfaces
         Task LeaveEventAsync(Guid accountId, Guid eventId);
         Task DropParticipationsAsync(Guid eventId, List<Guid> accountIds);
         Task DropAllParticipationsExceptThisUsersAsync(Guid eventId, List<Guid> accountIds);
+        Task DropAllParticipationsExceptWhiteListAsync(Guid eventId);
         Task<bool> IsUserParticipatedAsync(Guid accountId, Guid eventId);
         Task<ListResponse<AccountDto>> GetEventParticipantsAsync(EventParticipantsSearchRequest request);
         Task<List<Guid>> GetEventParticipantIdsAsync(Guid eventId);

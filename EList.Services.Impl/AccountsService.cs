@@ -10,6 +10,7 @@ using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using EList.Validators.Interfaces;
 using NLog;
+using NLog.Web.LayoutRenderers;
 using System.Diagnostics;
 
 namespace EList.Services.Impl
@@ -31,6 +32,8 @@ namespace EList.Services.Impl
         private readonly IEncryptionTool _encryptionTool;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IWalletsService _walletsService;
+        private readonly IMediaRepository _mediaRepository;
+
         public AccountsService(ICorrelationIdProvider correlationIdProvider,
             IAccountsRepository accountsRepository,
             IAuthorizationRepository authorizationRepository,
@@ -39,7 +42,8 @@ namespace EList.Services.Impl
             ISystemNotificationsService notificationsService,
             IEncryptionTool encryptionTool,
             IWalletsService walletsService,
-            IAccountDataHolder accountDataHolder)
+            IAccountDataHolder accountDataHolder,
+            IMediaRepository mediaRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
@@ -49,6 +53,7 @@ namespace EList.Services.Impl
             _encryptionTool = encryptionTool ?? throw new ArgumentNullException(nameof(encryptionTool));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _walletsService = walletsService ?? throw new ArgumentNullException(nameof(walletsService));
+            _mediaRepository = mediaRepository ?? throw new ArgumentNullException(nameof(mediaRepository));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -67,6 +72,10 @@ namespace EList.Services.Impl
 
             if (request.Password != request.PasswordConfirmation)
                 return CommandResult<Guid?>.Fail(ErrorCode.PasswordsDontMatch, "Пароль и подтверждение пароля не совпадают");
+
+            var existingContact = await _contactsRepository.CheckContactIsEmptyAsync(request.AuthorizationContactValue, request.AuthorizationContactType);
+            if (!existingContact) 
+                return CommandResult<Guid?>.Fail(ErrorCode.AuthorizationContactIsNotEmpty, $"Аккаунт, зарегистрированный на {request.AuthorizationContactValue}, уже существует");
 
             request.Password = _encryptionTool.CalculateStringHash(request.Password);
 
@@ -106,7 +115,9 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _accountsRepository.GetAccountAsync(accountId);
-
+            //if (result != null)
+            //    result.AvatarId = await _mediaRepository.GetLastAccountAvatarAsync(accountId);
+            
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Account?>(result);
         }
@@ -122,6 +133,8 @@ namespace EList.Services.Impl
             var authorizationInfo = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
 
             var result = await _accountsRepository.GetAccountAsync(authorizationInfo.AccountId);
+            //if (result != null)
+            //    result.AvatarId = await _mediaRepository.GetLastAccountAvatarAsync(authorizationInfo.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Account?>(result);

@@ -75,6 +75,12 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task<bool> CheckContactIsEmptyAsync(string contactValue, Guid contactType)
+        {
+            var result = await _contactDataProvider.CheckContactIsEmptyAsync(contactValue, contactType);
+            return result;
+        }
+
         public async Task UpdateContactAsync(Guid id, ContactRequest request)
         {
             var mappedRequest = new ContactDataDto
@@ -96,6 +102,15 @@ namespace EList.Repositories.Impl
         public async Task<ContactDataItem?> GetAccountContactAsync(Guid contactId)
         { 
             var contact = await _contactDataProvider.GetAccountContactAsync(contactId);
+            var result = _mapper.Map<ContactDataItem>(contact);
+            if (result != null)
+                result.AccountId = contact?.AccountRelation.AccountId;
+            return result;
+        }
+
+        public async Task<ContactDataItem?> GetContactAsync(string contactValue)
+        {
+            var contact = await _contactDataProvider.GetContactAsync(contactValue);
             var result = _mapper.Map<ContactDataItem>(contact);
             if (result != null)
                 result.AccountId = contact?.AccountRelation.AccountId;

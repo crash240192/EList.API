@@ -195,5 +195,7 @@ namespace EList.Api.Controllers
                 throw;
             }
         }
+
+        //public async Task<CommandResult> DropPasswordAsync()
     }
 }

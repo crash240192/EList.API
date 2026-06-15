@@ -36,8 +36,13 @@ namespace EList.AutoMapperProfile
             CreateMap<AuthorizationDto, Authorization>().ReverseMap();
 
             CreateMap<AccountDto, CreateAccountRequest>().ReverseMap();
-            CreateMap<AccountDto, Account>().ReverseMap();
-            CreateMap<AccountDto, AccountPublicData>().ReverseMap();
+            
+            CreateMap<AccountDto, Account>();
+            CreateMap<Account, AccountDto>()
+                .ForMember(dest => dest.Avatars, opt => opt.Ignore());
+
+            CreateMap<AccountDto, AccountPublicData>();
+
             CreateMap<PersonInfoDto, PersonInfo>().ReverseMap();
 
             CreateMap<ContactTypeDto, ContactType>().ReverseMap();
@@ -49,7 +54,7 @@ namespace EList.AutoMapperProfile
             CreateMap<SystemNotificationDto, SystemNotification>().ReverseMap();
             CreateMap<NotificationDto, Notification>()
                 .ForMember(dest => dest.Type, opt => opt.MapFrom(src => (UserNotificationType?)src.Type))
-                .ForMember(dest => dest.Data, opt => opt.MapFrom(src => !string.IsNullOrWhiteSpace(src.Data) ? JObject.Parse(src.Data) : null));
+                .ForMember(dest => dest.Data, opt => opt.MapFrom(src => !string.IsNullOrWhiteSpace(src.Data) ? JsonConvert.DeserializeObject(src.Data) : null));
             CreateMap<Notification, NotificationDto>()
                 .ForMember(dest => dest.Type, opt => opt.MapFrom(src => (int?)src.Type))
                 .ForMember(dest => dest.Data, opt => opt.MapFrom(src => src.Data != null ? JObject.FromObject(src.Data).ToString() : null));

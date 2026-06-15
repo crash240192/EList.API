@@ -236,8 +236,13 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _participantsBWListRepository.AddToBlackListAsync(request);
+            var existingParticipants = await _participationRepository.GetEventParticipantIdsAsync(request.EventId);
+            var bannedUsers = request.AccountIds?.Intersect(existingParticipants)?.ToList();
+
             await _invitationsRepository.DeleteInvitationAsync(request.EventId, request.AccountIds);
             await _participationRepository.DropParticipationsAsync(request.EventId, request.AccountIds);
+
+            await _notificationsService.NotifyAddedToBlackListAsync(request.EventId, bannedUsers);
 
             //TODO: Сформировать удаление о том что пользователя исключили, если он участвовал в мероприятии или у него было приглашение
 
@@ -260,8 +265,15 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _participantsBWListRepository.AddToWhiteListAsync(request);
-            await _invitationsRepository.CancelAllInvitationsExceptThisUsersAsync(request.EventId, request.AccountIds);
-            await _participationRepository.DropAllParticipationsExceptThisUsersAsync(request.EventId, request.AccountIds);
+            var whiteList = await _participantsBWListRepository.GetEventWhiteListShortAsync(request.EventId);
+
+            var existingParticipants = await _participationRepository.GetEventParticipantIdsAsync(request.EventId);
+            var bannedUsers = existingParticipants.Where(i => !whiteList.Contains(i)).ToList();
+
+            await _invitationsRepository.CancelAllInvitationsExceptThisUsersAsync(request.EventId, whiteList);
+            await _participationRepository.DropAllParticipationsExceptThisUsersAsync(request.EventId, whiteList);
+
+            await _notificationsService.NotifyNotInWhiteListAsync(request.EventId, bannedUsers);
 
             //TODO: Сформировать удаление о том что пользователя исключили, если он участвовал в мероприятии или у него было приглашение
 

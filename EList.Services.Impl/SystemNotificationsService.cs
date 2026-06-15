@@ -51,7 +51,7 @@ namespace EList.Services.Impl
             _accountDataHolder = accountDataHolder;
         }
 
-        public async Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType)
+        public async Task<CommandResult<string>> NotifyUserByContactAsync(SystemNotificationType notificationType)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -66,14 +66,14 @@ namespace EList.Services.Impl
             contacts = contacts?.Where(i => i.IsAuthorizationContact).ToList();
 
             if (!contacts.NullSafeAny())
-                return CommandResult.Fail(ErrorCode.UserHasNoNecessaryContacts, "У пользователя отсутствует контакт для уведомления");
+                return CommandResult<string>.Fail(ErrorCode.UserHasNoNecessaryContacts, "У пользователя отсутствует контакт для уведомления");
+
+            var contact = contacts.FirstOrDefault();
 
             var tokens = new Dictionary<string, string>
             {
                 { "#ACTIVATION_CODE#", tokenData.ActivationKey}
             };
-
-            var contact = contacts.FirstOrDefault();
 
             var notification = await _notificationsRepository.GetNotificationByTypeAsync(notificationType);
 
@@ -89,7 +89,7 @@ namespace EList.Services.Impl
                     RecipientEmail = contact.Value
                 });
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return CommandResult.OK;
+                return new CommandResult<string>($"Код активации был выслан на {contact.Value}");
             }
 
             var isPhone = true; //Валидация на корректность введения телефона
@@ -98,7 +98,7 @@ namespace EList.Services.Impl
                 await _smsClient.SendSmsAsync(contact.Value, messageBody);
             }
 
-            return CommandResult.Fail(ErrorCode.UnableToNotifyUser, "Не удалось уведомить пользователя");
+            return CommandResult<string>.Fail(ErrorCode.UnableToNotifyUser, "Не удалось уведомить пользователя");
         }
     }
 }

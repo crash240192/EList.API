@@ -84,6 +84,8 @@ namespace EList.DbDataProvider.DataProviders
             var request = _connection.BlackList
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.Avatars)
                 .Where(i => i.EventId == eventId);
 
             var count = await request.CountAsync();
@@ -103,6 +105,8 @@ namespace EList.DbDataProvider.DataProviders
             var request = _connection.WhiteList
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.Avatars)
                 .Where(i => i.EventId == eventId);
 
             var count = await request.CountAsync();

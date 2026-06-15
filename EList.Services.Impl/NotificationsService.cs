@@ -1,16 +1,18 @@
 ﻿using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
-using System.Text.Json;
 using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
+using EList.Models.Accounts;
 using EList.Models.Events;
 using EList.Models.Notifications;
 using EList.Models.Subscriptions;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using NLog;
 
 namespace EList.Services.Impl
@@ -33,6 +35,8 @@ namespace EList.Services.Impl
         private readonly IAccountsRepository _accountsRepository;
         private readonly IPersonsRepository _personsRepository;
         private readonly ISubscriptionsRepository _subscriptionsRepository;
+        private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
+        private readonly IEventsRatingRepository _eventsRatingRepository;
 
         public NotificationsService(
             WebSocketConnectionManager connectionManager,
@@ -44,7 +48,9 @@ namespace EList.Services.Impl
             IParticipationsRepository participationsRepository,
             IAccountsRepository accountsRepository,
             IPersonsRepository personsRepository,
-            ISubscriptionsRepository subscriptionsRepository)
+            ISubscriptionsRepository subscriptionsRepository,
+            IEventOrganizatorsRepository eventOrganizatorsRepository,
+            IEventsRatingRepository eventsRatingRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _notificationsRepository = notificationsRepository ?? throw new ArgumentNullException(nameof(notificationsRepository));
@@ -54,6 +60,8 @@ namespace EList.Services.Impl
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _personsRepository = personsRepository ?? throw new ArgumentException(nameof(personsRepository));
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
+            _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
+            _eventsRatingRepository = eventsRatingRepository ?? throw new ArgumentNullException(nameof(eventsRatingRepository));
             _connectionManager = connectionManager;
             _accountDataHolder = accountDataHolder;
         }
@@ -67,8 +75,6 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(AddConnectionAsync)}";
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-            _connectionManager.AddConnection(accountId, socket);
 
             var connectionId = _connectionManager.AddConnection(accountId, socket);
 
@@ -260,48 +266,14 @@ namespace EList.Services.Impl
         #region structured notifications
 
         #region event
-        public async Task<CommandResult> NotifyEventCreatedAsync(Guid eventId)
+        public async Task<CommandResult> NotifyEventCreatedAsync(Guid eventId, List<Guid> subscribers = null)
         {
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(NotifyEventCreatedAsync)}";
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var subscribers = await _notificationsRepository.SearchSubscribersEventCreatedAsync(_accountDataHolder.AccountId);
-            var eventData = await _eventsRepository.GetEventAsync(eventId);
-
-            if (subscribers?.Any() ?? false)
-            {
-                var notifications = subscribers.Select(subscriberId => new Notification
-                {
-                    Id = Guid.NewGuid(),
-                    AccountId = subscriberId,
-                    EventId = eventId,
-                    CreatedAt = DateTime.UtcNow,
-                    Message = $"{_accountDataHolder.AccountNameFullString} создал новое событие \"{eventData.Name}\"",
-                    Title = "Новое событие",
-                    RelatedAccountId = _accountDataHolder.AccountId,
-                    Type = UserNotificationType.EventCreated,
-                    Data = new EventShort(eventData)
-                }).ToList();
-
-                await _notificationsRepository.CreateNotificationsAsync(notifications);
-
-                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
-                await Task.WhenAll(wsTasks);
-            }
-
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return CommandResult.OK;
-        }
-
-        public async Task<CommandResult> NotifyEventCreatedAsync(Guid eventId, List<Guid> subscribers)
-        {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventCreatedAsync)}";
-            var execTime = Stopwatch.StartNew();
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
+            subscribers ??= await _notificationsRepository.SearchSubscribersEventCreatedAsync(_accountDataHolder.AccountId);
             var eventData = await _eventsRepository.GetEventAsync(eventId);
 
             if (subscribers?.Any() ?? false)
@@ -328,7 +300,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
-        
+
         public async Task<CommandResult> NotifyEventUpdatedAsync(Guid eventId)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -410,7 +382,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventData = await _eventsRepository.GetEventAsync(eventId);
-            
+
             if (subscribers?.Any() ?? false)
             {
                 var notifications = subscribers.Select(subscriberId => new Notification
@@ -420,7 +392,7 @@ namespace EList.Services.Impl
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
                     Message = $"{_accountDataHolder.AccountNameFullString} приглашает вас на \"{eventData.Name}\"",
-                    Title = null, 
+                    Title = null,
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.NewInvitation,
                     Data = new EventShort(eventData)
@@ -462,7 +434,7 @@ namespace EList.Services.Impl
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
                     Message = $"{_accountDataHolder.AccountNameFullString} принял участие в \"{eventData.Name}\"",
-                    Title = null, 
+                    Title = null,
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.Participated,
                     Data = new EventShort(eventData)
@@ -550,7 +522,7 @@ namespace EList.Services.Impl
                     EventId = null,
                     CreatedAt = DateTime.UtcNow,
                     Message = $"{_accountDataHolder.AccountNameFullString} подписался на {subscribedToAccountFullString}",
-                    Title = null, 
+                    Title = null,
                     RelatedAccountId = subscribedToId,
                     Type = UserNotificationType.RelatedPersonSubscribed,
                     Data = subscribedTo
@@ -574,11 +546,11 @@ namespace EList.Services.Impl
                 Title = $"У вас новый подписчик",
                 RelatedAccountId = _accountDataHolder.AccountId,
                 Type = UserNotificationType.NewSubscription,
-                Data = _accountDataHolder.Account,
+                Data = new AccountPublicData(_accountDataHolder.Account),
             };
 
             await _notificationsRepository.CreateNotificationAsync(notification);
-            await SendToUserAsync(subscribedToId, notification);   
+            await SendToUserAsync(subscribedToId, notification);
             #endregion
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -639,7 +611,7 @@ namespace EList.Services.Impl
                 Title = $"От вас отписались",
                 RelatedAccountId = _accountDataHolder.AccountId,
                 Type = UserNotificationType.Unsubscribed,
-                Data = _accountDataHolder.Account,
+                Data = new AccountPublicData(_accountDataHolder.Account),
             };
 
             await _notificationsRepository.CreateNotificationAsync(notification);
@@ -650,6 +622,185 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
         #endregion subscription
+
+        #region BWlist
+        public async Task<CommandResult> NotifyAddedToBlackListAsync(Guid eventId, List<Guid> blackList)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyAddedToBlackListAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+
+            if (blackList?.Any() ?? false)
+            {
+                var notifications = blackList.Select(subscriberId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"Вас добавили в чёрный список мероприятия \"{eventData.Name}\"",
+                    Title = null,
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.AddedToBlackList,
+                    Data = new EventShort(eventData)
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> NotifyNotInWhiteListAsync(Guid eventId, List<Guid> notInWhiteList)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyNotInWhiteListAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+
+            if (notInWhiteList?.Any() ?? false)
+            {
+                var notifications = notInWhiteList.Select(subscriberId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"Вы не попали в белый список закрытого мероприятия \"{eventData.Name}\"",
+                    Title = null,
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.NotInWhiteList,
+                    Data = new EventShort(eventData)
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+        #endregion BWlist
+
+        #region event rating
+        public async Task<CommandResult> NotifyNewEventRatingAsync(Guid eventId, Guid ratingItem, List<Guid> organizators = null)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyNewEventRatingAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+            organizators ??= (await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(eventId))?.ToList();
+            var rating = await _eventsRatingRepository.GetRatingItemAsync(ratingItem);
+
+            if (organizators?.Any() ?? false)
+            {
+                var notifications = organizators.Where(i => i != null).Select(organizatorId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = organizatorId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"{_accountDataHolder.AccountNameFullString} оценил мероприятие \"{eventData.Name}\"",
+                    Title = "Новая оценка у мероприятия",
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.NewEventRating,
+                    Data = rating
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> NotifyEventRatingChangedAsync(Guid eventId, Guid ratingItem, List<Guid> organizators = null)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventRatingChangedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+            organizators ??= (await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(eventId))?.ToList();
+            var rating = await _eventsRatingRepository.GetRatingItemAsync(ratingItem);
+
+            if (organizators?.Any() ?? false)
+            {
+                var notifications = organizators.Where(i => i != null).Select(organizatorId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = organizatorId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"{_accountDataHolder.AccountNameFullString} изменил свою оценку мероприятия \"{eventData.Name}\"",
+                    Title = "Оценка мероприятия изменилась",
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.EventRatingChanged,
+                    Data = rating
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> NotifyEventRatingDeletedAsync(Guid eventId, List<Guid> organizators = null)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventRatingDeletedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+            organizators ??= (await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(eventId))?.ToList();
+
+            if (organizators?.Any() ?? false)
+            {
+                var notifications = organizators.Where(i => i != null).Select(organizatorId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = organizatorId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"{_accountDataHolder.AccountNameFullString} удалил свою оценку мероприятия \"{eventData.Name}\"",
+                    Title = "Оценка мероприятия изменилась",
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.EventRatingDeleted
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+        #endregion
+
 
         #endregion structured notifications
 
@@ -677,10 +828,13 @@ namespace EList.Services.Impl
                         logger.Debug(correlationId, null, methodName,
                             $"Client requested close: accountId={accountId}", null);
 
-                        await socket.CloseAsync(
-                            WebSocketCloseStatus.NormalClosure,
-                            "Закрытие по запросу клиента",
-                            CancellationToken.None);
+                        if (socket.State == WebSocketState.CloseReceived)
+                        {
+                            await socket.CloseOutputAsync(
+                                WebSocketCloseStatus.NormalClosure,
+                                "Закрытие по запросу клиента",
+                                CancellationToken.None);
+                        }
                         break;
                     }
 
@@ -693,12 +847,18 @@ namespace EList.Services.Impl
             }
             catch (WebSocketException ex)
             {
-                logger.Error(correlationId, null, methodName,
-                    $"WebSocket error: accountId={accountId}, error={ex.Message}", null, ex, null);
+                logger.Warn(correlationId, null, methodName,
+                    $"WebSocket connection lost: accountId={accountId}, reason={ex.Message}", null);
             }
             finally
             {
                 _connectionManager.RemoveConnection(accountId, connectionId);
+
+                if (socket.State != WebSocketState.Closed && socket.State != WebSocketState.Aborted)
+                {
+                    try { socket.Abort(); } catch { }
+                }
+
                 logger.Debug(correlationId, null, methodName,
                     $"WebSocket disconnected: accountId={accountId}, connectionId={connectionId}", null);
             }
@@ -715,27 +875,28 @@ namespace EList.Services.Impl
 
             try
             {
-                using var doc = JsonDocument.Parse(rawMessage);
-                var type = doc.RootElement.TryGetProperty("type", out var typeProp)
-                    ? typeProp.GetString()
-                    : null;
+                var json = new JObject(rawMessage);
+                //using var doc = JsonDocument.Parse(rawMessage);
+                //var type = doc.RootElement.TryGetProperty("type", out var typeProp)
+                //    ? typeProp.GetString()
+                //    : null;
 
-                switch (type)
-                {
-                    case "ping":
-                        await SendNotificationAsync(socket, new { type = "pong", timestamp = DateTimeOffset.UtcNow });
-                        break;
+                //switch (type)
+                //{
+                //    case "ping":
+                //        await SendNotificationAsync(socket, new { type = "pong", timestamp = DateTimeOffset.UtcNow });
+                //        break;
 
-                    default:
-                        logger.Debug(correlationId, null, methodName,
-                            $"Unknown message type '{type}' from accountId={accountId}", null);
-                        await SendNotificationAsync(socket, new
-                        {
-                            type = "error",
-                            message = $"Неизвестный тип сообщения: '{type}'"
-                        });
-                        break;
-                }
+                //    default:
+                //        logger.Debug(correlationId, null, methodName,
+                //            $"Unknown message type '{type}' from accountId={accountId}", null);
+                //        await SendNotificationAsync(socket, new
+                //        {
+                //            type = "error",
+                //            message = $"Неизвестный тип сообщения: '{type}'"
+                //        });
+                //        break;
+                //}
             }
             catch (JsonException)
             {
@@ -752,11 +913,12 @@ namespace EList.Services.Impl
             if (socket.State != WebSocketState.Open)
                 return;
 
-            var json = JsonSerializer.Serialize(data, new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = false
-            });
+            var json = JsonConvert.SerializeObject(data);
+            //var json = JsonSerializer.Serialize(data, new JsonSerializerOptions
+            //{
+            //    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            //    WriteIndented = false
+            //});
 
             var bytes = Encoding.UTF8.GetBytes(json);
             await socket.SendAsync(

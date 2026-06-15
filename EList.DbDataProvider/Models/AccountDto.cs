@@ -61,5 +61,19 @@ namespace EList.DbDataProvider.Models
         /// </summary>
         [Association(ThisKey = nameof(Id), OtherKey = nameof(AccountAlbumRelationDto.AccountId))]
         public List<AccountAlbumRelationDto> AlbumRelations { get; set; }
+
+        /// <summary>
+        /// Список аватарок пользователя
+        /// </summary>
+        [Association(ThisKey = nameof(Id), OtherKey = nameof(AccountAvatarDto.AccountId))]
+        public List<AccountAvatarDto> Avatars { get; set; }
+
+        public Guid? AvatarId
+        {
+            get
+            {
+                return Avatars?.OrderByDescending(i => i.AssignmentDate)?.FirstOrDefault()?.PhotoId;
+            }
+        }
     }
 }

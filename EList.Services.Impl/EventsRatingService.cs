@@ -6,6 +6,7 @@ using EList.Models.Enums;
 using EList.Models.EventsRating;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
+using NetTopologySuite.Index.HPRtree;
 using NLog;
 using System.Diagnostics;
 
@@ -17,6 +18,9 @@ namespace EList.Services.Impl
         private readonly IEventsRatingRepository _eventsRatingRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IEventsRepository _eventsRepository;
+        private readonly INotificationsService _notificationsService;
+        private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
+
         #region logger
         private static readonly ILogger log = LogManager.GetCurrentClassLogger();
         private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
@@ -27,12 +31,16 @@ namespace EList.Services.Impl
             ICorrelationIdProvider correlationIdProvider,
             IEventsRatingRepository eventsRatingRepository,
             IEventsRepository eventsRepository,
-            IAccountDataHolder accountDataHolder)
+            IAccountDataHolder accountDataHolder,
+            INotificationsService notificationsService,
+            IEventOrganizatorsRepository eventOrganizatorsRepository)
         {
             _correlationIdProvider = correlationIdProvider;
             _eventsRatingRepository = eventsRatingRepository;
             _accountDataHolder = accountDataHolder;
             _eventsRepository = eventsRepository;
+            _notificationsService = notificationsService;
+            _eventOrganizatorsRepository = eventOrganizatorsRepository;
         }   
 
         public async Task<CommandResult<EventRating>> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize)
@@ -73,6 +81,13 @@ namespace EList.Services.Impl
 
             await _eventsRatingRepository.DeleteEventRatingAsync(itemId);
 
+            var organizators = (await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(item.EventId))
+                ?.ToList();
+            organizators = organizators?.Where(i => i != _accountDataHolder.AccountId)
+                ?.ToList();
+
+            await _notificationsService.NotifyEventRatingDeletedAsync(item.EventId, organizators);
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
@@ -95,6 +110,13 @@ namespace EList.Services.Impl
 
             request.AccountId = _accountDataHolder.AccountId;
             var eventRating = await _eventsRatingRepository.CreateEventRatingAsync(request);
+
+            var organizators = (await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(request.EventId))
+                ?.ToList();
+            organizators = organizators?.Where(i => i != _accountDataHolder.AccountId)
+                ?.ToList();
+
+            await _notificationsService.NotifyNewEventRatingAsync(request.EventId, eventRating);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid>(eventRating);

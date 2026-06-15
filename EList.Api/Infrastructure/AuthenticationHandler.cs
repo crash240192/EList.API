@@ -97,11 +97,22 @@ namespace EList.Api.Infrastructure
                     logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Invalid Authorization Header");
                     return AuthenticateResult.Fail("Invalid Authorization Header");
                 }
+                if (!authorizationItem.Result.Active && Request.Path != "/api/authorization/sendActivationCode")
+                {
+                    logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Token not activated");
+                    return AuthenticateResult.Fail("Token not activated");
+                }
 
                 _accountDataHolder.Token = authorizationItem.Result.Token;
 
                 var account = await _accountsService.GetAccountByTokenAsync();
-                if (!account.Success || !account.Result.Active) 
+                if (!account.Result.Active)
+                {
+                    logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Account disabled");
+                    return AuthenticateResult.Fail("Account disabled");
+                }
+
+                if (!account.Success) 
                 {
                     logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Invalid Authorization Header");
                     return AuthenticateResult.Fail("Account inavailable");

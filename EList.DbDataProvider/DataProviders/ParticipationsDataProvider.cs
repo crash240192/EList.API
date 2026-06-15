@@ -35,6 +35,12 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.Participations.DeleteAsync(i => i.EventId == eventId && !accountIds.Contains(i.AccountId));
         }
 
+        public async Task DropAllParticipationsExceptWhiteListAsync(Guid eventId)
+        {
+            var whiteList = await _connection.WhiteList.Where(i => i.EventId == eventId).Select(i => i.AccountId).ToListAsync();
+            await _connection.Participations.DeleteAsync(i => i.EventId == eventId && !whiteList.Contains(i.AccountId));
+        }
+
         public async Task<Guid> ParticipateAsync(Guid accountId, Guid eventId)
         {
             var existingParticipation = await _connection.Participations.FirstOrDefaultAsync(i => i.AccountId == accountId && eventId == i.EventId);
@@ -67,6 +73,8 @@ namespace EList.DbDataProvider.DataProviders
             var accountsRequest = _connection.Participations
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.Avatars)
                 .Where(i => request.EventId == i.EventId)                
                 .OrderBy(i => i.Account.Login)
                 .Select(i => i.Account);

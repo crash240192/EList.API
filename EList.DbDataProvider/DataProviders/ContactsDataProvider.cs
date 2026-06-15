@@ -1,5 +1,6 @@
 ﻿using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.Models.ContactData;
 using LinqToDB;
 using LinqToDB.Async;
 
@@ -52,6 +53,13 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<bool> CheckContactIsEmptyAsync(string contactValue, Guid contactType)
+        {
+            var result = !await _connection.ContactData
+                .AnyAsync(i => i.Value == contactValue && i.TypeId == contactType);
+            return result;
+        }
+
         public async Task UpdateContactAsync(ContactDataDto item)
         {
             await _connection.ContactData.Where(i => i.Id == item.Id)
@@ -78,6 +86,16 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.ContactType)
                 .LoadWith(i => i.AccountRelation)
                 .Where(i => i.Id == id)
+                .FirstOrDefaultAsync();
+            return result;
+        }
+
+        public async Task<ContactDataDto?> GetContactAsync(string contactValue)
+        {
+            var result = await _connection.ContactData
+                .LoadWith(i => i.ContactType)
+                .LoadWith(i => i.AccountRelation)
+                .Where(i => i.Value.ToLower() == contactValue.ToLower())
                 .FirstOrDefaultAsync();
             return result;
         }

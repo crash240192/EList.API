@@ -21,14 +21,20 @@ namespace EList.Services.Impl
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IMediaRepository _mediaRepository;
         private readonly IAccountDataHolder _accountDataHolder;
+        private readonly IParticipationsRepository _participationsRepository;
+        private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
 
         public MediaService(ICorrelationIdProvider correlationIdProvider,
             IMediaRepository mediaRepository,
-            IAccountDataHolder accountDataHolder) 
+            IAccountDataHolder accountDataHolder,
+            IParticipationsRepository participationsRepository,
+            IEventOrganizatorsRepository eventOrganizatorsRepository)
         {
             _correlationIdProvider = correlationIdProvider;
             _mediaRepository = mediaRepository;
             _accountDataHolder = accountDataHolder;
+            _participationsRepository = participationsRepository;
+            _eventOrganizatorsRepository = eventOrganizatorsRepository;
         }
 
         public async Task<CommandResult<Guid?>> CreateAlbumAsync(EventAlbumRequest request)
@@ -134,10 +140,13 @@ namespace EList.Services.Impl
 
             var result = await _mediaRepository.GetEventAlbumsAsync(eventId);
 
-            //if (authorizationInfo.AccountId != accountId)
-            {
-                //TODO: отобрать только те альбомы, которые доступны для просмотра
-            }
+            //var participants = await _participationsRepository.GetEventParticipantIdsAsync(eventId);
+            //var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(eventId);
+            //if (!participants.Contains(_accountDataHolder.AccountId) && !organizators.Contains(_accountDataHolder.AccountId))
+            //{
+            //    result = result?.Where(i => i.Parameters.)
+            //    //TODO: отобрать только те альбомы, которые доступны для просмотра
+            //}
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<MediaAlbum>>(result);

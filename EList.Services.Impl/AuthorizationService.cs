@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Mvc.Formatters;
 using Newtonsoft.Json.Linq;
 using NLog;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace EList.Services.Impl
 {
@@ -67,15 +68,37 @@ namespace EList.Services.Impl
             var account = await _accountsRepository.GetAccountAsync(login, passwordHash);
 
             if (account == null)
-                return CommandResult<AuthorizationResponse>.Fail(ErrorCode.AuthenticationError, $"Невероный логин или пароль");
+            {
+                var contactTypes = await _contactsRepository.GetAllContactTypesAsync();
+                foreach (var contactType in contactTypes)
+                {
+                    var regexCheck = Regex.Match(login, contactType.Mask);
+                    if (regexCheck.Success)
+                    {
+                        var loginContact = await _contactsRepository.GetContactAsync(login);
+                        if (loginContact != null && loginContact.AccountId != null && loginContact.IsAuthorizationContact)
+                        {
+                            var accountByContact = await _accountsRepository.GetAccountAsync(loginContact.AccountId.Value);
+                            if (accountByContact != null)
+                            {
+                                account = await _accountsRepository.GetAccountAsync(accountByContact.Login, passwordHash);
+                                if (account != null)
+                                    break;
+                            }
+                        }
+                    }
+                }
 
+                if (account == null)
+                    return CommandResult<AuthorizationResponse>.Fail(ErrorCode.AuthenticationError, $"Невероный логин или пароль");
+            }
             var tokenSearchResult = await _authorizationRepository.GetAuthorizationDataAsync(account.Id, clientHash);
 
             _accountDataHolder.Account = account;
 
             var result = new AuthorizationResponse();
             var commandResult = new CommandResult<AuthorizationResponse>(result);
-            var contact = await _contactsRepository.GetAccountContactAsync(account.Id);
+            var contact = (await _contactsRepository.GetAccountContactsAsync(account.Id))?.FirstOrDefault(i => i.IsAuthorizationContact);
 
             if (tokenSearchResult == null)
             {
@@ -112,7 +135,7 @@ namespace EList.Services.Impl
             return commandResult;
         }
 
-        public async Task<CommandResult> SendActivationCodeAsync()
+        public async Task<CommandResult<string>> SendActivationCodeAsync()
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -120,10 +143,10 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            await _notificationService.NotifyUserByContactAsync(SystemNotificationType.Activation);
-            
+            var result = await _notificationService.NotifyUserByContactAsync(SystemNotificationType.Activation);
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return CommandResult.OK;
+            return result;
         }
 
         public async Task<CommandResult<Authorization?>> GetAuthorizationDataAsync(Guid token)
