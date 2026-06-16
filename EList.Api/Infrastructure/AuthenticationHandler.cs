@@ -97,7 +97,7 @@ namespace EList.Api.Infrastructure
                     logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Invalid Authorization Header");
                     return AuthenticateResult.Fail("Invalid Authorization Header");
                 }
-                if (!authorizationItem.Result.Active && Request.Path != "/api/authorization/sendActivationCode")
+                if (!authorizationItem.Result.Active && Request.Path != "/api/authorization/sendActivationCode" && Request.Path != "/api/authorization/activate")
                 {
                     logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Token not activated");
                     return AuthenticateResult.Fail("Token not activated");
