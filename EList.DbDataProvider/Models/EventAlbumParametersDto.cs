@@ -5,7 +5,7 @@ namespace EList.DbDataProvider.Models
     [Table("event_album_parameters")]
     public class EventAlbumParametersDto
     {
-        [Column("album_id"), PrimaryKey, Identity]
+        [Column("album_id"), PrimaryKey]
         public Guid AlbumId { get;set; }
 
         [Column("head_album")]
@@ -14,7 +14,7 @@ namespace EList.DbDataProvider.Models
         [Column("participants_readonly")]
         public bool ParticipantsReadonly { get; set; }
 
-        [Column("privte_album")]
+        [Column("private_album")]
         public bool PrivateAlbum { get; set; }
 
         [Association(ThisKey = nameof(AlbumId), OtherKey = nameof(MediaAlbumDto.Id))]

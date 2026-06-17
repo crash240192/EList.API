@@ -19,10 +19,15 @@ namespace EList.DbDataProvider.DataProviders
                 UpdateDate = DateTimeOffset.Now,
                 Description = request.Description,
                 Name = request.Name,
-                WallpaperId = request.WallpaperId,
-                Parameters = request.Parameters
+                WallpaperId = request.WallpaperId
             };
             var result = (Guid)await _connection.InsertWithIdentityAsync(album);
+
+            if (request.Parameters != null)
+            {
+                request.Parameters.AlbumId = result;
+                await _connection.InsertAsync(request.Parameters);
+            }
 
             await _connection.InsertWithIdentityAsync(new AccountAlbumRelationDto
             {
