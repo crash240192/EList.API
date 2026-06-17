@@ -14,8 +14,8 @@ namespace EList.DbDataProvider.Models
         [Column("participants_readonly")]
         public bool ParticipantsReadonly { get; set; }
 
-        [Column("privte_album")]
-        public bool PrivateAlbum { get; set; }
+        [Column("private_album")]
+        public bool Private { get; set; }
 
         [Association(ThisKey = nameof(AlbumId), OtherKey = nameof(MediaAlbumDto.Id))]
         public MediaAlbumDto Album { get; set; }

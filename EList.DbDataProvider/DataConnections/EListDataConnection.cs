@@ -52,7 +52,7 @@ namespace EList.DbDataProvider.DataConnections
         
         public ITable<MediaAlbumDto> Albums => this.GetTable<MediaAlbumDto>();
         public ITable<FileAlbumRelationDto> AlbumFiles => this.GetTable<FileAlbumRelationDto>();
-
+        public ITable<EventAlbumParametersDto> EventAlbumParameters => this.GetTable<EventAlbumParametersDto>();
         public ITable<AccountAlbumRelationDto> AccountAlbums => this.GetTable<AccountAlbumRelationDto>();
         public ITable<EventAlbumRelationDto> EventAlbums => this.GetTable<EventAlbumRelationDto>();
         public ITable<AccountAvatarDto> AccountAvatars => this.GetTable<AccountAvatarDto>();

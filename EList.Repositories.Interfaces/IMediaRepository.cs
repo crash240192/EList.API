@@ -10,6 +10,7 @@ namespace EList.Repositories.Interfaces
 
         Task AssingAlbumToAccountAsync(Guid accountId, Guid albumId);
         Task AssingAlbumToEventAsync(Guid eventId, Guid albumId);
+        Task AddFilesToAlbumAsync(Guid albumId, List<Guid> fileIds);
 
         Task<MediaAlbum> GetAlbumAsync(Guid id);
         Task<List<MediaAlbum>> GetAccountAlbumsAsync(Guid accountId);

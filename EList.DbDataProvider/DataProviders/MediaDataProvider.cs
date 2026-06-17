@@ -2,6 +2,7 @@
 using EList.DbDataProvider.Models;
 using LinqToDB;
 using LinqToDB.Async;
+using LinqToDB.Data;
 
 namespace EList.DbDataProvider.DataProviders
 {
@@ -24,6 +25,9 @@ namespace EList.DbDataProvider.DataProviders
             };
             var result = (Guid)await _connection.InsertWithIdentityAsync(album);
 
+            request.Parameters.AlbumId = result;
+            await _connection.InsertWithIdentityAsync(request.Parameters);
+
             await _connection.InsertWithIdentityAsync(new AccountAlbumRelationDto
             {
                 AccountId = request.AccountId.Value,
@@ -31,6 +35,17 @@ namespace EList.DbDataProvider.DataProviders
             });
 
             return result;
+        }
+
+        public async Task AddFilesToAlbumAsync(Guid albumId, List<Guid> fileIds)
+        {
+            var files = fileIds.Select(i => new FileAlbumRelationDto
+            {
+                AlbumId = albumId,
+                FileId = i
+            });
+
+            await _connection.BulkCopyAsync(files);
         }
 
         public async Task UpdateAlbumAsync(MediaAlbumDto item)
@@ -45,7 +60,7 @@ namespace EList.DbDataProvider.DataProviders
             if (item.Parameters != null)
                 album.Set(i => i.Parameters.ParticipantsReadonly, item.Parameters.ParticipantsReadonly)
                 .Set(i => i.Parameters.HeadAlbum, item.Parameters.HeadAlbum)
-                .Set(i => i.Parameters.PrivateAlbum, item.Parameters.PrivateAlbum);
+                .Set(i => i.Parameters.Private, item.Parameters.Private);
 
             await album.UpdateAsync();
         }
@@ -72,20 +87,25 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<List<MediaAlbumDto>> GetAccountAlbumsAsync(Guid accountId)
         {
-            var result = await _connection.Albums.LoadWith(i => i.AccountRelation)
+            var result = await _connection.Albums
+                .LoadWith(i => i.Parameters)
+                .LoadWith(i => i.AccountRelation)
                 .Where(i => i.AccountRelation.AccountId == accountId).ToListAsync();
             return result;
         }
 
         public async Task<MediaAlbumDto> GetAlbumAsync(Guid id)
         {
-            var result = await _connection.Albums.FirstOrDefaultAsync(i => i.Id == id);
+            var result = await _connection.Albums
+                .LoadWith(i => i.Parameters)
+                .FirstOrDefaultAsync(i => i.Id == id);
             return result;
         }
 
         public async Task<List<MediaAlbumDto>> GetEventAlbumsAsync(Guid eventId)
         {
             var result = await _connection.Albums
+                .LoadWith(i => i.Parameters)
                 .LoadWith(i => i.EventRelation)
                 .Where(i => i.EventRelation.EventId == eventId)
                 .ToListAsync();

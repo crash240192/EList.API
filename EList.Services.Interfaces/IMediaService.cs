@@ -16,7 +16,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult<List<MediaAlbum>>> GetEventAlbumsAsync(Guid eventId);
         Task<CommandResult<PagedList<AlbumFile>>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null);
         //Task<CommandResult> SetEventAlbumParametersAsync(Guid token, EventAlbumParameters request);
-
+        Task<CommandResult> AddFilesToAlbumAsync(AddFilesRequest request);
         Task<CommandResult> SetNewAccountAvatarAsync(Guid fileId);
         Task<CommandResult<List<Guid>?>> GetCurAccountAvatarsAsync();
         Task<CommandResult<List<Guid>?>> GetAccountAvatarsAsync(Guid accountId);
@@ -26,5 +26,6 @@ namespace EList.Services.Interfaces
         Task<CommandResult> SetNewOrganizationAvatarAsync(Guid organizationId, Guid fileId);
         Task<CommandResult<List<Guid>?>> GetOrganizationAvatarsAsync(Guid organizationId);
         Task<CommandResult<Guid?>> GetOrganizationAvatarAsync(Guid organizationId);
+
     }
 }

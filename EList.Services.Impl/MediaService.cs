@@ -2,6 +2,7 @@
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
+using EList.Models.Accounts;
 using EList.Models.Media;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
@@ -90,6 +91,29 @@ namespace EList.Services.Impl
             //TODO: Добавить проверку что пользователь может редактировать альбом
 
             await _mediaRepository.AssingAlbumToAccountAsync(accountId, albumId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> AddFilesToAlbumAsync(AddFilesRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AddFilesToAlbumAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var album = await _mediaRepository.GetAlbumAsync(request.AlbumId);
+
+            if (album == null)
+                return CommandResult.Fail(ErrorCode.AlbumNotFound, $"Альбом {request.AlbumId} не найден");
+
+            if (!request.FileIds?.Any() ?? true)
+                return CommandResult.Fail(ErrorCode.AlbumNotFound, $"Перечень файлов не должен быть пустым");
+
+            //TODO: Добавить проверку доступа для добавления файлов в альбом
+
+            await _mediaRepository.AddFilesToAlbumAsync(request.AlbumId, request.FileIds);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

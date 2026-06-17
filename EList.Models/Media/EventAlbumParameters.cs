@@ -15,7 +15,7 @@
         /// <summary>
         /// Флаг только для чтения (для участников)
         /// </summary>
-        public bool ParticipantsRedonly { get; set; }
+        public bool ParticipantsReadonly { get; set; }
         
         /// <summary>
         /// Флаг закрытости альбома (виден только участникам события)

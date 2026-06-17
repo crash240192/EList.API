@@ -5,6 +5,7 @@ using EList.DbDataProvider.Models;
 using EList.Models.Accounts;
 using EList.Models.Media;
 using EList.Repositories.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace EList.Repositories.Impl
 {
@@ -40,6 +41,11 @@ namespace EList.Repositories.Impl
         public async Task AssingAlbumToEventAsync(Guid eventId, Guid albumId)
         {
             await _mediaDataProvider.AssingAlbumToEventAsync(eventId, albumId);
+        }
+
+        public async Task AddFilesToAlbumAsync(Guid albumId, List<Guid> fileIds)
+        {
+            await _mediaDataProvider.AddFilesToAlbumAsync(albumId, fileIds);
         }
 
         public async Task<List<MediaAlbum>> GetAccountAlbumsAsync(Guid accountId)
