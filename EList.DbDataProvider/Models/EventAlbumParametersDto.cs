@@ -5,7 +5,7 @@ namespace EList.DbDataProvider.Models
     [Table("event_album_parameters")]
     public class EventAlbumParametersDto
     {
-        [Column("album_id"), PrimaryKey, Identity]
+        [Column("album_id"), PrimaryKey]
         public Guid AlbumId { get;set; }
 
         [Column("head_album")]
