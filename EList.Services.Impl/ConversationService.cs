@@ -21,13 +21,15 @@ namespace EList.Services.Impl
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IConversationRepository _conversationsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
-
+        private readonly INotificationsService _notificationsService;
         public ConversationService(ICorrelationIdProvider correlationIdProvider,
             IConversationRepository conversationsRepository,
-            IAccountDataHolder accountDataHolder)
+            IAccountDataHolder accountDataHolder,
+            INotificationsService notificationsService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _conversationsRepository = conversationsRepository ?? throw new ArgumentNullException(nameof(conversationsRepository));
+            _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -56,6 +58,12 @@ namespace EList.Services.Impl
 
             //TODO: Добавить проверку что пользователь может писать в указанном чате
             var result = await _conversationsRepository.CreateMessageAsync(message);
+
+            if (message.ReplyTo != null)
+            {
+                var conversation = await _conversationsRepository.GetConversationAsync(message.ConversationId);
+                await _notificationsService.NotifyCommentRepliedsync(conversation?.EventId, message.ReplyTo.Value, result);
+            }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid>(result);

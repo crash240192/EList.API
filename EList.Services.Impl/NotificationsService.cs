@@ -37,7 +37,7 @@ namespace EList.Services.Impl
         private readonly ISubscriptionsRepository _subscriptionsRepository;
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
         private readonly IEventsRatingRepository _eventsRatingRepository;
-
+        private readonly IConversationRepository _conversationRepository;
         public NotificationsService(
             WebSocketConnectionManager connectionManager,
             ICorrelationIdProvider correlationIdProvider,
@@ -50,7 +50,8 @@ namespace EList.Services.Impl
             IPersonsRepository personsRepository,
             ISubscriptionsRepository subscriptionsRepository,
             IEventOrganizatorsRepository eventOrganizatorsRepository,
-            IEventsRatingRepository eventsRatingRepository)
+            IEventsRatingRepository eventsRatingRepository,
+            IConversationRepository conversationRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _notificationsRepository = notificationsRepository ?? throw new ArgumentNullException(nameof(notificationsRepository));
@@ -62,6 +63,7 @@ namespace EList.Services.Impl
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _eventsRatingRepository = eventsRatingRepository ?? throw new ArgumentNullException(nameof(eventsRatingRepository));
+            _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
             _connectionManager = connectionManager;
             _accountDataHolder = accountDataHolder;
         }
@@ -801,6 +803,45 @@ namespace EList.Services.Impl
         }
         #endregion
 
+        #region message
+        public async Task<CommandResult> NotifyCommentRepliedsync(Guid? eventId, Guid messageId, Guid replyId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyCommentRepliedsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (eventId != null)
+            {
+                var eventData = await _eventsRepository.GetEventAsync(eventId.Value);
+            }
+            var message = await _conversationRepository.GetMessageAsync(messageId);
+            var reply = await _conversationRepository.GetMessageAsync(replyId);
+
+            var messageStr = reply.MessageText?.Length > 100
+                ? reply.MessageText.Substring(100)
+                : reply.MessageText;
+
+            var notification = new Notification
+            {
+                Id = Guid.NewGuid(),
+                AccountId = message.AccountId.Value,
+                EventId = eventId,
+                CreatedAt = DateTime.UtcNow,
+                Message = $"{messageStr}...",
+                Title = $"{_accountDataHolder.AccountNameFullString} ответил на ваше сообщение",
+                RelatedAccountId = _accountDataHolder.AccountId,
+                Type = UserNotificationType.MessageReplied,
+                Data = reply
+            };
+
+            await _notificationsRepository.CreateNotificationAsync(notification);
+            var wsTasks = SendToUserAsync(notification.AccountId, notification);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+        #endregion
 
         #endregion structured notifications
 

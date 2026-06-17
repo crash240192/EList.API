@@ -40,6 +40,8 @@ namespace EList.Services.Interfaces
         Task<CommandResult> NotifyEventRatingChangedAsync(Guid eventId, Guid ratingItem, List<Guid> organizators = null);
         Task<CommandResult> NotifyEventRatingDeletedAsync(Guid eventId, List<Guid> organizators = null);
 
+
+        Task<CommandResult> NotifyCommentRepliedsync(Guid? eventId, Guid messageId, Guid replyId);
         //Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType);
     }
 }
