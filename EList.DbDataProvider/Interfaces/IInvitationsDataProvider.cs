@@ -13,6 +13,7 @@ namespace EList.DbDataProvider.Interfaces
         Task ViewInvitationAsync(Guid invitationId);
         Task ViewAllInvitationsAsync(Guid accountId);
         Task<List<InvitationDto>?> GetAllEventInvitationsAsync(Guid eventId);
+        Task<List<Guid>?> GetInvitedUsersAsync(Guid eventId);
         Task<InvitationDto> GetInvitationAsync(Guid invitedAccountId, Guid eventId);
         Task<bool> IsUserInvitatedAsync(Guid accountId, Guid eventId);
         Task<ListResponse<InvitationDto>> SearchInvitationsAsync(InvitationsSearchRequest request);

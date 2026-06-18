@@ -29,7 +29,7 @@ namespace EList.Repositories.Impl
 
         public async Task UpdateAlbumAsync(EventAlbumRequest request)
         {
-            var mappedRequest = _mapper.Map<MediaAlbumDto>(request);
+            var mappedRequest = _mapper.Map<AlbumRequest>(request);
             await _mediaDataProvider.UpdateAlbumAsync(mappedRequest);
         }
 

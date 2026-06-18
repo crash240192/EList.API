@@ -3,6 +3,7 @@ using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
 using EList.Models.Accounts;
+using EList.Models.Events;
 using EList.Models.Media;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
@@ -24,18 +25,24 @@ namespace EList.Services.Impl
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IParticipationsRepository _participationsRepository;
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
+        private readonly IEventsRepository _eventsRepository;
+        private readonly IInvitationsRepository _invitationsRepository;
 
         public MediaService(ICorrelationIdProvider correlationIdProvider,
             IMediaRepository mediaRepository,
             IAccountDataHolder accountDataHolder,
             IParticipationsRepository participationsRepository,
-            IEventOrganizatorsRepository eventOrganizatorsRepository)
+            IEventOrganizatorsRepository eventOrganizatorsRepository,
+            IEventsRepository eventsRepository,
+            IInvitationsRepository invitationsRepository)
         {
             _correlationIdProvider = correlationIdProvider;
             _mediaRepository = mediaRepository;
             _accountDataHolder = accountDataHolder;
             _participationsRepository = participationsRepository;
             _eventOrganizatorsRepository = eventOrganizatorsRepository;
+            _eventsRepository = eventsRepository;
+            _invitationsRepository = invitationsRepository;
         }
 
         public async Task<CommandResult<Guid?>> CreateAlbumAsync(EventAlbumRequest request)
@@ -111,6 +118,14 @@ namespace EList.Services.Impl
             if (!request.FileIds?.Any() ?? true)
                 return CommandResult.Fail(ErrorCode.AlbumNotFound, $"Перечень файлов не должен быть пустым");
 
+            if (album.EventId != null && (album.Parameters?.ParticipantsReadonly ?? false))
+            {
+                var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(album.EventId.Value);
+
+                if (!organizators.Contains(_accountDataHolder.AccountId))
+                    return CommandResult.Fail(ErrorCode.AddPhotosNotAllowed, "Организатор запретил добавление фотографий в этот альбом");
+            }
+
             //TODO: Добавить проверку доступа для добавления файлов в альбом
 
             await _mediaRepository.AddFilesToAlbumAsync(request.AlbumId, request.FileIds);
@@ -163,14 +178,31 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _mediaRepository.GetEventAlbumsAsync(eventId);
+            var eventItem = await _eventsRepository.GetEventAsync(eventId);
+            var participants = await _participationsRepository.GetEventParticipantIdsAsync(eventId);
+            var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(eventId);
+            var invitedUsers = await _invitationsRepository.GetInvitedUsersAsync(eventId);
 
-            //var participants = await _participationsRepository.GetEventParticipantIdsAsync(eventId);
-            //var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(eventId);
-            //if (!participants.Contains(_accountDataHolder.AccountId) && !organizators.Contains(_accountDataHolder.AccountId))
-            //{
-            //    result = result?.Where(i => i.Parameters.)
-            //    //TODO: отобрать только те альбомы, которые доступны для просмотра
-            //}
+            if (organizators.Contains(_accountDataHolder.AccountId))
+            {
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return new CommandResult<List<MediaAlbum>>(result);
+            }
+            if (eventItem.Parameters?.Private ?? false)
+            {
+                if (!participants.Contains(_accountDataHolder.AccountId) && !invitedUsers.Contains(_accountDataHolder.AccountId))
+                {
+                    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                    return CommandResult<List<MediaAlbum>>.Fail(ErrorCode.AccessError, "Просмотр альбомов закрытого мероприятия доступен только участникам");
+                }
+            }
+            else
+            {
+                if (!participants.Contains(_accountDataHolder.AccountId) && !invitedUsers.Contains(_accountDataHolder.AccountId))
+                {
+                    result = result?.Where(i => i.Parameters?.Private ?? false)?.ToList();
+                }
+            }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<MediaAlbum>>(result);
@@ -183,11 +215,42 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(GetAlbumFilesAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var result = await _mediaRepository.GetAlbumFilesAsync(albumId);
+            var album = await _mediaRepository.GetAlbumAsync(albumId);
 
-            //if (authorizationInfo.AccountId != accountId)
+            if (album.EventId != null)
             {
-                //TODO: отобрать только те файлы, которые доступны для просмотра, с учетом доступности альбома
+                var eventItem = await _eventsRepository.GetEventAsync(album.EventId.Value);
+                var participants = await _participationsRepository.GetEventParticipantIdsAsync(album.EventId.Value);
+                var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(album.EventId.Value);
+                var invitedUsers = await _invitationsRepository.GetInvitedUsersAsync(album.EventId.Value);
+
+                if (!organizators.Contains(_accountDataHolder.AccountId))
+                {
+                    if (eventItem?.Parameters?.Private ?? false)
+                    {
+                        if (!participants.Contains(_accountDataHolder.AccountId) && !invitedUsers.Contains(_accountDataHolder.AccountId))
+                        {
+                            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                            return CommandResult<PagedList<AlbumFile>>.Fail(ErrorCode.AccessError, "Просмотр альбомов закрытого мероприятия доступен только участникам");
+                        }
+                    }
+                    else
+                    {
+                        if (album.Parameters?.Private ?? false)
+                        {
+                            if (!participants.Contains(_accountDataHolder.AccountId) && !invitedUsers.Contains(_accountDataHolder.AccountId))
+                            {
+                                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                                return CommandResult<PagedList<AlbumFile>>.Fail(ErrorCode.AccessError, "Альбом доступен для просмотра только участникам мероприятия");
+                            }
+                        }
+                    }
+                }
+            }
+
+            var result = await _mediaRepository.GetAlbumFilesAsync(albumId);
+            {
+                //TODO: отобрать только те файлы, которые доступны для просмотра, с учетом доступности альбома другим пользователям
             }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);

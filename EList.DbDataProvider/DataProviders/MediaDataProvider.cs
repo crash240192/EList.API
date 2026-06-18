@@ -50,21 +50,36 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.BulkCopyAsync(files);
         }
 
-        public async Task UpdateAlbumAsync(MediaAlbumDto item)
+        public async Task UpdateAlbumAsync(AlbumRequest request)
         {
-            var album = _connection.Albums
+            await _connection.Albums
+                .Where(i => i.Id == request.Id)
+                .Set(i => i.Name, request.Name)
+                .Set(i => i.Description, request.Description)
+                .Set(i => i.UpdateDate, DateTimeOffset.Now)
+                .UpdateAsync();
+
+            var album = await _connection.Albums
                 .LoadWith(i => i.Parameters)
-                .Where(i => i.Id == item.Id)
-                .Set(i => i.Name, item.Name)
-                .Set(i => i.Description, item.Description)
-                .Set(i => i.UpdateDate, DateTimeOffset.Now);
+                .FirstOrDefaultAsync(i => i.Id == request.Id);
 
-            if (item.Parameters != null)
-                album.Set(i => i.Parameters.ParticipantsReadonly, item.Parameters.ParticipantsReadonly)
-                .Set(i => i.Parameters.HeadAlbum, item.Parameters.HeadAlbum)
-                .Set(i => i.Parameters.Private, item.Parameters.Private);
-
-            await album.UpdateAsync();
+            if (request.Parameters != null)
+            {
+                if (album.Parameters != null)
+                {
+                    await _connection.EventAlbumParameters
+                        .Where(i => i.AlbumId == request.Id)
+                        .Set(i => i.ParticipantsReadonly, request.Parameters.ParticipantsReadonly)
+                        .Set(i => i.HeadAlbum, request.Parameters.HeadAlbum)
+                        .Set(i => i.Private, request.Parameters.Private)
+                        .UpdateAsync();
+                }
+                else
+                {
+                    request.Parameters.AlbumId = request.Id.Value;
+                    await _connection.InsertAsync(request.Parameters);
+                }
+            }
         }
 
         public async Task AssingAlbumToAccountAsync(Guid accountId, Guid albumId)

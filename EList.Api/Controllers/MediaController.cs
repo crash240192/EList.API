@@ -79,7 +79,7 @@ namespace EList.Api.Controllers
         /// <param name="request"></param>
         /// <returns></returns>
         [HttpPut("albums/update")]
-        public async Task<CommandResult<Guid?>> UpdateAlbumAsync(EventAlbumRequest request)
+        public async Task<CommandResult> UpdateAlbumAsync(EventAlbumRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -90,7 +90,7 @@ namespace EList.Api.Controllers
                 await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _mediaService.CreateAlbumAsync(request);
+                var result = await _mediaService.UpdateAlbumAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 

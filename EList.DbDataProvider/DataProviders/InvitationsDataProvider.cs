@@ -88,6 +88,14 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<List<Guid>?> GetInvitedUsersAsync(Guid eventId)
+        {
+            var result = await _connection.Invitations.Where(i => i.EventId == eventId)
+                .Select(i => i.InvitedAccountId)
+                .ToListAsync();
+            return result;
+        }
+
         public async Task<InvitationDto> GetInvitationAsync(Guid invitedAccountId, Guid eventId)
         {
             var result = await _connection.Invitations.FirstOrDefaultAsync(i => i.InvitedAccountId == invitedAccountId && i.EventId == eventId);

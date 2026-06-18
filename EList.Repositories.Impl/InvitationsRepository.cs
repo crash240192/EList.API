@@ -142,6 +142,12 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task<List<Guid>?> GetInvitedUsersAsync(Guid eventId)
+        {
+            var result = await _invitationsDataProvider.GetInvitedUsersAsync(eventId);
+            return result;
+        }
+
         public async Task<Invitation> GetInvitationAsync(Guid invitedAccountId, Guid eventId)
         {
             var invitation = await _invitationsDataProvider.GetInvitationAsync(invitedAccountId, eventId);
