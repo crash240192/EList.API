@@ -67,7 +67,7 @@ namespace EList.Repositories.Impl
             var mappedRequest = _mapper.Map<MessageDto>(message);
             var result = await _conversationsDataProvider.CreateMessageAsync(mappedRequest);
             return result;
-        }        
+        }
 
         public async Task DeleteMessageAsync(Guid messageId)
         {

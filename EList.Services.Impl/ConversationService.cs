@@ -92,7 +92,17 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //TODO: Добавить проверку что пользователь может удалить диалог
+            var existingMessage = await _conversationsRepository.GetMessageAsync(messageId);
+
+            if (existingMessage.AccountId != _accountDataHolder.AccountId)
+                return CommandResult.Fail(ErrorCode.MessageNotFound, "Сообщение не найдено");
+
+            if (existingMessage.AccountId != _accountDataHolder.AccountId)
+                return CommandResult.Fail(ErrorCode.AccessError, "Нельзя удалять чужие сообщения");
+            
+            if (existingMessage.Replied)
+                return CommandResult.Fail(ErrorCode.MessageReplied, "Нельзя удалить сообщение на которое уже ответили");
+
             await _conversationsRepository.DeleteMessageAsync(messageId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
