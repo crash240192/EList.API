@@ -1,5 +1,7 @@
-﻿using EList.DbDataProvider.Interfaces;
+﻿using EList.Common.Extensions;
+using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.Models.Media;
 using LinqToDB;
 using LinqToDB.Async;
 using LinqToDB.Data;
@@ -142,6 +144,43 @@ namespace EList.DbDataProvider.DataProviders
                 resultList = await request.ToListAsync();
 
             return new ListResponse<FileAlbumRelationDto>(count, resultList);
+        }
+
+        public async Task<FileAlbumRelationDto> GetFileAsync(Guid fileId, Guid albumId)
+        {
+            var result = await _connection.AlbumFiles.FirstOrDefaultAsync(i => i.AlbumId == albumId && fileId == fileId);            
+            return result;
+        }
+
+        public async Task<List<Guid>> GetFilesNotExistsInAnotherAlbumsAsync(List<Guid> fileIds, Guid exceptAlbumId)
+        {
+            if (!fileIds.NullSafeAny())
+                return null;
+
+            var filesInAnotherAlbums = await _connection.AlbumFiles
+                .Where(i => i.AlbumId != exceptAlbumId && fileIds.Contains(i.FileId))
+                .Select(i => i.FileId)
+                .ToListAsync();
+
+            if (filesInAnotherAlbums.NullSafeAny())            
+                fileIds = fileIds?.Where(i => !filesInAnotherAlbums.Contains(i)).ToList();
+            
+            return fileIds;
+        }
+
+        public async Task DeleteFilesAsync(List<Guid> fileIds)
+        {
+            await _connection.AlbumFiles.Where(i => fileIds.Contains(i.FileId))
+                .DeleteAsync();
+        }
+
+        public async Task DeleteAlbumAsync(Guid albumId)
+        {
+            await _connection.AlbumFiles.Where(i => i.AlbumId == albumId)
+                .DeleteAsync();
+
+            await _connection.Albums.Where(i => i.Id == albumId)
+                .DeleteAsync();
         }
 
         #region account avatars

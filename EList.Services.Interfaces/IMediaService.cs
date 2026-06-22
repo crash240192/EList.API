@@ -17,6 +17,9 @@ namespace EList.Services.Interfaces
         Task<CommandResult<PagedList<AlbumFile>>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null);
         //Task<CommandResult> SetEventAlbumParametersAsync(Guid token, EventAlbumParameters request);
         Task<CommandResult> AddFilesToAlbumAsync(AddFilesRequest request);
+        Task<CommandResult> DeleteAlbumAsync(Guid albumId);
+        Task<CommandResult> DeleteFileAsync(Guid fileId, Guid albumId);
+
         Task<CommandResult> SetNewAccountAvatarAsync(Guid fileId);
         Task<CommandResult<List<Guid>?>> GetCurAccountAvatarsAsync();
         Task<CommandResult<List<Guid>?>> GetAccountAvatarsAsync(Guid accountId);

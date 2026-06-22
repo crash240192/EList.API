@@ -7,6 +7,7 @@ namespace EList.Services.Interfaces
     {
         Guid Token { get; set; }
         Account Account { get; set; }
+        string Jwt { get; set; }
         PersonInfo? PersonInfo { get; set; }
         Guid AccountId { get; }
 

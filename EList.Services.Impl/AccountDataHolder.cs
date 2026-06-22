@@ -7,6 +7,7 @@ namespace EList.Services.Impl
     public class AccountDataHolder : IAccountDataHolder
     {
         public Guid Token { get; set; }
+        public string Jwt { get; set; }
         public Account Account { get; set; }
         public PersonInfo? PersonInfo { get; set; }
         public Guid AccountId => Account.Id;

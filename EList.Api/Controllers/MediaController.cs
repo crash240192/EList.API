@@ -8,6 +8,7 @@ using EList.Services.Impl;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using NLog;
 using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
@@ -296,8 +297,6 @@ namespace EList.Api.Controllers
             }
         }
 
-
-
         /// <summary>
         /// Получить список альбомов события
         /// </summary>
@@ -359,6 +358,73 @@ namespace EList.Api.Controllers
         //    }
         //}
 
+        /// <summary>
+        /// Удаление альбома
+        /// </summary>
+        /// <param name="albumId"></param>
+        /// <returns></returns>
+        [HttpDelete("albums/{id}")]
+        public async Task<CommandResult> DeleteAlbumAsync(Guid albumId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteAlbumAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _mediaService.DeleteAlbumAsync(albumId);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Удаление файла из альбома
+        /// </summary>
+        /// <param name="fileId"></param>
+        /// <param name="albumId"></param>
+        /// <returns></returns>
+        [HttpDelete("albums/file/{id}")]
+        public async Task<CommandResult> DeleteFileAsync(Guid fileId, Guid albumId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteAlbumAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _mediaService.DeleteFileAsync(fileId, albumId);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
         #region account avatars
         /// <summary>
         /// Добавление новой аватарки
@@ -378,7 +444,7 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _mediaService.SetNewAccountAvatarAsync(photoId);
-                
+
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 

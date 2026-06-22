@@ -16,6 +16,10 @@ namespace EList.Repositories.Interfaces
         Task<List<MediaAlbum>> GetAccountAlbumsAsync(Guid accountId);
         Task<List<MediaAlbum>> GetEventAlbumsAsync(Guid eventId);
         Task<PagedList<AlbumFile>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null);
+        Task<AlbumFile> GetFileAsync(Guid fileId, Guid albumId);
+        Task<List<Guid>> GetFilesNotExistsInAnotherAlbumsAsync(List<Guid> fileIds, Guid exceptAlbumId);
+        Task DeleteFilesAsync(List<Guid> fileIds);
+        Task DeleteAlbumAsync(Guid albumId);
 
         Task SetNewAccountAvatarAsync(Guid accountId, Guid fileId);
         Task<List<Guid>?> GetAccountAvatarsAsync(Guid accountId);

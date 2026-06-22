@@ -1,13 +1,17 @@
 ﻿using EList.Common.CorrelationId;
+using EList.Common.Extensions;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
+using EList.Common.Threading;
+using EList.FilestorageClient;
 using EList.Models.Accounts;
 using EList.Models.Events;
 using EList.Models.Media;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 
 namespace EList.Services.Impl
@@ -27,14 +31,15 @@ namespace EList.Services.Impl
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
         private readonly IEventsRepository _eventsRepository;
         private readonly IInvitationsRepository _invitationsRepository;
-
+        private readonly IFilestorageClient _filestorageClient;
         public MediaService(ICorrelationIdProvider correlationIdProvider,
             IMediaRepository mediaRepository,
             IAccountDataHolder accountDataHolder,
             IParticipationsRepository participationsRepository,
             IEventOrganizatorsRepository eventOrganizatorsRepository,
             IEventsRepository eventsRepository,
-            IInvitationsRepository invitationsRepository)
+            IInvitationsRepository invitationsRepository,
+            IFilestorageClient filestorageClient)
         {
             _correlationIdProvider = correlationIdProvider;
             _mediaRepository = mediaRepository;
@@ -43,6 +48,7 @@ namespace EList.Services.Impl
             _eventOrganizatorsRepository = eventOrganizatorsRepository;
             _eventsRepository = eventsRepository;
             _invitationsRepository = invitationsRepository;
+            _filestorageClient = filestorageClient;
         }
 
         public async Task<CommandResult<Guid?>> CreateAlbumAsync(EventAlbumRequest request)
@@ -207,6 +213,118 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<MediaAlbum>>(result);
         }
+
+        public async Task<CommandResult> DeleteAlbumAsync(Guid albumId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteAlbumAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var album = await _mediaRepository.GetAlbumAsync(albumId);
+
+            if (album == null)
+                return CommandResult.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
+
+            if (album.EventId != null)
+            {
+                var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(album.EventId.Value);
+                if (!organizators.Contains(_accountDataHolder.AccountId) && _accountDataHolder.AccountId != album.AccountId)
+                {
+                    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                    return CommandResult<List<MediaAlbum>>.Fail(ErrorCode.AccessError, "Удалить альбом может только организатор мероприятия");
+                }
+            }
+            else
+            {
+                if (_accountDataHolder.AccountId != album.AccountId)
+                {
+                    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                    return CommandResult<List<MediaAlbum>>.Fail(ErrorCode.AccessError, "Удалить альбом может только его владелец");
+                }
+            }
+
+            var files = await _mediaRepository.GetAlbumFilesAsync(albumId);
+
+            if (files.Result.NullSafeAny())
+            {
+                var fileIds = files.Result?.Select(i => i.Id).ToList();
+                var filesWithoutAlbums = await _mediaRepository.GetFilesNotExistsInAnotherAlbumsAsync(fileIds, albumId);
+
+                if (filesWithoutAlbums.NullSafeAny())
+                {
+                    var fileIdsConcurrentQueue = new ConcurrentQueue<Guid>(filesWithoutAlbums);
+
+                    var tasks = new List<Task>();
+                    for (int i = 0; i < 10; i++)
+                    {
+                        var task = Task.Run(async () =>
+                        {
+                            while (fileIdsConcurrentQueue.TryDequeue(out var curFileId))
+                            {
+                                await _filestorageClient.DeleteFileAsync(curFileId, _accountDataHolder.Token, _accountDataHolder.Jwt);
+                            }
+                        });
+                    }
+
+                    Task.WaitAll(tasks.ToArray());
+                }
+            }
+
+            await _mediaRepository.DeleteAlbumAsync(albumId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> DeleteFileAsync(Guid fileId, Guid albumId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteFileAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var file = await _mediaRepository.GetFileAsync(fileId, albumId);
+            if (file == null)
+            {
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return CommandResult.Fail(ErrorCode.AlbumItemNotFound, "Файл не найден");
+            }
+
+            var album = await _mediaRepository.GetAlbumAsync(albumId);
+            if (album == null)
+            {
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return CommandResult.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
+            }
+
+            if (album.EventId != null)
+            {
+                var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(album.EventId.Value);
+                if (!organizators.Contains(_accountDataHolder.AccountId) && _accountDataHolder.AccountId != album.AccountId)
+                {
+                    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                    return CommandResult<List<MediaAlbum>>.Fail(ErrorCode.AccessError, "Удалить альбом может только организатор мероприятия");
+                }
+            }
+            else
+            {
+                if (_accountDataHolder.AccountId != album.AccountId)
+                {
+                    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                    return CommandResult<List<MediaAlbum>>.Fail(ErrorCode.AccessError, "Удалить альбом может только его владелец");
+                }
+            }
+
+            var filesWithoutAlbums = await _mediaRepository.GetFilesNotExistsInAnotherAlbumsAsync(new List<Guid> { fileId }, albumId);
+
+            if (filesWithoutAlbums.NullSafeAny())
+                await _filestorageClient.DeleteFileAsync(filesWithoutAlbums.FirstOrDefault(), _accountDataHolder.Token, _accountDataHolder.Jwt);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
 
         public async Task<CommandResult<PagedList<AlbumFile>>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
         {

@@ -104,6 +104,7 @@ namespace EList.Api.Infrastructure
                 }
 
                 _accountDataHolder.Token = authorizationItem.Result.Token;
+                _accountDataHolder.Jwt = jwtHeader;
 
                 var account = await _accountsService.GetAccountByTokenAsync();
                 if (!account.Result.Active)

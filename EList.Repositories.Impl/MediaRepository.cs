@@ -78,6 +78,30 @@ namespace EList.Repositories.Impl
             return new PagedList<AlbumFile>(files.TotalCount, result, pageIndex ?? 1, pageSize ?? files.TotalCount);
         }
 
+        public async Task<AlbumFile> GetFileAsync(Guid fileId, Guid albumId)
+        {
+            var file = await _mediaDataProvider.GetFileAsync(fileId, albumId);
+            var result = _mapper.Map<AlbumFile>(file);
+            return result;
+        }
+
+        public async Task<List<Guid>> GetFilesNotExistsInAnotherAlbumsAsync(List<Guid> fileIds, Guid exceptAlbumId)
+        {
+            var result = await _mediaDataProvider.GetFilesNotExistsInAnotherAlbumsAsync(fileIds, exceptAlbumId);
+            return result;
+        }
+
+        public async Task DeleteFilesAsync(List<Guid> fileIds)
+        {
+            await _mediaDataProvider.DeleteFilesAsync(fileIds);
+        }
+
+        public async Task DeleteAlbumAsync(Guid albumId)
+        {
+            await _mediaDataProvider.DeleteAlbumAsync(albumId);
+        }
+
+
         #region account avatars
         public async Task SetNewAccountAvatarAsync(Guid accountId, Guid fileId)
         {

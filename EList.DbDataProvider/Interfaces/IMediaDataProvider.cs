@@ -14,6 +14,10 @@ namespace EList.DbDataProvider.Interfaces
         Task<List<MediaAlbumDto>> GetAccountAlbumsAsync(Guid accountId);
         Task<List<MediaAlbumDto>> GetEventAlbumsAsync(Guid eventId);
         Task<ListResponse<FileAlbumRelationDto>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null);
+        Task<FileAlbumRelationDto> GetFileAsync(Guid fileId, Guid albumId);
+        Task<List<Guid>> GetFilesNotExistsInAnotherAlbumsAsync(List<Guid> fileIds, Guid exceptAlbumId);
+        Task DeleteFilesAsync(List<Guid> fileIds);
+        Task DeleteAlbumAsync(Guid albumId);
 
         Task SetNewAccountAvatarAsync(Guid accountId, Guid fileId);
         Task<List<Guid>?> GetAccountAvatarsAsync(Guid accountId);
