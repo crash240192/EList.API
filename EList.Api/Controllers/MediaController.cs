@@ -363,8 +363,8 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="albumId"></param>
         /// <returns></returns>
-        [HttpDelete("albums/{id}")]
-        public async Task<CommandResult> DeleteAlbumAsync(Guid albumId)
+        [HttpDelete("albums/{albumId}")]
+        public async Task<CommandResult> DeleteAlbumAsync([FromRoute] Guid albumId)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -397,7 +397,7 @@ namespace EList.Api.Controllers
         /// <param name="fileId"></param>
         /// <param name="albumId"></param>
         /// <returns></returns>
-        [HttpDelete("albums/file/{id}")]
+        [HttpDelete("albums/file")]
         public async Task<CommandResult> DeleteFileAsync(Guid fileId, Guid albumId)
         {
             var correlationId = _correlationIdProvider.Get();

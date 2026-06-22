@@ -117,6 +117,8 @@ namespace EList.DbDataProvider.DataProviders
         {
             var result = await _connection.Albums
                 .LoadWith(i => i.Parameters)
+                .LoadWith(i => i.EventRelation)
+                .LoadWith(i => i.AccountRelation)
                 .FirstOrDefaultAsync(i => i.Id == id);
             return result;
         }
