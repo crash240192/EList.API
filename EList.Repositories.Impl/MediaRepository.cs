@@ -2,10 +2,9 @@
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
-using EList.Models.Accounts;
+using EList.Models.Events;
 using EList.Models.Media;
 using EList.Repositories.Interfaces;
-using Microsoft.Extensions.Logging;
 
 namespace EList.Repositories.Impl
 {
@@ -71,11 +70,23 @@ namespace EList.Repositories.Impl
             return result;
         }
 
-        public async Task<List<MediaAlbum>> GetEventsAlbumsAsync(List<Guid> eventIds, Guid accountId)
+        public async Task<PagedList<EventAlbumsContainer>> GetEventsAlbumsAsync(
+            Guid accountId, Guid curAccountId, int? pageIndex = null, int? pageSize = null)
         {
-            var items = await _mediaDataProvider.GetEventsAlbumsAsync(eventIds, accountId);
-            var result = _mapper.Map<List<MediaAlbum>>(items);
-            return result;
+            var items = await _mediaDataProvider.GetEventsAlbumsAsync(accountId, curAccountId, pageIndex, pageSize);
+
+            var containers = items.Items?.Select(g =>
+            {
+                var eventShort = _mapper.Map<EventShort>(g.Event);
+                eventShort.Colors = g.Event.Types?.Select(t => t.Type.EventCategory.Color)?.ToArray();
+                return new EventAlbumsContainer
+                {
+                    Event = eventShort,
+                    Albums = _mapper.Map<List<MediaAlbum>>(g.Albums)
+                };
+            }).ToList();
+
+            return new PagedList<EventAlbumsContainer>(items.TotalCount, containers, pageIndex, pageSize);
         }
 
         public async Task<PagedList<AlbumFile>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)

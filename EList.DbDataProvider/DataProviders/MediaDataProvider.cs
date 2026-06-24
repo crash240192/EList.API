@@ -133,75 +133,112 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
-        public async Task<List<MediaAlbumDto>> GetEventsAlbumsAsync(List<Guid> eventIds, Guid curAccountId)
+        public async Task<ListResponse<EventAlbumsGroupDto>> GetEventsAlbumsAsync(
+            Guid accountId, Guid curAccountId, int? pageIndex = null, int? pageSize = null)
         {
-            var eventsRequest = _connection.Events
-                .OrderBy(i => i.StartTime)
-                .LoadWith(i => i.Albums)
-                .ThenLoad(i => i.Album)
-                .Where(i =>
-                        i.Organizators.Any(p => p.AccountId == curAccountId)
-                        ||
-                        (
-                            i.Parameters.Private == true &&
-                                (
-                                    (i.WhiteList.Any(p => p.AccountId == curAccountId) || i.WhiteList.Count() == 0)
-                                    &&
-                                    (i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId) || i.Participants.Any(p => p.AccountId == curAccountId))
-                                )
+            var eventsQuery = _connection.Events
+                .Where(e => e.Organizators.Any(o => o.AccountId == accountId)
+                    || e.Participants.Any(p => p.AccountId == accountId))
+                .Where(e => e.Albums.Any(rel =>
+                    e.Organizators.Any(o => o.AccountId == curAccountId)
+                    || (
+                        e.Parameters.Private == true
+                        && (e.WhiteList.Any(w => w.AccountId == curAccountId) || !e.WhiteList.Any())
+                        && (
+                            e.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
+                            || e.Participants.Any(p => p.AccountId == curAccountId)
                         )
-                        ||
-                        (i.Parameters.Private != true
-                           && !i.BlackList.Any(p => p.AccountId == curAccountId)
-                           &&
-                            (
-                                i.Participants.Any(p => p.AccountId == curAccountId)
-                                || i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
-                                || i.Albums.Parameters.Private != true
-                            )
+                    )
+                    || (
+                        e.Parameters.Private != true
+                        && !e.BlackList.Any(b => b.AccountId == curAccountId)
+                        && (
+                            e.Participants.Any(p => p.AccountId == curAccountId)
+                            || e.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
+                            || rel.Album.Parameters == null
+                            || !rel.Album.Parameters.Private
                         )
-                    );
+                    )))
+                .OrderBy(e => e.StartTime);
 
-            var albumsRequest = _connection.Albums
-                .LoadWith(i => i.Parameters)
-                .LoadWith(i => i.EventRelation)
-                .ThenLoad(i => i.Event)
-                .ThenLoad(i => i.Parameters)
-                .Where(i =>
-                        i.EventRelation.Event.Organizators.Any(p => p.AccountId == curAccountId)
-                        ||
-                        (
-                            i.EventRelation.Event.Parameters.Private == true &&
-                                (
-                                    (i.EventRelation.Event.WhiteList.Any(p => p.AccountId == curAccountId) || i.EventRelation.Event.WhiteList.Count() == 0)
-                                    &&
-                                    (i.EventRelation.Event.Invitations.Any(inv => inv.InvitedAccountId == curAccountId) || i.EventRelation.Event.Participants.Any(p => p.AccountId == curAccountId))
-                                )
+            var totalCount = await eventsQuery.CountAsync();
+
+            var pageIdx = pageIndex ?? 0;
+            var pageSz = pageSize ?? totalCount;
+            if (pageSz <= 0)
+                pageSz = totalCount;
+
+            var pagedEventIds = await eventsQuery
+                .Select(e => e.Id)
+                .Skip(pageIdx * pageSz)
+                .Take(pageSz)
+                .ToListAsync();
+
+            if (!pagedEventIds.Any())
+                return new ListResponse<EventAlbumsGroupDto>(totalCount, new List<EventAlbumsGroupDto>());
+
+            var events = await _connection.Events
+                .LoadWith(e => e.Types).ThenLoad(t => t.Type).ThenLoad(ty => ty.EventCategory)
+                .Where(e => pagedEventIds.Contains(e.Id))
+                .OrderBy(e => e.StartTime)
+                .ToListAsync();
+
+            var relations = await (
+                from e in _connection.Events
+                where pagedEventIds.Contains(e.Id)
+                from rel in e.Albums
+                where
+                    e.Organizators.Any(o => o.AccountId == curAccountId)
+                    || (
+                        e.Parameters.Private == true
+                        && (e.WhiteList.Any(w => w.AccountId == curAccountId) || !e.WhiteList.Any())
+                        && (
+                            e.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
+                            || e.Participants.Any(p => p.AccountId == curAccountId)
                         )
-                        || 
-                        (i.EventRelation.Event.Parameters.Private != true 
-                           && !i.EventRelation.Event.BlackList.Any(p => p.AccountId == curAccountId)
-                           && 
-                            (
-                                i.EventRelation.Event.Participants.Any(p => p.AccountId == curAccountId)
-                                || i.EventRelation.Event.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
-                                || i.Parameters.Private != true
-                            )
+                    )
+                    || (
+                        e.Parameters.Private != true
+                        && !e.BlackList.Any(b => b.AccountId == curAccountId)
+                        && (
+                            e.Participants.Any(p => p.AccountId == curAccountId)
+                            || e.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
+                            || rel.Album.Parameters == null
+                            || !rel.Album.Parameters.Private
                         )
-                    ).AsEnumerable();
+                    )
+                select rel
+            ).ToListAsync();
 
-            var grouping = albumsRequest.GroupBy(i => i.EventRelation.Event)
-                .Select(i =>
-                new
-                {
-                    eventId = i.Key,
-                    albumsList = i.ToList()
-                });
+            if (!relations.Any())
+                return new ListResponse<EventAlbumsGroupDto>(totalCount, new List<EventAlbumsGroupDto>());
 
-            var result = grouping.ToList();
+            var albumIds = relations.Select(r => r.AlbumId).Distinct().ToList();
+            var albums = await _connection.Albums
+                .LoadWith(a => a.Parameters)
+                .Where(a => albumIds.Contains(a.Id))
+                .ToListAsync();
 
-            return null;
+            var relationByAlbumId = relations
+                .GroupBy(r => r.AlbumId)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            foreach (var album in albums)
+                album.EventRelation = relationByAlbumId[album.Id];
+
+            var albumsByEventId = albums
+                .GroupBy(a => a.EventRelation.EventId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var result = events.Select(e => new EventAlbumsGroupDto
+            {
+                Event = e,
+                Albums = albumsByEventId.GetValueOrDefault(e.Id) ?? new List<MediaAlbumDto>()
+            }).ToList();
+
+            return new ListResponse<EventAlbumsGroupDto>(totalCount, result);
         }
+
 
         public async Task<ListResponse<FileAlbumRelationDto>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
         {

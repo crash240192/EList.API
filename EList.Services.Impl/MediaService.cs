@@ -221,29 +221,7 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(GetEventsAlbumsAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var events = await _eventsRepository.SearchEventsShortAsync(new EventsSearchRequest
-            {
-                ParticipantId = accountId,
-                OrganizatorId = accountId,
-                PageIndex = pageIndex,
-                PageSize = pageSize
-            }, _accountDataHolder.AccountId);
-
-            if (events.Result.NullSafeAny() == false)
-            {
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return new CommandResult<PagedList<EventAlbumsContainer>>(null);
-            }
-
-            var eventIds = events.Result?.Select(i => i.Id).ToList();
-            var albums = await _mediaRepository.GetEventsAlbumsAsync(eventIds, _accountDataHolder.AccountId);
-
-            var result = new PagedList<EventAlbumsContainer>(events.Total, events.Result?.Select(i => new EventAlbumsContainer
-                {
-                    Event = i,
-                    Albums = albums?.Where(a => a.EventId == i.Id).ToList()
-                }).ToList(),
-            pageIndex, pageSize);
+            var result = await _mediaRepository.GetEventsAlbumsAsync(accountId, _accountDataHolder.AccountId, pageIndex, pageSize);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<EventAlbumsContainer>>(result);
