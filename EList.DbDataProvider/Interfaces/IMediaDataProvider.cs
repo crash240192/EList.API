@@ -13,6 +13,7 @@ namespace EList.DbDataProvider.Interfaces
         Task<MediaAlbumDto> GetAlbumAsync(Guid id);
         Task<List<MediaAlbumDto>> GetAccountAlbumsAsync(Guid accountId);
         Task<List<MediaAlbumDto>> GetEventAlbumsAsync(Guid eventId);
+        Task<List<MediaAlbumDto>> GetEventsAlbumsAsync(List<Guid> eventIds, Guid curAccountId);
         Task<ListResponse<FileAlbumRelationDto>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null);
         Task<FileAlbumRelationDto> GetFileAsync(Guid fileId, Guid albumId);
         Task<List<Guid>> GetFilesNotExistsInAnotherAlbumsAsync(List<Guid> fileIds, Guid exceptAlbumId);

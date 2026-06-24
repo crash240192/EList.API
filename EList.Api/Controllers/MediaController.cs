@@ -326,6 +326,34 @@ namespace EList.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Получить список альбомов по мероприятиям
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("albums/byEvents")]
+        public async Task<CommandResult<PagedList<EventAlbumsContainer>>> GetEventsAlbumsAsync(Guid accountId, int? pageIndex = null, int? pageSize = null)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventAlbumsAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _mediaService.GetEventsAlbumsAsync(accountId, pageIndex, pageSize);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
         //[HttpPost("albums/setParameters")]
         //public async Task<CommandResult> SetEventAlbumParameters(EventAlbumParameters request)
         //{

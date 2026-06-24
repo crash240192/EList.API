@@ -17,7 +17,7 @@ namespace EList.DbDataProvider.Models.SearchRequests
         public double? Price { get; set; }
         public Gender? AllowedGender { get; set; }
         public bool Active { get; set; } = true;
-        public int PageIndex { get; set; }
-        public int PageSize { get; set; }  
+        public int? PageIndex { get; set; }
+        public int? PageSize { get; set; }  
     }
 }

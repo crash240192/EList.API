@@ -214,6 +214,42 @@ namespace EList.Services.Impl
             return new CommandResult<List<MediaAlbum>>(result);
         }
 
+        public async Task<CommandResult<PagedList<EventAlbumsContainer>>> GetEventsAlbumsAsync(Guid accountId, int? pageIndex = null, int? pageSize = null)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventsAlbumsAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var events = await _eventsRepository.SearchEventsShortAsync(new EventsSearchRequest
+            {
+                ParticipantId = accountId,
+                OrganizatorId = accountId,
+                PageIndex = pageIndex,
+                PageSize = pageSize
+            }, _accountDataHolder.AccountId);
+
+            if (events.Result.NullSafeAny() == false)
+            {
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return new CommandResult<PagedList<EventAlbumsContainer>>(null);
+            }
+
+            var eventIds = events.Result?.Select(i => i.Id).ToList();
+            var albums = await _mediaRepository.GetEventsAlbumsAsync(eventIds, _accountDataHolder.AccountId);
+
+            var result = new PagedList<EventAlbumsContainer>(events.Total, events.Result?.Select(i => new EventAlbumsContainer
+                {
+                    Event = i,
+                    Albums = albums?.Where(a => a.EventId == i.Id).ToList()
+                }).ToList(),
+            pageIndex, pageSize);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<PagedList<EventAlbumsContainer>>(result);
+        }
+
+
         public async Task<CommandResult> DeleteAlbumAsync(Guid albumId)
         {
             var correlationId = _correlationIdProvider.Get();

@@ -71,6 +71,13 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task<List<MediaAlbum>> GetEventsAlbumsAsync(List<Guid> eventIds, Guid accountId)
+        {
+            var items = await _mediaDataProvider.GetEventsAlbumsAsync(eventIds, accountId);
+            var result = _mapper.Map<List<MediaAlbum>>(items);
+            return result;
+        }
+
         public async Task<PagedList<AlbumFile>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
         {
             var files = await _mediaDataProvider.GetAlbumFilesAsync(albumId, pageIndex, pageSize);

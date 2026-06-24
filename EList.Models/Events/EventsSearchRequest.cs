@@ -78,11 +78,16 @@ namespace EList.Models.Events
         /// <summary>
         /// Номер страницы
         /// </summary>
-        public int PageIndex { get; set; } = 0;
+        public int? PageIndex { get; set; } = 0;
 
         /// <summary>
         /// Размер страницы
         /// </summary>
-        public int PageSize { get; set; } = 20;
+        public int? PageSize { get; set; } = 20;
+
+        /// <summary>
+        /// Порядок сортировки
+        /// </summary>
+        public string OrderBy { get; set; }
     }
 }

@@ -140,22 +140,6 @@ namespace EList.DbDataProvider.DataProviders
                         )
                         || (i.Parameters.Private != true && (!i.BlackList.Any(p => p.AccountId == curAccountId)))
                         || i.Organizators.Any(o => o.AccountId == curAccountId));
-
-            //отображение с учетом белых и черных списков
-            if (curAccountId != null)
-            {
-
-                //eventsRequest = eventsRequest
-                //    .LoadWith(i => i.BlackList)
-                //    .LoadWith(i => i.WhiteList)
-                //    .Where(i => (i.Parameters.Private != true 
-                //                    && (!i.BlackList.Any(p => p.AccountId == curAccountId) 
-                //                        || i.Organizators.Any(o => o.AccountId == curAccountId)))
-                //                ||
-                //                (i.Parameters.Private == true 
-                //                    && (i.WhiteList.Any(p => p.AccountId == curAccountId)
-                //                        || i.Organizators.Any(o => o.AccountId == curAccountId))));
-            }
             #endregion
 
             #region eventTypes
@@ -197,7 +181,7 @@ namespace EList.DbDataProvider.DataProviders
 
             var totalCount = await eventsRequest.CountAsync();
 
-            var resultList = await eventsRequest.ToPagedQuery(request.PageIndex, request.PageSize).ToListAsync();
+            var resultList = await eventsRequest.ToPagedQuery(request.PageIndex ?? 0, request.PageSize ?? totalCount).ToListAsync();
 
             return new ListResponse<EventDto>(totalCount, resultList);
         }

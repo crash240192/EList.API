@@ -15,6 +15,7 @@ namespace EList.Repositories.Interfaces
         Task<MediaAlbum> GetAlbumAsync(Guid id);
         Task<List<MediaAlbum>> GetAccountAlbumsAsync(Guid accountId);
         Task<List<MediaAlbum>> GetEventAlbumsAsync(Guid eventId);
+        Task<List<MediaAlbum>> GetEventsAlbumsAsync(List<Guid> eventId, Guid accountId);
         Task<PagedList<AlbumFile>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null);
         Task<AlbumFile> GetFileAsync(Guid fileId, Guid albumId);
         Task<List<Guid>> GetFilesNotExistsInAnotherAlbumsAsync(List<Guid> fileIds, Guid exceptAlbumId);

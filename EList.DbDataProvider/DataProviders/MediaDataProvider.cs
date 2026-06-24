@@ -133,6 +133,45 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<List<MediaAlbumDto>> GetEventsAlbumsAsync(List<Guid> eventIds, Guid curAccountId)
+        {
+            var albums = await _connection.Albums
+                .LoadWith(i => i.Parameters)
+                .LoadWith(i => i.EventRelation)
+                .LoadWith(i => i.EventRelation.Event.Parameters)
+                .LoadWith(i => i.EventRelation.Event.Participants)
+                .LoadWith(i => i.EventRelation.Event.Organizators)
+                .LoadWith(i => i.EventRelation.Event.Invitations)
+                .LoadWith(i => i.EventRelation.Event.WhiteList)
+                .LoadWith(i => i.EventRelation.Event.BlackList)
+                .Where(i => i.EventRelation.EventId.In(eventIds))
+                .Where(i =>
+                        i.EventRelation.Event.Organizators.Any(p => p.AccountId == curAccountId)
+                        ||
+                        (
+                            i.EventRelation.Event.Parameters.Private == true &&
+                                (
+                                    (i.EventRelation.Event.WhiteList.Any(p => p.AccountId == curAccountId) || i.EventRelation.Event.WhiteList.Count() == 0)
+                                    &&
+                                    (i.EventRelation.Event.Invitations.Any(inv => inv.InvitedAccountId == curAccountId) || i.EventRelation.Event.Participants.Any(p => p.AccountId == curAccountId))
+                                )
+                        )
+                        || 
+                        (i.EventRelation.Event.Parameters.Private != true 
+                           && !i.EventRelation.Event.BlackList.Any(p => p.AccountId == curAccountId)
+                           && 
+                            (
+                                i.EventRelation.Event.Participants.Any(p => p.AccountId == curAccountId)
+                                || i.EventRelation.Event.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
+                                || i.Parameters.Private != true
+                            )
+                        )
+                    )
+                .ToListAsync();
+
+            return albums;
+        }
+
         public async Task<ListResponse<FileAlbumRelationDto>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
         {
             var request = _connection.AlbumFiles.Where(i => i.AlbumId == albumId);
@@ -178,6 +217,15 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task DeleteAlbumAsync(Guid albumId)
         {
+            await _connection.AccountAlbums.Where(i => i.AlbumId == albumId)
+                .DeleteAsync();
+
+            await _connection.EventAlbums.Where(i => i.AlbumId == albumId)
+                .DeleteAsync();
+
+            await _connection.EventAlbumParameters.Where(i => i.AlbumId == albumId)
+                .DeleteAsync();
+
             await _connection.AlbumFiles.Where(i => i.AlbumId == albumId)
                 .DeleteAsync();
 
