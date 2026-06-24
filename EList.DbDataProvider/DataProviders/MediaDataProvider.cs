@@ -135,16 +135,38 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<List<MediaAlbumDto>> GetEventsAlbumsAsync(List<Guid> eventIds, Guid curAccountId)
         {
-            var albums = await _connection.Albums
+            var eventsRequest = _connection.Events
+                .OrderBy(i => i.StartTime)
+                .LoadWith(i => i.Albums)
+                .ThenLoad(i => i.Album)
+                .Where(i =>
+                        i.Organizators.Any(p => p.AccountId == curAccountId)
+                        ||
+                        (
+                            i.Parameters.Private == true &&
+                                (
+                                    (i.WhiteList.Any(p => p.AccountId == curAccountId) || i.WhiteList.Count() == 0)
+                                    &&
+                                    (i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId) || i.Participants.Any(p => p.AccountId == curAccountId))
+                                )
+                        )
+                        ||
+                        (i.Parameters.Private != true
+                           && !i.BlackList.Any(p => p.AccountId == curAccountId)
+                           &&
+                            (
+                                i.Participants.Any(p => p.AccountId == curAccountId)
+                                || i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
+                                || i.Albums.Parameters.Private != true
+                            )
+                        )
+                    );
+
+            var albumsRequest = _connection.Albums
                 .LoadWith(i => i.Parameters)
                 .LoadWith(i => i.EventRelation)
-                .LoadWith(i => i.EventRelation.Event.Parameters)
-                .LoadWith(i => i.EventRelation.Event.Participants)
-                .LoadWith(i => i.EventRelation.Event.Organizators)
-                .LoadWith(i => i.EventRelation.Event.Invitations)
-                .LoadWith(i => i.EventRelation.Event.WhiteList)
-                .LoadWith(i => i.EventRelation.Event.BlackList)
-                .Where(i => i.EventRelation.EventId.In(eventIds))
+                .ThenLoad(i => i.Event)
+                .ThenLoad(i => i.Parameters)
                 .Where(i =>
                         i.EventRelation.Event.Organizators.Any(p => p.AccountId == curAccountId)
                         ||
@@ -166,10 +188,19 @@ namespace EList.DbDataProvider.DataProviders
                                 || i.Parameters.Private != true
                             )
                         )
-                    )
-                .ToListAsync();
+                    ).AsEnumerable();
 
-            return albums;
+            var grouping = albumsRequest.GroupBy(i => i.EventRelation.Event)
+                .Select(i =>
+                new
+                {
+                    eventId = i.Key,
+                    albumsList = i.ToList()
+                });
+
+            var result = grouping.ToList();
+
+            return null;
         }
 
         public async Task<ListResponse<FileAlbumRelationDto>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)

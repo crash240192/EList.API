@@ -89,5 +89,10 @@ namespace EList.Models.Events
         /// Порядок сортировки
         /// </summary>
         public string OrderBy { get; set; }
+
+        /// <summary>
+        /// Поиск только мероприятий с привязанными альбомами
+        /// </summary>
+        public bool OnlyWithAlbums { get; set; } = false;
     }
 }

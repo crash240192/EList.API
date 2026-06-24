@@ -73,6 +73,12 @@ namespace EList.DbDataProvider.DataProviders
                 .AsQueryable();
             //.Where(i => request.LocationRange != null ? ;
 
+            //if (request.OnlyWithAlbums)
+            //{
+            //    eventsRequest = eventsRequest
+            //        .LoadWith(i => i.Albums)
+            //}
+
             #region location
             /*
             //Вариант поиска по кругу, но использует подзапрос.
