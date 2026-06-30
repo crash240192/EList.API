@@ -24,6 +24,42 @@ namespace EList.Api.Infrastructure
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IPersonsService _personsService;
 
+        private bool IsAnonymousMethod => AnonymousMethods.Contains(Request.Path.ToString().ToLower())
+                    || AnonymousMethods.Where(i => i.Last() == '*').Any(i => Request.Path.ToString().ToLower().Contains(i.Remove(i.Length - 1)));
+
+        private List<string> AnonymousMethods = new List<string>
+        {
+            "/api/contacts/contacttypes/get/*",
+            "/api/contacts/contacttypes/getall",
+            
+            "/api/conversations/get/*",
+            "/api/conversations/byevent/*",
+            "/api/conversations/messages/byconversationid/*",
+            "/api/conversations/messages/replies/*",
+
+            "/api/eventorganizators/getbyeventid/*",
+
+            "/api/events/eventcategories/get/*",
+            "/api/events/eventcategories/getall",
+            "/api/events/eventtypes/get/*",
+            "/api/events/eventtypes/bycategoryid/*",
+            "/api/events/eventtypes/getAll",
+            "/api/events/eventParameters/byEvent/*",
+            "/api/events/get/*",
+            "/api/events/search",
+            "/api/events/search/short",
+
+            "/api/media/albums/get/*",
+            "/api/media/albums/byAccount/*",
+            "/api/media/albums/{albumId}/files", // TODO: вопросики???
+            "/api/media/albums/byEvent/*",
+            "/api/media/albums/byEvents",
+            "/api/media/account/avatars/{accountId}",
+            "/api/media/account/avatar/{accountId}",
+            "/api/media/organization/avatars/{organizationId}",
+            "/api/media/organization/avatar/{organizationId}",
+        };
+
         /// <summary>
         /// Инициализация хендлера
         /// </summary>

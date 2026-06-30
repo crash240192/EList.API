@@ -142,7 +142,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
-        [HttpGet("eventCategories/{id}")]
+        [HttpGet("eventCategories/get/{id}")]
         public async Task<CommandResult<EventCategory?>> GetEventCategoryAsync(Guid id)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -296,7 +296,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
-        [HttpGet("eventTypes/{id}")]
+        [HttpGet("eventTypes/get/{id}")]
         public async Task<CommandResult<EventType?>> GetEventTypeAsync(Guid id)
         {
             var correlationId = _correlationIdProvider.Get();

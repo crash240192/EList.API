@@ -242,7 +242,7 @@ namespace EList.Api.Controllers
         /// <param name="pageIndex"></param>
         /// <param name="pageSize"></param>
         /// <returns></returns>
-        [HttpGet("messages/{conversationId}")]
+        [HttpGet("messages/byConversationId/{conversationId}")]
         public async Task<CommandResult<PagedList<Message>>> GetConversationMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize)
         {
             var correlationId = _correlationIdProvider.Get();

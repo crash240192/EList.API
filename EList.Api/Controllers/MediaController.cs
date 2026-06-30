@@ -180,7 +180,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
-        [HttpGet("albums/{id}")]
+        [HttpGet("albums/get/{id}")]
         public async Task<CommandResult<MediaAlbum>> GetAlbumAsync(Guid id)
         {
             var correlationId = _correlationIdProvider.Get();
