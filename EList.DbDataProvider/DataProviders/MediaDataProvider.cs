@@ -116,6 +116,7 @@ namespace EList.DbDataProvider.DataProviders
         public async Task<MediaAlbumDto> GetAlbumAsync(Guid id)
         {
             var result = await _connection.Albums
+                .LoadWith(i => i.EventRelation)
                 .LoadWith(i => i.Parameters)
                 .LoadWith(i => i.EventRelation)
                 .LoadWith(i => i.AccountRelation)
