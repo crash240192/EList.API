@@ -77,7 +77,9 @@ namespace EList.AutoMapperProfile
 
             CreateMap<EventAlbumParameters, EventAlbumParametersDto>().ReverseMap();
             CreateMap<EventAlbumRequest, AlbumRequest>().ReverseMap();
-            CreateMap<MediaAlbumDto, MediaAlbum>().ReverseMap();
+            CreateMap<MediaAlbum, MediaAlbumDto>();
+            CreateMap<MediaAlbumDto, MediaAlbum>()
+                .ForMember(dest => dest.EventId, opt =>opt.MapFrom(src => src.EventRelation.EventId));
             CreateMap<FileAlbumRelationDto, AlbumFile>().ReverseMap();
 
             CreateMap<TariffDto, Tariff>().ReverseMap();

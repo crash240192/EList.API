@@ -118,15 +118,44 @@ namespace EList.Services.Impl
             if (!request.FileIds?.Any() ?? true)
                 return CommandResult.Fail(ErrorCode.AlbumNotFound, $"Перечень файлов не должен быть пустым");
 
-            if (album.EventId != null && (album.Parameters?.ParticipantsReadonly ?? false))
+            if (album.EventId != null)
             {
                 var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(album.EventId.Value);
-
                 if (!organizators.Contains(_accountDataHolder.AccountId))
-                    return CommandResult.Fail(ErrorCode.AddPhotosNotAllowed, "Организатор запретил добавление фотографий в этот альбом");
+                {
+                    var eventItem = await _eventsRepository.GetEventAsync(album.EventId.Value);
+                    var participants = await _participationsRepository.GetEventParticipantIdsAsync(album.EventId.Value);
+                    var invitedUsers = await _invitationsRepository.GetInvitedUsersAsync(album.EventId.Value);
+
+                    if (eventItem?.Parameters?.Private ?? false)
+                    {
+                        if (!participants.Contains(_accountDataHolder.AccountId) && !invitedUsers.Contains(_accountDataHolder.AccountId))
+                        {
+                            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                            return CommandResult<PagedList<AlbumFile>>.Fail(ErrorCode.AccessError, "Альбом доступен только участникам мероприятия");
+                        }
+                    }
+                    else
+                    {
+                        if (album.Parameters?.Private ?? false)
+                        {
+                            if (!participants.Contains(_accountDataHolder.AccountId) && !invitedUsers.Contains(_accountDataHolder.AccountId))
+                            {
+                                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                                return CommandResult<PagedList<AlbumFile>>.Fail(ErrorCode.AccessError, "Альбом доступен для просмотра только участникам мероприятия");
+                            }
+                        }
+                    }
+
+                    if (album.Parameters?.ParticipantsReadonly ?? false)
+                    {
+                        logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                        return CommandResult.Fail(ErrorCode.AddPhotosNotAllowed, "Организатор запретил добавление фотографий в этот альбом");
+                    }
+                }
             }
 
-            //TODO: Добавить проверку доступа для добавления файлов в альбом
+            //TODO: Добавить проверку доступа для добавления файлов в альбом без привязки к мероприятию
 
             await _mediaRepository.AddFilesToAlbumAsync(request.AlbumId, request.FileIds);
 
@@ -200,7 +229,7 @@ namespace EList.Services.Impl
             {
                 if (!participants.Contains(_accountDataHolder.AccountId) && !invitedUsers.Contains(_accountDataHolder.AccountId))
                 {
-                    result = result?.Where(i => i.Parameters?.Private ?? false)?.ToList();
+                    result = result?.Where(i => !i.Parameters?.Private ?? true)?.ToList();
                 }
             }
 
@@ -219,13 +248,13 @@ namespace EList.Services.Impl
 
             if (album.EventId != null)
             {
-                var eventItem = await _eventsRepository.GetEventAsync(album.EventId.Value);
-                var participants = await _participationsRepository.GetEventParticipantIdsAsync(album.EventId.Value);
-                var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(album.EventId.Value);
-                var invitedUsers = await _invitationsRepository.GetInvitedUsersAsync(album.EventId.Value);
-
+                var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(album.EventId.Value);                
                 if (!organizators.Contains(_accountDataHolder.AccountId))
                 {
+                    var eventItem = await _eventsRepository.GetEventAsync(album.EventId.Value);
+                    var participants = await _participationsRepository.GetEventParticipantIdsAsync(album.EventId.Value);
+                    var invitedUsers = await _invitationsRepository.GetInvitedUsersAsync(album.EventId.Value);
+
                     if (eventItem?.Parameters?.Private ?? false)
                     {
                         if (!participants.Contains(_accountDataHolder.AccountId) && !invitedUsers.Contains(_accountDataHolder.AccountId))
