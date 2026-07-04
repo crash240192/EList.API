@@ -617,8 +617,6 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var token = this.GetToken();
-
                 var result = await _eventsService.GetEventAsync(id);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
