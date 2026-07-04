@@ -134,7 +134,7 @@ namespace EList.Services.Impl
             }
             #endregion
 
-            await _invitationsRepository.CreateInvitationsAsync(request, _accountDataHolder.AccountId);
+            await _invitationsRepository.CreateInvitationsAsync(request, _accountDataHolder.AccountId.Value);
 
             await _notificationsService.NotifyUsersInvitedAsync(request.EventId, request.AccountIds);
 
@@ -167,12 +167,12 @@ namespace EList.Services.Impl
 
             if (curEvent.Parameters.Private ?? false)
             {
-                if (!await _participantsBWListRepository.IsUserInWhiteListAsync(curEvent.Id, _accountDataHolder.AccountId))
+                if (!await _participantsBWListRepository.IsUserInWhiteListAsync(curEvent.Id, _accountDataHolder.AccountId.Value))
                     return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
             }
             else
             {
-                if (await _participantsBWListRepository.IsUserInBlackListAsync(curEvent.Id, _accountDataHolder.AccountId))
+                if (await _participantsBWListRepository.IsUserInBlackListAsync(curEvent.Id, _accountDataHolder.AccountId.Value))
                     return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
             }
 
@@ -186,7 +186,7 @@ namespace EList.Services.Impl
             if (invitation.InvitedAccountId != _accountDataHolder.AccountId)
                 return CommandResult.Fail(ErrorCode.AccessError, $"У текущего пользователя нет доступа для взаимодействия с этим приглашением");
 
-            await _participationsRepository.ParticipateAsync(_accountDataHolder.AccountId, invitation.EventId);
+            await _participationsRepository.ParticipateAsync(_accountDataHolder.AccountId.Value, invitation.EventId);
 
             await _invitationsRepository.DeleteInvitationAsync(invitationId);
 
@@ -255,7 +255,7 @@ namespace EList.Services.Impl
 
             var invitations = await _invitationsRepository.SearchInvitationsAsync(new InvitationsSearchRequest
             {
-                InvitedAccountIds = new List<Guid> { _accountDataHolder.AccountId },
+                InvitedAccountIds = new List<Guid> { _accountDataHolder.AccountId.Value },
                 PageIndex = pageIndex,
                 PageSize = pageSize,
             });
@@ -286,7 +286,7 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var notViewedInvitationsCount = await _invitationsRepository.GetNotViewedInvitationsCountAsync(_accountDataHolder.AccountId);
+            var notViewedInvitationsCount = await _invitationsRepository.GetNotViewedInvitationsCountAsync(_accountDataHolder.AccountId.Value);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<int>(notViewedInvitationsCount);
@@ -321,7 +321,7 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            await _invitationsRepository.ViewAllInvitationsAsync(_accountDataHolder.AccountId);
+            await _invitationsRepository.ViewAllInvitationsAsync(_accountDataHolder.AccountId.Value);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

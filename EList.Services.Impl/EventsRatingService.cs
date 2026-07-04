@@ -108,7 +108,7 @@ namespace EList.Services.Impl
             else
                 request.RatingType = EventRatingType.Summary;
 
-            request.AccountId = _accountDataHolder.AccountId;
+            request.AccountId = _accountDataHolder.AccountId.Value;
             var eventRating = await _eventsRatingRepository.CreateEventRatingAsync(request);
 
             var organizators = (await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(request.EventId))

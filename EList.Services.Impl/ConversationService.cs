@@ -117,7 +117,7 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var result = await _conversationsRepository.GetAccountConversationsAsync(_accountDataHolder.AccountId, personalOnly);
+            var result = await _conversationsRepository.GetAccountConversationsAsync(_accountDataHolder.AccountId.Value, personalOnly);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<Conversation>>(result);

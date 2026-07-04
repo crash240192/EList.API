@@ -5,11 +5,11 @@ namespace EList.Services.Interfaces
 {
     public interface IAccountDataHolder
     {
-        Guid Token { get; set; }
-        Account Account { get; set; }
+        Guid? Token { get; set; }
+        Account? Account { get; set; }
         string Jwt { get; set; }
         PersonInfo? PersonInfo { get; set; }
-        Guid AccountId { get; }
+        Guid? AccountId { get; }
 
         string AccountNameFullString { get; }
     }

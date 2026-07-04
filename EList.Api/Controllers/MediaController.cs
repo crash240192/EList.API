@@ -240,7 +240,7 @@ namespace EList.Api.Controllers
         /// <param name="pageIndex"></param>
         /// <param name="pageSize"></param>
         /// <returns></returns>
-        [HttpGet("albums/{albumId}/files")]
+        [HttpGet("albums/filesByAlbumId/{albumId}")]
         public async Task<CommandResult<PagedList<AlbumFile>>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -492,7 +492,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="accountId"></param>
         /// <returns></returns>
-        [HttpGet("account/avatars/{accountId}")]
+        [HttpGet("account/avatars/getByAccountId/{accountId}")]
         public async Task<CommandResult<List<Guid>?>> GetAccountAvatarsAsync(Guid accountId)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -519,7 +519,7 @@ namespace EList.Api.Controllers
         /// Получение списка аватарок пользователя
         /// </summary>
         /// <returns></returns>
-        [HttpGet("account/avatars")]
+        [HttpGet("account/avatars/get")]
         public async Task<CommandResult<List<Guid>?>> GetCurAccountAvatarsAsync()
         {
             var correlationId = _correlationIdProvider.Get();
@@ -547,7 +547,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="accountId"></param>
         /// <returns></returns>
-        [HttpGet("account/avatar/{accountId}")]
+        [HttpGet("account/avatar/getByAccountId/{accountId}")]
         public async Task<CommandResult<Guid?>> GetAccountAvatarAsync(Guid accountId)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -574,7 +574,7 @@ namespace EList.Api.Controllers
         /// Получение последней аватарки пользователя
         /// </summary>
         /// <returns></returns>
-        [HttpGet("account/avatar")]
+        [HttpGet("account/avatar/get")]
         public async Task<CommandResult<Guid?>> GetCurAccountAvatarAsync()
         {
             var correlationId = _correlationIdProvider.Get();
@@ -639,7 +639,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="organizationId"></param>
         /// <returns></returns>
-        [HttpGet("organization/avatars/{organizationId}")]
+        [HttpGet("organization/avatars/getByOrganizationId/{organizationId}")]
         public async Task<CommandResult<List<Guid>?>> GetOrganizationAvatarsAsync(Guid organizationId)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -667,7 +667,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="organizationId"></param>
         /// <returns></returns>
-        [HttpGet("organization/avatar/{organizationId}")]
+        [HttpGet("organization/avatar/getByOrganizationId/{organizationId}")]
         public async Task<CommandResult<Guid?>> GetOrganizationAvatarAsync(Guid organizationId)
         {
             var correlationId = _correlationIdProvider.Get();

@@ -130,7 +130,7 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var authorizationInfo = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
+            var authorizationInfo = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
 
             var result = await _accountsRepository.GetAccountAsync(authorizationInfo.AccountId);
             //if (result != null)
@@ -148,9 +148,9 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var authData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
+            var authData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
 
-            await _accountsRepository.UpdateLocationAsync(_accountDataHolder.AccountId, latitude, longitude);
+            await _accountsRepository.UpdateLocationAsync(_accountDataHolder.AccountId.Value, latitude, longitude);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -164,7 +164,7 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var authData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
+            var authData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
             var account = await _accountsRepository.GetAccountAsync(authData.AccountId);
 
             await _accountsRepository.UpdateLoginAsync(account.Id, newLogin);
@@ -183,7 +183,7 @@ namespace EList.Services.Impl
 
             var oldPasswordHash = _encryptionTool.CalculateStringHash(request.OldPassword);
 
-            var authData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
+            var authData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
             if (authData == null)
                 return CommandResult.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
 
@@ -204,7 +204,7 @@ namespace EList.Services.Impl
 
             await _authorizationRepository.DeactivateAccountTokensAsync(account.Id);
 
-            await _authorizationRepository.ActivateTokenAsync(_accountDataHolder.Token);
+            await _authorizationRepository.ActivateTokenAsync(_accountDataHolder.Token.Value);
 
             await _notificationsService.NotifyUserByContactAsync(SystemNotificationType.PasswordHasBeenChanged);
 

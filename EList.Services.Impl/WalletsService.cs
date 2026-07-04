@@ -165,12 +165,12 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var account = await _accountsRepository.GetAccountAsync(accountId ?? _accountDataHolder.AccountId);
+            var account = await _accountsRepository.GetAccountAsync(accountId ?? _accountDataHolder.AccountId.Value);
 
             if (account.WalletId == null)
             {
                 var result = await _walletsRepository.CreateWalletAsync();
-                await _accountsRepository.SetAccountWalletAsync(_accountDataHolder.AccountId, result);
+                await _accountsRepository.SetAccountWalletAsync(_accountDataHolder.AccountId.Value, result);
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return new CommandResult<Guid?>(result);
             }
@@ -271,6 +271,9 @@ namespace EList.Services.Impl
             var result = await _walletsRepository.GetAccountWalletAsync(accountId);
             if (result == null)
                 return CommandResult<Wallet?>.Fail(ErrorCode.WalletNotFound, $"Кошелёк для аккаунта с id='{accountId}' не найден");
+
+            if (accountId != _accountDataHolder.AccountId)
+                return CommandResult<Wallet?>.Fail(ErrorCode.AccessError, $"Это чужой кошелёк, нечего сюда смотреть");
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Wallet?>(result);

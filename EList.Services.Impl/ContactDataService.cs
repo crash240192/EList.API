@@ -115,7 +115,7 @@ namespace EList.Services.Impl
 
             var result = await _contactDataRepository.CreateContactAsync(request);
 
-            await _contactDataRepository.BindAccountAndContactAsync(_accountDataHolder.AccountId, result);
+            await _contactDataRepository.BindAccountAndContactAsync(_accountDataHolder.AccountId.Value, result);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(result);
@@ -193,11 +193,11 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var account = await _accountsRepository.GetAccountAsync(_accountDataHolder.AccountId);
+            var account = await _accountsRepository.GetAccountAsync(_accountDataHolder.AccountId.Value);
             if (account == null)
                 return CommandResult<ContactDataItem>.Fail(ErrorCode.AccountNotFound, $"Аккаунт с id='{_accountDataHolder.AccountId}' не найден");
 
-            var contact = await _contactDataRepository.GetAuthorizationContactAsync(_accountDataHolder.AccountId);
+            var contact = await _contactDataRepository.GetAuthorizationContactAsync(_accountDataHolder.AccountId.Value);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<ContactDataItem>(contact);
@@ -215,7 +215,7 @@ namespace EList.Services.Impl
             //if (!validationResult.Success)
             //    return CommandResult<Guid>.Fail(validationResult.ErrorCode, validationResult.Message);
 
-            var contacts = await _contactDataRepository.GetAccountContactsAsync(_accountDataHolder.AccountId);
+            var contacts = await _contactDataRepository.GetAccountContactsAsync(_accountDataHolder.AccountId.Value);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<ContactDataItem>?>(contacts);

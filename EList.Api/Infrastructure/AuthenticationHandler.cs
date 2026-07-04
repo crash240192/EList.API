@@ -1,4 +1,5 @@
 ﻿using EList.Common.Encryption;
+using EList.Models.Subscriptions;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
@@ -51,13 +52,25 @@ namespace EList.Api.Infrastructure
 
             "/api/media/albums/get/*",
             "/api/media/albums/byAccount/*",
-            "/api/media/albums/{albumId}/files", // TODO: вопросики???
-            "/api/media/albums/byEvent/*",
-            "/api/media/albums/byEvents",
-            "/api/media/account/avatars/{accountId}",
-            "/api/media/account/avatar/{accountId}",
-            "/api/media/organization/avatars/{organizationId}",
-            "/api/media/organization/avatar/{organizationId}",
+            "/api/media/albums/filesbyalbumid/*", 
+            "/api/media/albums/byevent/*",
+            "/api/media/albums/byevents",
+            "/api/media/account/avatars/get*",
+            "/api/media/account/avatar/get*",
+            "/api/media/organization/avatars/get*",
+            "/api/media/organization/avatar/get*",
+
+            "/api/participations/eventparticipants",
+            "/api/participations/blacklist/get/*",
+            "/api/participations/whitelist/get/*",
+
+            "/api/persons/get*",
+            
+            "/api/rating/events/getrating",
+            "/api/rating/organizators/*",
+
+            "/api/subscriptions/getSubscriptions*",
+            "/api/subscriptions/getSubscribers*",
         };
 
         /// <summary>
@@ -93,6 +106,16 @@ namespace EList.Api.Infrastructure
             try
             {
                 logger.Debug("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Get Authorization header");
+
+                if (IsAnonymousMethod)
+                {
+                    var anonymousClaims = new Claim[0];
+                    var anonymousIdentity = new ClaimsIdentity(anonymousClaims, Scheme.Name);
+                    var anonymousPrincipal = new ClaimsPrincipal(anonymousIdentity);
+                    var anonymousTticket = new AuthenticationTicket(anonymousPrincipal, Scheme.Name);
+                    return AuthenticateResult.Success(anonymousTticket);
+                }
+
                 var tokenHeader = Request.Headers.ContainsKey("Authorization") ? Request.Headers["Authorization"] : StringValues.Empty;
                 var jwtHeader = Request.Headers.ContainsKey("Authorization-jwt") ? Request.Headers["Authorization-jwt"] : StringValues.Empty;
 

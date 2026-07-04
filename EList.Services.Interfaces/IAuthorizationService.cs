@@ -10,6 +10,8 @@ namespace EList.Services.Interfaces
         Task<CommandResult<string>> SendActivationCodeAsync();
         Task<CommandResult<Authorization?>> GetAuthorizationDataAsync(Guid token);
         Task<CommandResult<Authorization?>> GetAuthorizationDataAsync(string clientHash);
+        
+        [Obsolete]
         Task<CommandResult<Guid>> CreateTokenAsync(string clientHash);
 
         Task<CommandResult> ActivateTokenAsync(string activationKey, string clientHash);

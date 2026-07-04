@@ -57,12 +57,12 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var isSubscribed = await _subscriptionsRepository.IsSubscriptionExistAsync(_accountDataHolder.AccountId, subscribeToId);
+            var isSubscribed = await _subscriptionsRepository.IsSubscriptionExistAsync(_accountDataHolder.AccountId.Value, subscribeToId);
 
             if (isSubscribed)
                 return CommandResult.Fail(ErrorCode.SubscriptionAlreadyExists, "Подписка уже существует");
 
-            await _subscriptionsRepository.SubscribeToAccountAsync(_accountDataHolder.AccountId, subscribeToId);
+            await _subscriptionsRepository.SubscribeToAccountAsync(_accountDataHolder.AccountId.Value, subscribeToId);
 
             await _notificationsService.NotifySubscribedAsync(subscribeToId);
 
@@ -78,7 +78,7 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var isSubscribed = await _subscriptionsRepository.IsSubscriptionExistAsync(_accountDataHolder.AccountId, subscribedToId);
+            var isSubscribed = await _subscriptionsRepository.IsSubscriptionExistAsync(_accountDataHolder.AccountId.Value, subscribedToId);
 
             if (!isSubscribed)
                 return CommandResult.Fail(ErrorCode.SubscriptionAlreadyExists, "Подписка не найдена");
@@ -86,7 +86,7 @@ namespace EList.Services.Impl
             await _subscriptionsRepository.UpdateSubscriptionAsync(new UpdateSubscriptionRequest
             { 
                 SubscribedToId = subscribedToId,
-                SubscriberId = _accountDataHolder.AccountId,
+                SubscriberId = _accountDataHolder.AccountId.Value,
                 NotifyEventCreated = request.NotifyEventCreated,
                 NotifyParticipated = request.NotifyParticipated,
                 NotifySubscribed = request.NotifySubscribed
@@ -160,11 +160,11 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
                 
-            var isSubscribed = await _subscriptionsRepository.IsSubscriptionExistAsync(_accountDataHolder.AccountId, subscribedToId);
+            var isSubscribed = await _subscriptionsRepository.IsSubscriptionExistAsync(_accountDataHolder.AccountId.Value, subscribedToId);
             if (!isSubscribed)
                 return CommandResult.Fail(ErrorCode.SubscriptionAlreadyExists, "Подписка не найдена");
 
-            await _subscriptionsRepository.DeleteSubscriptionAsync(_accountDataHolder.AccountId, subscribedToId);
+            await _subscriptionsRepository.DeleteSubscriptionAsync(_accountDataHolder.AccountId.Value, subscribedToId);
 
             await _notificationsService.NotifyUnsubscribedAsync(subscribedToId);
 

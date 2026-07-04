@@ -82,19 +82,19 @@ namespace EList.Services.Impl
                 var whiteListCount = await _participantsBWListRepository.WhiteListPersonsCountAsync(eventId);
                 if (whiteListCount == 0)
                 {// если белый список пуст, проверяем приглашения
-                    var isUserInvited = await _invitationsRepository.IsUserInvitatedAsync(eventId, _accountDataHolder.AccountId);
+                    var isUserInvited = await _invitationsRepository.IsUserInvitatedAsync(eventId, _accountDataHolder.AccountId.Value);
                     if (!isUserInvited)
                         return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Принять участие в закрытом мероприятии можно только по приглашению");
                 }
                 else
                 {
-                    if (!await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId))
+                    if (!await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId.Value))
                         return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
                 }
             }
             else
             {
-                if (await _participantsBWListRepository.IsUserInBlackListAsync(eventId, _accountDataHolder.AccountId))
+                if (await _participantsBWListRepository.IsUserInBlackListAsync(eventId, _accountDataHolder.AccountId.Value))
                     return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
             }
 
@@ -105,16 +105,16 @@ namespace EList.Services.Impl
                     return CommandResult<Guid?>.Fail(ErrorCode.EventIsFull, "В мероприятии уже участвует максимальное количество человек");
             }
 
-            var result = await _participationRepository.ParticipateAsync(_accountDataHolder.AccountId, eventId);
+            var result = await _participationRepository.ParticipateAsync(_accountDataHolder.AccountId.Value, eventId);
 
             var thisEventInvitations = await _invitationsRepository.SearchInvitationsAsync(new InvitationsSearchRequest
             {
-                InvitedAccountIds = new List<Guid> { _accountDataHolder.AccountId },
+                InvitedAccountIds = new List<Guid> { _accountDataHolder.AccountId.Value },
                 EventIds = new List<Guid> { eventId }
             });
             if (thisEventInvitations.Result?.Any() ?? false)
             {
-                thisEventInvitations.Result.ForEach(async i => await _invitationsRepository.DeleteInvitationAsync(eventId, _accountDataHolder.AccountId));
+                thisEventInvitations.Result.ForEach(async i => await _invitationsRepository.DeleteInvitationAsync(eventId, _accountDataHolder.AccountId.Value));
             }
 
             await _notificationsService.NotifyParticipatedAsync(eventId);
@@ -137,7 +137,7 @@ namespace EList.Services.Impl
 
             //TODO: Реализовать проверку на то что пользователь является инициатором события
 
-            await _participationRepository.LeaveEventAsync(_accountDataHolder.AccountId, eventId);
+            await _participationRepository.LeaveEventAsync(_accountDataHolder.AccountId.Value, eventId);
 
             await _notificationsService.NotifyEventLeftAsync(eventId);
 

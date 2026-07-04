@@ -115,7 +115,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _personService.GetPersonInfoByTokenAsync();
+                var result = await _personService.GetPersonInfoAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;

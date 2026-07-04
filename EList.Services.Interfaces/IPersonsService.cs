@@ -8,7 +8,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult<Guid?>> CreatePersonInfoAsync(PersonRequest request);
         Task<CommandResult<PersonInfo?>> GetPersonInfoByAccountIdAsync(Guid accountId);
 
-        Task<CommandResult<PersonInfo?>> GetPersonInfoByTokenAsync();
+        Task<CommandResult<PersonInfo?>> GetPersonInfoAsync();
         //Task<CommandResult> UpdatePersonInfoAsync(Guid token, PersonRequest request);
     }
 }
