@@ -2,7 +2,7 @@
 
 namespace EList.DbDataProvider.Models
 {
-    [Table("account_album_relation")]
+    [Table("account_album_rls")]
     public class AccountAlbumRelationDto
     {
         [Column("id"), PrimaryKey, Identity]

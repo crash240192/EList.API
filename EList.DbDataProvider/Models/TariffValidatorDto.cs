@@ -26,7 +26,7 @@ namespace EList.DbDataProvider.Models
         [Column("max_period")]
         public int? CreateDateMaxPeriod { get; set; }
 
-        [Column("allow_nultidays_events")]
+        [Column("allow_multidays_events")]
         public bool AllowMultidaysEvent {  get; set; }
 
         [Column("allow_gender_segregation")]

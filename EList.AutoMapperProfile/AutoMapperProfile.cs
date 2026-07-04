@@ -36,7 +36,7 @@ namespace EList.AutoMapperProfile
             CreateMap<AuthorizationDto, Authorization>().ReverseMap();
 
             CreateMap<AccountDto, CreateAccountRequest>().ReverseMap();
-            
+
             CreateMap<AccountDto, Account>();
             CreateMap<Account, AccountDto>()
                 .ForMember(dest => dest.Avatars, opt => opt.Ignore());
@@ -80,7 +80,6 @@ namespace EList.AutoMapperProfile
             CreateMap<MediaAlbum, MediaAlbumDto>();
             CreateMap<MediaAlbumDto, MediaAlbum>()
                 .ForMember(dest => dest.EventId, opt => opt.MapFrom(src => src.EventRelation != null ? src.EventRelation.EventId : (Guid?)null));
-
             CreateMap<FileAlbumRelationDto, AlbumFile>().ReverseMap();
 
             CreateMap<TariffDto, Tariff>().ReverseMap();

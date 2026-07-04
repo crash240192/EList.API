@@ -77,8 +77,8 @@ namespace EList.Repositories.Impl
 
             var containers = items.Items?.Select(g =>
             {
-                var eventShort = _mapper.Map<EventShort>(g.Event);
-                eventShort.Colors = g.Event.Types?.Select(t => t.Type.EventCategory.Color)?.ToArray();
+                var eventShort = _mapper.Map<Event>(g.Event);
+                //eventShort.Colors = g.Event.Types?.Select(t => t.Type.EventCategory.Color)?.ToArray();
                 return new EventAlbumsContainer
                 {
                     Event = eventShort,

@@ -110,7 +110,7 @@ CREATE TABLE public.event_types (
 	localization_path varchar(255) NOT NULL,
 	name varchar(100) not null,
 	category_id uuid NOT NULL,
-	ico bytea NOT NULL,
+	ico varchar NOT NULL,
 	description varchar(255),
 	CONSTRAINT event_type_pk PRIMARY KEY (id),
 	CONSTRAINT event_type_event_category_fk FOREIGN KEY (category_id) REFERENCES public.event_categories(id)
@@ -369,8 +369,8 @@ create table public.auto_invitation_inviter_rls (
 
 insert into public.contact_types 
 (id, localization_path, name, description, mask, allow_notifications) values 
-('1d69590d-06ea-4778-a37c-d591b8f25df8', '$.contactData.contactTypes.phone', 'Телефон', 'Телефон', '_ (___) ___-__-__', true),
-('8887c160-70b1-4591-903e-8289eb7f5e0a', '$.contactData.contactTypes.email', 'Электронная почта', 'Электронная почта', '_@_._', true);
+('1d69590d-06ea-4778-a37c-d591b8f25df8', '$.contactData.contactTypes.phone', 'Телефон', 'Телефон', '^\+7\s\(\d{3}\)\s\d{3}-\d{2}-\d{2}$', true),
+('8887c160-70b1-4591-903e-8289eb7f5e0a', '$.contactData.contactTypes.email', 'Электронная почта', 'Электронная почта', '^[^\s@]+@[^\s@]+\.[^\s@]+$', true);
 
 
 
