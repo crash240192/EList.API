@@ -138,6 +138,8 @@ namespace EList.DbDataProvider.DataProviders
             Guid accountId, Guid curAccountId, int? pageIndex = null, int? pageSize = null)
         {
             var eventsQuery = _connection.Events
+                .LoadWith(i => i.Parameters)
+                .LoadWith(i => i.Organizators)
                 .Where(e => e.Organizators.Any(o => o.AccountId == accountId)
                     || e.Participants.Any(p => p.AccountId == accountId))
                 .Where(e => e.Albums.Any(rel =>

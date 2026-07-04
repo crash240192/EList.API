@@ -71,5 +71,13 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.Comment, comment)
                 .UpdateAsync();
         }
+
+        public async Task<double?> GetOrganizatorRatingAsync(Guid accountId)
+        {
+            var result = await _connection.Organizators
+                .Where(i => i.AccountId == accountId)
+                .AverageAsync(i => i.Event.Rating.Value);
+            return result;
+        }
     }
 }

@@ -118,7 +118,7 @@ namespace EList.Api.Controllers
         /// <param name="accountId"></param>
         /// <returns></returns>
         [HttpGet("organizators/{accountId}")]
-        public async Task<CommandResult<int?>> GetOrganizatorRatingAsync(Guid accountId)
+        public async Task<CommandResult<double?>> GetOrganizatorRatingAsync(Guid accountId)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();

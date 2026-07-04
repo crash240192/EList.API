@@ -10,5 +10,6 @@ namespace EList.DbDataProvider.Interfaces
         Task UpdateEventRatingAsync(Guid id, int value, string comment); //обновление оценки
         Task<ValuedListResponse<EventsRatingDto>> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize); //получение оценки определенного ивента
         Task<EventsRatingDto?> GetRatingItemAsync(Guid itemId);
+        Task<double?> GetOrganizatorRatingAsync(Guid accountId);
     }
 }
