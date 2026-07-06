@@ -32,7 +32,7 @@ namespace EList.Api.Infrastructure
         {
             "/api/contacts/contacttypes/get/*",
             "/api/contacts/contacttypes/getall",
-            
+
             "/api/conversations/get/*",
             "/api/conversations/byevent/*",
             "/api/conversations/messages/byconversationid/*",
@@ -52,7 +52,7 @@ namespace EList.Api.Infrastructure
 
             "/api/media/albums/get/*",
             "/api/media/albums/byAccount/*",
-            "/api/media/albums/filesbyalbumid/*", 
+            "/api/media/albums/filesbyalbumid/*",
             "/api/media/albums/byevent/*",
             "/api/media/albums/byevents",
             "/api/media/account/avatars/get*",
@@ -65,7 +65,7 @@ namespace EList.Api.Infrastructure
             "/api/participations/whitelist/get/*",
 
             "/api/persons/get*",
-            
+
             "/api/rating/events/getrating",
             "/api/rating/organizators/*",
 
@@ -90,7 +90,7 @@ namespace EList.Api.Infrastructure
             _authorizationService = authorizationService ?? throw new ArgumentNullException(nameof(authorizationService));
             _encryptionTool = encryptionTool ?? throw new ArgumentNullException(nameof(encryptionTool));
             _accountsService = accountsService ?? throw new ArgumentNullException(nameof(accountsService));
-            _accountDataHolder= accountDataHolder ?? throw new ArgumentNullException(nameof(accountDataHolder));
+            _accountDataHolder = accountDataHolder ?? throw new ArgumentNullException(nameof(accountDataHolder));
             _personsService = personsService ?? throw new ArgumentNullException(nameof(personsService));
         }
 
@@ -107,24 +107,31 @@ namespace EList.Api.Infrastructure
             {
                 logger.Debug("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Get Authorization header");
 
-                if (IsAnonymousMethod)
-                {
-                    var anonymousClaims = new Claim[0];
-                    var anonymousIdentity = new ClaimsIdentity(anonymousClaims, Scheme.Name);
-                    var anonymousPrincipal = new ClaimsPrincipal(anonymousIdentity);
-                    var anonymousTticket = new AuthenticationTicket(anonymousPrincipal, Scheme.Name);
-                    return AuthenticateResult.Success(anonymousTticket);
-                }
-
                 var tokenHeader = Request.Headers.ContainsKey("Authorization") ? Request.Headers["Authorization"] : StringValues.Empty;
                 var jwtHeader = Request.Headers.ContainsKey("Authorization-jwt") ? Request.Headers["Authorization-jwt"] : StringValues.Empty;
 
                 if (jwtHeader == StringValues.Empty)
-                    return AuthenticateResult.Fail("Invalid Authorization-jwt Header");
+                {
+                    if (!IsAnonymousMethod)
+                    {
+                        return AuthenticateResult.Fail("Invalid Authorization-jwt Header");
+                    }
+                    else
+                    {
+                        var anonymousClaims = new Claim[0];
+                        var anonymousIdentity = new ClaimsIdentity(anonymousClaims, Scheme.Name);
+                        var anonymousPrincipal = new ClaimsPrincipal(anonymousIdentity);
+                        var anonymousTticket = new AuthenticationTicket(anonymousPrincipal, Scheme.Name);
+                        return AuthenticateResult.Success(anonymousTticket);
+                    }
+                }
 
                 var jwtHash = _encryptionTool.CalculateStringHash(jwtHeader);
 
                 var claims = new List<Claim> { new Claim(ClaimTypes.Hash, jwtHash) };
+
+                if (jwtHash != StringValues.Empty)
+                    claims.Add(new Claim(ClaimTypes.Hash, jwtHash));
 
                 if (tokenHeader != StringValues.Empty)
                     claims.Add(new Claim(ClaimTypes.PrimarySid, tokenHeader));
@@ -134,36 +141,48 @@ namespace EList.Api.Infrastructure
                 var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
                 if ((Request.Path == "/api/accounts/create" && Request.Method == "POST") || (Request.Path == "/api/authorization" && Request.Method == "POST"))
-                {
                     return AuthenticateResult.Success(ticket);
-                }
 
-                if (!Request.Headers.ContainsKey("Authorization"))
+                if (!Request.Headers.ContainsKey("Authorization") && !IsAnonymousMethod)
                 {
                     logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Missing Authorization Header");
                     return AuthenticateResult.Fail("Missing Authorization Header");
                 }
 
-                var tokenIsGuid = Guid.TryParse(tokenHeader, out var tokenValue);
-                if (!tokenIsGuid)
-                    return AuthenticateResult.Fail("Authorization header must be Guid");
+                var tokenParsed = Guid.TryParse(tokenHeader, out var tokenValue);
+                if (!tokenParsed)
+                    return !IsAnonymousMethod ? AuthenticateResult.Fail("Authorization header must be Guid") : AuthenticateResult.Success(ticket);
 
                 logger.Debug($"Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Get Token by id: {tokenValue}");
 
                 var authorizationItem = await _authorizationService.GetAuthorizationDataAsync(tokenValue);
                 if (!authorizationItem.Success)
                 {
-                    logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Invalid Authorization Header");
-                    return AuthenticateResult.Fail("Invalid Authorization Header");
+                    if (IsAnonymousMethod)
+                    {
+                        AuthenticateResult.Success(ticket);
+                    }
+                    else
+                    {
+                        logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Invalid Authorization Header");
+                        return AuthenticateResult.Fail("Invalid Authorization Header");
+                    }
                 }
+
                 if (!authorizationItem.Result.Active && Request.Path != "/api/authorization/sendActivationCode" && Request.Path != "/api/authorization/activate")
                 {
                     logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Token not activated");
                     return AuthenticateResult.Fail("Token not activated");
                 }
 
-                _accountDataHolder.Token = authorizationItem.Result.Token;
+                _accountDataHolder.Token = authorizationItem.Result?.Token;
                 _accountDataHolder.Jwt = jwtHeader;
+
+                if (_accountDataHolder.Token == null)
+                {
+                    if (!IsAnonymousMethod)
+                        return AuthenticateResult.Success(ticket);
+                }
 
                 var account = await _accountsService.GetAccountByTokenAsync();
                 if (!account.Result.Active)
@@ -172,7 +191,7 @@ namespace EList.Api.Infrastructure
                     return AuthenticateResult.Fail("Account disabled");
                 }
 
-                if (!account.Success) 
+                if (!account.Success)
                 {
                     logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Invalid Authorization Header");
                     return AuthenticateResult.Fail("Account inavailable");
@@ -180,12 +199,6 @@ namespace EList.Api.Infrastructure
 
                 _accountDataHolder.Account = account.Result;
                 _accountDataHolder.PersonInfo = (await _personsService.GetPersonInfoByAccountIdAsync(account.Result.Id))?.Result;
-
-                if (!authorizationItem.Result.Active && (Request.Path != "/api/authorization/activate" && Request.Path != "/api/authorization/sendActivationCode"))
-                {
-                    logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Token is not active");
-                    return AuthenticateResult.Fail("Token is not active");
-                }
 
                 if (authorizationItem.Result.ClientHash != jwtHash)
                 {

@@ -139,13 +139,15 @@ namespace EList.DbDataProvider.DataProviders
                     .Where(i =>
                         (i.Parameters.Private == true &&
                                 (
-                                    (i.WhiteList.Any(p => p.AccountId == curAccountId) || i.WhiteList.Count() == 0) 
+                                    (i.WhiteList.Any(p => p.AccountId == curAccountId) || i.WhiteList.Count() == 0)
                                     &&
                                     (i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId) || i.Participants.Any(p => p.AccountId == curAccountId))
                                 )
                         )
                         || (i.Parameters.Private != true && (!i.BlackList.Any(p => p.AccountId == curAccountId)))
                         || i.Organizators.Any(o => o.AccountId == curAccountId));
+            else
+                eventsRequest = eventsRequest.Where(i => i.Parameters.Private != true);
             #endregion
 
             #region eventTypes
