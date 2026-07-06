@@ -97,7 +97,6 @@ namespace EList.Api.Controllers
         /// Сообщение будет доставлено во все активные WebSocket-соединения этого аккаунта.
         /// </summary>
         /// <param name="accountId">Идентификатор аккаунта-получателя</param>
-        [AllowAnonymous]
         [HttpPost("send/{accountId}")]
         public async Task<CommandResult> SendToUserAsync(Guid accountId, Notification request)
         {
