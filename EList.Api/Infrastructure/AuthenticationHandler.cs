@@ -110,7 +110,7 @@ namespace EList.Api.Infrastructure
                 var tokenHeader = Request.Headers.ContainsKey("Authorization") ? Request.Headers["Authorization"] : StringValues.Empty;
                 var jwtHeader = Request.Headers.ContainsKey("Authorization-jwt") ? Request.Headers["Authorization-jwt"] : StringValues.Empty;
 
-                if (jwtHeader == StringValues.Empty)
+                if (jwtHeader == StringValues.Empty || tokenHeader == string.Empty)
                 {
                     if (!IsAnonymousMethod)
                     {
@@ -128,7 +128,7 @@ namespace EList.Api.Infrastructure
 
                 var jwtHash = _encryptionTool.CalculateStringHash(jwtHeader);
 
-                var claims = new List<Claim> { new Claim(ClaimTypes.Hash, jwtHash) };
+                var claims = new List<Claim>();
 
                 if (jwtHash != StringValues.Empty)
                     claims.Add(new Claim(ClaimTypes.Hash, jwtHash));
@@ -160,7 +160,7 @@ namespace EList.Api.Infrastructure
                 {
                     if (IsAnonymousMethod)
                     {
-                        AuthenticateResult.Success(ticket);
+                        return AuthenticateResult.Success(ticket);
                     }
                     else
                     {
@@ -180,7 +180,7 @@ namespace EList.Api.Infrastructure
 
                 if (_accountDataHolder.Token == null)
                 {
-                    if (!IsAnonymousMethod)
+                    if (IsAnonymousMethod)
                         return AuthenticateResult.Success(ticket);
                 }
 
