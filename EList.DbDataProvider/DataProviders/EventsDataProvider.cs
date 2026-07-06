@@ -129,6 +129,9 @@ namespace EList.DbDataProvider.DataProviders
             if (request.Price != null)
                 eventsRequest = eventsRequest.Where(e => e.Parameters.Cost == null || e.Parameters.Cost <= request.Price);
 
+            if (request.AgeLimit != null)
+                eventsRequest = eventsRequest.Where(e => e.Parameters.AgeLimit == null || e.Parameters.AgeLimit <= request.AgeLimit);
+
             // Отображение частных мероприятий
             // для черных списков - показывать если пользователь не в черных списках или он организатор
             // для белых списков - показывать, если пользователь в белом списке, или белый список пуст, или он организатор, или он уже участник
