@@ -71,6 +71,11 @@ namespace EList.Models.Events
         public Gender? AllowedGender { get; set; }
 
         /// <summary>
+        /// Возрастной порог
+        /// </summary>
+        public int? AgeLimit { get; set; }
+
+        /// <summary>
         /// Состояние мероприятия
         /// </summary>
         public bool Active { get; set; } = true;
