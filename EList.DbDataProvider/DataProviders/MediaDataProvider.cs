@@ -142,7 +142,9 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.Parameters)
                 .LoadWith(i => i.Organizators)
                 .Where(e => e.Organizators.Any(o => o.AccountId == accountId)
-                    || e.Participants.Any(p => p.AccountId == accountId));
+                    || e.Participants.Any(p => p.AccountId == accountId))
+                .OrderByDescending(i => i.StartTime)
+                .AsQueryable();
 
             if (curAccountId != null)
                 eventsQuery = eventsQuery

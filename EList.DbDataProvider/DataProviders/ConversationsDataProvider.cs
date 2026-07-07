@@ -110,8 +110,8 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<Guid> CreateMessageAsync(MessageDto message)
         {
-            message.CreateDate = DateTimeOffset.Now;
-            message.UpdateDate = DateTimeOffset.Now;
+            message.CreateDate = DateTimeOffset.Now.ToUniversalTime();
+            message.UpdateDate = DateTimeOffset.Now.ToUniversalTime();
             var result = (Guid)await _connection.InsertWithIdentityAsync(message);
 
             if (message.ReplyTo != null)
@@ -128,7 +128,7 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.Messages.Where(i => i.Id == message.Id)
                 .Set(i => i.MessageText, message.MessageText)
                 .Set(i => i.ReplyTo, message.ReplyTo)
-                .Set(i => i.UpdateDate, DateTimeOffset.Now)
+                .Set(i => i.UpdateDate, DateTimeOffset.Now.ToUniversalTime())
                 .UpdateAsync();
 
             if (existingMessage.ReplyTo != message.ReplyTo)

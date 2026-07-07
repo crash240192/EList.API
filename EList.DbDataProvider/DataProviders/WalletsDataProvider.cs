@@ -42,6 +42,7 @@ namespace EList.DbDataProvider.DataProviders
         {
             var result = await _connection.Tariffs
                 .LoadWith(i => i.TariffValidator)
+                .OrderBy(i => i.Cost)
                 .ToListAsync();
             return result;
         }

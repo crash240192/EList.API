@@ -15,6 +15,8 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<Guid> CreateEventAsync(EventDto item)
         {
+            item.CreateDate = DateTimeOffset.Now.ToUniversalTime();
+            item.UpdateDate = DateTimeOffset.Now.ToUniversalTime();
             var id = (Guid)await _connection.InsertWithIdentityAsync(item);
             return id;
         }
@@ -128,6 +130,9 @@ namespace EList.DbDataProvider.DataProviders
 
             if (request.Price != null)
                 eventsRequest = eventsRequest.Where(e => e.Parameters.Cost == null || e.Parameters.Cost <= request.Price);
+
+            if (request.AgeLimit != null)
+                eventsRequest = eventsRequest.Where(e => e.Parameters.AgeLimit == null || e.Parameters.AgeLimit <= request.AgeLimit);
 
             // Отображение частных мероприятий
             // для черных списков - показывать если пользователь не в черных списках или он организатор

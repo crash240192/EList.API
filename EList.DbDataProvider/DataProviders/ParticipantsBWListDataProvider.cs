@@ -86,6 +86,10 @@ namespace EList.DbDataProvider.DataProviders
                 .ThenLoad(i => i.PersonInfo)
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.Avatars)
+                .OrderBy(i => i.Account.Login)
+                .OrderBy(i => i.Account.PersonInfo.Patronymic)
+                .OrderBy(i => i.Account.PersonInfo.LastName)
+                .OrderBy(i => i.Account.PersonInfo.FirstName)
                 .Where(i => i.EventId == eventId);
 
             var count = await request.CountAsync();
@@ -107,6 +111,10 @@ namespace EList.DbDataProvider.DataProviders
                 .ThenLoad(i => i.PersonInfo)
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.Avatars)
+                .OrderBy(i => i.Account.Login)
+                .OrderBy(i => i.Account.PersonInfo.Patronymic)
+                .OrderBy(i => i.Account.PersonInfo.LastName)
+                .OrderBy(i => i.Account.PersonInfo.FirstName)
                 .Where(i => i.EventId == eventId);
 
             var count = await request.CountAsync();
@@ -123,26 +131,36 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<List<Guid>> GetEventBlackListShortAsync(Guid eventId)
         {
-            var result = await _connection.BlackList.Where(i => i.EventId == eventId).Select(i => i.AccountId).ToListAsync();
+            var result = await _connection.BlackList
+                .Where(i => i.EventId == eventId)
+                .Select(i => i.AccountId)
+                .ToListAsync();
             return result;
         }
 
         public async Task<List<Guid>> GetEventWhiteListShortAsync(Guid eventId)
         {
-            var result = await _connection.WhiteList.Where(i => i.EventId == eventId).Select(i => i.AccountId).ToListAsync();
+            var result = await _connection.WhiteList
+                .Where(i => i.EventId == eventId)
+                .Select(i => i.AccountId)
+                .ToListAsync();
             return result;
         }
 
 
         public async Task<int> BlackListPersonsCountAsync(Guid eventId)
         {
-            var result = await _connection.BlackList.Where(i => i.EventId != eventId).CountAsync();
+            var result = await _connection.BlackList
+                .Where(i => i.EventId != eventId)
+                .CountAsync();
             return result;
         }
 
         public async Task<int> WhiteListPersonsCountAsync(Guid eventId)
         {
-            var result = await _connection.WhiteList.Where(i => i.EventId != eventId).CountAsync();
+            var result = await _connection.WhiteList
+                .Where(i => i.EventId != eventId)
+                .CountAsync();
             return result;
         }
 
