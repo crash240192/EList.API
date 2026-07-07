@@ -1,4 +1,6 @@
 
+CREATE EXTENSION IF NOT EXISTS postgis;
+
 create or replace function public.uuid_generate_v4()
 returns uuid language 'c' cost 1 volatile strict as '$libdir/uuid-ossp', 'uuid_generate_v4';
 
@@ -93,7 +95,7 @@ CREATE TABLE public.tariffs (
 	constraint tariff_validator_fk foreign key (validator_id) references public.tariff_validators(id)
 );
 
-CREATE TABLE public.event_categories2 (
+CREATE TABLE public.event_categories (
 	id uuid NOT NULL default public.uuid_generate_v4(),
 	name varchar(100) not null,
 	localization_path varchar(255) NOT null,
@@ -113,6 +115,17 @@ CREATE TABLE public.event_types (
 	CONSTRAINT event_type_pk PRIMARY KEY (id),
 	CONSTRAINT event_type_event_category_fk FOREIGN KEY (category_id) REFERENCES public.event_categories(id)
 );
+
+CREATE TABLE public.wallets (
+	id uuid NOT NULL DEFAULT uuid_generate_v4(),
+	balance numeric NOT NULL,
+	paid_date timestamptz NULL,
+	tariff_id uuid NULL,
+	last_charge_date timestamptz NULL,
+	CONSTRAINT wallet_pk PRIMARY KEY (id),
+	CONSTRAINT wallet_tariff_fk FOREIGN KEY (tariff_id) REFERENCES public.tariffs(id)
+);
+
 
 create table public.accounts(
 	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
@@ -154,15 +167,6 @@ CREATE TABLE public.person_info(
 	constraint persons_data_account foreign key (account_id) references public.accounts (id)
 );
 
-CREATE TABLE public.wallets (
-	id uuid NOT NULL DEFAULT uuid_generate_v4(),
-	balance numeric NOT NULL,
-	paid_date timestamptz NULL,
-	tariff_id uuid NULL,
-	last_charge_date timestamptz NULL,
-	CONSTRAINT wallet_pk PRIMARY KEY (id),
-	CONSTRAINT wallet_tariff_fk FOREIGN KEY (tariff_id) REFERENCES public.tariffs(id)
-);
 
 
 
@@ -396,9 +400,7 @@ create table public.media_albums(
 	create_date timestamptz not null default NOW(),
 	update_date timestamptz not null default NOW(),
 	wallpaper_id uuid NULL,
-	constraint media_album_pk primary key (id),
-	constraint media_album_account_fk foreign key (event_id) references public.accounts (id),
-	constraint media_album_event_fk foreign key (event_id) references public.events (id)
+	constraint media_album_pk primary key (id)
 );
 
 create table public.event_album_parameters(
@@ -505,53 +507,7 @@ CREATE TABLE public.notifications (
 	CONSTRAINT notifications_related_account_fk FOREIGN KEY (related_account_id) REFERENCES public.accounts(id),
 	CONSTRAINT notifications_event_fk FOREIGN KEY (event_id) REFERENCES public.events(id)
 );
-
-
-
 /*
-
-create table public.photo_account_rls(
-	id uuid not null default public.uuid_generate_v4(),
-	photo_id uuid not null,
-	account_id uuid not null,
-	constraint photo_account_pk primary key (id),
-	constraint photo_account_account_fk foreign key (account_id) references public.accounts (id),
-	constraint photo_account_photo_fk foreign key (photo_id) references public.photos (id)
-);
-
-create table public.video_account_rls(
-	id uuid not null default public.uuid_generate_v4(),
-	video_id uuid not null,
-	account_id uuid not null,
-	constraint video_account_pk primary key (id),
-	constraint video_account_account_fk foreign key (account_id) references public.accounts (id),
-	constraint video_accounts_video_fk foreign key (video_id) references public.videos (id)
-);
-
-
-CREATE TABLE public.photos (
-	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
-	file_path varchar NOT NULL,
-	hash text not null,
-	CONSTRAINT photo_pk PRIMARY KEY (id)
-);
-
-CREATE TABLE public.videos (
-	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
-	file_path varchar NOT NULL,
-	hash text NOT NULL,
-	CONSTRAINT video_pk PRIMARY KEY (id)
-);
-
-
-create table public.chat (
-	id uuid not null default public.uuid_generate_v4(),
-	event_id uuid null,
-	constraint chat_pk primary key (id)
-);
-
-
-
 create table public.chat_administrator (
 	id uuid not null default public.uuid_generate_v4(),
 	person_id uuid null,

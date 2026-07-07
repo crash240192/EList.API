@@ -71,7 +71,7 @@ namespace EList.Repositories.Impl
         }
 
         public async Task<PagedList<EventAlbumsContainer>> GetEventsAlbumsAsync(
-            Guid accountId, Guid curAccountId, int? pageIndex = null, int? pageSize = null)
+            Guid accountId, Guid? curAccountId, int? pageIndex = null, int? pageSize = null)
         {
             var items = await _mediaDataProvider.GetEventsAlbumsAsync(accountId, curAccountId, pageIndex, pageSize);
 

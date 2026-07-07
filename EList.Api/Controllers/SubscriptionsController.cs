@@ -169,7 +169,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
-        [HttpPost("getSubscribers/")]
+        [HttpPost("getSubscribers")]
         public async Task<CommandResult<PagedList<Subscription>>> GetSubscribersAsync(SubscriptionsSearchRequest request)
         {
             var correlationId = _correlationIdProvider.Get();

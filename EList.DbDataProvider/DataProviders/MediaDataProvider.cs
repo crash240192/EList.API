@@ -1,6 +1,7 @@
 ﻿using EList.Common.Extensions;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Models.SearchRequests;
 using EList.Models.Media;
 using LinqToDB;
 using LinqToDB.Async;
@@ -135,13 +136,18 @@ namespace EList.DbDataProvider.DataProviders
         }
 
         public async Task<ListResponse<EventAlbumsGroupDto>> GetEventsAlbumsAsync(
-            Guid accountId, Guid curAccountId, int? pageIndex = null, int? pageSize = null)
+            Guid accountId, Guid? curAccountId, int? pageIndex = null, int? pageSize = null)
         {
             var eventsQuery = _connection.Events
                 .LoadWith(i => i.Parameters)
                 .LoadWith(i => i.Organizators)
                 .Where(e => e.Organizators.Any(o => o.AccountId == accountId)
                     || e.Participants.Any(p => p.AccountId == accountId))
+                .OrderByDescending(i => i.StartTime)
+                .AsQueryable();
+
+            if (curAccountId != null)
+                eventsQuery = eventsQuery
                 .Where(e => e.Albums.Any(rel =>
                     e.Organizators.Any(o => o.AccountId == curAccountId)
                     || (
@@ -161,8 +167,13 @@ namespace EList.DbDataProvider.DataProviders
                             || rel.Album.Parameters == null
                             || !rel.Album.Parameters.Private
                         )
-                    )))
-                .OrderBy(e => e.StartTime);
+                    )));
+            else
+                eventsQuery = eventsQuery
+                    .Where(i => i.Albums.Any(a =>
+                        i.Parameters.Private != null && a.Album.Parameters.Private != true));
+
+            eventsQuery = eventsQuery.OrderBy(e => e.StartTime);
 
             var totalCount = await eventsQuery.CountAsync();
 
@@ -186,7 +197,11 @@ namespace EList.DbDataProvider.DataProviders
                 .OrderBy(e => e.StartTime)
                 .ToListAsync();
 
-            var relations = await (
+            var relations = new List<EventAlbumRelationDto>();
+
+            if (curAccountId != null)
+            {
+                relations = await (
                 from e in _connection.Events
                 where pagedEventIds.Contains(e.Id)
                 from rel in e.Albums
@@ -211,7 +226,19 @@ namespace EList.DbDataProvider.DataProviders
                         )
                     )
                 select rel
-            ).ToListAsync();
+                ).ToListAsync();
+            }
+            else
+            {
+                relations = await (
+                from e in _connection.Events
+                where pagedEventIds.Contains(e.Id)
+                from rel in e.Albums
+                where
+                    e.Parameters.Private != true
+                select rel
+                ).ToListAsync();
+            }
 
             if (!relations.Any())
                 return new ListResponse<EventAlbumsGroupDto>(totalCount, new List<EventAlbumsGroupDto>());
@@ -260,7 +287,7 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<FileAlbumRelationDto> GetFileAsync(Guid fileId, Guid albumId)
         {
-            var result = await _connection.AlbumFiles.FirstOrDefaultAsync(i => i.AlbumId == albumId && fileId == fileId);            
+            var result = await _connection.AlbumFiles.FirstOrDefaultAsync(i => i.AlbumId == albumId && fileId == fileId);
             return result;
         }
 
@@ -274,9 +301,9 @@ namespace EList.DbDataProvider.DataProviders
                 .Select(i => i.FileId)
                 .ToListAsync();
 
-            if (filesInAnotherAlbums.NullSafeAny())            
+            if (filesInAnotherAlbums.NullSafeAny())
                 fileIds = fileIds?.Where(i => !filesInAnotherAlbums.Contains(i)).ToList();
-            
+
             return fileIds;
         }
 

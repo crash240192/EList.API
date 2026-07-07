@@ -99,7 +99,7 @@ namespace EList.Services.Impl
 
         public async Task<CommandResult> AddConnectionAsync(WebSocket socket)
         {
-            var accountId = _accountDataHolder.AccountId;
+            var accountId = _accountDataHolder.AccountId.Value;
             return await AddConnectionAsync(accountId, socket);
         }
 
@@ -252,7 +252,7 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var accountId = _accountDataHolder.AccountId;
+            var accountId = _accountDataHolder.AccountId.Value;
 
             await _notificationsRepository.ReadAllUserNotificationsAsync(accountId);
 
@@ -275,7 +275,7 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            subscribers ??= await _notificationsRepository.SearchSubscribersEventCreatedAsync(_accountDataHolder.AccountId);
+            subscribers ??= await _notificationsRepository.SearchSubscribersEventCreatedAsync(_accountDataHolder.AccountId.Value);
             var eventData = await _eventsRepository.GetEventAsync(eventId);
 
             if (subscribers?.Any() ?? false)
@@ -423,7 +423,7 @@ namespace EList.Services.Impl
             var eventData = await _eventsRepository.GetEventAsync(eventId);
             var subscribers = await _subscriptionsRepository.GetSubscribersIdsAsync(new SubscriptionsSearchRequest
             {
-                AccountId = _accountDataHolder.AccountId,
+                AccountId = _accountDataHolder.AccountId.Value,
                 NotifyParticipated = true
             });
 
@@ -462,7 +462,7 @@ namespace EList.Services.Impl
             var eventData = await _eventsRepository.GetEventAsync(eventId);
             var subscribers = await _subscriptionsRepository.GetSubscribersIdsAsync(new SubscriptionsSearchRequest
             {
-                AccountId = _accountDataHolder.AccountId,
+                AccountId = _accountDataHolder.AccountId.Value,
                 NotifyParticipated = true
             });
 
@@ -510,7 +510,7 @@ namespace EList.Services.Impl
             #region уведомляем всех, кроме того, на кого подписались
             var subscribers = await _subscriptionsRepository.GetSubscribersIdsAsync(new SubscriptionsSearchRequest
             {
-                AccountId = _accountDataHolder.AccountId,
+                AccountId = _accountDataHolder.AccountId.Value,
                 NotifySubscribed = true
             });
             subscribers = subscribers?.Where(i => i != subscribedToId)?.ToList();
@@ -575,7 +575,7 @@ namespace EList.Services.Impl
             #region уведомляем всех, кроме того, от кого отписались
             var subscribers = await _subscriptionsRepository.GetSubscribersIdsAsync(new SubscriptionsSearchRequest
             {
-                AccountId = _accountDataHolder.AccountId,
+                AccountId = _accountDataHolder.AccountId.Value,
                 NotifySubscribed = true
             });
             subscribers = subscribers?.Where(i => i != unsubscribedFromId)?.ToList();

@@ -411,8 +411,8 @@ namespace EList.Services.Impl
             if (request.OrganizatorAccountIds == null)
                 request.OrganizatorOrganizationIds = new List<Guid>();
 
-            if (!request.OrganizatorAccountIds.Contains(_accountDataHolder.AccountId))
-                request.OrganizatorAccountIds.Add(_accountDataHolder.AccountId);
+            if (!request.OrganizatorAccountIds.Contains(_accountDataHolder.AccountId.Value))
+                request.OrganizatorAccountIds.Add(_accountDataHolder.AccountId.Value);
 
             foreach (var accountId in request.OrganizatorAccountIds)
             {
@@ -478,7 +478,7 @@ namespace EList.Services.Impl
             {
                 subscribersList = await _subscriptionsRepository.GetSubscribersIdsAsync(new Models.Subscriptions.SubscriptionsSearchRequest
                 {
-                    AccountId = _accountDataHolder.AccountId,
+                    AccountId = _accountDataHolder.AccountId.Value,
                     NotifyEventCreated = true,
                 });
 
@@ -497,7 +497,7 @@ namespace EList.Services.Impl
                 {
                     AccountIds = usersToInvite,
                     EventId = eventId
-                }, _accountDataHolder.AccountId);
+                }, _accountDataHolder.AccountId.Value);
                 await _notificationsService.NotifyUsersInvitedAsync(eventId, usersToInvite);
             }
             #endregion
@@ -600,16 +600,19 @@ namespace EList.Services.Impl
             {
                 if (eventItem.Parameters?.Private == true)
                 {
-                    var isUserInWhiteList = await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId);
+                    if (_accountDataHolder.AccountId == null)
+                        return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Сначала Необходимо авторизоваться");
+
+                    var isUserInWhiteList = await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId.Value);
                     if (!isUserInWhiteList)
                     {
                         var whiteListIsEmpty = await _participantsBWListRepository.IsWhiteListEmptyAsync(eventId);
                         if (whiteListIsEmpty)
                         {
-                            var isUserParticipated = await _participationsRepository.IsUserParticipatedAsync(_accountDataHolder.AccountId, eventId);
+                            var isUserParticipated = await _participationsRepository.IsUserParticipatedAsync(_accountDataHolder.AccountId.Value, eventId);
                             if (!isUserParticipated)
                             {
-                                var invitation = await _invitationsRepository.GetInvitationAsync(_accountDataHolder.AccountId, eventId);
+                                var invitation = await _invitationsRepository.GetInvitationAsync(_accountDataHolder.AccountId.Value, eventId);
                                 if (invitation == null)
                                     return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Посещать закрытые мероприятия можно только приглашению");
                             }
@@ -622,9 +625,12 @@ namespace EList.Services.Impl
                 }
                 else
                 {
-                    var isUserInBlackList = await _participantsBWListRepository.IsUserInBlackListAsync(eventId, _accountDataHolder.AccountId);
-                    if (isUserInBlackList)
-                        return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Организатор добавил вас в чёрный список мероприятия");
+                    if (_accountDataHolder.AccountId != null)
+                    {
+                        var isUserInBlackList = await _participantsBWListRepository.IsUserInBlackListAsync(eventId, _accountDataHolder.AccountId.Value);
+                        if (isUserInBlackList)
+                            return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Организатор добавил вас в чёрный список мероприятия");
+                    }
                 }
             }
 

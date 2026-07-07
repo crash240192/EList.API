@@ -181,6 +181,7 @@ namespace EList.Services.Impl
             return new CommandResult<Authorization?>(result);
         }
 
+        [Obsolete]
         public async Task<CommandResult<Guid>> CreateTokenAsync(string clientHash)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -189,12 +190,12 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var existingToken = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.AccountId, clientHash);
+            var existingToken = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.AccountId.Value, clientHash);
 
             if (existingToken != null)
                 return new CommandResult<Guid>(existingToken.Token);
 
-            var result = await _authorizationRepository.CreateTokenAsync(_accountDataHolder.AccountId, clientHash);
+            var result = await _authorizationRepository.CreateTokenAsync(_accountDataHolder.AccountId.Value, clientHash);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid>(result);
@@ -210,7 +211,7 @@ namespace EList.Services.Impl
 
             //var existingToken = await _authorizationRepository.GetAuthorizationDataAsync(clientHash);
 
-            var existingToken = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
+            var existingToken = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
 
             if (existingToken == null)
                 return CommandResult.Fail(ErrorCode.AuthorizationDataNotFound, $"Не найден авторизационный токен для текущего клиента");

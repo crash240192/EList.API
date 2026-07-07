@@ -144,7 +144,7 @@ namespace EList.Api.Controllers
         /// <param name="pageIndex"></param>
         /// <param name="pageSize"></param>
         /// <returns></returns>
-        [HttpGet("blackList/{eventId}")]
+        [HttpGet("blackList/get/{eventId}")]
         public async Task<CommandResult<PagedList<ParticipantBlackListItem>>> GetEventBlackListAsync(Guid eventId, int? pageIndex, int? pageSize)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -174,7 +174,7 @@ namespace EList.Api.Controllers
         /// <param name="pageIndex"></param>
         /// <param name="pageSize"></param>
         /// <returns></returns>
-        [HttpGet("whiteList/{eventId}")]
+        [HttpGet("whiteList/get/{eventId}")]
         public async Task<CommandResult<PagedList<ParticipantWhiteListItem>>> GetEventWhiteListAsync(Guid eventId, int? pageIndex, int? pageSize)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -202,7 +202,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="eventId"></param>
         /// <returns></returns>
-        [HttpGet("blackList/{eventId}/short")]
+        [HttpGet("blackList/get/{eventId}/short")]
         public async Task<CommandResult<List<Guid>>> GetEventBlackListShortAsync(Guid eventId)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -230,7 +230,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="eventId"></param>
         /// <returns></returns>
-        [HttpGet("whiteList/{eventId}/short")]
+        [HttpGet("whiteList/get/{eventId}/short")]
         public async Task<CommandResult<List<Guid>>> GetEventWhiteListShortAsync(Guid eventId)
         {
             var correlationId = _correlationIdProvider.Get();

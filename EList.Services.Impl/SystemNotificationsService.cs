@@ -59,7 +59,7 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var tokenData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token);
+            var tokenData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
 
             var contacts = await _contactsRepository.GetAccountContactsAsync(tokenData.AccountId);
 

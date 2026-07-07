@@ -56,12 +56,12 @@ namespace EList.Services.Impl
             //if (!validationResult.Success)
             //    return CommandResult<Guid>.Fail(validationResult.ErrorCode, validationResult.Message);
 
-            var existingPersonInfo = await _personRepository.GetPersonInfoAsync(_accountDataHolder.AccountId);
+            var existingPersonInfo = await _personRepository.GetPersonInfoAsync(_accountDataHolder.AccountId.Value);
 
             Guid result;
             if (existingPersonInfo == null)
             {
-                result = await _personRepository.CreatePersonInfoAsync(_accountDataHolder.AccountId, request);
+                result = await _personRepository.CreatePersonInfoAsync(_accountDataHolder.AccountId.Value, request);
             }
             else
             {
@@ -90,15 +90,15 @@ namespace EList.Services.Impl
             return new CommandResult<PersonInfo?>(result);
         }
 
-        public async Task<CommandResult<PersonInfo?>> GetPersonInfoByTokenAsync()
+        public async Task<CommandResult<PersonInfo?>> GetPersonInfoAsync()
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetPersonInfoByAccountIdAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(GetPersonInfoAsync)}";
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var result = await _personRepository.GetPersonInfoAsync(_accountDataHolder.AccountId);
+            var result = await _personRepository.GetPersonInfoAsync(_accountDataHolder.AccountId.Value);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PersonInfo?>(result);

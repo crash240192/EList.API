@@ -273,7 +273,7 @@ namespace EList.Api.Controllers.ContactData
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _contactDataService.GetAccountContactsAsync(_accountDataHolder.AccountId);
+                var result = await _contactDataService.GetAccountContactsAsync(_accountDataHolder.AccountId.Value);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 

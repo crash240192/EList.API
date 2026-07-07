@@ -15,6 +15,8 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<Guid> CreateEventAsync(EventDto item)
         {
+            item.CreateDate = DateTimeOffset.Now.ToUniversalTime();
+            item.UpdateDate = DateTimeOffset.Now.ToUniversalTime();
             var id = (Guid)await _connection.InsertWithIdentityAsync(item);
             return id;
         }
@@ -142,13 +144,15 @@ namespace EList.DbDataProvider.DataProviders
                     .Where(i =>
                         (i.Parameters.Private == true &&
                                 (
-                                    (i.WhiteList.Any(p => p.AccountId == curAccountId) || i.WhiteList.Count() == 0) 
+                                    (i.WhiteList.Any(p => p.AccountId == curAccountId) || i.WhiteList.Count() == 0)
                                     &&
                                     (i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId) || i.Participants.Any(p => p.AccountId == curAccountId))
                                 )
                         )
                         || (i.Parameters.Private != true && (!i.BlackList.Any(p => p.AccountId == curAccountId)))
                         || i.Organizators.Any(o => o.AccountId == curAccountId));
+            else
+                eventsRequest = eventsRequest.Where(i => i.Parameters.Private != true);
             #endregion
 
             #region eventTypes
