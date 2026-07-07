@@ -1,17 +1,15 @@
-﻿using EList.Common.CorrelationId;
+﻿using System.Diagnostics;
+using EList.Common.CorrelationId;
 using EList.Common.Encryption;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
 using EList.Models.Accounts;
 using EList.Models.ContactData;
-using EList.Models.Enums;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using EList.Validators.Interfaces;
 using NLog;
-using NLog.Web.LayoutRenderers;
-using System.Diagnostics;
 
 namespace EList.Services.Impl
 {
@@ -168,45 +166,6 @@ namespace EList.Services.Impl
             var account = await _accountsRepository.GetAccountAsync(authData.AccountId);
 
             await _accountsRepository.UpdateLoginAsync(account.Id, newLogin);
-
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return CommandResult.OK;
-        }
-
-        public async Task<CommandResult> ChangePasswordAsync(ChangePasswordRequest request)
-        {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(ChangePasswordAsync)}";
-
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-            var oldPasswordHash = _encryptionTool.CalculateStringHash(request.OldPassword);
-
-            var authData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
-            if (authData == null)
-                return CommandResult.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
-
-            var account = await _accountsRepository.GetAccountAsync(authData.AccountId);
-
-            if (_encryptionTool.CalculateStringHash(request.OldPassword) != account?.PasswordHash)
-                return CommandResult.Fail(ErrorCode.PasswordsDontMatch, "Старый пароль указан не верно");
-
-            if (request.NewPassword != request.NewPasswordConfirmation)
-                    return CommandResult.Fail(ErrorCode.PasswordsDontMatch, "Пароль и подтверждение пароля не совпадают");
-
-            var newPasswordHash = _encryptionTool.CalculateStringHash(request.NewPassword);
-
-            if (newPasswordHash == oldPasswordHash)
-                return CommandResult.Fail(ErrorCode.NewAndOldPasswordsMatch, "Новый пароль должен отличаться от старого");
-
-            await _accountsRepository.UpdatePasswordAsync(account.Id, newPasswordHash);
-
-            await _authorizationRepository.DeactivateAccountTokensAsync(account.Id);
-
-            await _authorizationRepository.ActivateTokenAsync(_accountDataHolder.Token.Value);
-
-            await _notificationsService.NotifyUserByContactAsync(SystemNotificationType.PasswordHasBeenChanged);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

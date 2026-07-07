@@ -29,6 +29,9 @@ namespace EList.DbDataProvider.Models
         [Column("authorization_date")]
         public DateTimeOffset AuthorizationDate { get; set; }
 
+        [Column("drop_password_key")]
+        public string DropPasswordKey { get; set; }
+
         [Association(ThisKey = nameof(AccountId), OtherKey = nameof(AccountDto.Id))]
         public AccountDto Account { get; set; }
     }

@@ -18,6 +18,11 @@
         /// <summary>
         /// Простое уведомление с кодом активации.
         /// </summary>
-        Activation = 2
+        Activation = 2,
+
+        /// <summary>
+        /// Запрос на смену пароля
+        /// </summary>
+        ResetPasswordRequest = 3
     }
 }

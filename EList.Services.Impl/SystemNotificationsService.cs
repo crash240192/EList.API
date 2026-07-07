@@ -4,6 +4,7 @@ using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
 using EList.Common.TemplateParser;
+using EList.Models.ContactData;
 using EList.Models.Enums;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
@@ -51,7 +52,7 @@ namespace EList.Services.Impl
             _accountDataHolder = accountDataHolder;
         }
 
-        public async Task<CommandResult<string>> NotifyUserByContactAsync(SystemNotificationType notificationType)
+        public async Task<CommandResult<string>> NotifyUserByContactAsync(SystemNotificationType notificationType, Guid? accountId = null)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -59,9 +60,17 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var tokenData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
 
-            var contacts = await _contactsRepository.GetAccountContactsAsync(tokenData.AccountId);
+            var contacts = new List<ContactDataItem>();
+            if (accountId == null)
+            {
+                var tokenData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
+                contacts = await _contactsRepository.GetAccountContactsAsync(tokenData.AccountId);
+            }
+            else
+            {
+                contacts = await _contactsRepository.GetAccountContactsAsync(accountId.Value);
+            }
 
             contacts = contacts?.Where(i => i.IsAuthorizationContact).ToList();
 
@@ -92,7 +101,7 @@ namespace EList.Services.Impl
                 return new CommandResult<string>($"Код активации был выслан на {contact.Value}");
             }
 
-            var isPhone = true; //Валидация на корректность введения телефона
+            var isPhone = true; //TODO: Валидация на корректность введения телефона
             {
                 var messageBody = _templateParser.Parse(notification.ShortMessage, tokens);
                 await _smsClient.SendSmsAsync(contact.Value, messageBody);

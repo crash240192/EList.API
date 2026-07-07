@@ -10,6 +10,5 @@ namespace EList.Services.Interfaces
         Task<CommandResult<Account?>> GetAccountAsync(Guid accountId);
         Task<CommandResult> UpdateLocationAsync(double latitude, double longitude);
         Task<CommandResult> UpdateLoginAsync(string newLogin);
-        Task<CommandResult> ChangePasswordAsync(ChangePasswordRequest request);
     }
 }

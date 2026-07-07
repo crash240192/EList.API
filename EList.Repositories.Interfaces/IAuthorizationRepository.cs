@@ -16,6 +16,6 @@ namespace EList.Repositories.Interfaces
         Task DeactivateAccountTokensAsync(Guid accountId);
         Task<Authorization> GetAuthorizationDataAsync(Guid token);
         Task<Authorization?> GetAuthorizationDataAsync(Guid accountId, string clientHash);
-        Task<Authorization?> GetAuthorizationDataAsync(string clientHash);
+        Task<AuthorizationResponse?> GetAuthorizationDataAsync(string clientHash);
     }
 }

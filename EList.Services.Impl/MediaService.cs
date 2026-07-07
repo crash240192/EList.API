@@ -293,8 +293,10 @@ namespace EList.Services.Impl
             if (files.Result.NullSafeAny())
             {
                 var fileIds = files.Result?.Select(i => i.Id).ToList();
+                //TODO: Добавить проверку что этот файл не является в том числе аватаркой 
                 var filesWithoutAlbums = await _mediaRepository.GetFilesNotExistsInAnotherAlbumsAsync(fileIds, albumId);
 
+                //Тут мы проверяем что этот файл больше не прикреплён ни к одному альбому
                 if (filesWithoutAlbums.NullSafeAny())
                 {
                     var fileIdsConcurrentQueue = new ConcurrentQueue<Guid>(filesWithoutAlbums);
@@ -360,6 +362,7 @@ namespace EList.Services.Impl
                 }
             }
 
+            //TODO: Добавить првоерку что файл не является в том числе аватаркой 
             var filesWithoutAlbums = await _mediaRepository.GetFilesNotExistsInAnotherAlbumsAsync(new List<Guid> { fileId }, albumId);
 
             if (filesWithoutAlbums.NullSafeAny())

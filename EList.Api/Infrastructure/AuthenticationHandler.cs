@@ -73,7 +73,7 @@ namespace EList.Api.Infrastructure
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IPersonsService _personsService;
 
-        private bool IsAnonymousMethod
+        private bool IsAnonymousMethod // Не обязательны ни токен, ни jwt
         {
             get
             {
@@ -85,13 +85,18 @@ namespace EList.Api.Infrastructure
             }
         }
 
-        private bool IsRegistrationFlow =>
-            (Request.Path == "/api/accounts/create" && Request.Method == "POST")
-            || (Request.Path == "/api/authorization" && Request.Method == "POST");
+        private bool IsRegistrationFlow => // Jwt обязателен
+            (Request.Path == "/api/accounts/create" && Request.Method == "POST");
 
-        private bool IsActivationFlow =>
+        private bool IsAuthorizationFlow => // Jwt обязателен
+            (Request.Path == "/api/authorization" && Request.Method == "POST");
+
+        private bool IsActivationFlow => // Jwt и токен обязателен
             Request.Path == "/api/authorization/sendActivationCode"
             || Request.Path == "/api/authorization/activate";
+
+        private bool IsResetPasswordFlow => // Jwt обязателен
+            Request.Path == "/api/authorization/forgotPassword";
 
         /// <summary>
         /// Инициализация хендлера
@@ -126,56 +131,93 @@ namespace EList.Api.Infrastructure
             {
                 logger.Debug("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Get Authorization header");
 
-                var hasAuthorization = Request.Headers.TryGetValue("Authorization", out var tokenHeader)
+                var hasToken = Request.Headers.TryGetValue("Authorization", out var tokenHeader)
                     && !StringValues.IsNullOrEmpty(tokenHeader);
                 var hasJwt = Request.Headers.TryGetValue("Authorization-jwt", out var jwtHeader)
                     && !StringValues.IsNullOrEmpty(jwtHeader);
 
-                if (IsRegistrationFlow)
+                //if (!hasJwt)
+                //{
+                //    if (!IsAnonymousMethod)
+                //        return AuthenticateResult.Fail("Missing Authorization headers");
+                //}
+                //else
+                //{
+
+                //}
+
+
+                //if (!hasToken)
+                //{
+                //    if (!hasJwt)
+                //    {
+                //        if (!IsAnonymousMethod)
+                //            return AuthenticateResult.Fail("Missing Authorization headers");
+                //    }
+                //    else
+                //    {
+                //        if (!IsRegistrationFlow && !IsAuthorizationFlow && !IsResetPasswordFlow)
+                //            return AuthenticateResult.Fail("Invalid Authorization-jwt Header");
+                //        _accountDataHolder.Jwt = jwtHeader;
+                //    }
+                //}
+                //else
+                //{
+
+                //}
+
+
+                // Для активации, авторизации, регистрации и сброса пароля нужен Jwt
+                if (IsRegistrationFlow || IsResetPasswordFlow || IsAuthorizationFlow || IsActivationFlow)
                 {
                     if (!hasJwt)
                         return AuthenticateResult.Fail("Invalid Authorization-jwt Header");
 
-                    return AuthenticateResult.Success(CreateTicket(jwtHeader.ToString(), hasAuthorization ? tokenHeader.ToString() : null));
+                    _accountDataHolder.Jwt = jwtHeader;
+                    return AuthenticateResult.Success(CreateTicket(jwtHeader.ToString(), hasToken ? tokenHeader.ToString() : null));
                 }
 
-                if (!hasAuthorization && !hasJwt)
+                // Если нет ни токена ни jwt, то разрешены только анонимные методы
+                if (!hasToken && !hasJwt)
                 {
                     if (!IsAnonymousMethod)
                         return AuthenticateResult.Fail("Missing Authorization headers");
 
-                    ClearAccountData();
+                    //ClearAccountData();
                     return AuthenticateResult.Success(CreateAnonymousTicket());
                 }
 
-                var ticket = CreateTicket(
-                    hasJwt ? jwtHeader.ToString() : null,
-                    hasAuthorization ? tokenHeader.ToString() : null);
-
+                // Если нет jwt, то разрешены только анонимные методы
                 if (!hasJwt)
                 {
                     if (!IsAnonymousMethod)
                         return AuthenticateResult.Fail("Invalid Authorization-jwt Header");
 
-                    ClearAccountData();
-                    return AuthenticateResult.Success(ticket);
+                    //ClearAccountData();
+                    //return AuthenticateResult.Success(ticket);
                 }
 
-                if (!hasAuthorization)
+
+                var ticket = CreateTicket(
+                    hasJwt ? jwtHeader.ToString() : null,
+                    hasToken ? tokenHeader.ToString() : null);
+
+                // Если нет токена, то разрешены анонимные методы, регистрация и сброс пароля
+                if (!hasToken)
                 {
-                    if (!IsAnonymousMethod)
+                    if (!IsAnonymousMethod && !IsResetPasswordFlow && !IsRegistrationFlow)
                         return AuthenticateResult.Fail("Missing Authorization Header");
 
-                    ClearAccountData();
+                    //ClearAccountData();
                     return AuthenticateResult.Success(ticket);
                 }
 
                 if (!Guid.TryParse(tokenHeader, out var tokenValue))
                 {
-                    if (!IsAnonymousMethod)
+                    if (!IsAnonymousMethod && !IsResetPasswordFlow)
                         return AuthenticateResult.Fail("Authorization header must be Guid");
 
-                    ClearAccountData();
+                    //ClearAccountData();
                     return AuthenticateResult.Success(ticket);
                 }
 
@@ -184,16 +226,18 @@ namespace EList.Api.Infrastructure
                 var authorizationItem = await _authorizationService.GetAuthorizationDataAsync(tokenValue);
                 if (!authorizationItem.Success)
                 {
-                    if (!IsAnonymousMethod)
+                    if (!IsAnonymousMethod && !IsResetPasswordFlow)
                     {
                         logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Invalid Authorization Header");
                         return AuthenticateResult.Fail("Invalid Authorization Header");
                     }
 
-                    ClearAccountData();
+                    //ClearAccountData();
                     return AuthenticateResult.Success(ticket);
                 }
+                _accountDataHolder.Token = authorizationItem.Result.Token;
 
+                // Если токен не активен и это не активация, то ошибка авторизации
                 if (!authorizationItem.Result.Active && !IsActivationFlow)
                 {
                     if (!IsAnonymousMethod)
@@ -202,25 +246,28 @@ namespace EList.Api.Infrastructure
                         return AuthenticateResult.Fail("Token not activated");
                     }
 
-                    ClearAccountData();
+                    //ClearAccountData();
                     return AuthenticateResult.Success(ticket);
                 }
 
-                var jwtHash = _encryptionTool.CalculateStringHash(jwtHeader);
-                if (authorizationItem.Result.ClientHash != jwtHash)
+                var clientHash = GetClientHash(jwtHeader);
+                _accountDataHolder.ClientHash = clientHash;
+
+                if (authorizationItem.Result.ClientHash != clientHash)
                 {
-                    if (!IsAnonymousMethod)
+                    if (!IsAnonymousMethod && !IsResetPasswordFlow)
                     {
                         logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Token is not available for this client");
                         return AuthenticateResult.Fail("Token is not available for this client");
                     }
 
-                    ClearAccountData();
+                    //ClearAccountData();
                     return AuthenticateResult.Success(ticket);
                 }
 
-                _accountDataHolder.Token = authorizationItem.Result.Token;
+                
                 _accountDataHolder.Jwt = jwtHeader;
+                
 
                 var account = await _accountsService.GetAccountByTokenAsync();
                 if (!account.Success || account.Result == null)
@@ -231,19 +278,19 @@ namespace EList.Api.Infrastructure
                         return AuthenticateResult.Fail("Account inavailable");
                     }
 
-                    ClearAccountData();
+                    //ClearAccountData();
                     return AuthenticateResult.Success(ticket);
                 }
 
                 if (!account.Result.Active)
                 {
-                    if (!IsAnonymousMethod)
+                    if (!IsAnonymousMethod)// && !IsActivationFlow)
                     {
                         logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Account disabled");
                         return AuthenticateResult.Fail("Account disabled");
                     }
 
-                    ClearAccountData();
+                    //ClearAccountData();
                     return AuthenticateResult.Success(ticket);
                 }
 
@@ -258,6 +305,17 @@ namespace EList.Api.Infrastructure
                 logger.Error(ex, "Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Fail: Invalid Authorization Header");
                 return AuthenticateResult.Fail("Invalid Authorization Header");
             }
+        }
+
+        private string GetClientHash(string jwtHeader)
+        {
+            var jwtHash = _encryptionTool.CalculateStringHash(jwtHeader);
+            var ipAddress = Request.HttpContext.Connection.RemoteIpAddress?.ToString();
+            var userAgent = Request.Headers.UserAgent;
+            var userAgentHash = _encryptionTool.CalculateStringHash($"{ipAddress} - {userAgent}");
+
+            var resultClientHash = _encryptionTool.CalculateStringHash($"{jwtHash} - {userAgentHash}");
+            return resultClientHash;
         }
 
         private AuthenticationTicket CreateAnonymousTicket()

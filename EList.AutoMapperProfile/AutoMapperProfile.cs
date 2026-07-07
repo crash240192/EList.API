@@ -29,10 +29,7 @@ namespace EList.AutoMapperProfile
             //    defaultPageSize = 100;
             //}
 
-            //CreateMap<StartNewProcessRequest, StartNewProcessDto>()
-            //    .ForMember(x => x.RoleContext, o =>
-            //        o.MapFrom(s => s.RoleContext));
-
+            CreateMap<AuthorizationDto, AuthorizationResponse>().ReverseMap();
             CreateMap<AuthorizationDto, Authorization>().ReverseMap();
 
             CreateMap<AccountDto, CreateAccountRequest>().ReverseMap();

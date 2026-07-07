@@ -3,10 +3,12 @@ using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
+using EList.Models.Accounts;
 using EList.Models.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NLog;
+using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 using TM.Schedule.API.Attributes;
 using Authorization = EList.Models.Authorization.Authorization;
@@ -56,7 +58,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var clientHash = this.GetClientHash(); //TODO: Реализовать получение информации о клиенте
+                //var clientHash = this.GetClientHash(); //TODO: Реализовать получение информации о клиенте
 
                 var result = await _authorizationService.AuthorizeAsync(request.Login, request.Password, clientHash);
 
@@ -87,7 +89,7 @@ namespace EList.Api.Controllers
                 await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var clientHash = this.GetClientHash();
+                //var clientHash = this.GetClientHash();
 
                 var result = await _authorizationService.ActivateTokenAsync(activationKey, clientHash);
 
@@ -238,7 +240,7 @@ namespace EList.Api.Controllers
         /// <returns></returns>
         //[AllowAnonymous]
         [HttpPost("getData")]
-        public async Task<CommandResult<Authorization?>> GetAuthorizationDataAsync()
+        public async Task<CommandResult<AuthorizationResponse?>> GetAuthorizationDataAsync()
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -248,7 +250,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var clientHash = this.GetClientHash();
+                //var clientHash = this.GetClientHash();
 
                 var result = await _authorizationService.GetAuthorizationDataAsync(clientHash);
 
@@ -257,6 +259,69 @@ namespace EList.Api.Controllers
             }
             catch (Exception ex)
             {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Изменение пароля
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost("changePassword")]
+        public async Task<CommandResult> ChangePasswordAsync(ChangePasswordRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(ChangePasswordAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _authorizationService.ChangePasswordAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Отправка одноразового кода для смены пароля
+        /// </summary>
+        /// <param name="login"></param>
+        /// <returns></returns>
+        [HttpPost("forgotPassword")]
+        public async Task<CommandResult> ForgotPasswordAsync(ResetPasswordRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(ForgotPasswordAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _authorizationService.ForgotPasswordAsync(request?.Login);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }

@@ -151,6 +151,7 @@ create table public.authorization_token(
 	activation_attempts_remaining int not null,
 	creation_date timestamptz not null,
 	authorization_date timestamptz not null,
+	drop_password_key varchar null,
 	constraint authorization_token_pk primary key (token),
 	constraint authorization_token_account_fk foreign key (account_id) references public.accounts(id)
 );
@@ -158,8 +159,8 @@ create table public.authorization_token(
 CREATE TABLE public.person_info(
 	id uuid NOT NULL DEFAULT public.uuid_generate_v4(), 
 	account_id uuid not null,
-	first_name varchar(50) NOT NULL,
-	last_name varchar(50) NOT NULL,
+	first_name varchar(50) NULL,
+	last_name varchar(50) NULL,
 	patronymic varchar(50) NULL,
 	gender gender NULL,
 	birthdate timestamp NULL,

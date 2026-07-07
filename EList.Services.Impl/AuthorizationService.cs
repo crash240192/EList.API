@@ -4,14 +4,17 @@ using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
 using EList.FilestorageClient;
+using EList.Models.Accounts;
 using EList.Models.Authorization;
 using EList.Models.Enums;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using EList.Validators.Interfaces;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Newtonsoft.Json.Linq;
 using NLog;
+using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 
@@ -65,33 +68,9 @@ namespace EList.Services.Impl
 
             var passwordHash = _encryptionTool.CalculateStringHash(password);
 
-            var account = await _accountsRepository.GetAccountAsync(login, passwordHash);
-
-            if (account == null)
-            {
-                var contactTypes = await _contactsRepository.GetAllContactTypesAsync();
-                foreach (var contactType in contactTypes)
-                {
-                    var regexCheck = Regex.Match(login, contactType.Mask);
-                    if (regexCheck.Success)
-                    {
-                        var loginContact = await _contactsRepository.GetContactAsync(login);
-                        if (loginContact != null && loginContact.AccountId != null && loginContact.IsAuthorizationContact)
-                        {
-                            var accountByContact = await _accountsRepository.GetAccountAsync(loginContact.AccountId.Value);
-                            if (accountByContact != null)
-                            {
-                                account = await _accountsRepository.GetAccountAsync(accountByContact.Login, passwordHash);
-                                if (account != null)
-                                    break;
-                            }
-                        }
-                    }
-                }
-
-                if (account == null)
-                    return CommandResult<AuthorizationResponse>.Fail(ErrorCode.AuthenticationError, $"Невероный логин или пароль");
-            }
+            var account = await FindAccountByLoginAsync(login, password);
+            
+            //TODO: Убрать clientHash из параметров метода и сделать его получение из метода GetClientHash
             var tokenSearchResult = await _authorizationRepository.GetAuthorizationDataAsync(account.Id, clientHash);
 
             _accountDataHolder.Account = account;
@@ -109,7 +88,7 @@ namespace EList.Services.Impl
                 result.Token = tokenId;
                 result.ActivationRequired = true;
 
-                commandResult.Message = $"Для активации клиента было выслано уведомление на {contact?.Value}";
+                commandResult.Message = $"Указанный клиент не активирован. Для активации клиента было выслано уведомление на {contact?.Value}";
                 return commandResult;
             }
             else
@@ -123,7 +102,7 @@ namespace EList.Services.Impl
                 result.Token = tokenSearchResult.Token;
                 result.ActivationRequired = true;
 
-                commandResult.Message = $"Указанный клиент заблокирован. Для активации клиента было выслано уведомление на {contact?.Value}";
+                commandResult.Message = $"Указанный клиент не активирован. Для активации клиента было выслано уведомление на {contact?.Value}";
                 return commandResult;
             }
 
@@ -165,7 +144,7 @@ namespace EList.Services.Impl
             return new CommandResult<Authorization?>(result);
         }
 
-        public async Task<CommandResult<Authorization?>> GetAuthorizationDataAsync(string clientHash)
+        public async Task<CommandResult<AuthorizationResponse?>> GetAuthorizationDataAsync(string clientHash)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -175,10 +154,10 @@ namespace EList.Services.Impl
 
             var result = await _authorizationRepository.GetAuthorizationDataAsync(clientHash);
             if (result == null)
-                return CommandResult<Authorization?>.Fail(ErrorCode.AuthorizationDataNotFound, $"Не найден авторизационный токен текущего устройства клиента");
+                return CommandResult<AuthorizationResponse?>.Fail(ErrorCode.AuthorizationDataNotFound, $"Не найден авторизационный токен текущего устройства клиента");
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<Authorization?>(result);
+            return new CommandResult<AuthorizationResponse?>(result);
         }
 
         [Obsolete]
@@ -269,6 +248,119 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
             return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> ChangePasswordAsync(ChangePasswordRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(ChangePasswordAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var oldPasswordHash = _encryptionTool.CalculateStringHash(request.OldPassword);
+
+            var authData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
+            if (authData == null)
+                return CommandResult.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
+
+            var account = await _accountsRepository.GetAccountAsync(authData.AccountId);
+
+            if (_encryptionTool.CalculateStringHash(request.OldPassword) != account?.PasswordHash)
+                return CommandResult.Fail(ErrorCode.PasswordsDontMatch, "Старый пароль указан не верно");
+
+            if (request.NewPassword != request.NewPasswordConfirmation)
+                return CommandResult.Fail(ErrorCode.PasswordsDontMatch, "Пароль и подтверждение пароля не совпадают");
+
+            var newPasswordHash = _encryptionTool.CalculateStringHash(request.NewPassword);
+
+            if (newPasswordHash == oldPasswordHash)
+                return CommandResult.Fail(ErrorCode.NewAndOldPasswordsMatch, "Новый пароль должен отличаться от старого");
+
+            await _accountsRepository.UpdatePasswordAsync(account.Id, newPasswordHash);
+
+            await _authorizationRepository.DeactivateAccountTokensAsync(account.Id);
+
+            await _authorizationRepository.ActivateTokenAsync(_accountDataHolder.Token.Value);
+
+            await _notificationService.NotifyUserByContactAsync(SystemNotificationType.PasswordHasBeenChanged);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> ForgotPasswordAsync(string login)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(ForgotPasswordAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (string.IsNullOrWhiteSpace(login))
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Логин не указан");
+
+            var account = await FindAccountByLoginAsync(login);
+
+            if (account == null)
+                return CommandResult.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
+
+            var clientHash =
+
+            var token = await _authorizationRepository.GetAuthorizationDataAsync(clientHash);
+
+            await _notificationService.NotifyUserByContactAsync(SystemNotificationType.ResetPasswordRequest);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        /// <summary>
+        /// Поиск аккаунта по логину и паролю (в том числе по почте/телефону)
+        /// </summary>
+        /// <param name="login"></param>
+        /// <param name="password"></param>
+        /// <returns></returns>
+        private async Task<Account?> FindAccountByLoginAsync(string login, string password = null)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(FindAccountByLoginAsync)}";
+
+            var account = await _accountsRepository.GetAccountAsync(login);
+            var passwordHash = password != null ? _encryptionTool.CalculateStringHash(password) : null;
+            if (account == null)
+            {
+                var contactTypes = await _contactsRepository.GetAllContactTypesAsync();
+                foreach (var contactType in contactTypes)
+                {
+                    var regexCheck = Regex.Match(login, contactType.Mask);
+                    if (regexCheck.Success)
+                    {
+                        var loginContact = await _contactsRepository.GetContactAsync(login);
+                        if (loginContact != null && loginContact.AccountId != null && loginContact.IsAuthorizationContact)
+                        {
+                            var accountByContact = await _accountsRepository.GetAccountAsync(loginContact.AccountId.Value);
+                            if (accountByContact != null)
+                            {
+                                if (passwordHash == null)
+                                {
+                                    account = accountByContact;
+                                    break;
+                                }
+                                else
+                                {
+                                    account = await _accountsRepository.GetAccountAsync(accountByContact.Login, passwordHash);
+                                    if (account != null)
+                                        break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return account;
         }
     }
 }

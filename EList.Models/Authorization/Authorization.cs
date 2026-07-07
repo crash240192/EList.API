@@ -1,11 +1,4 @@
-﻿using LinqToDB.Mapping;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace EList.Models.Authorization
+﻿namespace EList.Models.Authorization
 {
     /// <summary>
     /// Объект авторизации
@@ -51,5 +44,10 @@ namespace EList.Models.Authorization
         /// Дата последней авторизации
         /// </summary>
         public DateTimeOffset AuthorizationDate { get; set; }
+
+        /// <summary>
+        /// Временный ключ для сброса пароля
+        /// </summary>
+        public string DropPasswordKey { get; set; }
     }
 }

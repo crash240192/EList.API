@@ -9,6 +9,7 @@ using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NLog;
+using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 using TM.Schedule.API.Attributes;
 
@@ -61,7 +62,7 @@ namespace EList.Api.Controllers
                 await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var clientHash = this.GetClientHash();
+                //var clientHash = this.GetClientHash();
 
                 var result = await _accountsService.CreateAccountAsync(request, clientHash);
                 if (!result.Success)
@@ -164,38 +165,5 @@ namespace EList.Api.Controllers
                 throw;
             }
         }
-
-        /// <summary>
-        /// Изменение пароля
-        /// </summary>
-        /// <returns></returns>
-        [HttpPost("changePassword")]
-        public async Task<CommandResult> ChangePasswordAsync(ChangePasswordRequest request)
-        {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(ChangePasswordAsync)}";
-
-            try
-            {
-                await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _accountsService.ChangePasswordAsync(request);
-                if (!result.Success)
-                    await _connectionProvider.RollbackTransactionAsync();
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
-        }
-
-        //public async Task<CommandResult> DropPasswordAsync()
     }
 }

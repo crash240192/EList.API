@@ -23,6 +23,12 @@ namespace EList.DbDataProvider.Models.Enums
         /// Простое уведомление с кодом активации.
         /// </summary>
         [MapValue(Value = "new_authorization")]
-        NewAuthorization = 2
+        NewAuthorization = 2,
+
+        /// <summary>
+        /// Запрос на смену пароля.
+        /// </summary>
+        [MapValue(Value = "reset_password_request")]
+        ResetPasswordRequest = 2
     }
 }
