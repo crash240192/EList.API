@@ -75,8 +75,11 @@ namespace EList.DbDataProvider.DataProviders
                 .ThenLoad(i => i.PersonInfo)
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.Avatars)
-                .Where(i => request.EventId == i.EventId)                
+                .Where(i => request.EventId == i.EventId)
                 .OrderBy(i => i.Account.Login)
+                .OrderBy(i => i.Account.PersonInfo.Patronymic)
+                .OrderBy(i => i.Account.PersonInfo.LastName)
+                .OrderBy(i => i.Account.PersonInfo.FirstName)
                 .Select(i => i.Account);
 
             #region name

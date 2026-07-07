@@ -20,6 +20,9 @@ namespace EList.Api.Infrastructure
 
         private static readonly List<string> AnonymousMethods = new()
         {
+            "/api/accounts/getdata/*",
+            "/api/contacts/getaccountcontacts/*",
+
             "/api/contacts/contacttypes/get/*",
             "/api/contacts/contacttypes/getall",
 

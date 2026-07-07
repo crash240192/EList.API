@@ -15,6 +15,8 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<Guid> CreateEventAsync(EventDto item)
         {
+            item.CreateDate = DateTimeOffset.Now.ToUniversalTime();
+            item.UpdateDate = DateTimeOffset.Now.ToUniversalTime();
             var id = (Guid)await _connection.InsertWithIdentityAsync(item);
             return id;
         }
