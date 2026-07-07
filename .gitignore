@@ -36,3 +36,4 @@ bin/
 *.suo
 .idea/
 logs/
+EList.Api/internal-nlog.txt
