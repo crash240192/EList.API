@@ -55,7 +55,7 @@ namespace EList.Services.Impl
             _accountDataHolder = accountDataHolder;
         }
 
-        public async Task<CommandResult<Guid?>> CreateAccountAsync(CreateAccountRequest request, string clientHash)
+        public async Task<CommandResult<Guid?>> CreateAccountAsync(CreateAccountRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -79,7 +79,7 @@ namespace EList.Services.Impl
 
             var accountId = await _accountsRepository.CreateAccountAsync(request);
             var account = await _accountsRepository.GetAccountAsync(accountId);
-            var tokenId = await _authorizationRepository.CreateTokenAsync(accountId, clientHash);
+            var tokenId = await _authorizationRepository.CreateTokenAsync(accountId, _accountDataHolder.ClientHash);
 
             _accountDataHolder.Token = tokenId;
             _accountDataHolder.Account = account;

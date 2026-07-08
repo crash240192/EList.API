@@ -5,6 +5,6 @@ namespace EList.Services.Interfaces
 {
     public interface ISystemNotificationsService
     {
-        Task<CommandResult<string>> NotifyUserByContactAsync(SystemNotificationType notificationType);
+        Task<CommandResult<string>> NotifyUserByContactAsync(SystemNotificationType notificationType, Guid? accountId = null);
     }
 }

@@ -58,7 +58,7 @@ namespace EList.Services.Impl
             _accountDataHolder = accountDataHolder;
         }
 
-        public async Task<CommandResult<AuthorizationResponse>> AuthorizeAsync(string login, string password, string clientHash)
+        public async Task<CommandResult<AuthorizationResponse>> AuthorizeAsync(string login, string password)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -71,7 +71,7 @@ namespace EList.Services.Impl
             var account = await FindAccountByLoginAsync(login, password);
             
             //TODO: Убрать clientHash из параметров метода и сделать его получение из метода GetClientHash
-            var tokenSearchResult = await _authorizationRepository.GetAuthorizationDataAsync(account.Id, clientHash);
+            var tokenSearchResult = await _authorizationRepository.GetAuthorizationDataAsync(account.Id, _accountDataHolder.ClientHash);
 
             _accountDataHolder.Account = account;
 
@@ -81,7 +81,7 @@ namespace EList.Services.Impl
 
             if (tokenSearchResult == null)
             {
-                var tokenId = await _authorizationRepository.CreateTokenAsync(account.Id, clientHash);
+                var tokenId = await _authorizationRepository.CreateTokenAsync(account.Id, _accountDataHolder.ClientHash);
                 _accountDataHolder.Token = tokenId;
                 await _notificationService.NotifyUserByContactAsync(SystemNotificationType.Activation);
 
@@ -180,7 +180,7 @@ namespace EList.Services.Impl
             return new CommandResult<Guid>(result);
         }
 
-        public async Task<CommandResult> ActivateTokenAsync(string activationKey, string clientHash)
+        public async Task<CommandResult> ActivateTokenAsync(string activationKey)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -195,7 +195,7 @@ namespace EList.Services.Impl
             if (existingToken == null)
                 return CommandResult.Fail(ErrorCode.AuthorizationDataNotFound, $"Не найден авторизационный токен для текущего клиента");
 
-            if (existingToken.ClientHash != clientHash)
+            if (existingToken.ClientHash != _accountDataHolder.ClientHash)
                 return CommandResult.Fail(ErrorCode.AuthenticationError, "Клиент не подтверждён");
 
             if (existingToken.ActivationKey != activationKey)
@@ -300,16 +300,14 @@ namespace EList.Services.Impl
             if (string.IsNullOrWhiteSpace(login))
                 return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Логин не указан");
 
-            var account = await FindAccountByLoginAsync(login);
+            //var account = await FindAccountByLoginAsync(login);
 
-            if (account == null)
-                return CommandResult.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
+            //if (account == null)
+            //    return CommandResult.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
 
-            var clientHash =
+            //var token = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.ClientHash);
 
-            var token = await _authorizationRepository.GetAuthorizationDataAsync(clientHash);
-
-            await _notificationService.NotifyUserByContactAsync(SystemNotificationType.ResetPasswordRequest);
+            //await _notificationService.NotifyUserByContactAsync(SystemNotificationType.ResetPasswordRequest);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

@@ -62,9 +62,7 @@ namespace EList.Api.Controllers
                 await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                //var clientHash = this.GetClientHash();
-
-                var result = await _accountsService.CreateAccountAsync(request, clientHash);
+                var result = await _accountsService.CreateAccountAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 

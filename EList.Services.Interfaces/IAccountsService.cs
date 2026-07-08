@@ -5,7 +5,7 @@ namespace EList.Services.Interfaces
 {
     public interface IAccountsService
     {
-        Task<CommandResult<Guid?>> CreateAccountAsync(CreateAccountRequest request, string clientHash);
+        Task<CommandResult<Guid?>> CreateAccountAsync(CreateAccountRequest request);
         Task<CommandResult<Account?>> GetAccountByTokenAsync();
         Task<CommandResult<Account?>> GetAccountAsync(Guid accountId);
         Task<CommandResult> UpdateLocationAsync(double latitude, double longitude);

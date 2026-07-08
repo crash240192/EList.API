@@ -58,9 +58,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                //var clientHash = this.GetClientHash(); //TODO: Реализовать получение информации о клиенте
-
-                var result = await _authorizationService.AuthorizeAsync(request.Login, request.Password, clientHash);
+                var result = await _authorizationService.AuthorizeAsync(request.Login, request.Password);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -82,16 +80,14 @@ namespace EList.Api.Controllers
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(AuthorizeAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(ActivateTokenAsync)}";
 
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                //var clientHash = this.GetClientHash();
-
-                var result = await _authorizationService.ActivateTokenAsync(activationKey, clientHash);
+                var result = await _authorizationService.ActivateTokenAsync(activationKey);
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
@@ -239,7 +235,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <returns></returns>
         //[AllowAnonymous]
-        [HttpPost("getData")]
+        /*[HttpPost("getData")]
         public async Task<CommandResult<AuthorizationResponse?>> GetAuthorizationDataAsync()
         {
             var correlationId = _correlationIdProvider.Get();
@@ -249,8 +245,6 @@ namespace EList.Api.Controllers
             try
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                //var clientHash = this.GetClientHash();
 
                 var result = await _authorizationService.GetAuthorizationDataAsync(clientHash);
 
@@ -262,7 +256,7 @@ namespace EList.Api.Controllers
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
-        }
+        }*/
 
         /// <summary>
         /// Изменение пароля

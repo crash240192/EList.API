@@ -62,15 +62,15 @@ namespace EList.Services.Impl
 
 
             var contacts = new List<ContactDataItem>();
-            if (accountId == null)
-            {
+            //if (accountId == null)
+            //{
                 var tokenData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
                 contacts = await _contactsRepository.GetAccountContactsAsync(tokenData.AccountId);
-            }
-            else
-            {
-                contacts = await _contactsRepository.GetAccountContactsAsync(accountId.Value);
-            }
+            //}
+            //else
+            //{
+            //    contacts = await _contactsRepository.GetAccountContactsAsync(accountId.Value);
+            //}
 
             contacts = contacts?.Where(i => i.IsAuthorizationContact).ToList();
 

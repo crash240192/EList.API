@@ -6,7 +6,7 @@ namespace EList.Services.Interfaces
 {
     public interface IAuthorizationService
     {
-        Task<CommandResult<AuthorizationResponse>> AuthorizeAsync(string login, string password, string clientHash);
+        Task<CommandResult<AuthorizationResponse>> AuthorizeAsync(string login, string password);
 
         Task<CommandResult<string>> SendActivationCodeAsync();
         Task<CommandResult<Authorization?>> GetAuthorizationDataAsync(Guid token);
@@ -15,7 +15,7 @@ namespace EList.Services.Interfaces
         [Obsolete]
         Task<CommandResult<Guid>> CreateTokenAsync(string clientHash);
 
-        Task<CommandResult> ActivateTokenAsync(string activationKey, string clientHash);
+        Task<CommandResult> ActivateTokenAsync(string activationKey);
         Task<CommandResult> DeactivateTokenAsync(Guid token);
 
         Task<CommandResult> ChangePasswordAsync(ChangePasswordRequest request);
