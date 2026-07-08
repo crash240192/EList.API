@@ -69,7 +69,7 @@ namespace EList.Services.Impl
             var passwordHash = _encryptionTool.CalculateStringHash(password);
 
             var account = await FindAccountByLoginAsync(login, password);
-            
+
             //TODO: Убрать clientHash из параметров метода и сделать его получение из метода GetClientHash
             var tokenSearchResult = await _authorizationRepository.GetAuthorizationDataAsync(account.Id, _accountDataHolder.ClientHash);
 
@@ -300,14 +300,27 @@ namespace EList.Services.Impl
             if (string.IsNullOrWhiteSpace(login))
                 return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Логин не указан");
 
-            //var account = await FindAccountByLoginAsync(login);
+            var account = await FindAccountByLoginAsync(login);
 
-            //if (account == null)
-            //    return CommandResult.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
+            if (account == null)
+                return CommandResult.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
 
-            //var token = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.ClientHash);
+            var token = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.ClientHash);
 
-            //await _notificationService.NotifyUserByContactAsync(SystemNotificationType.ResetPasswordRequest);
+            if (token == null)
+            {
+                var newTokenId = await _authorizationRepository.CreateTokenAsync(account.Id, _accountDataHolder.ClientHash);
+                _accountDataHolder.Token = newTokenId;
+            }
+            else
+            {
+                _accountDataHolder.Token = token.Token;
+            }
+
+            await _authorizationRepository.GenerateNewActivationKey(_accountDataHolder.Token.Value);
+
+            await _notificationService.NotifyUserByContactAsync(SystemNotificationType.ResetPasswordRequest, account.Id);
+
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

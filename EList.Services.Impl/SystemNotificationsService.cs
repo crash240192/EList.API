@@ -60,17 +60,13 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-
             var contacts = new List<ContactDataItem>();
-            //if (accountId == null)
-            //{
-                var tokenData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
-                contacts = await _contactsRepository.GetAccountContactsAsync(tokenData.AccountId);
-            //}
-            //else
-            //{
-            //    contacts = await _contactsRepository.GetAccountContactsAsync(accountId.Value);
-            //}
+            var tokenData = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
+
+            if (accountId == null)            
+                contacts = await _contactsRepository.GetAccountContactsAsync(tokenData.AccountId);            
+            else
+                contacts = await _contactsRepository.GetAccountContactsAsync(accountId.Value);
 
             contacts = contacts?.Where(i => i.IsAuthorizationContact).ToList();
 

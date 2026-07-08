@@ -81,6 +81,13 @@ namespace EList.DbDataProvider.DataProviders
                 .UpdateAsync();
         }
 
+        public async Task GenerateNewActivationKey(Guid token)
+        {
+            await _connection.Authorization.Where(i => i.Token == token)
+                .Set(i => i.ActivationKey, ActivationKeysGenerator.Generate(activationKeyLength))
+                .UpdateAsync();
+        }
+
         public async Task DeactivateAccountTokensAsync(Guid accountId)
         {
             await _connection.Authorization

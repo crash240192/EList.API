@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using EList.Common.Support;
 using EList.DbDataProvider.Interfaces;
 using EList.Models.Authorization;
 using EList.Repositories.Interfaces;
@@ -60,6 +61,11 @@ namespace EList.Repositories.Impl
             var authorizationItem = await _authorizationDataProvider.GetAuthorizationDataAsync(clientHash);
             var result = _mapper.Map<AuthorizationResponse>(authorizationItem);
             return result;
+        }
+
+        public async Task GenerateNewActivationKey(Guid token)
+        {
+            await _authorizationDataProvider.GenerateNewActivationKey(token);
         }
     }
 }

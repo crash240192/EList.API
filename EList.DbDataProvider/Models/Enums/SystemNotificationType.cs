@@ -29,6 +29,6 @@ namespace EList.DbDataProvider.Models.Enums
         /// Запрос на смену пароля.
         /// </summary>
         [MapValue(Value = "reset_password_request")]
-        ResetPasswordRequest = 2
+        ResetPasswordRequest = 3
     }
 }
