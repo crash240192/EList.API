@@ -382,6 +382,15 @@ namespace EList.Services.Impl
             if (string.IsNullOrWhiteSpace(request?.Code))
                 return CommandResult<AuthorizationResponse>.Fail(ErrorCode.IsNullOrEmpty, "Код авторизации не указан");
 
+            if (string.IsNullOrWhiteSpace(request.NewPassword))
+                return CommandResult<AuthorizationResponse>.Fail(ErrorCode.IsNullOrEmpty, "Пароль не должен быть пустым");
+
+            if (string.IsNullOrWhiteSpace(request.NewPasswordConfirmation))
+                return CommandResult<AuthorizationResponse>.Fail(ErrorCode.IsNullOrEmpty, "Подтверждение пароля не должно быть пустым");
+
+            if (request.NewPasswordConfirmation != request.NewPassword)
+                return CommandResult<AuthorizationResponse>.Fail(ErrorCode.PasswordsDontMatch, "Пароль и подтверждение пароля не совпадают");
+
             var account = await FindAccountByLoginAsync(request.Login);
 
             if (account == null)
@@ -405,6 +414,9 @@ namespace EList.Services.Impl
             await _authorizationRepository.ActivateTokenAsync(token.Token);
 
             await _filestorageClient.RegisterAuthDataAsync(token.Token, account.Id, _accountDataHolder.ClientHash);
+
+            var newPasswordHash = _encryptionTool.CalculateStringHash(request.NewPassword);
+            await _accountsRepository.UpdatePasswordAsync(account.Id, newPasswordHash);
 
             var result = new AuthorizationResponse
             {

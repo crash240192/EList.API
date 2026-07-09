@@ -68,7 +68,7 @@ namespace EList.Api.Controllers
                     configurationAllowed = bool.Parse(ConfigurationManager.AppSettings["registrationAllowed"]);
 
                 if (!configurationAllowed)
-                    return CommandResult.Fail(ErrorCode.RegistrationForbiden);
+                    return CommandResult.Fail(ErrorCode.RegistrationForbiden, "Регистрация временно недоступна");
 
                 var result = await _accountsService.CreateAccountAsync(request);
                 if (!result.Success)
