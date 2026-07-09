@@ -44,10 +44,5 @@
         /// Дата последней авторизации
         /// </summary>
         public DateTimeOffset AuthorizationDate { get; set; }
-
-        /// <summary>
-        /// Временный ключ для сброса пароля
-        /// </summary>
-        public string DropPasswordKey { get; set; }
     }
 }

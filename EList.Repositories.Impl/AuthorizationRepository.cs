@@ -56,10 +56,10 @@ namespace EList.Repositories.Impl
             return result;
         }
 
-        public async Task<AuthorizationResponse?> GetAuthorizationDataAsync(string clientHash)
+        public async Task<Authorization?> GetAuthorizationDataAsync(string clientHash)
         {
             var authorizationItem = await _authorizationDataProvider.GetAuthorizationDataAsync(clientHash);
-            var result = _mapper.Map<AuthorizationResponse>(authorizationItem);
+            var result = _mapper.Map<Authorization>(authorizationItem);
             return result;
         }
 

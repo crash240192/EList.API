@@ -97,7 +97,9 @@ namespace EList.Api.Infrastructure
             || Request.Path == "/api/authorization/activate";
 
         private bool IsResetPasswordFlow => // Jwt обязателен
-            Request.Path == "/api/authorization/forgotPassword";
+            Request.Path == "/api/authorization/forgotPassword"
+            || Request.Path == "/api/authorization/verifyResetCode"
+            || Request.Path == "/api/authorization/resetPassword";
 
         //private bool IsMainFlow => !IsRegistrationFlow && !IsAuthorizationFlow && !IsActivationFlow && !IsResetPasswordFlow;
 

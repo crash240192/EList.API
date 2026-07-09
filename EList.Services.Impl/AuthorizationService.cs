@@ -70,7 +70,9 @@ namespace EList.Services.Impl
 
             var account = await FindAccountByLoginAsync(login, password);
 
-            //TODO: Убрать clientHash из параметров метода и сделать его получение из метода GetClientHash
+            if (account == null)
+                return CommandResult<AuthorizationResponse>.Fail(ErrorCode.AuthenticationError, "Неправильное имя пользователя или пароль");
+
             var tokenSearchResult = await _authorizationRepository.GetAuthorizationDataAsync(account.Id, _accountDataHolder.ClientHash);
 
             _accountDataHolder.Account = account;
@@ -157,7 +159,11 @@ namespace EList.Services.Impl
                 return CommandResult<AuthorizationResponse?>.Fail(ErrorCode.AuthorizationDataNotFound, $"Не найден авторизационный токен текущего устройства клиента");
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<AuthorizationResponse?>(result);
+            return new CommandResult<AuthorizationResponse?>(new AuthorizationResponse
+            {
+                ActivationRequired = !result.Active,
+                Token = result.Token
+            });
         }
 
         [Obsolete]
@@ -321,10 +327,96 @@ namespace EList.Services.Impl
 
             await _notificationService.NotifyUserByContactAsync(SystemNotificationType.ResetPasswordRequest, account.Id);
 
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> VerifyResetPasswordAsync(string login, string code)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(VerifyResetPasswordAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (string.IsNullOrWhiteSpace(login))
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Логин не указан");
+
+            if (string.IsNullOrWhiteSpace(code))
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Код авторизации не указан");
+
+            var account = await FindAccountByLoginAsync(login);
+
+            if (account == null)
+                return CommandResult.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
+
+            var token = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.ClientHash);
+
+            if (token == null)
+                return CommandResult.Fail(ErrorCode.AccountNotFound, "Не найден токен для указанного клиента");
+            else
+                _accountDataHolder.Token = token.Token;
+
+            if (token.ActivationKey != code)
+            {
+                await _authorizationRepository.GenerateNewActivationKey(_accountDataHolder.Token.Value);
+                await _notificationService.NotifyUserByContactAsync(SystemNotificationType.ResetPasswordRequest, account.Id);
+                return CommandResult.Fail(ErrorCode.InvalidActivationKey, "Код сброса пароля указан неправильно. Был отправлен новый код");
+            }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
+
+        public async Task<CommandResult<AuthorizationResponse>> ResetPasswordAsync(ResetPasswordRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(VerifyResetPasswordAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (string.IsNullOrWhiteSpace(request?.Login))
+                return CommandResult<AuthorizationResponse>.Fail(ErrorCode.IsNullOrEmpty, "Логин не указан");
+
+            if (string.IsNullOrWhiteSpace(request?.Code))
+                return CommandResult<AuthorizationResponse>.Fail(ErrorCode.IsNullOrEmpty, "Код авторизации не указан");
+
+            var account = await FindAccountByLoginAsync(request.Login);
+
+            if (account == null)
+                return CommandResult<AuthorizationResponse>.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
+
+            var token = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.ClientHash);
+
+            if (token == null)
+                return CommandResult<AuthorizationResponse>.Fail(ErrorCode.AccountNotFound, "Не найден токен для указанного клиента");
+            else
+                _accountDataHolder.Token = token.Token;
+
+            if (token.ActivationKey != request.Code)
+            {
+                await _authorizationRepository.GenerateNewActivationKey(_accountDataHolder.Token.Value);
+                await _notificationService.NotifyUserByContactAsync(SystemNotificationType.ResetPasswordRequest, account.Id);
+                return CommandResult<AuthorizationResponse>.Fail(ErrorCode.InvalidActivationKey, "Код сброса пароля указан неправильно. Был отправлен новый код");
+            }
+
+            await _authorizationRepository.DeactivateAccountTokensAsync(account.Id);
+            await _authorizationRepository.ActivateTokenAsync(token.Token);
+
+            var result = new AuthorizationResponse
+            {
+                Token = token.Token,
+                ActivationRequired = false
+            };
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<AuthorizationResponse>(result);
+        }
+
+
+
+
 
         /// <summary>
         /// Поиск аккаунта по логину и паролю (в том числе по почте/телефону)
@@ -369,6 +461,12 @@ namespace EList.Services.Impl
                         }
                     }
                 }
+            }
+
+            if (passwordHash != null)
+            {
+                if (passwordHash != account.PasswordHash)
+                    return null;
             }
 
             return account;

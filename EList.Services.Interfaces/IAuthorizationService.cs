@@ -20,5 +20,7 @@ namespace EList.Services.Interfaces
 
         Task<CommandResult> ChangePasswordAsync(ChangePasswordRequest request);
         Task<CommandResult> ForgotPasswordAsync(string login);
+        Task<CommandResult> VerifyResetPasswordAsync(string login, string code);
+        Task<CommandResult<AuthorizationResponse>> ResetPasswordAsync(ResetPasswordRequest request);
     }
 }

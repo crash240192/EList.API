@@ -320,5 +320,69 @@ namespace EList.Api.Controllers
                 throw;
             }
         }
+
+        /// <summary>
+        /// Валидация кода сброса пароля
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        [HttpPost("verifyResetCode")]
+        public async Task<CommandResult> VerifyResetPasswordAsync(VerifyResetPasswordRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(VerifyResetPasswordAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _authorizationService.VerifyResetPasswordAsync(request?.Login, request?.Code);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Сброс пароля для механизма "не помню пароль"
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        [HttpPost("resetPassword")]
+        public async Task<CommandResult<AuthorizationResponse>> ResetPasswordAsync(ResetPasswordRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(ResetPasswordAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _authorizationService.ResetPasswordAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
     }
 }

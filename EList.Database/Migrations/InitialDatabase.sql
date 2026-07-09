@@ -22,7 +22,7 @@ do $CREATE_NOTIFICATION_TYPES$
 BEGIN
 	if not exists (select 1 from pg_type where typname = 'system_notification_type')
 	then 
-		CREATE TYPE public.system_notification_type AS ENUM ('account_created', 'password_has_been_changed', 'new_authorization');
+		CREATE TYPE public.system_notification_type AS ENUM ('account_created', 'password_has_been_changed', 'new_authorization', 'reset_password_request');
 	end if;
 end $CREATE_NOTIFICATION_TYPES$;
 
@@ -58,7 +58,12 @@ insert into public.system_notifications
 ('new_authorization', 
 'Авторизация с нового устройства',
 'Аригату в хату, бисёнены!<br/><br/>Обнаружена попытка входа с нового устройства.<br/><br/>Для доступа в систему введите код активации:<br/> #ACTIVATION_CODE#<br/><br/> В случае, если вы не пытались авторизоваться с другого устройства, можете проигнорировать данное сообщение.<br/><i>Это письмо отправлено автоматически.</i><br/><i>Отвечать на него не нужно.',
-'Для авторизации с нового устройства введите код активации #ACTIVATION_CODE#');
+'Для авторизации с нового устройства введите код активации #ACTIVATION_CODE#'),
+
+('reset_password_request', 
+'Запрос на смену пароля',
+'Аригату в хату, бисёнены!<br/><br/>Тут говорят ты пароль хочешь сменить? Вот код для подтверждения смены пароля: <br/> #ACTIVATION_CODE#<br/><br/> В случае, если вы не пытались авторизоваться с другого устройства, можете проигнорировать данное сообщение.<br/><i>Это письмо отправлено автоматически.</i><br/><i>Отвечать на него не нужно.',
+'Код смены пароля #ACTIVATION_CODE#');
 
 
 
@@ -151,7 +156,6 @@ create table public.authorization_token(
 	activation_attempts_remaining int not null,
 	creation_date timestamptz not null,
 	authorization_date timestamptz not null,
-	drop_password_key varchar null,
 	constraint authorization_token_pk primary key (token),
 	constraint authorization_token_account_fk foreign key (account_id) references public.accounts(id)
 );
