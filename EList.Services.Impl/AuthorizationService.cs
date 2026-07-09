@@ -404,6 +404,8 @@ namespace EList.Services.Impl
             await _authorizationRepository.DeactivateAccountTokensAsync(account.Id);
             await _authorizationRepository.ActivateTokenAsync(token.Token);
 
+            await _filestorageClient.RegisterAuthDataAsync(token.Token, account.Id, _accountDataHolder.ClientHash);
+
             var result = new AuthorizationResponse
             {
                 Token = token.Token,
@@ -413,10 +415,6 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<AuthorizationResponse>(result);
         }
-
-
-
-
 
         /// <summary>
         /// Поиск аккаунта по логину и паролю (в том числе по почте/телефону)

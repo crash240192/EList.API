@@ -268,12 +268,9 @@ namespace EList.Api.Infrastructure
         private string GetClientHash(string jwtHeader)
         {
             var jwtHash = _encryptionTool.CalculateStringHash(jwtHeader);
-            var ipAddress = Request.HttpContext.Connection.RemoteIpAddress?.ToString();
-            var userAgent = Request.Headers.UserAgent;
-            var userAgentHash = _encryptionTool.CalculateStringHash($"{ipAddress} - {userAgent}");
-
-            var resultClientHash = _encryptionTool.CalculateStringHash($"{jwtHash} - {userAgentHash}");
-            return resultClientHash;
+            var platform = Request.Headers["X-Client-Platform"].FirstOrDefault() ?? "unknown";
+            var appVersion = Request.Headers["X-App-Version"].FirstOrDefault() ?? "unknown";
+            return _encryptionTool.CalculateStringHash($"{jwtHash}|{platform}|{appVersion}");
         }
 
         private AuthenticationTicket CreateAnonymousTicket()
@@ -292,14 +289,6 @@ namespace EList.Api.Infrastructure
 
             var identity = new ClaimsIdentity(claims, Scheme.Name);
             return new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name);
-        }
-
-        private void ClearAccountData()
-        {
-            _accountDataHolder.Token = null;
-            _accountDataHolder.Jwt = null;
-            _accountDataHolder.Account = null;
-            _accountDataHolder.PersonInfo = null;
         }
 
         /// <summary>
