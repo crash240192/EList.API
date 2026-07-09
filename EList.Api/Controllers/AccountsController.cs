@@ -1,7 +1,9 @@
-﻿using EList.Api.Extensions;
+﻿using System.Diagnostics;
+using EList.Common.Configuration;
 using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
+using EList.Common.Support;
 using EList.DbDataProvider.Interfaces;
 using EList.Models.Accounts;
 using EList.Models.Location;
@@ -9,9 +11,8 @@ using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NLog;
-using Org.BouncyCastle.Asn1.Ocsp;
-using System.Diagnostics;
 using TM.Schedule.API.Attributes;
+using ConfigurationManager = EList.Common.Configuration.ConfigurationManager;
 
 namespace EList.Api.Controllers
 {
@@ -42,7 +43,7 @@ namespace EList.Api.Controllers
             _connectionProvider = connectionProvider;
             _mediaService = mediaService;
         }
-        
+
 
         /// <summary>
         /// Создание аккаунта
@@ -61,6 +62,13 @@ namespace EList.Api.Controllers
             {
                 await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var configurationAllowed = false;
+                if (ConfigurationManager.AppSettings.Contains("registrationAllowed"))
+                    configurationAllowed = bool.Parse(ConfigurationManager.AppSettings["registrationAllowed"]);
+
+                if (!configurationAllowed)
+                    return CommandResult.Fail(ErrorCode.RegistrationForbiden);
 
                 var result = await _accountsService.CreateAccountAsync(request);
                 if (!result.Success)
