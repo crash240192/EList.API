@@ -11,6 +11,7 @@ using EList.Models.Media;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
+using Org.BouncyCastle.Ocsp;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 
@@ -289,33 +290,9 @@ namespace EList.Services.Impl
             }
 
             var files = await _mediaRepository.GetAlbumFilesAsync(albumId);
-
-            if (files.Result.NullSafeAny())
-            {
-                var fileIds = files.Result?.Select(i => i.Id).ToList();
-                //TODO: Добавить проверку что этот файл не является в том числе аватаркой 
-                var filesWithoutAlbums = await _mediaRepository.GetFilesNotExistsInAnotherAlbumsAsync(fileIds, albumId);
-
-                //Тут мы проверяем что этот файл больше не прикреплён ни к одному альбому
-                if (filesWithoutAlbums.NullSafeAny())
-                {
-                    var fileIdsConcurrentQueue = new ConcurrentQueue<Guid>(filesWithoutAlbums);
-
-                    var tasks = new List<Task>();
-                    for (int i = 0; i < 10; i++)
-                    {
-                        var task = Task.Run(async () =>
-                        {
-                            while (fileIdsConcurrentQueue.TryDequeue(out var curFileId))
-                            {
-                                await _filestorageClient.DeleteFileAsync(curFileId, _accountDataHolder.Token.Value, _accountDataHolder.Jwt);
-                            }
-                        });
-                    }
-
-                    Task.WaitAll(tasks.ToArray());
-                }
-            }
+            var fileIds = files.Result?.Select(i => i.Id)?.ToList();
+            if (fileIds.NullSafeAny())
+                await DeleteAbondonedFiles(fileIds, albumId);
 
             await _mediaRepository.DeleteAlbumAsync(albumId);
 
@@ -323,18 +300,25 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
-        public async Task<CommandResult> DeleteFileAsync(Guid fileId, Guid albumId)
+        public async Task<CommandResult> DeleteFilesAsync(List<Guid> fileIds, Guid albumId)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeleteFileAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteFilesAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var file = await _mediaRepository.GetFileAsync(fileId, albumId);
-            if (file == null)
+            if (!fileIds.NullSafeAny())
             {
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return CommandResult.Fail(ErrorCode.AlbumItemNotFound, "Файл не найден");
+                return CommandResult.Fail(ErrorCode.AlbumItemNotFound, "Список файлов не должен быть пустым");
+            }
+
+            var allFilesExists = await _mediaRepository.CheckFilesExistsAsync(fileIds);
+
+            if (!allFilesExists)
+            {
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return CommandResult.Fail(ErrorCode.AlbumItemNotFound, "Указанные файлы не найдены");
             }
 
             var album = await _mediaRepository.GetAlbumAsync(albumId);
@@ -362,16 +346,13 @@ namespace EList.Services.Impl
                 }
             }
 
-            //TODO: Добавить првоерку что файл не является в том числе аватаркой 
-            var filesWithoutAlbums = await _mediaRepository.GetFilesNotExistsInAnotherAlbumsAsync(new List<Guid> { fileId }, albumId);
-
-            if (filesWithoutAlbums.NullSafeAny())
-                await _filestorageClient.DeleteFileAsync(filesWithoutAlbums.FirstOrDefault(), _accountDataHolder.Token.Value, _accountDataHolder.Jwt);
+            await DeleteAbondonedFiles(fileIds, albumId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
 
+        
 
         public async Task<CommandResult<PagedList<AlbumFile>>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
         {
@@ -519,7 +500,41 @@ namespace EList.Services.Impl
 
             return CommandResult<Guid?>.OK(result);
         }
+
+        public async Task<CommandResult> DeleteAvatarAsync(Guid fileId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteAvatarAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var avatar = await _mediaRepository.GetAvatarAsync(fileId);
+            if (avatar == null)
+            {
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return CommandResult.Fail(ErrorCode.AlbumItemNotFound, "Файл не найден");
+            }
+
+            if (avatar.AccountId != _accountDataHolder.AccountId)
+            {
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return CommandResult.Fail(ErrorCode.AccessError, "Файл принадлежит другмоу аккаунту");
+            }
+
+            await _mediaRepository.DeleteAvatarAsync(fileId);
+
+            #region если файл больше нигде не фигурирует то удаляем его физически из файлохранилища            
+            var fileInAnotherAlbum = await _mediaRepository.SomeAlbumContainsThisFileAsync(fileId);
+            if (!fileInAnotherAlbum)
+                await _filestorageClient.DeleteFileAsync(fileId, _accountDataHolder.Token.Value, _accountDataHolder.Jwt);
+            #endregion
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
         #endregion
+
 
         #region organization avatars
         public async Task<CommandResult> SetNewOrganizationAvatarAsync(Guid organizationId, Guid fileId)
@@ -573,5 +588,36 @@ namespace EList.Services.Impl
             return CommandResult<Guid?>.OK(result);
         }
         #endregion
+
+        private async Task DeleteAbondonedFiles(List<Guid>? fileIds, Guid albumId)
+        {
+            // проверяем что файлы в удаляемом альбоме не прикреплены к другим альбомам. Если не прикреплены, то удаляем их физически из файлохранилища
+            
+            if (fileIds.NullSafeAny())
+            {
+                //TODO: Добавить проверку что этот файл не является в том числе аватаркой 
+                var filesWithoutAlbums = await _mediaRepository.GetFilesNotExistsInAnotherAlbumsAsync(fileIds, albumId);
+
+                //Тут мы проверяем что этот файл больше не прикреплён ни к одному альбому
+                if (filesWithoutAlbums.NullSafeAny())
+                {
+                    var fileIdsConcurrentQueue = new ConcurrentQueue<Guid>(filesWithoutAlbums);
+
+                    var tasks = new List<Task>();
+                    for (int i = 0; i < 10; i++)
+                    {
+                        var task = Task.Run(async () =>
+                        {
+                            while (fileIdsConcurrentQueue.TryDequeue(out var curFileId))
+                            {
+                                await _filestorageClient.DeleteFileAsync(curFileId, _accountDataHolder.Token.Value, _accountDataHolder.Jwt);
+                            }
+                        });
+                    }
+
+                    Task.WaitAll(tasks.ToArray());
+                }
+            }
+        }
     }
 }

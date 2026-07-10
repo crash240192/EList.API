@@ -38,6 +38,8 @@ namespace EList.AutoMapperProfile
             CreateMap<Account, AccountDto>()
                 .ForMember(dest => dest.Avatars, opt => opt.Ignore());
 
+            CreateMap<AccountAvatarDto, AccountAvatarItem>().ReverseMap();
+
             CreateMap<AccountDto, AccountPublicData>();
 
             CreateMap<PersonInfoDto, PersonInfo>().ReverseMap();

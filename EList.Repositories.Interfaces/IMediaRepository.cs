@@ -18,12 +18,16 @@ namespace EList.Repositories.Interfaces
         Task<PagedList<EventAlbumsContainer>> GetEventsAlbumsAsync(Guid accountId, Guid? curAccountId, int? pageIndex = null, int? pageSize = null);
         Task<PagedList<AlbumFile>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null);
         Task<AlbumFile> GetFileAsync(Guid fileId, Guid albumId);
+        Task<bool> CheckFilesExistsAsync(List<Guid> fileIds);
         Task<List<Guid>> GetFilesNotExistsInAnotherAlbumsAsync(List<Guid> fileIds, Guid exceptAlbumId);
+        Task<bool> SomeAlbumContainsThisFileAsync(Guid fileId);
         Task DeleteFilesAsync(List<Guid> fileIds);
         Task DeleteAlbumAsync(Guid albumId);
 
         Task SetNewAccountAvatarAsync(Guid accountId, Guid fileId);
         Task<List<Guid>?> GetAccountAvatarsAsync(Guid accountId);
+        Task<AccountAvatarItem> GetAvatarAsync(Guid fileId);
+        Task DeleteAvatarAsync(Guid fileId);
         Task<Guid?> GetLastAccountAvatarAsync(Guid accountId);
 
         Task SetNewOrganizationAvatarAsync(Guid organizationId, Guid fileId);

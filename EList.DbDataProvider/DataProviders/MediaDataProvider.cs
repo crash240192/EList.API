@@ -2,6 +2,7 @@
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.SearchRequests;
+using EList.Models.Accounts;
 using EList.Models.Media;
 using LinqToDB;
 using LinqToDB.Async;
@@ -291,6 +292,14 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<bool> CheckFileExistsAsync(List<Guid> fileIds)
+        {
+            var result = await _connection.AlbumFiles.Where(i => fileIds.Contains(i.FileId)).DistinctBy(i => i.FileId).CountAsync();
+            if (result == fileIds.Count)
+                return true;
+            return false;
+        }
+
         public async Task<List<Guid>> GetFilesNotExistsInAnotherAlbumsAsync(List<Guid> fileIds, Guid exceptAlbumId)
         {
             if (!fileIds.NullSafeAny())
@@ -305,6 +314,13 @@ namespace EList.DbDataProvider.DataProviders
                 fileIds = fileIds?.Where(i => !filesInAnotherAlbums.Contains(i)).ToList();
 
             return fileIds;
+        }
+
+        public async Task<bool> SomeAlbumContainsThisFileAsync(Guid fileId)
+        {
+            var result = await _connection.AlbumFiles
+                .AnyAsync(i => i.FileId == fileId);
+            return result;
         }
 
         public async Task DeleteFilesAsync(List<Guid> fileIds)
@@ -346,6 +362,18 @@ namespace EList.DbDataProvider.DataProviders
                 .OrderByDescending(i => i.AssignmentDate)
                 .FirstOrDefaultAsync();
             return result?.PhotoId ?? null;
+        }
+
+        public async Task<AccountAvatarDto> GetAvatarAsync(Guid fileId)
+        {
+            var result = await _connection.AccountAvatars.FirstOrDefaultAsync(i => i.PhotoId == fileId);
+            return result;
+        }
+
+        public async Task DeleteAvatarAsync(Guid fileId)
+        {
+            await _connection.AccountAvatars.Where(i => i.PhotoId == fileId)
+                .DeleteAsync();
         }
 
         public async Task SetNewAccountAvatarAsync(Guid accountId, Guid fileId)

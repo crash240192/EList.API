@@ -19,13 +19,14 @@ namespace EList.Services.Interfaces
         //Task<CommandResult> SetEventAlbumParametersAsync(Guid token, EventAlbumParameters request);
         Task<CommandResult> AddFilesToAlbumAsync(AddFilesRequest request);
         Task<CommandResult> DeleteAlbumAsync(Guid albumId);
-        Task<CommandResult> DeleteFileAsync(Guid fileId, Guid albumId);
+        Task<CommandResult> DeleteFilesAsync(List<Guid> fileId, Guid albumId);
 
         Task<CommandResult> SetNewAccountAvatarAsync(Guid fileId);
         Task<CommandResult<List<Guid>?>> GetCurAccountAvatarsAsync();
         Task<CommandResult<List<Guid>?>> GetAccountAvatarsAsync(Guid accountId);
         Task<CommandResult<Guid?>> GetCurAccountAvatarAsync();
         Task<CommandResult<Guid?>> GetAccountAvatarAsync(Guid accountId);
+        Task<CommandResult> DeleteAvatarAsync(Guid fileId);
 
         Task<CommandResult> SetNewOrganizationAvatarAsync(Guid organizationId, Guid fileId);
         Task<CommandResult<List<Guid>?>> GetOrganizationAvatarsAsync(Guid organizationId);

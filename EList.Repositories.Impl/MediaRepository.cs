@@ -103,9 +103,21 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task<bool> CheckFilesExistsAsync(List<Guid> fileIds)
+        {
+            var result = await _mediaDataProvider.CheckFileExistsAsync(fileIds);
+            return result;
+        }
+
         public async Task<List<Guid>> GetFilesNotExistsInAnotherAlbumsAsync(List<Guid> fileIds, Guid exceptAlbumId)
         {
             var result = await _mediaDataProvider.GetFilesNotExistsInAnotherAlbumsAsync(fileIds, exceptAlbumId);
+            return result;
+        }
+
+        public async Task<bool> SomeAlbumContainsThisFileAsync(Guid fileId)
+        {
+            var result = await _mediaDataProvider.SomeAlbumContainsThisFileAsync(fileId);
             return result;
         }
 
@@ -130,6 +142,18 @@ namespace EList.Repositories.Impl
         {
             var fileIds = await _mediaDataProvider.GetAccountAvatarsAsync(accountId);
             return fileIds;
+        }
+
+        public async Task<AccountAvatarItem> GetAvatarAsync(Guid fileId)
+        {
+            var avatarItem = await _mediaDataProvider.GetAvatarAsync(fileId);
+            var result = _mapper.Map<AccountAvatarItem>(avatarItem);
+            return result;
+        }
+
+        public async Task DeleteAvatarAsync(Guid fileId)
+        {
+            await _mediaDataProvider.DeleteAvatarAsync(fileId);
         }
 
         public async Task<Guid?> GetLastAccountAvatarAsync(Guid accountId)

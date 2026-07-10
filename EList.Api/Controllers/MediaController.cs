@@ -425,19 +425,19 @@ namespace EList.Api.Controllers
         /// <param name="fileId"></param>
         /// <param name="albumId"></param>
         /// <returns></returns>
-        [HttpDelete("albums/file")]
-        public async Task<CommandResult> DeleteFileAsync(Guid fileId, Guid albumId)
+        [HttpDelete("albums/deleteFiles")]
+        public async Task<CommandResult> DeleteFileAsync(DeleteFilesRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeleteAlbumAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteFileAsync)}";
 
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _mediaService.DeleteFileAsync(fileId, albumId);
+                var result = await _mediaService.DeleteFilesAsync(request.FileIds, request.AlbumId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
@@ -586,6 +586,34 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _mediaService.GetCurAccountAvatarAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Получение списка аватарок пользователя
+        /// </summary>
+        /// <param name="fileId"></param>
+        /// <returns></returns>
+        [HttpDelete("account/avatars/delete/{fileId}")]
+        public async Task<CommandResult> DeleteAccountAvatarAsync(Guid fileId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteAccountAvatarAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _mediaService.DeleteAvatarAsync(fileId);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
