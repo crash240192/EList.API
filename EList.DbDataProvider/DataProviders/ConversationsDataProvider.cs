@@ -101,7 +101,7 @@ namespace EList.DbDataProvider.DataProviders
         public async Task UpdateConversationAsync(ConversationDto conversation)
         {
             await _connection.Conversations.Where(i => i.Id == conversation.Id)
-                .Set(i => i.EventId, conversation.Id)
+                .Set(i => i.EventId, conversation.EventId)
                 .Set(i => i.Name, conversation.Name)
                 .Set(i => i.UpdateDate, DateTimeOffset.Now)
                 .UpdateAsync();

@@ -292,7 +292,7 @@ namespace EList.Services.Impl
             var files = await _mediaRepository.GetAlbumFilesAsync(albumId);
             var fileIds = files.Result?.Select(i => i.Id)?.ToList();
             if (fileIds.NullSafeAny())
-                await DeleteAbondonedFiles(fileIds, albumId);
+                await DeleteAbondonedFilesFromFilestorageAsync(fileIds, albumId);
 
             await _mediaRepository.DeleteAlbumAsync(albumId);
 
@@ -346,7 +346,9 @@ namespace EList.Services.Impl
                 }
             }
 
-            await DeleteAbondonedFiles(fileIds, albumId);
+            await _mediaRepository.DeleteFilesAsync(fileIds);
+
+            await DeleteAbondonedFilesFromFilestorageAsync(fileIds, albumId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -589,7 +591,7 @@ namespace EList.Services.Impl
         }
         #endregion
 
-        private async Task DeleteAbondonedFiles(List<Guid>? fileIds, Guid albumId)
+        private async Task DeleteAbondonedFilesFromFilestorageAsync(List<Guid>? fileIds, Guid albumId)
         {
             // проверяем что файлы в удаляемом альбоме не прикреплены к другим альбомам. Если не прикреплены, то удаляем их физически из файлохранилища
             

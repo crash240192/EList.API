@@ -294,7 +294,10 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<bool> CheckFileExistsAsync(List<Guid> fileIds)
         {
-            var result = await _connection.AlbumFiles.Where(i => fileIds.Contains(i.FileId)).DistinctBy(i => i.FileId).CountAsync();
+            var result = await _connection.AlbumFiles.Where(i => fileIds.Contains(i.FileId))
+                .Select(i => i.FileId)
+                .Distinct()
+                .CountAsync();
             if (result == fileIds.Count)
                 return true;
             return false;
