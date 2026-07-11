@@ -152,6 +152,13 @@ namespace EList.DbDataProvider.DataProviders
                         e.Organizators.Any(o => o.AccountId == curAccountId)
                         || (e.Parameters.AgeLimit ?? 0) < 18);
             }
+            else
+            {
+                if (strongAgeValidation)
+                    eventsRequest = eventsRequest.Where(e => (e.Parameters.AgeLimit ?? 0) <= userAge);
+                else if (userAge < 18)
+                    eventsRequest = eventsRequest.Where(e => (e.Parameters.AgeLimit ?? 0) < 18);
+            }
             #endregion
 
             #region eventTypes
