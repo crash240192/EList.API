@@ -74,7 +74,7 @@ namespace EList.Repositories.Impl
             await _eventsDataProvider.SetEventCoverImageAsync(id, imageId);
         }
 
-        public async Task<PagedList<Event>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId)
+        public async Task<PagedList<Event>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId, bool strongAgeValidation)
         {
             var mappedRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.EventsSearchRequest>(request);
             var items = await _eventsDataProvider.SearchEventsAsync(mappedRequest, curAccountId);
@@ -89,7 +89,7 @@ namespace EList.Repositories.Impl
             return new PagedList<Event>(items.TotalCount, resultList, request.PageIndex, request.PageSize);
         }
 
-        public async Task<PagedList<EventShort>> SearchEventsShortAsync(EventsSearchRequest request, Guid? curAccountId)
+        public async Task<PagedList<EventShort>> SearchEventsShortAsync(EventsSearchRequest request, Guid? curAccountId, bool strongAgeValidation)
         {
             var mappedRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.EventsSearchRequest>(request);
             var items = await _eventsDataProvider.SearchEventsAsync(mappedRequest, curAccountId);

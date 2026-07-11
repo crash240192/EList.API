@@ -25,5 +25,18 @@ namespace EList.Services.Impl
                 : $"{Account.Login}";
             }
         } 
+
+        public int Age
+        {
+            get
+            {
+                if (PersonInfo?.BirthDate == null)
+                    return 0;
+
+                var age = DateTime.Today.Year - PersonInfo.BirthDate.Value.Year;
+                if (PersonInfo.BirthDate.Value.Date > DateTime.Today.AddYears(-age)) age--;
+                return age;
+            }
+        }
     }
 }

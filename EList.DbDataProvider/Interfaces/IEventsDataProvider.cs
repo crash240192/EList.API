@@ -9,7 +9,7 @@ namespace EList.DbDataProvider.Interfaces
         Task<EventDto> GetEventAsync(Guid id);
         Task UpdateEventAsync(EventDto item);
         Task SetEventCoverImageAsync(Guid eventId, Guid? imageId);
-        Task<ListResponse<EventDto>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId = null);
+        Task<ListResponse<EventDto>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId = null, bool strongAgeValidation = false);
         Task CancelEventAsync(Guid eventId);
     }
 }

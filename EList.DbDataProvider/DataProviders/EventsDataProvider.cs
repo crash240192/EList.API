@@ -2,6 +2,7 @@
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.SearchRequests;
+using EList.Models.Person;
 using LinqToDB;
 using LinqToDB.Async;
 
@@ -56,8 +57,18 @@ namespace EList.DbDataProvider.DataProviders
                 .UpdateAsync();
         }
 
-        public async Task<ListResponse<EventDto>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId = null)
+        public async Task<ListResponse<EventDto>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId = null, bool strongAgeValidation = false)
         {
+            //var birthdate = await _connection.Accounts
+            //    .LoadWith(i => i.PersonInfo)
+            //    .Where(i => i.Id == curAccountId)
+            //    .Select(i => i.PersonInfo.Birthdate)
+            //    .FirstOrDefaultAsync();
+
+            //var age = DateTime.Today.Year - birthdate.Year;
+            //if (PersonInfo.BirthDate.Value.Date > DateTime.Today.AddYears(-age)) age--;
+            //return age;
+
             var eventParametersRequest = _connection.EventParameters.AsQueryable();
             var eventTypes = _connection.EventTypes.AsQueryable();
             var eventsRequest = _connection.Events
@@ -73,37 +84,8 @@ namespace EList.DbDataProvider.DataProviders
                 .Where(i => request.Active ? i.Active == true : true)
                 .OrderBy(i => i.StartTime)
                 .AsQueryable();
-            //.Where(i => request.LocationRange != null ? ;
-
-            //if (request.OnlyWithAlbums)
-            //{
-            //    eventsRequest = eventsRequest
-            //        .LoadWith(i => i.Albums)
-            //}
 
             #region location
-            /*
-            //Вариант поиска по кругу, но использует подзапрос.
-            if (request.Latitude != null && request.Longitude != null && request.LocationRange != null)
-            {
-                var lat = request.Latitude.Value;
-                var lng = request.Longitude.Value;
-                var radius = request.LocationRange.Value; // в метрах
-
-                // Получаем ID событий в радиусе через сырой SQL
-                var nearbyIds = await _connection.QueryToListAsync<Guid>(@"
-                    SELECT id FROM events
-                    WHERE ST_DWithin(
-                        location::geography,
-                        ST_SetSRID(ST_MakePoint(@lng, @lat), 4326)::geography,
-                        @radius
-                    )",
-                    new { lat, lng, radius });
-
-                eventsRequest = eventsRequest.Where(e => nearbyIds.Contains(e.Id));
-            }
-            */
-
             //Вариант без подзапроса, но ищет по квадрату, а не по кругу.
             if (request.Latitude != null && request.Longitude != null && request.LocationRange != null)
             {
