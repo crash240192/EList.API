@@ -178,7 +178,7 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Получить альбом по id
         /// </summary>
-        /// <param name="request"></param>
+        /// <param name="id"></param>
         /// <returns></returns>
         [HttpGet("albums/get/{id}")]
         public async Task<CommandResult<MediaAlbum>> GetAlbumAsync(Guid id)

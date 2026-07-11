@@ -709,7 +709,7 @@ namespace EList.Services.Impl
 
             if (organizators?.Any() ?? false)
             {
-                var notifications = organizators.Where(i => i != null).Select(organizatorId => new Notification
+                var notifications = organizators.Where(i => i != _accountDataHolder.AccountId).Select(organizatorId => new Notification
                 {
                     Id = Guid.NewGuid(),
                     AccountId = organizatorId,
@@ -745,7 +745,7 @@ namespace EList.Services.Impl
 
             if (organizators?.Any() ?? false)
             {
-                var notifications = organizators.Where(i => i != null).Select(organizatorId => new Notification
+                var notifications = organizators.Where(i => i != _accountDataHolder.AccountId).Select(organizatorId => new Notification
                 {
                     Id = Guid.NewGuid(),
                     AccountId = organizatorId,
@@ -780,7 +780,7 @@ namespace EList.Services.Impl
 
             if (organizators?.Any() ?? false)
             {
-                var notifications = organizators.Where(i => i != null).Select(organizatorId => new Notification
+                var notifications = organizators.Where(i => i != _accountDataHolder.AccountId).Select(organizatorId => new Notification
                 {
                     Id = Guid.NewGuid(),
                     AccountId = organizatorId,
@@ -816,28 +816,31 @@ namespace EList.Services.Impl
                 var eventData = await _eventsRepository.GetEventAsync(eventId.Value);
             }
             var message = await _conversationRepository.GetMessageAsync(messageId);
-            var reply = await _conversationRepository.GetMessageAsync(replyId);
 
-            var messageStr = reply.MessageText?.Length > 100
-                ? reply.MessageText.Substring(100)
-                : reply.MessageText;
-
-            var notification = new Notification
+            if (message.AccountId.Value != _accountDataHolder.AccountId)
             {
-                Id = Guid.NewGuid(),
-                AccountId = message.AccountId.Value,
-                EventId = eventId,
-                CreatedAt = DateTime.UtcNow,
-                Message = $"{messageStr}...",
-                Title = $"{_accountDataHolder.AccountNameFullString} ответил на ваше сообщение",
-                RelatedAccountId = _accountDataHolder.AccountId,
-                Type = UserNotificationType.MessageReplied,
-                Data = reply
-            };
+                var reply = await _conversationRepository.GetMessageAsync(replyId);
 
-            await _notificationsRepository.CreateNotificationAsync(notification);
-            var wsTasks = SendToUserAsync(notification.AccountId, notification);
+                var messageStr = reply.MessageText?.Length > 100
+                    ? reply.MessageText.Substring(100)
+                    : reply.MessageText;
 
+                var notification = new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = message.AccountId.Value,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"{messageStr}...",
+                    Title = $"{_accountDataHolder.AccountNameFullString} ответил на ваше сообщение",
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.MessageReplied,
+                    Data = reply
+                };
+
+                await _notificationsRepository.CreateNotificationAsync(notification);
+                var wsTasks = SendToUserAsync(notification.AccountId, notification);
+            }
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
