@@ -2,7 +2,6 @@
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.SearchRequests;
-using EList.Models.Person;
 using LinqToDB;
 using LinqToDB.Async;
 
@@ -59,15 +58,21 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<ListResponse<EventDto>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId = null, bool strongAgeValidation = false)
         {
-            //var birthdate = await _connection.Accounts
-            //    .LoadWith(i => i.PersonInfo)
-            //    .Where(i => i.Id == curAccountId)
-            //    .Select(i => i.PersonInfo.Birthdate)
-            //    .FirstOrDefaultAsync();
+            var userAge = 0;
+            if (curAccountId != null)
+            {
+                var birthdate = await _connection.Accounts
+                    .Where(i => i.Id == curAccountId)
+                    .Select(i => i.PersonInfo.Birthdate)
+                    .FirstOrDefaultAsync();
 
-            //var age = DateTime.Today.Year - birthdate.Year;
-            //if (PersonInfo.BirthDate.Value.Date > DateTime.Today.AddYears(-age)) age--;
-            //return age;
+                if (birthdate != null)
+                {
+                    userAge = DateTime.Today.Year - birthdate.Value.Year;
+                    if (birthdate.Value.Date > DateTime.Today.AddYears(-userAge))
+                        userAge--;
+                }
+            }
 
             var eventParametersRequest = _connection.EventParameters.AsQueryable();
             var eventTypes = _connection.EventTypes.AsQueryable();
@@ -135,6 +140,14 @@ namespace EList.DbDataProvider.DataProviders
                         || i.Organizators.Any(o => o.AccountId == curAccountId));
             else
                 eventsRequest = eventsRequest.Where(i => i.Parameters.Private != true);
+
+            if (curAccountId != null)
+            {
+                if (strongAgeValidation)
+                    eventsRequest = eventsRequest.Where(e => (e.Parameters.AgeLimit ?? 0) <= userAge);
+                else if (userAge < 18)
+                    eventsRequest = eventsRequest.Where(e => (e.Parameters.AgeLimit ?? 0) < 18);
+            }
             #endregion
 
             #region eventTypes
