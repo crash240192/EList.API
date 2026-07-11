@@ -13,6 +13,6 @@ namespace EList.Services.Interfaces
         Guid? AccountId { get; }
 
         string AccountNameFullString { get; }
-        public int Age { get; set; }
+        public int Age { get; }
     }
 }
