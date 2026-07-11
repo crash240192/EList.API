@@ -659,16 +659,19 @@ namespace EList.Services.Impl
             }
 
             #region age validation
-            if (eventItem.Parameters == null)
-                eventItem.Parameters = new EventParameters
-                {
-                    AgeLimit = 0,
-                };
-            else
-                eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
+            if (!isOrganizator)
+            {
+                if (eventItem.Parameters == null)
+                    eventItem.Parameters = new EventParameters
+                    {
+                        AgeLimit = 0,
+                    };
+                else
+                    eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
 
-            if (ValidateAgeAccessToEvent(eventItem.Parameters.AgeLimit, _accountDataHolder.Age, _strongAgeValidation))
-                return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, $"Просмотр мероприятий {eventItem.Parameters.AgeLimit}+ доступен только для авторизованных пользователей достигших соответствующего возраста");
+                if (ValidateAgeAccessToEvent(eventItem.Parameters.AgeLimit, _accountDataHolder.Age, _strongAgeValidation))
+                    return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, $"Просмотр мероприятий {eventItem.Parameters.AgeLimit}+ доступен только для авторизованных пользователей достигших соответствующего возраста");
+            }
             #endregion
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
