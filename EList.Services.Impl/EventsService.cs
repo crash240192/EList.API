@@ -669,7 +669,7 @@ namespace EList.Services.Impl
                 else
                     eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
 
-                if (ValidateAgeAccessToEvent(eventItem.Parameters.AgeLimit, _accountDataHolder.Age, _strongAgeValidation))
+                if (!ValidateAgeAccessToEvent(eventItem.Parameters.AgeLimit, _accountDataHolder.Age, _strongAgeValidation))
                     return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, $"Просмотр мероприятий {eventItem.Parameters.AgeLimit}+ доступен только для авторизованных пользователей достигших соответствующего возраста");
             }
             #endregion
@@ -682,7 +682,7 @@ namespace EList.Services.Impl
         {
             value = value ?? 0;
             var ageRatingValues = Enum.GetValues<AgeRating>().Cast<int>().ToList();
-            var nextAvailableRatingValue = ageRatingValues.FirstOrDefault(x => x > value, 18);
+            var nextAvailableRatingValue = ageRatingValues.FirstOrDefault(x => x >= value, 18);
             return nextAvailableRatingValue;
         }
 
@@ -695,7 +695,7 @@ namespace EList.Services.Impl
 
             if (strongValidation)
             {
-                if (minAllowedAge > userAge)
+                if (minAllowedAge >= userAge)
                     return false;
                 else
                     return true;
