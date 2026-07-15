@@ -65,5 +65,7 @@ namespace EList.DbDataProvider.DataConnections
 
         public ITable<ConversationDto> Conversations => this.GetTable<ConversationDto>();
         public ITable<MessageDto> Messages => this.GetTable<MessageDto>();
+
+        public ITable<AnonymousAgeAgreementDto> AnonymousAgeAgreements => this.GetTable<AnonymousAgeAgreementDto>();
     }
 }

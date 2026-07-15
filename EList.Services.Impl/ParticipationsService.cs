@@ -82,7 +82,7 @@ namespace EList.Services.Impl
                 var whiteListCount = await _participantsBWListRepository.WhiteListPersonsCountAsync(eventId);
                 if (whiteListCount == 0)
                 {// если белый список пуст, проверяем приглашения
-                    var isUserInvited = await _invitationsRepository.IsUserInvitatedAsync(eventId, _accountDataHolder.AccountId.Value);
+                    var isUserInvited = await _invitationsRepository.IsUserInvitatedAsync(_accountDataHolder.AccountId.Value, eventId);
                     if (!isUserInvited)
                         return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Принять участие в закрытом мероприятии можно только по приглашению");
                 }

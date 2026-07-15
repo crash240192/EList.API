@@ -512,6 +512,21 @@ CREATE TABLE public.notifications (
 	CONSTRAINT notifications_related_account_fk FOREIGN KEY (related_account_id) REFERENCES public.accounts(id),
 	CONSTRAINT notifications_event_fk FOREIGN KEY (event_id) REFERENCES public.events(id)
 );
+
+
+
+
+
+CREATE TABLE public.anonymous_age_agreements (
+	id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+	jwt uuid NOT NULL,
+	agreement_date timestamptz DEFAULT now() NOT NULL,
+	client_info varchar NOT NULL,
+	CONSTRAINT anonymous_age_agreements_pk PRIMARY KEY (id)
+);
+
+
+
 /*
 create table public.chat_administrator (
 	id uuid not null default public.uuid_generate_v4(),

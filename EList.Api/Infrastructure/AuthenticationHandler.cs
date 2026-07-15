@@ -1,4 +1,5 @@
 ﻿using EList.Common.Encryption;
+using EList.Models;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
@@ -65,6 +66,9 @@ namespace EList.Api.Infrastructure
 
             "/api/subscriptions/getsubscriptions*",
             "/api/subscriptions/getsubscribers*",
+
+            "/api/agreements/age/anonymous/agree",
+            "/api/agreements/age/anonymous/get"
         };
 
         private readonly Logger _currentLogger = LogManager.GetCurrentClassLogger();
@@ -150,6 +154,7 @@ namespace EList.Api.Infrastructure
                     var clientHash = GetClientHash(jwtHeader.ToString());
                     _accountDataHolder.ClientHash = clientHash;
                     _accountDataHolder.Jwt = jwtHeader.ToString();
+                    _accountDataHolder.ClientInfo = GetClientInfo();
 
                     return AuthenticateResult.Success(CreateTicket(jwtHeader.ToString(), hasToken ? tokenHeader.ToString() : null));
                 }
@@ -169,6 +174,7 @@ namespace EList.Api.Infrastructure
                     var clientHash = GetClientHash(jwtHeader.ToString());
                     _accountDataHolder.ClientHash = clientHash;
                     _accountDataHolder.Jwt = jwtHeader.ToString();
+                    _accountDataHolder.ClientInfo = GetClientInfo();
                 }
 
                 //Токен не обязателен для анонимных и не нужен для авторизации
@@ -270,7 +276,15 @@ namespace EList.Api.Infrastructure
             var jwtHash = _encryptionTool.CalculateStringHash(jwtHeader);
             var platform = Request.Headers["X-Client-Platform"].FirstOrDefault() ?? "unknown";
             var appVersion = Request.Headers["X-App-Version"].FirstOrDefault() ?? "unknown";
+
             return _encryptionTool.CalculateStringHash($"{jwtHash}|{platform}|{appVersion}");
+        }
+
+        private string GetClientInfo()
+        {
+            var clientInfo = (ClientInfo)Request.HttpContext.Items["ClientInfo"];
+
+            return $"{clientInfo.IP}|{clientInfo.Timezone}|{clientInfo.AcceptLanguage}";
         }
 
         private AuthenticationTicket CreateAnonymousTicket()

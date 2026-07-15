@@ -14,6 +14,7 @@ using EList.Models.Notifications;
 using EList.Models.Participation;
 using EList.Models.Person;
 using EList.Models.Subscriptions;
+using EList.Models.UserAgreements;
 using EList.Models.Wallets;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -28,6 +29,8 @@ namespace EList.AutoMapperProfile
             //{
             //    defaultPageSize = 100;
             //}
+
+            CreateMap<AnonymousAgeAgreement, AnonymousAgeAgreementDto>().ReverseMap();
 
             CreateMap<AuthorizationDto, AuthorizationResponse>().ReverseMap();
             CreateMap<AuthorizationDto, Authorization>().ReverseMap();

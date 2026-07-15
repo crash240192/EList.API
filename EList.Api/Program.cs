@@ -80,6 +80,7 @@ app.Use(async (context, next) =>
 });
 
 app.UseMiddleware<ErrorHandlingMiddleware>();
+app.UseMiddleware<ClientInfoMiddleware>();
 app.UseMiddleware<WebSocketsTokenHandlerMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
