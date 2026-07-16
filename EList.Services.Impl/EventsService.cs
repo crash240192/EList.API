@@ -26,8 +26,6 @@ namespace EList.Services.Impl
         private const string LOGGER_NAME = "EList.Services.Impl.EventsService.";
         #endregion
 
-        private readonly bool _strongAgeValidation = false;
-
         private readonly IEventsMetadataRepository _eventsMetadataRepository;
         private readonly IEventsRepository _eventsRepository;
         private readonly ICorrelationIdProvider _correlationIdProvider;
@@ -69,9 +67,6 @@ namespace EList.Services.Impl
             _walletsRepository = walletsRepository ?? throw new Exception(nameof(walletsRepository));
             _notificationsService = notificationsService ?? throw new Exception(nameof(notificationsService));
             _accountDataHolder = accountDataHolder;
-
-            if (ConfigurationManager.AppSettings.ContainsSection("strongAgeValidation"))
-                _strongAgeValidation = bool.Parse(ConfigurationManager.AppSettings["strongAgeValidation"]);
         }
 
 
@@ -670,7 +665,6 @@ namespace EList.Services.Impl
                     eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
 
                 if (eventItem.Parameters.AgeLimit>=18 && !_accountDataHolder.AdultConfirmed)
-                //if (!ValidateAgeAccessToEvent(eventItem.Parameters.AgeLimit, _accountDataHolder.Age, _strongAgeValidation))
                     return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, $"Просмотр мероприятий 18+ недоступен");
             }
             #endregion

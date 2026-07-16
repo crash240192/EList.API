@@ -187,6 +187,9 @@ namespace EList.Api.Infrastructure
                 {
                     if (!IsAuthorizationFlow && !IsRegistrationFlow && !IsResetPasswordFlow && !IsAnonymousMethod)
                         return AuthenticateResult.Fail("Missing Authorization Header");
+
+                    var ageAgreement = await _agreementService.GetAnonymousAgeAgreementAsync();
+                    _accountDataHolder.AdultConfirmed = ageAgreement.Success;
                 }
                 else
                 {
