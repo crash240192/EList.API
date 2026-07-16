@@ -12,6 +12,7 @@ namespace EList.Services.Interfaces
         string ClientInfo { get; set; }
         PersonInfo? PersonInfo { get; set; }
         Guid? AccountId { get; }
+        public bool AdultConfirmed { get; set; }
 
         string AccountNameFullString { get; }
         public int Age { get; }

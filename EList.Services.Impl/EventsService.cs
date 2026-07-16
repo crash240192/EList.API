@@ -669,8 +669,9 @@ namespace EList.Services.Impl
                 else
                     eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
 
-                if (!ValidateAgeAccessToEvent(eventItem.Parameters.AgeLimit, _accountDataHolder.Age, _strongAgeValidation))
-                    return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, $"Просмотр мероприятий {eventItem.Parameters.AgeLimit}+ доступен только для авторизованных пользователей достигших соответствующего возраста");
+                if (eventItem.Parameters.AgeLimit>=18 && !_accountDataHolder.AdultConfirmed)
+                //if (!ValidateAgeAccessToEvent(eventItem.Parameters.AgeLimit, _accountDataHolder.Age, _strongAgeValidation))
+                    return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, $"Просмотр мероприятий 18+ недоступен");
             }
             #endregion
 
@@ -686,27 +687,27 @@ namespace EList.Services.Impl
             return nextAvailableRatingValue;
         }
 
-        private static bool ValidateAgeAccessToEvent(int? eventAgeLimit, int userAge, bool strongValidation)
-        {
-            if (userAge >= 18)
-                return true;
+        //private static bool ValidateAgeAccessToEvent(int? eventAgeLimit, int userAge, bool strongValidation)
+        //{
+        //    if (userAge >= 18)
+        //        return true;
 
-            var minAllowedAge = GetEventMinAllowedAge(eventAgeLimit);
+        //    var minAllowedAge = GetEventMinAllowedAge(eventAgeLimit);
 
-            if (strongValidation)
-            {
-                if (minAllowedAge >= userAge)
-                    return false;
-                else
-                    return true;
-            }   
-            else
-            {
-                if (minAllowedAge == 18 && userAge < 18)
-                    return false;
-                return true;
-            }   
-        }
+        //    if (strongValidation)
+        //    {
+        //        if (minAllowedAge >= userAge)
+        //            return false;
+        //        else
+        //            return true;
+        //    }   
+        //    else
+        //    {
+        //        if (minAllowedAge == 18 && userAge < 18)
+        //            return false;
+        //        return true;
+        //    }   
+        //}
 
         public async Task<CommandResult<PagedList<Event>?>> SearchEventsAsync(EventsSearchRequest request)
         {
@@ -715,7 +716,7 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SearchEventsAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var searchResult = await _eventsRepository.SearchEventsAsync(request, _accountDataHolder.AccountId, _strongAgeValidation);
+            var searchResult = await _eventsRepository.SearchEventsAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<Event>?>(searchResult);
@@ -728,7 +729,7 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SearchEventsShortAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var searchResult = await _eventsRepository.SearchEventsShortAsync(request, _accountDataHolder.AccountId, _strongAgeValidation);
+            var searchResult = await _eventsRepository.SearchEventsShortAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<EventShort>?>(searchResult);

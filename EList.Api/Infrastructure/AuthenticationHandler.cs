@@ -77,7 +77,7 @@ namespace EList.Api.Infrastructure
         private readonly IEncryptionTool _encryptionTool;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IPersonsService _personsService;
-
+        private readonly IAgreementService _agreementService;
         private bool IsAnonymousMethod // Не обязательны ни токен, ни jwt
         {
             get
@@ -119,13 +119,15 @@ namespace EList.Api.Infrastructure
             [NotNull] IAccountsService accountsService,
             IEncryptionTool encryptionTool,
             IPersonsService personsService,
-            IAccountDataHolder accountDataHolder) : base(options, logger, encoder, clock)
+            IAccountDataHolder accountDataHolder,
+            IAgreementService agreementService) : base(options, logger, encoder, clock)
         {
             _authorizationService = authorizationService ?? throw new ArgumentNullException(nameof(authorizationService));
             _encryptionTool = encryptionTool ?? throw new ArgumentNullException(nameof(encryptionTool));
             _accountsService = accountsService ?? throw new ArgumentNullException(nameof(accountsService));
             _accountDataHolder = accountDataHolder ?? throw new ArgumentNullException(nameof(accountDataHolder));
             _personsService = personsService ?? throw new ArgumentNullException(nameof(personsService));
+            _agreementService = agreementService ?? throw new ArgumentNullException(nameof(agreementService));
         }
 
         /// <summary>
@@ -155,6 +157,9 @@ namespace EList.Api.Infrastructure
                     _accountDataHolder.ClientHash = clientHash;
                     _accountDataHolder.Jwt = jwtHeader.ToString();
                     _accountDataHolder.ClientInfo = GetClientInfo();
+
+                    var ageAgreement = await _agreementService.GetAnonymousAgeAgreementAsync();
+                    _accountDataHolder.AdultConfirmed = ageAgreement.Success;
 
                     return AuthenticateResult.Success(CreateTicket(jwtHeader.ToString(), hasToken ? tokenHeader.ToString() : null));
                 }
