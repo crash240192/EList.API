@@ -76,6 +76,11 @@ namespace EList.Models.Events
         public int? AgeLimit { get; set; }
 
         /// <summary>
+        /// Отображать только мероприятия для взрослых
+        /// </summary>
+        public bool AdultOnly { get; set; } = false;
+
+        /// <summary>
         /// Состояние мероприятия
         /// </summary>
         public bool Active { get; set; } = true;

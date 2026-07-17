@@ -21,5 +21,6 @@ namespace EList.DbDataProvider.Models.SearchRequests
         public int? PageSize { get; set; }
         public bool OnlyWithAlbums { get; set; } = false;
         public int? AgeLimit { get; set; }
+        public bool AdultOnly { get; set; } = false;
     }
 }

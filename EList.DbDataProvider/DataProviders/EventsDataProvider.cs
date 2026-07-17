@@ -58,22 +58,6 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<ListResponse<EventDto>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId = null, bool adultConfirmed = false)
         {
-            //var userAge = 0;
-            //if (curAccountId != null)
-            //{
-            //    var birthdate = await _connection.Accounts
-            //        .Where(i => i.Id == curAccountId)
-            //        .Select(i => i.PersonInfo.Birthdate)
-            //        .FirstOrDefaultAsync();
-
-            //    if (birthdate != null)
-            //    {
-            //        userAge = DateTime.Today.Year - birthdate.Value.Year;
-            //        if (birthdate.Value.Date > DateTime.Today.AddYears(-userAge))
-            //            userAge--;
-            //    }
-            //}
-
             var eventParametersRequest = _connection.EventParameters.AsQueryable();
             var eventTypes = _connection.EventTypes.AsQueryable();
             var eventsRequest = _connection.Events
@@ -119,7 +103,10 @@ namespace EList.DbDataProvider.DataProviders
                 eventsRequest = eventsRequest.Where(e => e.Parameters.Cost == null || e.Parameters.Cost <= request.Price);
 
             if (request.AgeLimit != null)
-                eventsRequest = eventsRequest.Where(e =>  e.Parameters.AgeLimit >= request.AgeLimit);
+                eventsRequest = eventsRequest.Where(e => e.Parameters.AgeLimit <= request.AgeLimit);
+
+            if (request.AdultOnly)
+                eventsRequest = eventsRequest.Where(e => e.Parameters.AgeLimit >= 18);
 
             // Отображение частных мероприятий
             // для черных списков - показывать если пользователь не в черных списках или он организатор
