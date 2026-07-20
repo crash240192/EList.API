@@ -108,7 +108,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="documentType"></param>
         /// <returns></returns>
-        [HttpGet("checkUserAgreement")]
+        [HttpGet("checkUserAgreement/{documentType}")]
         public async Task<CommandResult> DoesUserAgreedWithLatestDocumentVersion(DocumentType documentType)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -136,7 +136,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="documentType"></param>
         /// <returns></returns>
-        [HttpGet("agree")]
+        [HttpGet("agree/{documentType}")]
         public async Task<CommandResult> SaveUserAgreementAsync(DocumentType documentType)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -191,6 +191,7 @@ namespace EList.Api.Controllers
         /// Возвращает список документов соглашений последней версии
         /// </summary>
         /// <returns></returns>
+        [AllowAnonymous]
         [HttpGet("documents/last")]
         public async Task<CommandResult<List<Document>>> GetLatestDocumentsAsync()
         {
@@ -211,8 +212,9 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
-        [HttpGet("documents/last/{type}")]
-        public async Task<CommandResult<Document>> GetLatestDocumentAsync(DocumentType type)
+        [AllowAnonymous]
+        [HttpGet("documents/last/{documentType}")]
+        public async Task<CommandResult<Document>> GetLatestDocumentAsync(DocumentType documentType)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -220,7 +222,7 @@ namespace EList.Api.Controllers
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var result = await _agreementService.GetLatestDocumentAsync(type);
+            var result = await _agreementService.GetLatestDocumentAsync(documentType);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return result;
