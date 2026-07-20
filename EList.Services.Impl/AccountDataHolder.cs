@@ -6,7 +6,7 @@ namespace EList.Services.Impl
 {
     public class AccountDataHolder : IAccountDataHolder
     {
-        private bool? _adultConfirmed = false;
+        private bool? _adultConfirmed;
         public Guid? Token { get; set; }
         public string Jwt { get; set; }
         public string ClientHash { get; set; }
@@ -47,7 +47,7 @@ namespace EList.Services.Impl
             {
                 if (_adultConfirmed != null)
                     return _adultConfirmed.Value;
-                if (Age > 18) 
+                if (Age > 18)
                     return true;
                 return false;
             }

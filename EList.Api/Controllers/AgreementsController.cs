@@ -2,7 +2,11 @@
 using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
+using EList.Common.Support;
 using EList.DbDataProvider.Interfaces;
+using EList.Models.Enums;
+using EList.Models.UserAgreements;
+using EList.Services.Impl;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -41,7 +45,7 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Соглашение что анонимному пользователю есть 18+
         /// </summary>
-        /// <returns></returns>
+        /// <returns></returns>Ы
         [AllowAnonymous]
         [HttpGet("age/anonymous/agree")]
         public async Task<CommandResult> SaveAnonymousAgeAgreementAsync()
@@ -96,6 +100,130 @@ namespace EList.Api.Controllers
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
+        }
+
+
+        /// <summary>
+        /// Проверяет, подписал ли пользователь соглашение указанного типа
+        /// </summary>
+        /// <param name="documentType"></param>
+        /// <returns></returns>
+        [HttpGet("checkUserAgreement")]
+        public async Task<CommandResult> DoesUserAgreedWithLatestDocumentVersion(DocumentType documentType)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DoesUserAgreedWithLatestDocumentVersion)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _agreementService.DoesUserAgreedWithLatestDocumentVersion(documentType);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Отметка о согласии пользователя с соглашением
+        /// </summary>
+        /// <param name="documentType"></param>
+        /// <returns></returns>
+        [HttpGet("agree")]
+        public async Task<CommandResult> SaveUserAgreementAsync(DocumentType documentType)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SaveUserAgreementAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _agreementService.SaveUserAgreementAsync(documentType);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+
+        [HttpPost("documents/add")]
+        public async Task<CommandResult> AddNewDocumentAsync(DocumentRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AddNewDocumentAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _agreementService.AddNewDocumentAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Возвращает список документов соглашений последней версии
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("documents/last")]
+        public async Task<CommandResult<List<Document>>> GetLatestDocumentsAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetLatestDocumentsAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var result = await _agreementService.GetLatestDocumentsAsync();
+            
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return result;
+        }
+
+        /// <summary>
+        /// Возвращает документ соглашения последней версии указанного типа
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        [HttpGet("documents/last/{type}")]
+        public async Task<CommandResult<Document>> GetLatestDocumentAsync(DocumentType type)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetLatestDocumentAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var result = await _agreementService.GetLatestDocumentAsync(type);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return result;
         }
     }
 }
