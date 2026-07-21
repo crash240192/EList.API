@@ -137,7 +137,7 @@ namespace EList.Services.Impl
             var hash = _encryptionTool.CalculateStringHash(request.Text);
 
             var versionesult = FormatAndVerifyVersion(request.Version, latestDocument?.Version);
-            if (versionesult.Success)
+            if (!versionesult.Success)
                 return versionesult;
 
             await _agreementRepository.AddNewDocumentAsync(new Document

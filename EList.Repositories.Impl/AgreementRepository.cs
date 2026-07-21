@@ -34,7 +34,7 @@ namespace EList.Repositories.Impl
         {
             var mappedDocumentType = _mapper.Map<DbDataProvider.Models.Enums.DocumentType>(documentType);
             var result = await _agreementDataProvider.DoesUserAgreedWithLatestDocumentVersion(accountId, mappedDocumentType);
-            throw new NotImplementedException();
+            return result;
         }
 
         public async Task SaveUserAgreementAsync(Guid accountId, Guid documentId)

@@ -97,7 +97,6 @@ namespace EList.DbDataProvider.DataProviders
                 AgreementDate = DateTimeOffset.UtcNow,
                 DocumentId = documentId,
             });
-            throw new NotImplementedException();
         }
         #endregion
     }
