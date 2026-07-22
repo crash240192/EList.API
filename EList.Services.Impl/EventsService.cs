@@ -376,8 +376,8 @@ namespace EList.Services.Impl
             if (!organizators?.Any(i => i.Account.Id == _accountDataHolder.AccountId) ?? true)
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
 
-            if (!Enum.IsDefined(typeof(AgeRating), parameters.AgeLimit))
-                return CommandResult.Fail(ErrorCode.InvalidAgeLimitValue, "Значение возрастного ограничения может принимать значения '0', '6', '12', '16' или '18'");
+            //if (!Enum.IsDefined(typeof(AgeRating), parameters.AgeLimit))
+            //    return CommandResult.Fail(ErrorCode.InvalidAgeLimitValue, "Значение возрастного ограничения может принимать значения '0', '6', '12', '16' или '18'");
 
             if (curEvent.EventParametersId == null)
             {
@@ -440,8 +440,29 @@ namespace EList.Services.Impl
                     AllowUsersToInvite = true
                 };
 
-            if (!Enum.IsDefined(typeof(AgeRating), request.EventParameters.AgeLimit))
-                return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, "Значение возрастного ограничения может принимать значения '0', '6', '12', '16' или '18'");
+            var wallet = await _walletsRepository.GetAccountWalletAsync(_accountDataHolder.AccountId.Value);
+            var walletTariff = await _walletsRepository.GetWalletTariffAsync(wallet.Id);
+            var tariffAgeThreshold = walletTariff.TariffValidator.AgeLimit ?? 0;
+
+            switch(tariffAgeThreshold)
+            {
+                case 0: 
+                    if (request.EventParameters.AgeLimit > 0) 
+                        return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, "В рамках текущего тарифа доступно создание мероприятий только 0+");
+                    break;
+                case 6:
+                    if (request.EventParameters.AgeLimit >= 12)
+                        return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, "В рамках текущего тарифа доступно создание мероприятий только ");
+                    break;
+                case 12: break;
+                case 16: break;
+                case 18: break;
+            }
+
+
+
+            //if (!Enum.IsDefined(typeof(AgeRating), request.EventParameters.AgeLimit))
+            //    return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, "Значение возрастного ограничения может принимать значения '0', '6', '12', '16' или '18'");
 
             if (request.EventParameters != null)
             {

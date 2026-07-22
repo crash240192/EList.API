@@ -52,7 +52,8 @@ namespace EList.DbDataProvider.DataProviders
             var wallet = await _connection.Wallets.FirstOrDefaultAsync(i => i.Id == walletId);
             if (wallet?.TariffId != null)
             {
-                var tariff = await _connection.Tariffs.FirstOrDefaultAsync(i => i.Id == wallet.TariffId);
+                var tariff = await _connection.Tariffs.LoadWith(i => i.TariffValidator)
+                    .FirstOrDefaultAsync(i => i.Id == wallet.TariffId);
                 return tariff;
             }
             return null;

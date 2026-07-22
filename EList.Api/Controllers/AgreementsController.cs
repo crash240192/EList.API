@@ -107,8 +107,8 @@ namespace EList.Api.Controllers
         /// Проверяет, подписал ли пользователь соглашение указанного типа
         /// </summary>
         /// <param name="documentType"></param>
-        /// <returns></returns>
-        [HttpGet("checkUserAgreement/{documentType}")]
+        /// <returns></returns>        
+        [HttpGet("checkUserAgreement/{documentType}")]        
         public async Task<CommandResult> DoesUserAgreedWithLatestDocumentVersion(DocumentType documentType)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -136,6 +136,7 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="documentType"></param>
         /// <returns></returns>
+        [AllowAnonymous]
         [HttpGet("agree/{documentType}")]
         public async Task<CommandResult> SaveUserAgreementAsync(DocumentType documentType)
         {
