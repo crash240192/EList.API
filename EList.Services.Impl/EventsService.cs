@@ -402,17 +402,39 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(CreateEventAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //TODO: Сюда нужно поместить проверку на то что текущий пользователь может создавать событие с указанными параметрами и от имени указанных организаторов
+            #region validation
+            if (request.EventParameters == null)
+                request.EventParameters = new EventParametersRequest
+                {
+                    AgeLimit = 0,
+                    Cost = 0,
+                    Private = false,
+                    AllowUsersToInvite = true
+                };
 
-            //var eventsCount = await _eventsRepository.SearchEventsAsync(new EventsSearchRequest
-            //{
-            //    OrganizatorId = _accountDataHolder.AccountId,
-            //    EndTime = DateTimeOffset.UtcNow
-            //}, null);
+            var tariffValidator = await _walletsRepository.GetAccountTariffValidatorAsync(_accountDataHolder.AccountId.Value);
 
-            //var tariffValidator = await _walletsRepository.GetAccountWalletAsync(_accountDataHolder.AccountId);
+            var ageThreshold = tariffValidator != null
+                ? tariffValidator.AgeLimit : 0;
+
+            if (ageThreshold != null)
+                if (request.EventParameters.AgeLimit > ageThreshold)
+                    return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, $"В рамках текущего тарифа доступно создание мероприятий только мероприятия c ограничением по возрассту до {ageThreshold} лет");
+
+            if (request.EventParameters.AgeLimit >= 18 && !_accountDataHolder.AdultConfirmed)
+                return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, $"Несовершеннолетние пользователи не могут создавать мероприятия 18+");
+
+            if (request.EventParameters.Cost > 0 && !_accountDataHolder.AdultConfirmed)
+                return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, $"Несовершеннолетние пользователи не могут создавать платные мероприятия");
+            #endregion
+
 
             var eventId = await _eventsRepository.CreateEventAsync(request.Event);
+            var createEventParametersResult = await SetEventParametersAsync(eventId, request.EventParameters);
+
+            if (!createEventParametersResult.Success)
+                return CommandResult<Guid?>.Fail(createEventParametersResult.ErrorCode, createEventParametersResult.Message);
+
 
             #region Привязываем идентификаторы организаторов к событию
             if (request.OrganizatorAccountIds == null)
@@ -431,46 +453,7 @@ namespace EList.Services.Impl
             }
             #endregion
 
-            if (request.EventParameters == null)
-                request.EventParameters = new EventParametersRequest
-                {
-                    AgeLimit = 0,
-                    Cost = 0,
-                    Private = false,
-                    AllowUsersToInvite = true
-                };
 
-            var wallet = await _walletsRepository.GetAccountWalletAsync(_accountDataHolder.AccountId.Value);
-            var walletTariff = await _walletsRepository.GetWalletTariffAsync(wallet.Id);
-            var tariffAgeThreshold = walletTariff.TariffValidator.AgeLimit ?? 0;
-
-            switch(tariffAgeThreshold)
-            {
-                case 0: 
-                    if (request.EventParameters.AgeLimit > 0) 
-                        return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, "В рамках текущего тарифа доступно создание мероприятий только 0+");
-                    break;
-                case 6:
-                    if (request.EventParameters.AgeLimit >= 12)
-                        return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, "В рамках текущего тарифа доступно создание мероприятий только ");
-                    break;
-                case 12: break;
-                case 16: break;
-                case 18: break;
-            }
-
-
-
-            //if (!Enum.IsDefined(typeof(AgeRating), request.EventParameters.AgeLimit))
-            //    return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, "Значение возрастного ограничения может принимать значения '0', '6', '12', '16' или '18'");
-
-            if (request.EventParameters != null)
-            {
-                var createEventParametersResult = await SetEventParametersAsync(eventId, request.EventParameters);
-
-                if (!createEventParametersResult.Success)
-                    return CommandResult<Guid?>.Fail(createEventParametersResult.ErrorCode, createEventParametersResult.Message);
-            }
 
             await _eventsMetadataRepository.BindEventTypesAsync(eventId, request.EventTypes);
 
@@ -685,7 +668,7 @@ namespace EList.Services.Impl
                 else
                     eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
 
-                if (eventItem.Parameters.AgeLimit>=18 && !_accountDataHolder.AdultConfirmed)
+                if (eventItem.Parameters.AgeLimit >= 18 && !_accountDataHolder.AdultConfirmed)
                     return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, $"Просмотр мероприятий 18+ недоступен");
             }
             #endregion
