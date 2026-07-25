@@ -428,14 +428,8 @@ namespace EList.Services.Impl
                 return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, $"Несовершеннолетние пользователи не могут создавать платные мероприятия");
             #endregion
 
-
             var eventId = await _eventsRepository.CreateEventAsync(request.Event);
-            var createEventParametersResult = await SetEventParametersAsync(eventId, request.EventParameters);
-
-            if (!createEventParametersResult.Success)
-                return CommandResult<Guid?>.Fail(createEventParametersResult.ErrorCode, createEventParametersResult.Message);
-
-
+            
             #region Привязываем идентификаторы организаторов к событию
             if (request.OrganizatorAccountIds == null)
                 request.OrganizatorOrganizationIds = new List<Guid>();
@@ -453,7 +447,10 @@ namespace EList.Services.Impl
             }
             #endregion
 
+            var createEventParametersResult = await SetEventParametersAsync(eventId, request.EventParameters);
 
+            if (!createEventParametersResult.Success)
+                return CommandResult<Guid?>.Fail(createEventParametersResult.ErrorCode, createEventParametersResult.Message);
 
             await _eventsMetadataRepository.BindEventTypesAsync(eventId, request.EventTypes);
 
