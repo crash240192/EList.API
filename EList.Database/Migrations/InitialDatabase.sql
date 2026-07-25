@@ -512,6 +512,48 @@ CREATE TABLE public.notifications (
 	CONSTRAINT notifications_related_account_fk FOREIGN KEY (related_account_id) REFERENCES public.accounts(id),
 	CONSTRAINT notifications_event_fk FOREIGN KEY (event_id) REFERENCES public.events(id)
 );
+
+
+
+
+-- agreements
+CREATE TABLE public.anonymous_age_agreements (
+	id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+	jwt uuid NOT NULL,
+	agreement_date timestamptz DEFAULT now() NOT NULL,
+	client_info varchar NOT NULL,
+	CONSTRAINT anonymous_age_agreements_pk PRIMARY KEY (id)
+);
+
+
+CREATE TYPE public.document_type AS ENUM (
+	'policy',
+	'consent',
+	'agreement');
+
+	CREATE TABLE public.documents (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	"header" varchar NOT NULL,
+	"text" text NOT NULL,
+	hash varchar NOT NULL,
+	"type" public.document_type NOT NULL,
+	"version" varchar NOT NULL,
+	creation_date timestamptz DEFAULT now() NOT NULL,
+	CONSTRAINT documents_pk PRIMARY KEY (id)
+);
+
+
+CREATE TABLE public.account_agreement_rls (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	account_id uuid NOT NULL,
+	document_id uuid NOT NULL,
+	agreement_date timestamptz not null,
+	CONSTRAINT account_agreement_rls_pk PRIMARY KEY (id),
+	CONSTRAINT account_agreement_rls_accounts_fk FOREIGN KEY (account_id) REFERENCES public.accounts(id),
+	CONSTRAINT account_agreement_rls_document_fk FOREIGN KEY (document_id) REFERENCES public.documents(id)
+);
+--agreements
+
 /*
 create table public.chat_administrator (
 	id uuid not null default public.uuid_generate_v4(),

@@ -52,7 +52,8 @@ namespace EList.DbDataProvider.DataProviders
             var wallet = await _connection.Wallets.FirstOrDefaultAsync(i => i.Id == walletId);
             if (wallet?.TariffId != null)
             {
-                var tariff = await _connection.Tariffs.FirstOrDefaultAsync(i => i.Id == wallet.TariffId);
+                var tariff = await _connection.Tariffs.LoadWith(i => i.TariffValidator)
+                    .FirstOrDefaultAsync(i => i.Id == wallet.TariffId);
                 return tariff;
             }
             return null;
@@ -73,7 +74,7 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.AllowPrivate, item.AllowPrivate)
                 .Set(i => i.AllowGenderSegregation, item.AllowGenderSegregation)
                 .Set(i => i.AgeLimit, item.AgeLimit)
-                .Set(i => i.AllowMultidaysEvent, item. AllowMultidaysEvent)
+                .Set(i => i.AllowMultidaysEvent, item.AllowMultidaysEvent)
                 .Set(i => i.MaxEventsCount, item.MaxEventsCount)
                 .Set(i => i.CreateDateMaxPeriod, item.CreateDateMaxPeriod)
                 .UpdateAsync();
@@ -124,11 +125,32 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<WalletDto?> GetAccountWalletAsync(Guid accountId)
         {
-            var account = await _connection.Accounts.FirstOrDefaultAsync(i => i.Id == accountId);
-            if (account?.WalletId != null)
+            var walletId = await _connection.Accounts
+                .Where(i => i.Id == accountId)
+                .Select(i => i.WalletId)
+                .FirstOrDefaultAsync();
+            if (walletId != null)
             {
-                var wallet = await _connection.Wallets.FirstOrDefaultAsync(i => i.Id == account.WalletId);
+                var wallet = await _connection.Wallets.FirstOrDefaultAsync(i => i.Id == walletId);
                 return wallet;
+            }
+            return null;
+        }
+
+        public async Task<TariffValidatorDto?> GetAccountTariffValidatorAsync(Guid accountId)
+        {
+            var walletId = await _connection.Accounts
+                .Where(i => i.Id == accountId)
+                .Select(i => i.WalletId)
+                .FirstOrDefaultAsync();
+
+            if (walletId != null)
+            {
+                var tariffValidator = await _connection.Wallets
+                    .Where(i => i.Id == walletId)
+                    .Select(i => i.Tariff.TariffValidator)
+                    .FirstOrDefaultAsync();
+                return tariffValidator;
             }
             return null;
         }
@@ -144,10 +166,9 @@ namespace EList.DbDataProvider.DataProviders
             return null;
         }
 
-        
         public async Task<List<WalletDto>> GetOverdueWalletsAsync()
         {
-            var wallets = await _connection.Wallets.Where(i => i.TariffId != null && i.PaidDate>i.LastChargeDate).ToListAsync();
+            var wallets = await _connection.Wallets.Where(i => i.TariffId != null && i.PaidDate > i.LastChargeDate).ToListAsync();
             return wallets;
         }
 

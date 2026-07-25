@@ -100,6 +100,8 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            item.AgeLimit ??= 0;
+
             var result = await _walletsRepository.CreateTariffValidatorAsync(item);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -117,6 +119,8 @@ namespace EList.Services.Impl
             var tariffValidator = await _walletsRepository.GetTariffValidatorAsync(item.Id);
             if (tariffValidator == null)
                 return CommandResult.Fail(ErrorCode.TariffValidatorNotFound, $"Валидатор тарифа с id='{item.Id}' не найден");
+
+            item.AgeLimit ??= 0;
 
             await _walletsRepository.UpdateTariffValidatorAsync(item);
 

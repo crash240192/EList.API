@@ -14,6 +14,7 @@ using EList.Models.Notifications;
 using EList.Models.Participation;
 using EList.Models.Person;
 using EList.Models.Subscriptions;
+using EList.Models.UserAgreements;
 using EList.Models.Wallets;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -28,6 +29,9 @@ namespace EList.AutoMapperProfile
             //{
             //    defaultPageSize = 100;
             //}
+
+            CreateMap<AnonymousAgeAgreement, AnonymousAgeAgreementDto>().ReverseMap();
+            CreateMap<AccountAgreement, AccountAgreementDto>().ReverseMap();
 
             CreateMap<AuthorizationDto, AuthorizationResponse>().ReverseMap();
             CreateMap<AuthorizationDto, Authorization>().ReverseMap();
@@ -46,6 +50,8 @@ namespace EList.AutoMapperProfile
 
             CreateMap<ContactTypeDto, ContactType>().ReverseMap();
             CreateMap<ContactDataDto, ContactDataItem>().ReverseMap();
+
+            CreateMap<Document, DocumentDto>().ReverseMap();
 
             CreateMap<SubscriptionDto, Subscription>().ReverseMap();
             CreateMap<DbDataProvider.Models.SearchRequests.SubscriptionsSearchRequest, SubscriptionsSearchRequest>().ReverseMap();
@@ -93,6 +99,7 @@ namespace EList.AutoMapperProfile
             CreateMap<Models.Enums.Gender, DbDataProvider.Models.Enums.Gender>().ReverseMap();
             CreateMap<Models.Enums.SystemNotificationType, DbDataProvider.Models.Enums.SystemNotificationType>().ReverseMap();
             CreateMap<Models.Enums.EventRatingType, DbDataProvider.Models.Enums.EventRatingType>().ReverseMap();
+            CreateMap<Models.Enums.DocumentType, DbDataProvider.Models.Enums.DocumentType>().ReverseMap();
         }
     }
 }

@@ -21,8 +21,9 @@ namespace EList.DI
         public ServiceMapping GetServiceMapping()
         {
             var mapper = new ServiceMapping();
-            
+
             //DataProviders
+            mapper.AddScoped<IAgreementDataProvider, AgreementDataProvider>();
             mapper.AddSingleton<ICorrelationIdProvider, Common.HttpRestClient.CorrelationIdProvider>();
             mapper.AddScoped<IPersonsDataProvider, PersonsDataProvider>();
             mapper.AddScoped<IContactsDataProvider, ContactsDataProvider>();
@@ -58,10 +59,12 @@ namespace EList.DI
             mapper.AddScoped<IEventsRatingService, EventsRatingService>();
             mapper.AddScoped<IConversationService, ConversationService>();
             mapper.AddScoped<INotificationsService, NotificationsService>();
+            mapper.AddScoped<IAgreementService, AgreementService>();
 
             mapper.AddSingleton<WebSocketConnectionManager>();
 
             //Repositories
+            mapper.AddScoped<IAgreementRepository, AgreementRepository>();
             mapper.AddScoped<IPersonsRepository, PersonsRepository>();
             mapper.AddScoped<IContactsRepository, ContactsRepository>();
             mapper.AddScoped<IAuthorizationRepository, AuthorizationRepository>();

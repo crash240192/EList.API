@@ -2,7 +2,6 @@
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.SearchRequests;
-using EList.Models.Person;
 using LinqToDB;
 using LinqToDB.Async;
 
@@ -57,18 +56,8 @@ namespace EList.DbDataProvider.DataProviders
                 .UpdateAsync();
         }
 
-        public async Task<ListResponse<EventDto>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId = null, bool strongAgeValidation = false)
+        public async Task<ListResponse<EventDto>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId = null, bool adultConfirmed = false)
         {
-            //var birthdate = await _connection.Accounts
-            //    .LoadWith(i => i.PersonInfo)
-            //    .Where(i => i.Id == curAccountId)
-            //    .Select(i => i.PersonInfo.Birthdate)
-            //    .FirstOrDefaultAsync();
-
-            //var age = DateTime.Today.Year - birthdate.Year;
-            //if (PersonInfo.BirthDate.Value.Date > DateTime.Today.AddYears(-age)) age--;
-            //return age;
-
             var eventParametersRequest = _connection.EventParameters.AsQueryable();
             var eventTypes = _connection.EventTypes.AsQueryable();
             var eventsRequest = _connection.Events
@@ -114,7 +103,10 @@ namespace EList.DbDataProvider.DataProviders
                 eventsRequest = eventsRequest.Where(e => e.Parameters.Cost == null || e.Parameters.Cost <= request.Price);
 
             if (request.AgeLimit != null)
-                eventsRequest = eventsRequest.Where(e => e.Parameters.AgeLimit == null || e.Parameters.AgeLimit <= request.AgeLimit);
+                eventsRequest = eventsRequest.Where(e => e.Parameters.AgeLimit <= request.AgeLimit);
+
+            if (request.AdultOnly)
+                eventsRequest = eventsRequest.Where(e => e.Parameters.AgeLimit >= 18);
 
             // Отображение частных мероприятий
             // для черных списков - показывать если пользователь не в черных списках или он организатор
@@ -135,6 +127,19 @@ namespace EList.DbDataProvider.DataProviders
                         || i.Organizators.Any(o => o.AccountId == curAccountId));
             else
                 eventsRequest = eventsRequest.Where(i => i.Parameters.Private != true);
+
+            if (curAccountId != null)
+            {
+                if (!adultConfirmed)
+                    eventsRequest = eventsRequest.Where(e =>
+                        e.Organizators.Any(o => o.AccountId == curAccountId)
+                        || (e.Parameters.AgeLimit ?? 0) < 18);
+            }
+            else
+            {
+                if (!adultConfirmed)
+                    eventsRequest = eventsRequest.Where(e => (e.Parameters.AgeLimit ?? 0) < 18);
+            }
             #endregion
 
             #region eventTypes

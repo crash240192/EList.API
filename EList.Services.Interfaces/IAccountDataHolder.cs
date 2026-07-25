@@ -9,10 +9,12 @@ namespace EList.Services.Interfaces
         Account? Account { get; set; }
         string Jwt { get; set; }
         string ClientHash { get; set; }
+        string ClientInfo { get; set; }
         PersonInfo? PersonInfo { get; set; }
         Guid? AccountId { get; }
+        public bool AdultConfirmed { get; set; }
 
         string AccountNameFullString { get; }
-        public int Age { get; set; }
+        public int Age { get; }
     }
 }

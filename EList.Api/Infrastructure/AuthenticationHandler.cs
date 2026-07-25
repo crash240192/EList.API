@@ -1,4 +1,5 @@
 ﻿using EList.Common.Encryption;
+using EList.Models;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
@@ -21,6 +22,9 @@ namespace EList.Api.Infrastructure
 
         private static readonly List<string> AnonymousMethods = new()
         {
+            "/api/agreements/documents/last*",
+            "/api/agreements/agree/*",
+
             "/api/accounts/getdata/*",
             "/api/contacts/getaccountcontacts/*",
 
@@ -65,6 +69,9 @@ namespace EList.Api.Infrastructure
 
             "/api/subscriptions/getsubscriptions*",
             "/api/subscriptions/getsubscribers*",
+
+            "/api/agreements/age/anonymous/agree",
+            "/api/agreements/age/anonymous/get"
         };
 
         private readonly Logger _currentLogger = LogManager.GetCurrentClassLogger();
@@ -73,7 +80,7 @@ namespace EList.Api.Infrastructure
         private readonly IEncryptionTool _encryptionTool;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IPersonsService _personsService;
-
+        private readonly IAgreementService _agreementService;
         private bool IsAnonymousMethod // Не обязательны ни токен, ни jwt
         {
             get
@@ -115,13 +122,15 @@ namespace EList.Api.Infrastructure
             [NotNull] IAccountsService accountsService,
             IEncryptionTool encryptionTool,
             IPersonsService personsService,
-            IAccountDataHolder accountDataHolder) : base(options, logger, encoder, clock)
+            IAccountDataHolder accountDataHolder,
+            IAgreementService agreementService) : base(options, logger, encoder, clock)
         {
             _authorizationService = authorizationService ?? throw new ArgumentNullException(nameof(authorizationService));
             _encryptionTool = encryptionTool ?? throw new ArgumentNullException(nameof(encryptionTool));
             _accountsService = accountsService ?? throw new ArgumentNullException(nameof(accountsService));
             _accountDataHolder = accountDataHolder ?? throw new ArgumentNullException(nameof(accountDataHolder));
             _personsService = personsService ?? throw new ArgumentNullException(nameof(personsService));
+            _agreementService = agreementService ?? throw new ArgumentNullException(nameof(agreementService));
         }
 
         /// <summary>
@@ -150,6 +159,10 @@ namespace EList.Api.Infrastructure
                     var clientHash = GetClientHash(jwtHeader.ToString());
                     _accountDataHolder.ClientHash = clientHash;
                     _accountDataHolder.Jwt = jwtHeader.ToString();
+                    _accountDataHolder.ClientInfo = GetClientInfo();
+
+                    var ageAgreement = await _agreementService.GetAnonymousAgeAgreementAsync();
+                    _accountDataHolder.AdultConfirmed = ageAgreement.Success;
 
                     return AuthenticateResult.Success(CreateTicket(jwtHeader.ToString(), hasToken ? tokenHeader.ToString() : null));
                 }
@@ -169,6 +182,7 @@ namespace EList.Api.Infrastructure
                     var clientHash = GetClientHash(jwtHeader.ToString());
                     _accountDataHolder.ClientHash = clientHash;
                     _accountDataHolder.Jwt = jwtHeader.ToString();
+                    _accountDataHolder.ClientInfo = GetClientInfo();
                 }
 
                 //Токен не обязателен для анонимных и не нужен для авторизации
@@ -176,6 +190,9 @@ namespace EList.Api.Infrastructure
                 {
                     if (!IsAuthorizationFlow && !IsRegistrationFlow && !IsResetPasswordFlow && !IsAnonymousMethod)
                         return AuthenticateResult.Fail("Missing Authorization Header");
+
+                    var ageAgreement = await _agreementService.GetAnonymousAgeAgreementAsync();
+                    _accountDataHolder.AdultConfirmed = ageAgreement.Success;
                 }
                 else
                 {
@@ -270,7 +287,15 @@ namespace EList.Api.Infrastructure
             var jwtHash = _encryptionTool.CalculateStringHash(jwtHeader);
             var platform = Request.Headers["X-Client-Platform"].FirstOrDefault() ?? "unknown";
             var appVersion = Request.Headers["X-App-Version"].FirstOrDefault() ?? "unknown";
+
             return _encryptionTool.CalculateStringHash($"{jwtHash}|{platform}|{appVersion}");
+        }
+
+        private string GetClientInfo()
+        {
+            var clientInfo = (ClientInfo)Request.HttpContext.Items["ClientInfo"];
+
+            return $"{clientInfo.IP}|{clientInfo.Timezone}|{clientInfo.AcceptLanguage}";
         }
 
         private AuthenticationTicket CreateAnonymousTicket()

@@ -473,6 +473,9 @@ namespace EList.Services.Impl
                 }
             }
 
+            if (account == null)
+                return null;
+            
             if (passwordHash != null)
             {
                 if (passwordHash != account.PasswordHash)

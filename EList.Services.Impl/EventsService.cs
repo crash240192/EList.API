@@ -26,8 +26,6 @@ namespace EList.Services.Impl
         private const string LOGGER_NAME = "EList.Services.Impl.EventsService.";
         #endregion
 
-        private readonly bool _strongAgeValidation = false;
-
         private readonly IEventsMetadataRepository _eventsMetadataRepository;
         private readonly IEventsRepository _eventsRepository;
         private readonly ICorrelationIdProvider _correlationIdProvider;
@@ -69,9 +67,6 @@ namespace EList.Services.Impl
             _walletsRepository = walletsRepository ?? throw new Exception(nameof(walletsRepository));
             _notificationsService = notificationsService ?? throw new Exception(nameof(notificationsService));
             _accountDataHolder = accountDataHolder;
-
-            if (ConfigurationManager.AppSettings.ContainsSection("strongAgeValidation"))
-                _strongAgeValidation = bool.Parse(ConfigurationManager.AppSettings["strongAgeValidation"]);
         }
 
 
@@ -381,8 +376,8 @@ namespace EList.Services.Impl
             if (!organizators?.Any(i => i.Account.Id == _accountDataHolder.AccountId) ?? true)
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
 
-            if (!Enum.IsDefined(typeof(AgeRating), parameters.AgeLimit))
-                return CommandResult.Fail(ErrorCode.InvalidAgeLimitValue, "Значение возрастного ограничения может принимать значения '0', '6', '12', '16' или '18'");
+            //if (!Enum.IsDefined(typeof(AgeRating), parameters.AgeLimit))
+            //    return CommandResult.Fail(ErrorCode.InvalidAgeLimitValue, "Значение возрастного ограничения может принимать значения '0', '6', '12', '16' или '18'");
 
             if (curEvent.EventParametersId == null)
             {
@@ -407,18 +402,34 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(CreateEventAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //TODO: Сюда нужно поместить проверку на то что текущий пользователь может создавать событие с указанными параметрами и от имени указанных организаторов
+            #region validation
+            if (request.EventParameters == null)
+                request.EventParameters = new EventParametersRequest
+                {
+                    AgeLimit = 0,
+                    Cost = 0,
+                    Private = false,
+                    AllowUsersToInvite = true
+                };
 
-            //var eventsCount = await _eventsRepository.SearchEventsAsync(new EventsSearchRequest
-            //{
-            //    OrganizatorId = _accountDataHolder.AccountId,
-            //    EndTime = DateTimeOffset.UtcNow
-            //}, null);
+            var tariffValidator = await _walletsRepository.GetAccountTariffValidatorAsync(_accountDataHolder.AccountId.Value);
 
-            //var tariffValidator = await _walletsRepository.GetAccountWalletAsync(_accountDataHolder.AccountId);
+            var ageThreshold = tariffValidator != null
+                ? tariffValidator.AgeLimit : 0;
+
+            if (ageThreshold != null)
+                if (request.EventParameters.AgeLimit > ageThreshold)
+                    return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, $"В рамках текущего тарифа доступно создание мероприятий только мероприятия c ограничением по возрассту до {ageThreshold} лет");
+
+            if (request.EventParameters.AgeLimit >= 18 && !_accountDataHolder.AdultConfirmed)
+                return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, $"Несовершеннолетние пользователи не могут создавать мероприятия 18+");
+
+            if (request.EventParameters.Cost > 0 && !_accountDataHolder.AdultConfirmed)
+                return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, $"Несовершеннолетние пользователи не могут создавать платные мероприятия");
+            #endregion
 
             var eventId = await _eventsRepository.CreateEventAsync(request.Event);
-
+            
             #region Привязываем идентификаторы организаторов к событию
             if (request.OrganizatorAccountIds == null)
                 request.OrganizatorOrganizationIds = new List<Guid>();
@@ -436,25 +447,10 @@ namespace EList.Services.Impl
             }
             #endregion
 
-            if (request.EventParameters == null)
-                request.EventParameters = new EventParametersRequest
-                {
-                    AgeLimit = 0,
-                    Cost = 0,
-                    Private = false,
-                    AllowUsersToInvite = true
-                };
+            var createEventParametersResult = await SetEventParametersAsync(eventId, request.EventParameters);
 
-            if (!Enum.IsDefined(typeof(AgeRating), request.EventParameters.AgeLimit))
-                return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, "Значение возрастного ограничения может принимать значения '0', '6', '12', '16' или '18'");
-
-            if (request.EventParameters != null)
-            {
-                var createEventParametersResult = await SetEventParametersAsync(eventId, request.EventParameters);
-
-                if (!createEventParametersResult.Success)
-                    return CommandResult<Guid?>.Fail(createEventParametersResult.ErrorCode, createEventParametersResult.Message);
-            }
+            if (!createEventParametersResult.Success)
+                return CommandResult<Guid?>.Fail(createEventParametersResult.ErrorCode, createEventParametersResult.Message);
 
             await _eventsMetadataRepository.BindEventTypesAsync(eventId, request.EventTypes);
 
@@ -659,16 +655,19 @@ namespace EList.Services.Impl
             }
 
             #region age validation
-            if (eventItem.Parameters == null)
-                eventItem.Parameters = new EventParameters
-                {
-                    AgeLimit = 0,
-                };
-            else
-                eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
+            if (!isOrganizator)
+            {
+                if (eventItem.Parameters == null)
+                    eventItem.Parameters = new EventParameters
+                    {
+                        AgeLimit = 0,
+                    };
+                else
+                    eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
 
-            if (ValidateAgeAccessToEvent(eventItem.Parameters.AgeLimit, _accountDataHolder.Age, _strongAgeValidation))
-                return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, $"Просмотр мероприятий {eventItem.Parameters.AgeLimit}+ доступен только для авторизованных пользователей достигших соответствующего возраста");
+                if (eventItem.Parameters.AgeLimit >= 18 && !_accountDataHolder.AdultConfirmed)
+                    return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, $"Просмотр мероприятий 18+ недоступен");
+            }
             #endregion
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -679,31 +678,31 @@ namespace EList.Services.Impl
         {
             value = value ?? 0;
             var ageRatingValues = Enum.GetValues<AgeRating>().Cast<int>().ToList();
-            var nextAvailableRatingValue = ageRatingValues.FirstOrDefault(x => x > value, 18);
+            var nextAvailableRatingValue = ageRatingValues.FirstOrDefault(x => x >= value, 18);
             return nextAvailableRatingValue;
         }
 
-        private static bool ValidateAgeAccessToEvent(int? eventAgeLimit, int userAge, bool strongValidation)
-        {
-            if (userAge >= 18)
-                return true;
+        //private static bool ValidateAgeAccessToEvent(int? eventAgeLimit, int userAge, bool strongValidation)
+        //{
+        //    if (userAge >= 18)
+        //        return true;
 
-            var minAllowedAge = GetEventMinAllowedAge(eventAgeLimit);
+        //    var minAllowedAge = GetEventMinAllowedAge(eventAgeLimit);
 
-            if (strongValidation)
-            {
-                if (minAllowedAge > userAge)
-                    return false;
-                else
-                    return true;
-            }   
-            else
-            {
-                if (minAllowedAge == 18 && userAge < 18)
-                    return false;
-                return true;
-            }   
-        }
+        //    if (strongValidation)
+        //    {
+        //        if (minAllowedAge >= userAge)
+        //            return false;
+        //        else
+        //            return true;
+        //    }   
+        //    else
+        //    {
+        //        if (minAllowedAge == 18 && userAge < 18)
+        //            return false;
+        //        return true;
+        //    }   
+        //}
 
         public async Task<CommandResult<PagedList<Event>?>> SearchEventsAsync(EventsSearchRequest request)
         {
@@ -712,7 +711,7 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SearchEventsAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var searchResult = await _eventsRepository.SearchEventsAsync(request, _accountDataHolder.AccountId, _strongAgeValidation);
+            var searchResult = await _eventsRepository.SearchEventsAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<Event>?>(searchResult);
@@ -725,7 +724,7 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SearchEventsShortAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var searchResult = await _eventsRepository.SearchEventsShortAsync(request, _accountDataHolder.AccountId, _strongAgeValidation);
+            var searchResult = await _eventsRepository.SearchEventsShortAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<EventShort>?>(searchResult);
