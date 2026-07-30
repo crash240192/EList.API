@@ -11,6 +11,8 @@ using EList.Models.EventsRating;
 using EList.Models.Invitations;
 using EList.Models.Media;
 using EList.Models.Notifications;
+using EList.Models.Orders;
+using EList.Models.Organizations;
 using EList.Models.Participation;
 using EList.Models.Person;
 using EList.Models.Subscriptions;
@@ -91,6 +93,51 @@ namespace EList.AutoMapperProfile
             CreateMap<TariffValidatorDto, TariffValidator>().ReverseMap();
             CreateMap<WalletDto, Wallet>().ReverseMap();
 
+            CreateMap<OrganizationDto, Organization>().ReverseMap()
+                .ForMember(dest => dest.Members, opt => opt.Ignore())
+                .ForMember(dest => dest.Legal, opt => opt.Ignore())
+                .ForMember(dest => dest.Payout, opt => opt.Ignore())
+                .ForMember(dest => dest.Wallet, opt => opt.Ignore())
+                .ForMember(dest => dest.CreatedByAccount, opt => opt.Ignore());
+            CreateMap<OrganizationRequest, OrganizationDto>()
+                .ForMember(dest => dest.Id, opt => opt.Ignore())
+                .ForMember(dest => dest.Active, opt => opt.Ignore())
+                .ForMember(dest => dest.WalletId, opt => opt.Ignore())
+                .ForMember(dest => dest.CreatedByAccountId, opt => opt.Ignore())
+                .ForMember(dest => dest.VerificationStatus, opt => opt.Ignore())
+                .ForMember(dest => dest.CanSellTickets, opt => opt.Ignore())
+                .ForMember(dest => dest.CreateDate, opt => opt.Ignore())
+                .ForMember(dest => dest.UpdateDate, opt => opt.Ignore())
+                .ForMember(dest => dest.Members, opt => opt.Ignore())
+                .ForMember(dest => dest.Legal, opt => opt.Ignore())
+                .ForMember(dest => dest.Payout, opt => opt.Ignore())
+                .ForMember(dest => dest.Wallet, opt => opt.Ignore())
+                .ForMember(dest => dest.CreatedByAccount, opt => opt.Ignore());
+            CreateMap<OrganizationAccountRelationDto, OrganizationMember>().ReverseMap()
+                .ForMember(dest => dest.Account, opt => opt.Ignore())
+                .ForMember(dest => dest.InvitedByAccount, opt => opt.Ignore())
+                .ForMember(dest => dest.Organization, opt => opt.Ignore());
+            CreateMap<OrganizationLegalDto, OrganizationLegal>().ReverseMap()
+                .ForMember(dest => dest.Organization, opt => opt.Ignore());
+            CreateMap<OrganizationPayoutDto, OrganizationPayout>().ReverseMap()
+                .ForMember(dest => dest.Organization, opt => opt.Ignore())
+                .ForMember(dest => dest.UpdatedByAccount, opt => opt.Ignore());
+
+            CreateMap<OrderDto, Order>().ReverseMap()
+                .ForMember(dest => dest.Event, opt => opt.Ignore())
+                .ForMember(dest => dest.BuyerAccount, opt => opt.Ignore())
+                .ForMember(dest => dest.SellerOrganization, opt => opt.Ignore())
+                .ForMember(dest => dest.Tickets, opt => opt.Ignore())
+                .ForMember(dest => dest.Refunds, opt => opt.Ignore());
+            CreateMap<TicketDto, Ticket>().ReverseMap()
+                .ForMember(dest => dest.Order, opt => opt.Ignore())
+                .ForMember(dest => dest.Event, opt => opt.Ignore())
+                .ForMember(dest => dest.HolderAccount, opt => opt.Ignore());
+            CreateMap<RefundDto, Refund>().ReverseMap()
+                .ForMember(dest => dest.Order, opt => opt.Ignore());
+            CreateMap<PaymentWebhookEventDto, PaymentWebhookEvent>().ReverseMap()
+                .ForMember(dest => dest.Order, opt => opt.Ignore());
+
             CreateMap<MessageDto, Message>().ReverseMap();
             CreateMap<MessageRequest, MessageDto>().ReverseMap();
             CreateMap<ConversationDto, Conversation>().ReverseMap();
@@ -100,6 +147,14 @@ namespace EList.AutoMapperProfile
             CreateMap<Models.Enums.SystemNotificationType, DbDataProvider.Models.Enums.SystemNotificationType>().ReverseMap();
             CreateMap<Models.Enums.EventRatingType, DbDataProvider.Models.Enums.EventRatingType>().ReverseMap();
             CreateMap<Models.Enums.DocumentType, DbDataProvider.Models.Enums.DocumentType>().ReverseMap();
+            CreateMap<Models.Enums.OrganizationMemberRole, DbDataProvider.Models.Enums.OrganizationMemberRole>().ReverseMap();
+            CreateMap<Models.Enums.OrganizationVerificationStatus, DbDataProvider.Models.Enums.OrganizationVerificationStatus>().ReverseMap();
+            CreateMap<Models.Enums.OrganizationLegalForm, DbDataProvider.Models.Enums.OrganizationLegalForm>().ReverseMap();
+            CreateMap<Models.Enums.PaymentProvider, DbDataProvider.Models.Enums.PaymentProvider>().ReverseMap();
+            CreateMap<Models.Enums.OrderStatus, DbDataProvider.Models.Enums.OrderStatus>().ReverseMap();
+            CreateMap<Models.Enums.TicketStatus, DbDataProvider.Models.Enums.TicketStatus>().ReverseMap();
+            CreateMap<Models.Enums.RefundStatus, DbDataProvider.Models.Enums.RefundStatus>().ReverseMap();
+            CreateMap<Models.Enums.ProviderOnboardingStatus, DbDataProvider.Models.Enums.ProviderOnboardingStatus>().ReverseMap();
         }
     }
 }

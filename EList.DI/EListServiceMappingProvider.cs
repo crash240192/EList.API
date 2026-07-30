@@ -83,6 +83,8 @@ namespace EList.DI
             mapper.AddScoped<IEventsRatingRepository, EventsRatingRepository>();
             mapper.AddScoped<IParticipantsBWListRepository, ParticipantsBWListRepository>();
             mapper.AddScoped<IConversationRepository, ConversationRepository>();
+            mapper.AddScoped<IOrganizationsRepository, OrganizationsRepository>();
+            mapper.AddScoped<IOrdersRepository, OrdersRepository>();
 
             //Validators
             mapper.AddScoped<IPersonValidator, PersonValidator>();
