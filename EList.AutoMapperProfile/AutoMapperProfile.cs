@@ -93,50 +93,23 @@ namespace EList.AutoMapperProfile
             CreateMap<TariffValidatorDto, TariffValidator>().ReverseMap();
             CreateMap<WalletDto, Wallet>().ReverseMap();
 
-            CreateMap<OrganizationDto, Organization>().ReverseMap()
-                .ForMember(dest => dest.Members, opt => opt.Ignore())
-                .ForMember(dest => dest.Legal, opt => opt.Ignore())
-                .ForMember(dest => dest.Payout, opt => opt.Ignore())
-                .ForMember(dest => dest.Wallet, opt => opt.Ignore())
-                .ForMember(dest => dest.CreatedByAccount, opt => opt.Ignore());
-            CreateMap<OrganizationRequest, OrganizationDto>()
-                .ForMember(dest => dest.Id, opt => opt.Ignore())
-                .ForMember(dest => dest.Active, opt => opt.Ignore())
-                .ForMember(dest => dest.WalletId, opt => opt.Ignore())
-                .ForMember(dest => dest.CreatedByAccountId, opt => opt.Ignore())
-                .ForMember(dest => dest.VerificationStatus, opt => opt.Ignore())
-                .ForMember(dest => dest.CanSellTickets, opt => opt.Ignore())
-                .ForMember(dest => dest.CreateDate, opt => opt.Ignore())
-                .ForMember(dest => dest.UpdateDate, opt => opt.Ignore())
-                .ForMember(dest => dest.Members, opt => opt.Ignore())
-                .ForMember(dest => dest.Legal, opt => opt.Ignore())
-                .ForMember(dest => dest.Payout, opt => opt.Ignore())
-                .ForMember(dest => dest.Wallet, opt => opt.Ignore())
-                .ForMember(dest => dest.CreatedByAccount, opt => opt.Ignore());
-            CreateMap<OrganizationAccountRelationDto, OrganizationMember>().ReverseMap()
-                .ForMember(dest => dest.Account, opt => opt.Ignore())
-                .ForMember(dest => dest.InvitedByAccount, opt => opt.Ignore())
-                .ForMember(dest => dest.Organization, opt => opt.Ignore());
-            CreateMap<OrganizationLegalDto, OrganizationLegal>().ReverseMap()
-                .ForMember(dest => dest.Organization, opt => opt.Ignore());
-            CreateMap<OrganizationPayoutDto, OrganizationPayout>().ReverseMap()
-                .ForMember(dest => dest.Organization, opt => opt.Ignore())
-                .ForMember(dest => dest.UpdatedByAccount, opt => opt.Ignore());
+            CreateMap<OrganizationDto, Organization>().ReverseMap();
+            CreateMap<OrganizationRequest, OrganizationDto>();
+            CreateMap<OrganizationAccountRelationDto, OrganizationMember>().ReverseMap();
+            CreateMap<OrganizationLegalDto, OrganizationLegal>().ReverseMap();
+            CreateMap<OrganizationPayoutDto, OrganizationPayout>().ReverseMap();
+            CreateMap<Organization, OrganizationResponse>();
+            CreateMap<OrganizationMember, OrganizationMemberResponse>();
+            CreateMap<OrganizationLegal, OrganizationLegalResponse>();
+            CreateMap<OrganizationPayout, OrganizationPayoutResponse>();
 
-            CreateMap<OrderDto, Order>().ReverseMap()
-                .ForMember(dest => dest.Event, opt => opt.Ignore())
-                .ForMember(dest => dest.BuyerAccount, opt => opt.Ignore())
-                .ForMember(dest => dest.SellerOrganization, opt => opt.Ignore())
-                .ForMember(dest => dest.Tickets, opt => opt.Ignore())
-                .ForMember(dest => dest.Refunds, opt => opt.Ignore());
-            CreateMap<TicketDto, Ticket>().ReverseMap()
-                .ForMember(dest => dest.Order, opt => opt.Ignore())
-                .ForMember(dest => dest.Event, opt => opt.Ignore())
-                .ForMember(dest => dest.HolderAccount, opt => opt.Ignore());
-            CreateMap<RefundDto, Refund>().ReverseMap()
-                .ForMember(dest => dest.Order, opt => opt.Ignore());
-            CreateMap<PaymentWebhookEventDto, PaymentWebhookEvent>().ReverseMap()
-                .ForMember(dest => dest.Order, opt => opt.Ignore());
+            CreateMap<OrderDto, Order>().ReverseMap();
+            CreateMap<TicketDto, Ticket>().ReverseMap();
+            CreateMap<RefundDto, Refund>().ReverseMap();
+            CreateMap<PaymentWebhookEventDto, PaymentWebhookEvent>().ReverseMap();
+            CreateMap<Order, OrderResponse>();
+            CreateMap<Ticket, TicketResponse>();
+            CreateMap<Refund, RefundResponse>();
 
             CreateMap<MessageDto, Message>().ReverseMap();
             CreateMap<MessageRequest, MessageDto>().ReverseMap();
