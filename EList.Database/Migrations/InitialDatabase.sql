@@ -554,6 +554,273 @@ CREATE TABLE public.account_agreement_rls (
 );
 --agreements
 
+
+-- =============================================================================
+-- Organizations (расширение) + юридические реквизиты + платежи/билеты
+--
+-- ”прощение относительно черновика Claude:
+--   * users -> accounts; document_versions/acceptances уже есть (documents/account_agreement_rls)
+--   * birthdate/age уже в person_info/event_parameters Ч не дублируем
+--   * убраны org_type/plan, invitations, audit_log, append-only триггеры
+--   * роли менеджеров: owner | manager (без author/admin)
+--   * информационна€ организаци€: минимум полей, can_sell_tickets = false
+--   * юридически оформленна€: organization_legal + organization_payout, can_sell_tickets после verified
+-- =============================================================================
+
+do $CREATE_ORG_MEMBER_ROLES$
+BEGIN
+	if not exists (select 1 from pg_type where typname = 'organization_member_role')
+	then
+		CREATE TYPE public.organization_member_role AS ENUM ('owner', 'manager');
+	end if;
+end $CREATE_ORG_MEMBER_ROLES$;
+
+do $CREATE_ORG_VERIFICATION_STATUS$
+BEGIN
+	if not exists (select 1 from pg_type where typname = 'organization_verification_status')
+	then
+		CREATE TYPE public.organization_verification_status AS ENUM ('unverified', 'pending', 'verified', 'rejected');
+	end if;
+end $CREATE_ORG_VERIFICATION_STATUS$;
+
+do $CREATE_ORG_LEGAL_FORM$
+BEGIN
+	if not exists (select 1 from pg_type where typname = 'organization_legal_form')
+	then
+		CREATE TYPE public.organization_legal_form AS ENUM ('self_employed', 'ip', 'legal_entity');
+	end if;
+end $CREATE_ORG_LEGAL_FORM$;
+
+do $CREATE_PAYMENT_PROVIDER$
+BEGIN
+	if not exists (select 1 from pg_type where typname = 'payment_provider')
+	then
+		CREATE TYPE public.payment_provider AS ENUM ('yookassa', 'tbank', 'sberpay', 'payanyway', 'paygine', 'other');
+	end if;
+end $CREATE_PAYMENT_PROVIDER$;
+
+do $CREATE_ORDER_STATUS$
+BEGIN
+	if not exists (select 1 from pg_type where typname = 'order_status')
+	then
+		CREATE TYPE public.order_status AS ENUM (
+			'pending', 'authorized', 'paid', 'canceled', 'refunded', 'partially_refunded', 'failed');
+	end if;
+end $CREATE_ORDER_STATUS$;
+
+do $CREATE_TICKET_STATUS$
+BEGIN
+	if not exists (select 1 from pg_type where typname = 'ticket_status')
+	then
+		CREATE TYPE public.ticket_status AS ENUM ('issued', 'used', 'refunded', 'void');
+	end if;
+end $CREATE_TICKET_STATUS$;
+
+do $CREATE_REFUND_STATUS$
+BEGIN
+	if not exists (select 1 from pg_type where typname = 'refund_status')
+	then
+		CREATE TYPE public.refund_status AS ENUM ('pending', 'succeeded', 'failed');
+	end if;
+end $CREATE_REFUND_STATUS$;
+
+do $CREATE_PROVIDER_ONBOARDING_STATUS$
+BEGIN
+	if not exists (select 1 from pg_type where typname = 'provider_onboarding_status')
+	then
+		CREATE TYPE public.provider_onboarding_status AS ENUM ('none', 'pending', 'active', 'rejected');
+	end if;
+end $CREATE_PROVIDER_ONBOARDING_STATUS$;
+
+
+-- organizations: информационный профиль + флаг продажи билетов
+ALTER TABLE public.organizations
+	ADD COLUMN IF NOT EXISTS description text NULL,
+	ADD COLUMN IF NOT EXISTS created_by_account_id uuid NULL,
+	ADD COLUMN IF NOT EXISTS verification_status public.organization_verification_status NOT NULL DEFAULT 'unverified',
+	ADD COLUMN IF NOT EXISTS can_sell_tickets bool NOT NULL DEFAULT false,
+	ADD COLUMN IF NOT EXISTS create_date timestamptz NOT NULL DEFAULT now(),
+	ADD COLUMN IF NOT EXISTS update_date timestamptz NOT NULL DEFAULT now();
+
+-- проста€ организаци€ может быть без адреса и кошелька
+ALTER TABLE public.organizations ALTER COLUMN address DROP NOT NULL;
+ALTER TABLE public.organizations ALTER COLUMN wallet_id DROP NOT NULL;
+
+ALTER TABLE public.organizations DROP CONSTRAINT IF EXISTS organization_created_by_fk;
+ALTER TABLE public.organizations
+	ADD CONSTRAINT organization_created_by_fk
+		FOREIGN KEY (created_by_account_id) REFERENCES public.accounts(id);
+
+ALTER TABLE public.organizations DROP CONSTRAINT IF EXISTS organization_sell_tickets_verified_chk;
+ALTER TABLE public.organizations
+	ADD CONSTRAINT organization_sell_tickets_verified_chk
+		CHECK (can_sell_tickets = false OR verification_status = 'verified');
+
+CREATE INDEX IF NOT EXISTS organizations_created_by_account_id_idx
+	ON public.organizations (created_by_account_id);
+CREATE INDEX IF NOT EXISTS organizations_verification_status_idx
+	ON public.organizations (verification_status);
+
+
+-- organization_accounts_rls: владелец и менеджеры
+ALTER TABLE public.organization_accounts_rls
+	ADD COLUMN IF NOT EXISTS role public.organization_member_role NOT NULL DEFAULT 'manager',
+	ADD COLUMN IF NOT EXISTS active bool NOT NULL DEFAULT true,
+	ADD COLUMN IF NOT EXISTS invited_by uuid NULL,
+	ADD COLUMN IF NOT EXISTS joined_at timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE public.organization_accounts_rls DROP CONSTRAINT IF EXISTS organization_accounts_unique;
+ALTER TABLE public.organization_accounts_rls
+	ADD CONSTRAINT organization_accounts_unique UNIQUE (organization_id, account_id);
+
+ALTER TABLE public.organization_accounts_rls DROP CONSTRAINT IF EXISTS organization_accounts_invited_by_fk;
+ALTER TABLE public.organization_accounts_rls
+	ADD CONSTRAINT organization_accounts_invited_by_fk
+		FOREIGN KEY (invited_by) REFERENCES public.accounts(id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS organization_accounts_one_owner_idx
+	ON public.organization_accounts_rls (organization_id)
+	WHERE role = 'owner';
+
+CREATE INDEX IF NOT EXISTS organization_accounts_account_id_idx
+	ON public.organization_accounts_rls (account_id);
+
+
+-- юридические данные (1:1), нужны дл€ верификации и продажи билетов
+CREATE TABLE IF NOT EXISTS public.organization_legal (
+	organization_id uuid NOT NULL,
+	legal_form public.organization_legal_form NOT NULL,
+	inn varchar(12) NULL,
+	ogrn varchar(15) NULL,
+	kpp varchar(9) NULL,
+	legal_address varchar(500) NULL,
+	head_name varchar(255) NULL,
+	head_basis varchar(255) NULL,
+	verified_at timestamptz NULL,
+	CONSTRAINT organization_legal_pk PRIMARY KEY (organization_id),
+	CONSTRAINT organization_legal_organization_fk FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+
+
+-- платЄжные реквизиты / онбординг у провайдера (1:1)
+CREATE TABLE IF NOT EXISTS public.organization_payout (
+	organization_id uuid NOT NULL,
+	bank_account varchar(34) NULL,
+	bik varchar(9) NULL,
+	bank_name varchar(255) NULL,
+	tax_regime varchar(50) NULL,
+	provider public.payment_provider NULL,
+	provider_seller_id varchar NULL,
+	onboarding_status public.provider_onboarding_status NOT NULL DEFAULT 'none',
+	updated_by uuid NULL,
+	update_date timestamptz NOT NULL DEFAULT now(),
+	CONSTRAINT organization_payout_pk PRIMARY KEY (organization_id),
+	CONSTRAINT organization_payout_organization_fk FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+	CONSTRAINT organization_payout_updated_by_fk FOREIGN KEY (updated_by) REFERENCES public.accounts(id)
+);
+
+
+-- заказы (сплит: сумма продавца + комисси€ сервиса)
+CREATE TABLE IF NOT EXISTS public.orders (
+	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
+	event_id uuid NOT NULL,
+	buyer_account_id uuid NOT NULL,
+	seller_organization_id uuid NOT NULL,
+	quantity int NOT NULL,
+	amount_total numeric(12, 2) NOT NULL,
+	amount_seller numeric(12, 2) NOT NULL,
+	amount_commission numeric(12, 2) NOT NULL,
+	currency char(3) NOT NULL DEFAULT 'RUB',
+	status public.order_status NOT NULL DEFAULT 'pending',
+	provider public.payment_provider NULL,
+	provider_payment_id varchar NULL,
+	idempotency_key varchar NULL,
+	create_date timestamptz NOT NULL DEFAULT now(),
+	paid_at timestamptz NULL,
+	CONSTRAINT orders_pk PRIMARY KEY (id),
+	CONSTRAINT orders_event_fk FOREIGN KEY (event_id) REFERENCES public.events(id),
+	CONSTRAINT orders_buyer_account_fk FOREIGN KEY (buyer_account_id) REFERENCES public.accounts(id),
+	CONSTRAINT orders_seller_organization_fk FOREIGN KEY (seller_organization_id) REFERENCES public.organizations(id),
+	CONSTRAINT orders_quantity_chk CHECK (quantity > 0),
+	CONSTRAINT orders_amount_total_chk CHECK (amount_total >= 0),
+	CONSTRAINT orders_amount_seller_chk CHECK (amount_seller >= 0),
+	CONSTRAINT orders_amount_commission_chk CHECK (amount_commission >= 0),
+	CONSTRAINT orders_split_sum_chk CHECK (amount_total = amount_seller + amount_commission)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS orders_provider_payment_uidx
+	ON public.orders (provider, provider_payment_id)
+	WHERE provider_payment_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS orders_idempotency_uidx
+	ON public.orders (idempotency_key)
+	WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS orders_event_id_idx ON public.orders (event_id);
+CREATE INDEX IF NOT EXISTS orders_buyer_account_id_idx ON public.orders (buyer_account_id);
+CREATE INDEX IF NOT EXISTS orders_seller_organization_id_idx ON public.orders (seller_organization_id);
+CREATE INDEX IF NOT EXISTS orders_status_idx ON public.orders (status);
+
+
+-- билеты
+CREATE TABLE IF NOT EXISTS public.tickets (
+	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
+	order_id uuid NOT NULL,
+	event_id uuid NOT NULL,
+	holder_account_id uuid NOT NULL,
+	status public.ticket_status NOT NULL DEFAULT 'issued',
+	code varchar NOT NULL,
+	issued_at timestamptz NOT NULL DEFAULT now(),
+	CONSTRAINT tickets_pk PRIMARY KEY (id),
+	CONSTRAINT tickets_code_unique UNIQUE (code),
+	CONSTRAINT tickets_order_fk FOREIGN KEY (order_id) REFERENCES public.orders(id),
+	CONSTRAINT tickets_event_fk FOREIGN KEY (event_id) REFERENCES public.events(id),
+	CONSTRAINT tickets_holder_account_fk FOREIGN KEY (holder_account_id) REFERENCES public.accounts(id)
+);
+
+CREATE INDEX IF NOT EXISTS tickets_order_id_idx ON public.tickets (order_id);
+CREATE INDEX IF NOT EXISTS tickets_holder_account_id_idx ON public.tickets (holder_account_id);
+CREATE INDEX IF NOT EXISTS tickets_event_id_idx ON public.tickets (event_id);
+
+
+-- возвраты
+CREATE TABLE IF NOT EXISTS public.refunds (
+	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
+	order_id uuid NOT NULL,
+	amount numeric(12, 2) NOT NULL,
+	reason varchar NULL,
+	provider_refund_id varchar NULL,
+	status public.refund_status NOT NULL DEFAULT 'pending',
+	create_date timestamptz NOT NULL DEFAULT now(),
+	CONSTRAINT refunds_pk PRIMARY KEY (id),
+	CONSTRAINT refunds_order_fk FOREIGN KEY (order_id) REFERENCES public.orders(id),
+	CONSTRAINT refunds_amount_chk CHECK (amount > 0)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS refunds_provider_refund_uidx
+	ON public.refunds (provider_refund_id)
+	WHERE provider_refund_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS refunds_order_id_idx ON public.refunds (order_id);
+
+
+-- журнал webhook провайдера (идемпотентность колбэков)
+CREATE TABLE IF NOT EXISTS public.payment_webhook_events (
+	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
+	provider public.payment_provider NOT NULL,
+	provider_event_id varchar NOT NULL,
+	order_id uuid NULL,
+	payload jsonb NULL,
+	received_at timestamptz NOT NULL DEFAULT now(),
+	processed_at timestamptz NULL,
+	CONSTRAINT payment_webhook_events_pk PRIMARY KEY (id),
+	CONSTRAINT payment_webhook_events_order_fk FOREIGN KEY (order_id) REFERENCES public.orders(id),
+	CONSTRAINT payment_webhook_events_provider_event_unique UNIQUE (provider, provider_event_id)
+);
+
+CREATE INDEX IF NOT EXISTS payment_webhook_events_order_id_idx
+	ON public.payment_webhook_events (order_id);
+
+-- /organizations + payments
+
+
 /*
 create table public.chat_administrator (
 	id uuid not null default public.uuid_generate_v4(),
