@@ -91,7 +91,7 @@ namespace EList.Repositories.Impl
                 message.PersonInfo = _mapper.Map<PersonInfo>(i.Account.PersonInfo);
                 return message;
             })?.ToList();
-            return new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex, pageSize);
+            return new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex ?? 0, pageSize ?? dbResult.TotalCount);
         }
 
         public async Task<PagedList<Message>> GetMessageRepliesAsync(Guid messageId, int? pageIndex, int? pageSize)
@@ -104,7 +104,7 @@ namespace EList.Repositories.Impl
                 message.PersonInfo = _mapper.Map<PersonInfo>(i.Account.PersonInfo);
                 return message;
             })?.ToList();
-            return new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex, pageSize);
+            return new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex ?? 0, pageSize ?? dbResult.TotalCount);
         }
 
         public async Task UpdateMessageAsync(MessageRequest message)

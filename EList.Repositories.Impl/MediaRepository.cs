@@ -86,7 +86,7 @@ namespace EList.Repositories.Impl
                 };
             }).ToList();
 
-            return new PagedList<EventAlbumsContainer>(items.TotalCount, containers, pageIndex, pageSize);
+            return new PagedList<EventAlbumsContainer>(items.TotalCount, containers, pageIndex ?? 0, pageSize ?? 20);
         }
 
         public async Task<PagedList<AlbumFile>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)

@@ -62,6 +62,7 @@ namespace EList.DI
             mapper.AddScoped<IConversationService, ConversationService>();
             mapper.AddScoped<INotificationsService, NotificationsService>();
             mapper.AddScoped<IAgreementService, AgreementService>();
+            mapper.AddScoped<IOrganizationsService, OrganizationsService>();
 
             mapper.AddSingleton<WebSocketConnectionManager>();
 

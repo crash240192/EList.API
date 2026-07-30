@@ -86,7 +86,7 @@ namespace EList.Repositories.Impl
                 return item;
             }).ToList();
 
-            return new PagedList<Event>(items.TotalCount, resultList, request.PageIndex, request.PageSize);
+            return new PagedList<Event>(items.TotalCount, resultList, request.PageIndex ?? 0, request.PageSize ?? 20);
         }
 
         public async Task<PagedList<EventShort>> SearchEventsShortAsync(EventsSearchRequest request, Guid? curAccountId, bool adultConfirmed)
@@ -101,7 +101,7 @@ namespace EList.Repositories.Impl
                 return item;
             }).ToList();
 
-            return new PagedList<EventShort>(items.TotalCount, resultList, request.PageIndex, request.PageSize);
+            return new PagedList<EventShort>(items.TotalCount, resultList, request.PageIndex ?? 0, request.PageSize ?? 20);
         }
 
         public async Task CancelEventAsync(Guid eventId)

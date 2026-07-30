@@ -21,15 +21,18 @@ namespace EList.Services.Impl
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IWalletsRepository _walletsRepository;
         private readonly IAccountsRepository _accountsRepository;
+        private readonly IOrganizationsRepository _organizationsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         public WalletsService(ICorrelationIdProvider correlationIdProvider,
             IWalletsRepository walletsRepository,
             IAccountsRepository accountsRepository,
+            IOrganizationsRepository organizationsRepository,
             IAccountDataHolder accountDataHolder)
         {
             _correlationIdProvider = correlationIdProvider;
             _walletsRepository = walletsRepository;
             _accountsRepository = accountsRepository;
+            _organizationsRepository = organizationsRepository;
             _accountDataHolder = accountDataHolder;
         }
 
@@ -195,31 +198,31 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //if (item.TariffId != null)
-            //{
-            //    var tariff = await _walletsRepository.GetTariffAsync(item.TariffId.Value);
-            //    if (tariff == null)
-            //        return CommandResult<Guid?>.Fail(ErrorCode.TariffNotFound, $"Тариф с id='{item.TariffId}' не найден");
-            //}
+            if (item?.Id == null || item.Id == Guid.Empty)
+                return CommandResult<Guid?>.Fail(ErrorCode.IsNullOrEmpty, "Не указан идентификатор организации в поле Id");
 
-            //var account = await _accountsRepository.GetAccountAsync(_accountDataHolder.AccountId);
+            var organizationId = item.Id;
+            var organization = await _organizationsRepository.GetOrganizationAsync(organizationId);
+            if (organization == null)
+                return CommandResult<Guid?>.Fail(ErrorCode.OrganizationNotFound, $"Организация с id='{organizationId}' не найдена");
 
-            //if (account.WalletId != null)
-            //{
-            //    var result = await _walletsRepository.CreateWalletAsync(item);
-            //    await _accountsRepository.SetAccountWalletAsync(_accountDataHolder.AccountId, result);
-            //    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            //    return new CommandResult<Guid?>(result);
-            //}
-            //else
-            //{
-            //    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            //    var result = new CommandResult<Guid?>(account.WalletId);
-            //    result.Message = $"Для текущего аккаунта уже существует кошелёк";
-            //    return result;
-            //}
+            if (_accountDataHolder.AccountId == null
+                || !await _organizationsRepository.IsOwnerAsync(organizationId, _accountDataHolder.AccountId.Value))
+                return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Действие доступно только владельцу организации");
 
-            throw new NotImplementedException();
+            if (organization.WalletId != null)
+            {
+                var existing = new CommandResult<Guid?>(organization.WalletId);
+                existing.Message = "Для текущей организации уже существует кошелёк";
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return existing;
+            }
+
+            var walletId = await _walletsRepository.CreateWalletAsync();
+            await _organizationsRepository.SetOrganizationWalletAsync(organizationId, walletId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<Guid?>(walletId);
         }
 
         public async Task<CommandResult> SetWalletTariffAsync(Guid walletId, Guid tariffId)
@@ -292,10 +295,13 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            // TODO: Добавить сюда проверку наличия организации
-            //var organization = await _organizationsRepository.GetOrganizationAsync(organizationId);
-            //if (organization == null)
-            //    return CommandResult<Wallet?>.Fail(ErrorCode.OrganizationNotFound, $"Организация с id='{organizationId}' не найдена");
+            var organization = await _organizationsRepository.GetOrganizationAsync(organizationId);
+            if (organization == null)
+                return CommandResult<Wallet?>.Fail(ErrorCode.OrganizationNotFound, $"Организация с id='{organizationId}' не найдена");
+
+            if (_accountDataHolder.AccountId == null
+                || !await _organizationsRepository.IsOwnerOrManagerAsync(organizationId, _accountDataHolder.AccountId.Value))
+                return CommandResult<Wallet?>.Fail(ErrorCode.AccessError, "Действие доступно только владельцу или менеджеру организации");
 
             var result = await _walletsRepository.GetOrganizationWalletAsync(organizationId);
             if (result == null)

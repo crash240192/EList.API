@@ -97,7 +97,9 @@ namespace EList.AutoMapperProfile
             CreateMap<OrganizationRequest, OrganizationDto>();
             CreateMap<OrganizationAccountRelationDto, OrganizationMember>().ReverseMap();
             CreateMap<OrganizationLegalDto, OrganizationLegal>().ReverseMap();
+            CreateMap<OrganizationLegalRequest, OrganizationLegal>();
             CreateMap<OrganizationPayoutDto, OrganizationPayout>().ReverseMap();
+            CreateMap<OrganizationPayoutRequest, OrganizationPayout>();
             CreateMap<Organization, OrganizationResponse>();
             CreateMap<OrganizationMember, OrganizationMemberResponse>();
             CreateMap<OrganizationLegal, OrganizationLegalResponse>();
