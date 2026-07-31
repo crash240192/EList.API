@@ -8,6 +8,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult<Guid?>> CreateOrganizationAsync(OrganizationRequest request);
         Task<CommandResult<OrganizationResponse?>> GetOrganizationAsync(Guid organizationId);
         Task<CommandResult<List<OrganizationResponse>?>> GetMyOrganizationsAsync();
+        Task<CommandResult<List<OrganizationResponse>?>> GetUserOrganizationsAsync(Guid accountId);
         Task<CommandResult> UpdateOrganizationAsync(Guid organizationId, OrganizationRequest request);
         Task<CommandResult> SetOrganizationActiveAsync(Guid organizationId, bool active);
 

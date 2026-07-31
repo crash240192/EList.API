@@ -150,6 +150,20 @@ namespace EList.Services.Impl
             return new CommandResult<List<OrganizationResponse>?>(response);
         }
 
+        public async Task<CommandResult<List<OrganizationResponse>?>> GetUserOrganizationsAsync(Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetMyOrganizationsAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var organizations = await _organizationsRepository.GetOrganizationsByAccountIdAsync(accountId);
+            var response = _mapper.Map<List<OrganizationResponse>>(organizations);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<OrganizationResponse>?>(response);
+        }
+
         public async Task<CommandResult> UpdateOrganizationAsync(Guid organizationId, OrganizationRequest request)
         {
             var correlationId = _correlationIdProvider.Get();

@@ -93,6 +93,7 @@ namespace EList.Api.Controllers
             }
         }
 
+
         /// <summary>
         /// Получить организации текущего пользователя
         /// </summary>
@@ -108,6 +109,32 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _organizationsService.GetMyOrganizationsAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Получить организации указанного пользователя
+        /// </summary>
+        [HttpGet("get/byAccountId/{accountId}")]
+        public async Task<CommandResult<List<OrganizationResponse>?>> GetUserOrganizationsAsync(Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetUserOrganizationsAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _organizationsService.GetUserOrganizationsAsync(accountId);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
