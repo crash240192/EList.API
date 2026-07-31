@@ -162,7 +162,6 @@ namespace EList.Api.Controllers
             }
         }
 
-
         [HttpPost("documents/add")]
         public async Task<CommandResult> AddNewDocumentAsync(DocumentRequest request)
         {

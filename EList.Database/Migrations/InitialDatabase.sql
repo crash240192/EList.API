@@ -529,7 +529,9 @@ CREATE TABLE public.anonymous_age_agreements (
 CREATE TYPE public.document_type AS ENUM (
 	'policy',
 	'consent',
-	'agreement');
+	'agreement',
+	'organization_agreement',
+	'ticketing_agreement');
 
 	CREATE TABLE public.documents (
 	id uuid DEFAULT uuid_generate_v4() NOT NULL,

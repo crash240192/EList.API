@@ -18,6 +18,16 @@
         /// <summary>
         /// Пользовательское соглашение
         /// </summary>
-        Agreement = 2
+        Agreement = 2,
+
+        /// <summary>
+        /// Соглашение организации
+        /// </summary>
+        OrganizationAgreement = 3,
+
+        /// <summary>
+        /// Соглашение по билетам
+        /// </summary>
+        TicketingAgreement = 4  
     }
 }

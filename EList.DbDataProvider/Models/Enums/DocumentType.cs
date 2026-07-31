@@ -23,6 +23,18 @@ namespace EList.DbDataProvider.Models.Enums
         /// Пользовательское соглашение
         /// </summary>
         [MapValue(Value = "agreement")]
-        Agreement = 2
+        Agreement = 2,
+
+        /// <summary>
+        /// Соглашение организации
+        /// </summary>
+        [MapValue(Value = "organization_agreement")]
+        OrganizationAgreement = 3,
+
+        /// <summary>
+        /// Соглашение по билетам
+        /// </summary>
+        [MapValue(Value = "ticketing_agreement")]
+        TicketingAgreement = 4
     }
 }
