@@ -554,6 +554,18 @@ CREATE TABLE public.account_agreement_rls (
 	CONSTRAINT account_agreement_rls_accounts_fk FOREIGN KEY (account_id) REFERENCES public.accounts(id),
 	CONSTRAINT account_agreement_rls_document_fk FOREIGN KEY (document_id) REFERENCES public.documents(id)
 );
+
+CREATE TABLE public.organization_agreement_rls (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	organization_id uuid NOT NULL,
+	document_id uuid NOT NULL,
+	agreement_date timestamptz NOT NULL,
+	CONSTRAINT organization_agreement_rls_pk PRIMARY KEY (id),
+	CONSTRAINT organization_agreement_rls_organizations_fk FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+	CONSTRAINT organization_agreement_rls_documents_fk FOREIGN KEY (document_id) REFERENCES public.documents(id)
+);
+
+
 --agreements
 
 
