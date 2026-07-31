@@ -13,6 +13,8 @@ namespace EList.Services.Interfaces
         Task<CommandResult> DoesUserAgreedWithLatestDocumentVersion(DocumentType documentType);
         Task<CommandResult> SaveUserAgreementAsync(DocumentType documentType);
 
+        Task<CommandResult> DoesOrganizationAgreedWithLatestDocumentVersion(Guid organizationId, DocumentType documentType);
+        Task<CommandResult> SaveOrganizationAgreementAsync(Guid organizationId, DocumentType documentType);
 
         Task<CommandResult> AddNewDocumentAsync(DocumentRequest request);
         Task<CommandResult<List<Document>>> GetLatestDocumentsAsync();

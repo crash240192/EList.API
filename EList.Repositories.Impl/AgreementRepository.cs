@@ -41,6 +41,18 @@ namespace EList.Repositories.Impl
         {
             await _agreementDataProvider.SaveUserAgreementAsync(accountId, documentId);
         }
+
+        public async Task<bool> DoesOrganizationAgreedWithLatestDocumentVersion(Guid organizationId, Models.Enums.DocumentType documentType)
+        {
+            var mappedDocumentType = _mapper.Map<DbDataProvider.Models.Enums.DocumentType>(documentType);
+            var result = await _agreementDataProvider.DoesOrganizationAgreedWithLatestDocumentVersion(organizationId, mappedDocumentType);
+            return result;
+        }
+
+        public async Task SaveOrganizationAgreementAsync(Guid organizationId, Guid documentId)
+        {
+            await _agreementDataProvider.SaveOrganizationAgreementAsync(organizationId, documentId);
+        }
         #endregion
 
 

@@ -44,23 +44,23 @@ namespace EList.DbDataProvider.DataProviders
         public async Task<List<DocumentDto>> GetLatestDocumentsAsync()
         {
             var result = new List<DocumentDto>();
-            var agreement = await _connection.Documents.Where(i => i.Type == DocumentType.Agreement)
-                .OrderByDescending(i => i.CreationDate)
-                .FirstOrDefaultAsync();
-            if (agreement != null)
-                result.Add(agreement);
+            var documentTypes = new[]
+            {
+                DocumentType.Agreement,
+                DocumentType.Consent,
+                DocumentType.Policy,
+                DocumentType.OrganizationAgreement,
+                DocumentType.TicketingAgreement
+            };
 
-            var consent = await _connection.Documents.Where(i => i.Type == DocumentType.Consent)
-                .OrderByDescending(i => i.CreationDate)
-                .FirstOrDefaultAsync();
-            if (consent != null) 
-                result.Add(consent);
-
-            var policy = await _connection.Documents.Where(i => i.Type == DocumentType.Policy)
-                .OrderByDescending(i => i.CreationDate)
-                .FirstOrDefaultAsync();
-            if (policy != null) 
-                result.Add(policy);
+            foreach (var documentType in documentTypes)
+            {
+                var document = await _connection.Documents.Where(i => i.Type == documentType)
+                    .OrderByDescending(i => i.CreationDate)
+                    .FirstOrDefaultAsync();
+                if (document != null)
+                    result.Add(document);
+            }
 
             return result;
         }
@@ -94,6 +94,33 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.InsertWithIdentityAsync(new AccountAgreementDto
             {
                 AccountId = accountId,
+                AgreementDate = DateTimeOffset.UtcNow,
+                DocumentId = documentId,
+            });
+        }
+        #endregion
+
+
+
+        #region organization agreements
+        public async Task<bool> DoesOrganizationAgreedWithLatestDocumentVersion(Guid organizationId, DocumentType documentType)
+        {
+            var documentId = await _connection.Documents.Where(i => i.Type == documentType)
+                .OrderByDescending(i => i.CreationDate)
+                .Select(i => i.Id)
+                .FirstOrDefaultAsync();
+
+            var organizationAgreed = await _connection.OrganizationAgreements
+                .AnyAsync(i => i.OrganizationId == organizationId && i.DocumentId == documentId);
+
+            return organizationAgreed;
+        }
+
+        public async Task SaveOrganizationAgreementAsync(Guid organizationId, Guid documentId)
+        {
+            await _connection.InsertWithIdentityAsync(new OrganizationAgreementDto
+            {
+                OrganizationId = organizationId,
                 AgreementDate = DateTimeOffset.UtcNow,
                 DocumentId = documentId,
             });

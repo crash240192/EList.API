@@ -162,6 +162,62 @@ namespace EList.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Проверяет, подписала ли организация соглашение указанного типа
+        /// </summary>
+        [HttpGet("checkOrganizationAgreement/{organizationId}/{documentType}")]
+        public async Task<CommandResult> DoesOrganizationAgreedWithLatestDocumentVersion(Guid organizationId, DocumentType documentType)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DoesOrganizationAgreedWithLatestDocumentVersion)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _agreementService.DoesOrganizationAgreedWithLatestDocumentVersion(organizationId, documentType);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Отметка о согласии организации с соглашением
+        /// </summary>
+        [HttpGet("agree/organization/{organizationId}/{documentType}")]
+        public async Task<CommandResult> SaveOrganizationAgreementAsync(Guid organizationId, DocumentType documentType)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SaveOrganizationAgreementAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _agreementService.SaveOrganizationAgreementAsync(organizationId, documentType);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
         [HttpPost("documents/add")]
         public async Task<CommandResult> AddNewDocumentAsync(DocumentRequest request)
         {

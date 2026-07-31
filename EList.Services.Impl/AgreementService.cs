@@ -21,16 +21,19 @@ namespace EList.Services.Impl
         #endregion
 
         private readonly IAgreementRepository _agreementRepository;
+        private readonly IOrganizationsRepository _organizationsRepository;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IEncryptionTool _encryptionTool;
 
         public AgreementService(ICorrelationIdProvider correlationIdProvider,
             IAgreementRepository agreementRepository,
+            IOrganizationsRepository organizationsRepository,
             IAccountDataHolder accountDataHolder,
             IEncryptionTool encryptionTool)
         {
             _agreementRepository = agreementRepository;
+            _organizationsRepository = organizationsRepository;
             _correlationIdProvider = correlationIdProvider;
             _accountDataHolder = accountDataHolder;
             _encryptionTool = encryptionTool;
@@ -116,7 +119,59 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
+        public async Task<CommandResult> DoesOrganizationAgreedWithLatestDocumentVersion(Guid organizationId, DocumentType documentType)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DoesOrganizationAgreedWithLatestDocumentVersion)}";
 
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+
+            var isOwnerOrManager = await _organizationsRepository.IsOwnerOrManagerAsync(organizationId, _accountDataHolder.AccountId.Value);
+            if (!isOwnerOrManager)
+                return CommandResult.Fail(ErrorCode.AccessError, "Недостаточно прав для просмотра соглашений организации");
+
+            var checkResult = await _agreementRepository.DoesOrganizationAgreedWithLatestDocumentVersion(organizationId, documentType);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+
+            var result = checkResult switch
+            {
+                true => CommandResult.OK,
+                false => CommandResult.Fail(ErrorCode.AgreementNotFound, "Соглашение с организацией отсутствует")
+            };
+
+            return result;
+        }
+
+        public async Task<CommandResult> SaveOrganizationAgreementAsync(Guid organizationId, DocumentType documentType)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SaveOrganizationAgreementAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+
+            var isOwnerOrManager = await _organizationsRepository.IsOwnerOrManagerAsync(organizationId, _accountDataHolder.AccountId.Value);
+            if (!isOwnerOrManager)
+                return CommandResult.Fail(ErrorCode.AccessError, "Недостаточно прав для принятия соглашения организации");
+
+            var lastDocument = await _agreementRepository.GetLatestDocumentAsync(documentType);
+
+            if (lastDocument == null)
+                return CommandResult.Fail(ErrorCode.AgreementDocumentNotFound, "Документ для соглашения отсутствует в базе");
+
+            await _agreementRepository.SaveOrganizationAgreementAsync(organizationId, lastDocument.Id);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
 
         public async Task<CommandResult> AddNewDocumentAsync(DocumentRequest request)
         {

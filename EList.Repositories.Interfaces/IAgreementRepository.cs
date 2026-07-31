@@ -11,6 +11,8 @@ namespace EList.Repositories.Interfaces
         Task<bool> DoesUserAgreedWithLatestDocumentVersion(Guid accountId, DocumentType documentType);
         Task SaveUserAgreementAsync(Guid accountId, Guid documentId);
 
+        Task<bool> DoesOrganizationAgreedWithLatestDocumentVersion(Guid organizationId, DocumentType documentType);
+        Task SaveOrganizationAgreementAsync(Guid organizationId, Guid documentId);
 
         Task AddNewDocumentAsync(Document document);
         Task<List<Document>> GetLatestDocumentsAsync();
