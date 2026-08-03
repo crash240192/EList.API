@@ -39,9 +39,9 @@ namespace EList.Repositories.Impl
             return result;
         }
         
-        public async Task<List<Tariff>?> GetTariffsAsync()
+        public async Task<List<Tariff>?> GetTariffsAsync(bool? forOrganization = null)
         {
-            var tariff = await _walletsDataProvider.GetTariffsAsync();
+            var tariff = await _walletsDataProvider.GetTariffsAsync(forOrganization);
             var result = _mapper.Map<List<Tariff>>(tariff);
             return result;
         }

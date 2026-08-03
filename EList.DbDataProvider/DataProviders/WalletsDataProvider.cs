@@ -38,12 +38,18 @@ namespace EList.DbDataProvider.DataProviders
             return item;
         }
 
-        public async Task<List<TariffDto>?> GetTariffsAsync()
+        public async Task<List<TariffDto>?> GetTariffsAsync(bool? forOrganization = null)
         {
-            var result = await _connection.Tariffs
+            var query = _connection.Tariffs
                 .LoadWith(i => i.TariffValidator)
-                .OrderBy(i => i.Cost)
+                .AsQueryable();
+                
+            if (forOrganization != null)
+                query = query.Where(i => i.ForOrganization == forOrganization.Value);
+
+            var result = await query.OrderBy(i => i.Cost)
                 .ToListAsync();
+
             return result;
         }
 

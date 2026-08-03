@@ -334,15 +334,15 @@ namespace EList.Services.Impl
             return new CommandResult<Tariff?>(result);
         }
 
-        public async Task<CommandResult<List<Tariff>?>> GetAllTariffsAsync()
+        public async Task<CommandResult<List<Tariff>?>> GetTariffsAsync(bool? forOrganization = null)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetAllTariffsAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(GetTariffsAsync)}";
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var result = await _walletsRepository.GetTariffsAsync();
+            var result = await _walletsRepository.GetTariffsAsync(forOrganization);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<Tariff>?>(result);

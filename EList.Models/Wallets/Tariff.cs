@@ -49,5 +49,10 @@ namespace EList.Models.Wallets
         /// Валидатор тарифа
         /// </summary>
         public TariffValidator TariffValidator { get; set; }
+
+        /// <summary>
+        /// Тариф для организаций
+        /// </summary>
+        public bool ForOrganization { get; set; } = false;
     }
 }

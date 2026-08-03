@@ -169,18 +169,18 @@ namespace EList.Api.Controllers
         /// Список тарифов
         /// </summary>
         /// <returns></returns>
-        [HttpGet("tariff/all")]
-        public async Task<CommandResult<List<Tariff>?>> GetAllTariffsAsync()
+        [HttpGet("tariffs")]
+        public async Task<CommandResult<List<Tariff>?>> GetTariffsAsync(bool forOrganization = false)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetAllTariffsAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(GetTariffsAsync)}";
 
             try
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _walletsService.GetAllTariffsAsync();
+                var result = await _walletsService.GetTariffsAsync(forOrganization);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;

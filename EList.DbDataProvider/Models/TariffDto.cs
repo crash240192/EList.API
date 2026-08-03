@@ -22,5 +22,8 @@ namespace EList.DbDataProvider.Models
 
         [Association(ThisKey = nameof(ValidatorId), OtherKey = nameof(TariffValidatorDto.Id))]
         public TariffValidatorDto TariffValidator { get; set; }
+
+        [Column("for_organization")]
+        public bool ForOrganization { get; set; }
     }
 }
