@@ -96,6 +96,7 @@ CREATE TABLE public.tariffs (
 	"cost" numeric NOT NULL,
 	"period" interval NOT NULL,
 	validator_id uuid not null,
+	for_organization bool not null,
 	CONSTRAINT tariff_pk PRIMARY KEY (id),
 	constraint tariff_validator_fk foreign key (validator_id) references public.tariff_validators(id)
 );
