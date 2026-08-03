@@ -37,6 +37,9 @@ namespace EList.DbDataProvider.Models
         [Column("verification_status", DataType = DataType.Enum)]
         public OrganizationVerificationStatus VerificationStatus { get; set; }
 
+        [Column("verification_reject_reason")]
+        public string? VerificationRejectReason { get; set; }
+
         [Column("can_sell_tickets")]
         public bool CanSellTickets { get; set; }
 

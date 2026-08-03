@@ -68,10 +68,13 @@ namespace EList.DbDataProvider.DataProviders
                 .UpdateAsync();
         }
 
-        public async Task SetVerificationStatusAsync(Guid organizationId, OrganizationVerificationStatus status)
+        public async Task SetVerificationStatusAsync(Guid organizationId, OrganizationVerificationStatus status, string? rejectReason = null)
         {
+            var reason = status == OrganizationVerificationStatus.Rejected ? rejectReason : null;
+
             await _connection.Organizations.Where(i => i.Id == organizationId)
                 .Set(i => i.VerificationStatus, status)
+                .Set(i => i.VerificationRejectReason, reason)
                 .Set(i => i.UpdateDate, DateTimeOffset.Now.ToUniversalTime())
                 .UpdateAsync();
 
@@ -81,6 +84,28 @@ namespace EList.DbDataProvider.DataProviders
                     .Set(i => i.VerifiedAt, DateTimeOffset.Now.ToUniversalTime())
                     .UpdateAsync();
             }
+            else if (status == OrganizationVerificationStatus.Rejected
+                || status == OrganizationVerificationStatus.Unverified
+                || status == OrganizationVerificationStatus.Pending)
+            {
+                await _connection.OrganizationLegal.Where(i => i.OrganizationId == organizationId)
+                    .Set(i => i.VerifiedAt, (DateTimeOffset?)null)
+                    .UpdateAsync();
+            }
+        }
+
+        public async Task<List<OrganizationDto>> GetPendingVerificationOrganizationsAsync(int limit = 100)
+        {
+            if (limit <= 0)
+                limit = 100;
+
+            var result = await _connection.Organizations
+                .LoadWith(i => i.Legal)
+                .Where(i => i.Active && i.VerificationStatus == OrganizationVerificationStatus.Pending)
+                .OrderBy(i => i.UpdateDate)
+                .Take(limit)
+                .ToListAsync();
+            return result;
         }
 
         public async Task SetCanSellTicketsAsync(Guid organizationId, bool canSellTickets)

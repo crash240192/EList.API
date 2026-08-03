@@ -63,10 +63,10 @@ namespace EList.Repositories.Impl
             await _organizationsDataProvider.SetOrganizationWalletAsync(organizationId, walletId);
         }
 
-        public async Task SetVerificationStatusAsync(Guid organizationId, OrganizationVerificationStatus status)
+        public async Task SetVerificationStatusAsync(Guid organizationId, OrganizationVerificationStatus status, string? rejectReason = null)
         {
             var mappedStatus = _mapper.Map<DbDataProvider.Models.Enums.OrganizationVerificationStatus>(status);
-            await _organizationsDataProvider.SetVerificationStatusAsync(organizationId, mappedStatus);
+            await _organizationsDataProvider.SetVerificationStatusAsync(organizationId, mappedStatus, rejectReason);
         }
 
         public async Task SetCanSellTicketsAsync(Guid organizationId, bool canSellTickets)
@@ -85,6 +85,19 @@ namespace EList.Repositories.Impl
         {
             var items = await _organizationsDataProvider.GetOrganizationsByCreatedByAsync(accountId);
             var result = _mapper.Map<List<Organization>>(items);
+            return result;
+        }
+
+        public async Task<List<Organization>> GetPendingVerificationOrganizationsAsync(int limit = 100)
+        {
+            var items = await _organizationsDataProvider.GetPendingVerificationOrganizationsAsync(limit);
+            var result = new List<Organization>();
+            foreach (var item in items)
+            {
+                var organization = _mapper.Map<Organization>(item);
+                organization.Legal = _mapper.Map<OrganizationLegal>(item.Legal);
+                result.Add(organization);
+            }
             return result;
         }
         #endregion

@@ -652,6 +652,7 @@ ALTER TABLE public.organizations
 	ADD COLUMN IF NOT EXISTS description text NULL,
 	ADD COLUMN IF NOT EXISTS created_by_account_id uuid NULL,
 	ADD COLUMN IF NOT EXISTS verification_status public.organization_verification_status NOT NULL DEFAULT 'unverified',
+	ADD COLUMN IF NOT EXISTS verification_reject_reason text NULL,
 	ADD COLUMN IF NOT EXISTS can_sell_tickets bool NOT NULL DEFAULT false,
 	ADD COLUMN IF NOT EXISTS create_date timestamptz NOT NULL DEFAULT now(),
 	ADD COLUMN IF NOT EXISTS update_date timestamptz NOT NULL DEFAULT now();

@@ -12,10 +12,11 @@ namespace EList.DbDataProvider.Interfaces
         Task UpdateOrganizationAsync(OrganizationDto item);
         Task SetOrganizationActiveAsync(Guid organizationId, bool active);
         Task SetOrganizationWalletAsync(Guid organizationId, Guid? walletId);
-        Task SetVerificationStatusAsync(Guid organizationId, OrganizationVerificationStatus status);
+        Task SetVerificationStatusAsync(Guid organizationId, OrganizationVerificationStatus status, string? rejectReason = null);
         Task SetCanSellTicketsAsync(Guid organizationId, bool canSellTickets);
         Task<List<OrganizationDto>> GetOrganizationsByAccountIdAsync(Guid accountId, bool onlyActiveMembers = true);
         Task<List<OrganizationDto>> GetOrganizationsByCreatedByAsync(Guid accountId);
+        Task<List<OrganizationDto>> GetPendingVerificationOrganizationsAsync(int limit = 100);
         #endregion
 
         #region members
