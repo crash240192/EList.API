@@ -379,6 +379,10 @@ namespace EList.Services.Impl
                 || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
 
+            var ticketSalesError = await EnsureTicketSalesAllowedAsync(eventId, parameters.TicketsEnabled);
+            if (ticketSalesError != null)
+                return ticketSalesError;
+
             //if (!Enum.IsDefined(typeof(AgeRating), parameters.AgeLimit))
             //    return CommandResult.Fail(ErrorCode.InvalidAgeLimitValue, "Значение возрастного ограничения может принимать значения '0', '6', '12', '16' или '18'");
 
@@ -396,6 +400,35 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
         #endregion
+
+        private async Task<CommandResult?> EnsureTicketSalesAllowedAsync(Guid eventId, bool ticketsEnabled)
+        {
+            if (!ticketsEnabled)
+                return null;
+
+            var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
+            var organizationIds = organizators?
+                .Where(i => i.OrganizationId != null)
+                .Select(i => i.OrganizationId!.Value)
+                .Distinct()
+                .ToList() ?? new List<Guid>();
+
+            if (organizationIds.Count == 0)
+            {
+                return CommandResult.Fail(ErrorCode.InvalidValue,
+                    "Продажу билетов можно включить только для мероприятия с организацией-организатором");
+            }
+
+            foreach (var organizationId in organizationIds)
+            {
+                var organization = await _organizationsRepository.GetOrganizationAsync(organizationId);
+                if (organization?.CanSellTickets == true)
+                    return null;
+            }
+
+            return CommandResult.Fail(ErrorCode.OrganizationNotVerified,
+                "Ни одна организация-организатор не имеет права продавать билеты");
+        }
 
         #region events
         public async Task<CommandResult<Guid?>> CreateEventAsync(CreateEventRequest request)

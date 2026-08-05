@@ -240,6 +240,7 @@ create table public.event_parameters(
 	age_limit int null,
 	allowed_gender gender null,
 	allow_users_to_invite bool null,
+	tickets_enabled bool not null default false,
 	CONSTRAINT event_parameters_pk PRIMARY KEY (id)
 );
 
@@ -833,6 +834,10 @@ CREATE TABLE IF NOT EXISTS public.payment_webhook_events (
 
 CREATE INDEX IF NOT EXISTS payment_webhook_events_order_id_idx
 	ON public.payment_webhook_events (order_id);
+
+-- флаг продажи билетов на уровне мероприятия
+ALTER TABLE public.event_parameters
+	ADD COLUMN IF NOT EXISTS tickets_enabled bool NOT NULL DEFAULT false;
 
 -- контактные данные организаций (аналог contact_account_rls)
 CREATE TABLE IF NOT EXISTS public.contact_organization_rls (
