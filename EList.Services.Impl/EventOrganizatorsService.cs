@@ -71,7 +71,8 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
             var eventOrganizators = await _organizatorsRepository.GetByEventIdAsync(eventId);
-            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
+            if (_accountDataHolder.AccountId == null
+                || !await _organizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
             await _organizatorsRepository.AssignAsync(eventId, accountIds, organizationIds);

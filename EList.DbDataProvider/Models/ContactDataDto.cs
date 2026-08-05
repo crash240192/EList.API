@@ -27,6 +27,9 @@ namespace EList.DbDataProvider.Models
 
         [Association(ThisKey = nameof(Id), OtherKey = nameof(ContactAccountRelationDto.ContactId))]
         public ContactAccountRelationDto AccountRelation { get; set; }
+
+        [Association(ThisKey = nameof(Id), OtherKey = nameof(ContactOrganizationRelationDto.ContactId))]
+        public ContactOrganizationRelationDto OrganizationRelation { get; set; }
         
     }
 }

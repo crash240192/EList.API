@@ -834,6 +834,23 @@ CREATE TABLE IF NOT EXISTS public.payment_webhook_events (
 CREATE INDEX IF NOT EXISTS payment_webhook_events_order_id_idx
 	ON public.payment_webhook_events (order_id);
 
+-- контактные данные организаций (аналог contact_account_rls)
+CREATE TABLE IF NOT EXISTS public.contact_organization_rls (
+	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
+	contact_data_id uuid NOT NULL,
+	organization_id uuid NOT NULL,
+	CONSTRAINT contact_organization_pk PRIMARY KEY (id),
+	CONSTRAINT contact_organization_fk FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+	CONSTRAINT contact_organization_contact_data_fk FOREIGN KEY (contact_data_id) REFERENCES public.contact_data(id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS contact_organization_unique_uidx
+	ON public.contact_organization_rls (organization_id, contact_data_id);
+CREATE INDEX IF NOT EXISTS contact_organization_organization_id_idx
+	ON public.contact_organization_rls (organization_id);
+CREATE INDEX IF NOT EXISTS contact_organization_contact_data_id_idx
+	ON public.contact_organization_rls (contact_data_id);
+
 -- /organizations + payments
 
 

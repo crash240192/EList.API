@@ -40,6 +40,7 @@ namespace EList.DbDataProvider.DataProviders
                 .ThenLoad(i => i.PersonInfo)
                 .LoadWith(i => i.Account)
                 .ThenLoad(i => i.Avatars)
+                .LoadWith(i => i.Organization)
                 .Where(i => i.EventId == eventId).ToListAsync();
             return organizators;
         }
@@ -54,30 +55,60 @@ namespace EList.DbDataProvider.DataProviders
             return organizatorIds;
         }
 
+        public async Task<bool> IsAccountEventOrganizatorAsync(Guid eventId, Guid accountId)
+        {
+            var isDirectOrganizator = await _connection.Organizators
+                .AnyAsync(i => i.EventId == eventId && i.AccountId == accountId);
+            if (isDirectOrganizator)
+                return true;
+
+            var organizationIds = await _connection.Organizators
+                .Where(i => i.EventId == eventId && i.OrganizationId != null)
+                .Select(i => i.OrganizationId!.Value)
+                .ToListAsync();
+
+            if (organizationIds.Count == 0)
+                return false;
+
+            return await _connection.OrganizationMembers
+                .AnyAsync(m => m.AccountId == accountId
+                    && m.Active
+                    && organizationIds.Contains(m.OrganizationId));
+        }
+
         public async Task AssignAsync(Guid eventId, List<Guid> accountIds, List<Guid> organizationIds)
         {
+            var organizators = await _connection.Organizators
+                .Where(i => i.EventId == eventId).ToListAsync();
+
             if (accountIds?.Any() ?? false)
             {
-                var organizators = await _connection.Organizators
-                    .Where(i => i.EventId == eventId).ToListAsync();
+                var accountOrganizators = accountIds
+                    .Where(i => !organizators.Any(o => o.AccountId == i))
+                    .Select(i => new EventOrganizatorDto
+                    {
+                        AccountId = i,
+                        EventId = eventId
+                    })
+                    .ToList();
 
-                var organizatorItems = accountIds?.Where(i => !organizators.Any(o => o.AccountId == i))?.Select(i => new EventOrganizatorDto
-                {
-                    AccountId = i,
-                    EventId = eventId
-                })?.ToList();
+                if (accountOrganizators.Any())
+                    await _connection.BulkCopyAsync(accountOrganizators);
+            }
 
-                if (organizatorItems?.Any() ?? false)
-                    await _connection.BulkCopyAsync(organizatorItems);
+            if (organizationIds?.Any() ?? false)
+            {
+                var organizationOrganizators = organizationIds
+                    .Where(i => !organizators.Any(o => o.OrganizationId == i))
+                    .Select(i => new EventOrganizatorDto
+                    {
+                        OrganizationId = i,
+                        EventId = eventId
+                    })
+                    .ToList();
 
-                organizatorItems = organizationIds?.Where(i => !organizators.Any(o => o.OrganizationId == i))?.Select(i => new EventOrganizatorDto
-                {
-                    OrganizationId = i,
-                    EventId = eventId
-                })?.ToList();
-
-                if (organizatorItems?.Any() ?? false)
-                    await _connection.BulkCopyAsync(organizatorItems);
+                if (organizationOrganizators.Any())
+                    await _connection.BulkCopyAsync(organizationOrganizators);
             }
         }
     }

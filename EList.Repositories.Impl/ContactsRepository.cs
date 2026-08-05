@@ -99,12 +99,26 @@ namespace EList.Repositories.Impl
             await _contactDataProvider.BindAccountAndContactAsync(accountId, contactId);
         }
 
+        public async Task BindOrganizationAndContactAsync(Guid organizationId, Guid contactId)
+        {
+            await _contactDataProvider.BindOrganizationAndContactAsync(organizationId, contactId);
+        }
+
         public async Task<ContactDataItem?> GetAccountContactAsync(Guid contactId)
         { 
             var contact = await _contactDataProvider.GetAccountContactAsync(contactId);
             var result = _mapper.Map<ContactDataItem>(contact);
             if (result != null)
-                result.AccountId = contact?.AccountRelation.AccountId;
+                result.AccountId = contact?.AccountRelation?.AccountId;
+            return result;
+        }
+
+        public async Task<ContactDataItem?> GetOrganizationContactAsync(Guid contactId)
+        {
+            var contact = await _contactDataProvider.GetOrganizationContactAsync(contactId);
+            var result = _mapper.Map<ContactDataItem>(contact);
+            if (result != null)
+                result.OrganizationId = contact?.OrganizationRelation?.OrganizationId;
             return result;
         }
 
@@ -113,7 +127,10 @@ namespace EList.Repositories.Impl
             var contact = await _contactDataProvider.GetContactAsync(contactValue);
             var result = _mapper.Map<ContactDataItem>(contact);
             if (result != null)
-                result.AccountId = contact?.AccountRelation.AccountId;
+            {
+                result.AccountId = contact?.AccountRelation?.AccountId;
+                result.OrganizationId = contact?.OrganizationRelation?.OrganizationId;
+            }
             return result;
         }
 
@@ -122,14 +139,31 @@ namespace EList.Repositories.Impl
             var contact = await _contactDataProvider.GetAuthorizationContactAsync(accountId);
             var result = _mapper.Map<ContactDataItem>(contact);
             if (result != null)
-                result.AccountId = contact?.AccountRelation.AccountId;
+                result.AccountId = contact?.AccountRelation?.AccountId;
             return result;
         }
 
-        public async Task<List<ContactDataItem>?> GetAccountContactsAsync(Guid accountId)
+        public async Task<List<ContactDataItem>> GetAccountContactsAsync(Guid accountId)
         { 
             var contacts = await _contactDataProvider.GetAccountContactsAsync(accountId);
-            var result = contacts?.Select(i => _mapper.Map<ContactDataItem>(i)).ToList();
+            var result = contacts?.Select(i =>
+            {
+                var item = _mapper.Map<ContactDataItem>(i);
+                item.AccountId = i.AccountRelation?.AccountId;
+                return item;
+            }).ToList() ?? new List<ContactDataItem>();
+            return result;
+        }
+
+        public async Task<List<ContactDataItem>> GetOrganizationContactsAsync(Guid organizationId)
+        {
+            var contacts = await _contactDataProvider.GetOrganizationContactsAsync(organizationId);
+            var result = contacts?.Select(i =>
+            {
+                var item = _mapper.Map<ContactDataItem>(i);
+                item.OrganizationId = i.OrganizationRelation?.OrganizationId;
+                return item;
+            }).ToList() ?? new List<ContactDataItem>();
             return result;
         }
     }
