@@ -161,6 +161,24 @@ namespace EList.DbDataProvider.DataProviders
             return null;
         }
 
+        public async Task<TariffValidatorDto?> GetOrganizationTariffValidatorAsync(Guid organizationId)
+        {
+            var walletId = await _connection.Organizations
+                .Where(i => i.Id == organizationId)
+                .Select(i => i.WalletId)
+                .FirstOrDefaultAsync();
+
+            if (walletId != null)
+            {
+                var tariffValidator = await _connection.Wallets
+                    .Where(i => i.Id == walletId)
+                    .Select(i => i.Tariff.TariffValidator)
+                    .FirstOrDefaultAsync();
+                return tariffValidator;
+            }
+            return null;
+        }
+
         public async Task<WalletDto?> GetOrganizationWalletAsync(Guid organizationId)
         {
             var organization = await _connection.Organizations.FirstOrDefaultAsync(i => i.Id == organizationId);

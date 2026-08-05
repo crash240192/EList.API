@@ -448,7 +448,20 @@ namespace EList.Services.Impl
                     AllowUsersToInvite = true
                 };
 
-            var tariffValidator = await _walletsRepository.GetAccountTariffValidatorAsync(_accountDataHolder.AccountId.Value);
+            request.OrganizatorAccountIds ??= new List<Guid>();
+            request.OrganizatorOrganizationIds ??= new List<Guid>();
+
+            // Для мероприятия от организации берём тариф кошелька организации, иначе — личного аккаунта
+            Models.Wallets.TariffValidator? tariffValidator;
+            if (request.OrganizatorOrganizationIds.Count > 0)
+            {
+                // Основная организация — первая в списке (обычно передаётся одна)
+                tariffValidator = await _walletsRepository.GetOrganizationTariffValidatorAsync(request.OrganizatorOrganizationIds[0]);
+            }
+            else
+            {
+                tariffValidator = await _walletsRepository.GetAccountTariffValidatorAsync(_accountDataHolder.AccountId.Value);
+            }
 
             var ageThreshold = tariffValidator != null
                 ? tariffValidator.AgeLimit : 0;
@@ -467,9 +480,6 @@ namespace EList.Services.Impl
             var eventId = await _eventsRepository.CreateEventAsync(request.Event);
             
             #region Привязываем идентификаторы организаторов к событию
-            request.OrganizatorAccountIds ??= new List<Guid>();
-            request.OrganizatorOrganizationIds ??= new List<Guid>();
-
             // Личный аккаунт добавляем автоматически только если организация-организатор не указана
             if (request.OrganizatorOrganizationIds.Count == 0
                 && !request.OrganizatorAccountIds.Contains(_accountDataHolder.AccountId.Value))
