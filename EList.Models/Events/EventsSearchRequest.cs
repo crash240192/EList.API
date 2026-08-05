@@ -52,6 +52,7 @@ namespace EList.Models.Events
 
         /// <summary>
         /// Поиск мероприятий указанного аккаунта организатора
+        /// (включая мероприятия организаций, где этот аккаунт — активный участник)
         /// </summary>
         public Guid? OrganizatorId { get; set; }
 
