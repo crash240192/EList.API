@@ -218,10 +218,39 @@ namespace EList.DbDataProvider.DataProviders
 
             if (request.OrganizatorId != null)
             {
-                if (request.ParticipantId != null)
-                    eventsRequest = eventsRequest.Where(i => i.Organizators.Any(o => o.AccountId == request.OrganizatorId) || i.Participants.Any(p => p.AccountId == request.ParticipantId));
+                // Личные мероприятия аккаунта + мероприятия организаций, где он активный участник
+                var organizatorOrganizationIds = await _connection.OrganizationMembers
+                    .Where(m => m.AccountId == request.OrganizatorId && m.Active)
+                    .Select(m => m.OrganizationId)
+                    .ToListAsync();
+
+                if (organizatorOrganizationIds.Count > 0)
+                {
+                    if (request.ParticipantId != null)
+                    {
+                        eventsRequest = eventsRequest.Where(i =>
+                            i.Organizators.Any(o => o.AccountId == request.OrganizatorId)
+                            || i.Organizators.Any(o => o.OrganizationId != null && organizatorOrganizationIds.Contains(o.OrganizationId.Value))
+                            || i.Participants.Any(p => p.AccountId == request.ParticipantId));
+                    }
+                    else
+                    {
+                        eventsRequest = eventsRequest.Where(i =>
+                            i.Organizators.Any(o => o.AccountId == request.OrganizatorId)
+                            || i.Organizators.Any(o => o.OrganizationId != null && organizatorOrganizationIds.Contains(o.OrganizationId.Value)));
+                    }
+                }
+                else if (request.ParticipantId != null)
+                {
+                    eventsRequest = eventsRequest.Where(i =>
+                        i.Organizators.Any(o => o.AccountId == request.OrganizatorId)
+                        || i.Participants.Any(p => p.AccountId == request.ParticipantId));
+                }
                 else
-                    eventsRequest = eventsRequest.Where(i => i.Organizators.Any(o => o.AccountId == request.OrganizatorId));
+                {
+                    eventsRequest = eventsRequest.Where(i =>
+                        i.Organizators.Any(o => o.AccountId == request.OrganizatorId));
+                }
             }
             else if (request.ParticipantId != null)
             {
