@@ -108,14 +108,42 @@ namespace EList.DbDataProvider.DataProviders
             if (request.AdultOnly)
                 eventsRequest = eventsRequest.Where(e => e.Parameters.AgeLimit >= 18);
 
-            // Отображение частных мероприятий
-            // для черных списков - показывать если пользователь не в черных списках или он организатор
-            // для белых списков - показывать, если пользователь в белом списке, или белый список пуст, или он организатор, или он уже участник
+            // Организации, в которых текущий пользователь — активный участник (полный доступ к их мероприятиям)
+            var memberOrganizationIds = new List<Guid>();
             if (curAccountId != null)
+            {
+                memberOrganizationIds = await _connection.OrganizationMembers
+                    .Where(m => m.AccountId == curAccountId && m.Active)
+                    .Select(m => m.OrganizationId)
+                    .ToListAsync();
+            }
+
+            // Отображение частных мероприятий
+            // для черных списков - показывать если пользователь не в черных списках или он организатор / член орг-организатора
+            // для белых списков - показывать, если пользователь в белом списке, или белый список пуст, или он организатор/член орг, или он уже участник
+            if (curAccountId != null)
+            {
                 eventsRequest = eventsRequest
                         .LoadWith(i => i.BlackList)
-                        .LoadWith(i => i.WhiteList)
-                    .Where(i =>
+                        .LoadWith(i => i.WhiteList);
+
+                if (memberOrganizationIds.Count > 0)
+                {
+                    eventsRequest = eventsRequest.Where(i =>
+                        (i.Parameters.Private == true &&
+                                (
+                                    (i.WhiteList.Any(p => p.AccountId == curAccountId) || i.WhiteList.Count() == 0)
+                                    &&
+                                    (i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId) || i.Participants.Any(p => p.AccountId == curAccountId))
+                                )
+                        )
+                        || (i.Parameters.Private != true && (!i.BlackList.Any(p => p.AccountId == curAccountId)))
+                        || i.Organizators.Any(o => o.AccountId == curAccountId)
+                        || i.Organizators.Any(o => o.OrganizationId != null && memberOrganizationIds.Contains(o.OrganizationId.Value)));
+                }
+                else
+                {
+                    eventsRequest = eventsRequest.Where(i =>
                         (i.Parameters.Private == true &&
                                 (
                                     (i.WhiteList.Any(p => p.AccountId == curAccountId) || i.WhiteList.Count() == 0)
@@ -125,15 +153,31 @@ namespace EList.DbDataProvider.DataProviders
                         )
                         || (i.Parameters.Private != true && (!i.BlackList.Any(p => p.AccountId == curAccountId)))
                         || i.Organizators.Any(o => o.AccountId == curAccountId));
+                }
+            }
             else
+            {
                 eventsRequest = eventsRequest.Where(i => i.Parameters.Private != true);
+            }
 
             if (curAccountId != null)
             {
                 if (!adultConfirmed)
-                    eventsRequest = eventsRequest.Where(e =>
-                        e.Organizators.Any(o => o.AccountId == curAccountId)
-                        || (e.Parameters.AgeLimit ?? 0) < 18);
+                {
+                    if (memberOrganizationIds.Count > 0)
+                    {
+                        eventsRequest = eventsRequest.Where(e =>
+                            e.Organizators.Any(o => o.AccountId == curAccountId)
+                            || e.Organizators.Any(o => o.OrganizationId != null && memberOrganizationIds.Contains(o.OrganizationId.Value))
+                            || (e.Parameters.AgeLimit ?? 0) < 18);
+                    }
+                    else
+                    {
+                        eventsRequest = eventsRequest.Where(e =>
+                            e.Organizators.Any(o => o.AccountId == curAccountId)
+                            || (e.Parameters.AgeLimit ?? 0) < 18);
+                    }
+                }
             }
             else
             {
@@ -165,7 +209,13 @@ namespace EList.DbDataProvider.DataProviders
             eventsRequest = eventsRequest.Where(i => eventIdsByEventTypes.Contains(i.Id));
             #endregion
 
-            #region organizator and participant
+            #region organizator, organization and participant
+            if (request.OrganizationId != null)
+            {
+                eventsRequest = eventsRequest.Where(i =>
+                    i.Organizators.Any(o => o.OrganizationId == request.OrganizationId));
+            }
+
             if (request.OrganizatorId != null)
             {
                 if (request.ParticipantId != null)
