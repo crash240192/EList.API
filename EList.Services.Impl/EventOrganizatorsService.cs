@@ -80,5 +80,25 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
+
+        public async Task<CommandResult<bool>> IsCurrentUserEventOrganizatorAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(IsCurrentUserEventOrganizatorAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<bool>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var curEvent = await _eventsRepository.GetEventAsync(eventId);
+            if (curEvent == null)
+                return CommandResult<bool>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            var isOrganizator = await _organizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<bool>(isOrganizator);
+        }
     }
 }

@@ -98,5 +98,33 @@ namespace EList.Api.Controllers
                 throw;
             }
         }
+
+        /// <summary>
+        /// Проверяет, является ли текущий пользователь организатором мероприятия
+        /// (напрямую или как активный участник организации-организатора)
+        /// </summary>
+        /// <param name="eventId">Идентификатор мероприятия</param>
+        [HttpGet("isOrganizator/{eventId}")]
+        public async Task<CommandResult<bool>> IsCurrentUserEventOrganizatorAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(IsCurrentUserEventOrganizatorAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _organizatorsService.IsCurrentUserEventOrganizatorAsync(eventId);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
     }
 }
