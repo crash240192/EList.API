@@ -12,10 +12,11 @@ namespace EList.Repositories.Interfaces
         Task UpdateOrganizationAsync(Organization item);
         Task SetOrganizationActiveAsync(Guid organizationId, bool active);
         Task SetOrganizationWalletAsync(Guid organizationId, Guid? walletId);
-        Task SetVerificationStatusAsync(Guid organizationId, OrganizationVerificationStatus status);
+        Task SetVerificationStatusAsync(Guid organizationId, OrganizationVerificationStatus status, string? rejectReason = null);
         Task SetCanSellTicketsAsync(Guid organizationId, bool canSellTickets);
         Task<List<Organization>> GetOrganizationsByAccountIdAsync(Guid accountId, bool onlyActiveMembers = true);
         Task<List<Organization>> GetOrganizationsByCreatedByAsync(Guid accountId);
+        Task<List<Organization>> GetPendingVerificationOrganizationsAsync(int limit = 100);
         #endregion
 
         #region members

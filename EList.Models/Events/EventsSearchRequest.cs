@@ -56,6 +56,11 @@ namespace EList.Models.Events
         public Guid? OrganizatorId { get; set; }
 
         /// <summary>
+        /// Поиск мероприятий указанной организации
+        /// </summary>
+        public Guid? OrganizationId { get; set; }
+
+        /// <summary>
         /// Поиск мероприятий в которых участвует указанный аккаунт
         /// </summary>
         public Guid? ParticipantId { get; set; }

@@ -6,6 +6,7 @@ using EList.AutoMapperProfile;
 using EList.Common.DI;
 using EList.DbDataProvider.Interfaces;
 using EList.DI;
+using EList.Services.Impl.BackgroundWorkers;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -55,6 +56,13 @@ ContainerConfigurator.Configure(builder.Services, new EListServiceMappingProvide
 var mappingConfig = new MapperConfiguration(mc => { mc.AddProfile(new AutoMapperProfile()); });
 var mapper = mappingConfig.CreateMapper();
 builder.Services.AddSingleton(mapper);
+
+builder.Services.AddSingleton<DebtCollectorWorker>();
+builder.Services.AddSingleton<IDebtCollectorUtility>(sp => sp.GetRequiredService<DebtCollectorWorker>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DebtCollectorWorker>());
+
+builder.Services.AddSingleton<OrganizationVerificationWorker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<OrganizationVerificationWorker>());
 
 var app = builder.Build();
 
@@ -118,25 +126,13 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     ForwardedHeaders.XForwardedProto
 });
 
-//app.UseDeveloperExceptionPage();
-
-IHostApplicationLifetime hostApplicationLifetime = app.Lifetime;
-var scope = app.Services.CreateScope();
-
-var dataConnectionProvider = scope.ServiceProvider.GetRequiredService<IDataConnectionProvider>();
-var debtCollector = scope.ServiceProvider.GetRequiredService<IDebtCollectorUtility>();
-
-hostApplicationLifetime.ApplicationStarted.Register(() =>
+// Configure DB before hosted background workers start processing.
+using (var startupScope = app.Services.CreateScope())
 {
+    var dataConnectionProvider = startupScope.ServiceProvider.GetRequiredService<IDataConnectionProvider>();
     const string connectionStringName = "elist_main_db";
     dataConnectionProvider.Configure(connectionStringName);
-    debtCollector.Start();
-});
-
-app.Lifetime.ApplicationStopping.Register(() =>
-{
-    debtCollector.Stop();
-});
+}
 
 app.Run();
 

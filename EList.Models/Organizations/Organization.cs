@@ -59,6 +59,11 @@ namespace EList.Models.Organizations
         public OrganizationVerificationStatus VerificationStatus { get; set; }
 
         /// <summary>
+        /// Причина отклонения верификации
+        /// </summary>
+        public string? VerificationRejectReason { get; set; }
+
+        /// <summary>
         /// Разрешена ли продажа билетов через сервис
         /// </summary>
         public bool CanSellTickets { get; set; }

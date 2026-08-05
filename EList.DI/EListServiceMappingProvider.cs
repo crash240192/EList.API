@@ -8,6 +8,7 @@ using EList.FilestorageClient;
 using EList.Repositories.Impl;
 using EList.Repositories.Interfaces;
 using EList.Services.Impl;
+using EList.Services.Impl.OrganizationRegistry;
 using EList.Services.Interfaces;
 using EList.Sms;
 using EList.Smtp;
@@ -100,7 +101,7 @@ namespace EList.DI
             mapper.AddSingleton<ITemplateParser, TemplateParser>();
             mapper.AddSingleton<IEncryptionTool, EncryptionTool>();
             mapper.AddScoped<IAccountDataHolder, AccountDataHolder>();
-            mapper.AddScoped<IDebtCollectorUtility, DebtCollectorUtility>();
+            mapper.AddScoped<IOrganizationRegistryClient, StubOrganizationRegistryClient>();
 
             return mapper;
         }
