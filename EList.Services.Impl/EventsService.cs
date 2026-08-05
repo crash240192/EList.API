@@ -445,6 +445,15 @@ namespace EList.Services.Impl
                     EventId = eventId,
                 });
             }
+
+            foreach (var organizationId in request.OrganizatorOrganizationIds)
+            {
+                await _eventOrganizatorsRepository.CreateAsync(new EventOrganizatorRequest
+                {
+                    OrganizationId = organizationId,
+                    EventId = eventId,
+                });
+            }
             #endregion
 
             var createEventParametersResult = await SetEventParametersAsync(eventId, request.EventParameters);

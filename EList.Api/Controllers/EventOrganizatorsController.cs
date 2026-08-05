@@ -38,6 +38,11 @@ namespace EList.Api.Controllers
             _connectionProvider = connectionProvider;
         }
 
+        /// <summary>
+        /// список организаторов мероприятия
+        /// </summary>
+        /// <param name="eventId"></param>
+        /// <returns></returns>
         [HttpGet("getByEventId/{eventId}")]
         public async Task<CommandResult<List<EventOrganizator>>> GetByEventIdAsync(Guid eventId)
         {
@@ -64,11 +69,10 @@ namespace EList.Api.Controllers
         /// <summary>
         /// Добавить мероприятию организаторов
         /// </summary>
-        /// <param name="eventId"></param>
-        /// <param name="accountIds"></param>
+        /// <param name="request"></param>
         /// <returns></returns>
-        [HttpPost("assign/{eventId}")]
-        public async Task<CommandResult> AssignEventOrganizatorsAsync(Guid eventId, List<Guid> accountIds)
+        [HttpPost("assign")]
+        public async Task<CommandResult> AssignEventOrganizatorsAsync(EventOrganizatorsListRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -79,7 +83,7 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
-                var result = await _organizatorsService.AssignEventOrganizatorsAsync(eventId, accountIds);
+                var result = await _organizatorsService.AssignEventOrganizatorsAsync(request.EventId, request.AccountIds, request.OrganizationIds);
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();

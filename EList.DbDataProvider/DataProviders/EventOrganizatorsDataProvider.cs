@@ -54,7 +54,7 @@ namespace EList.DbDataProvider.DataProviders
             return organizatorIds;
         }
 
-        public async Task AssignAsync(Guid eventId, List<Guid> accountIds)
+        public async Task AssignAsync(Guid eventId, List<Guid> accountIds, List<Guid> organizationIds)
         {
             if (accountIds?.Any() ?? false)
             {
@@ -67,7 +67,17 @@ namespace EList.DbDataProvider.DataProviders
                     EventId = eventId
                 })?.ToList();
 
-                var res = await _connection.BulkCopyAsync(organizatorItems);
+                if (organizatorItems?.Any() ?? false)
+                    await _connection.BulkCopyAsync(organizatorItems);
+
+                organizatorItems = organizationIds?.Where(i => !organizators.Any(o => o.OrganizationId == i))?.Select(i => new EventOrganizatorDto
+                {
+                    OrganizationId = i,
+                    EventId = eventId
+                })?.ToList();
+
+                if (organizatorItems?.Any() ?? false)
+                    await _connection.BulkCopyAsync(organizatorItems);
             }
         }
     }

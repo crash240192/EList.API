@@ -71,9 +71,9 @@ namespace EList.Repositories.Impl
             return result;
         }
 
-        public async Task AssignAsync(Guid eventId, List<Guid> accountIds)
+        public async Task AssignAsync(Guid eventId, List<Guid> accountIds, List<Guid> organizationIds)
         {
-            await _eventOrganizatorsDataProvider.AssignAsync(eventId, accountIds);
+            await _eventOrganizatorsDataProvider.AssignAsync(eventId, accountIds, organizationIds);
         }
     }
 }
