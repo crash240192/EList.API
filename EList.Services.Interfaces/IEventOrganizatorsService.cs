@@ -7,5 +7,6 @@ namespace EList.Services.Interfaces
     {
         Task<CommandResult<List<EventOrganizator>>> GetByEventIdAsync(Guid eventId);
         Task<CommandResult> AssignEventOrganizatorsAsync(Guid eventId, List<Guid> accountIds, List<Guid> organizationIds);
+        Task<CommandResult<bool>> IsCurrentUserEventOrganizatorAsync(Guid eventId);
     }
 }

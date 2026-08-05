@@ -49,8 +49,9 @@ namespace EList.Repositories.Impl
             var items = await _eventOrganizatorsDataProvider.GetByEventIdAsync(eventId);
             var result = items?.Select(i => new EventOrganizator
             {
-                Account = _mapper.Map<AccountPublicData>(i.Account),
-                PersonInfo = _mapper.Map<PersonInfo>(i.Account.PersonInfo),
+                Account = i.Account != null ? _mapper.Map<AccountPublicData>(i.Account) : null,
+                PersonInfo = i.Account?.PersonInfo != null ? _mapper.Map<PersonInfo>(i.Account.PersonInfo) : null,
+                Organization = i.Organization != null ? _mapper.Map<Models.Organizations.Organization>(i.Organization) : null,
                 Id = i.Id,
                 EventId = eventId,
                 OrganizationId = i.OrganizationId
@@ -62,6 +63,11 @@ namespace EList.Repositories.Impl
         {
             var organizators = await _eventOrganizatorsDataProvider.GetOrganizatorIdsByEventIdAsync(eventId);
             return organizators;
+        }
+
+        public async Task<bool> IsAccountEventOrganizatorAsync(Guid eventId, Guid accountId)
+        {
+            return await _eventOrganizatorsDataProvider.IsAccountEventOrganizatorAsync(eventId, accountId);
         }
 
         public async Task<EventOrganizator?> GetByIdAsync(Guid id)

@@ -127,8 +127,8 @@ namespace EList.Services.Impl
 
             if (album.EventId != null)
             {
-                var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(album.EventId.Value);
-                if (!organizators.Contains(_accountDataHolder.AccountId.Value))
+                var isOrganizator = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(album.EventId.Value, _accountDataHolder.AccountId.Value);
+                if (!isOrganizator)
                 {
                     var eventItem = await _eventsRepository.GetEventAsync(album.EventId.Value);
                     var participants = await _participationsRepository.GetEventParticipantIdsAsync(album.EventId.Value);
@@ -216,10 +216,11 @@ namespace EList.Services.Impl
             var result = await _mediaRepository.GetEventAlbumsAsync(eventId);
             var eventItem = await _eventsRepository.GetEventAsync(eventId);
             var participants = await _participationsRepository.GetEventParticipantIdsAsync(eventId);
-            var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(eventId);
+            var isOrganizator = _accountDataHolder.AccountId != null
+                && await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value);
             var invitedUsers = await _invitationsRepository.GetInvitedUsersAsync(eventId);
 
-            if (_accountDataHolder.AccountId != null && organizators.Contains(_accountDataHolder.AccountId.Value))
+            if (isOrganizator)
             {
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return new CommandResult<List<MediaAlbum>>(result);
@@ -273,8 +274,8 @@ namespace EList.Services.Impl
 
             if (album.EventId != null)
             {
-                var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(album.EventId.Value);
-                if (!organizators.Contains(_accountDataHolder.AccountId.Value) && _accountDataHolder.AccountId != album.AccountId)
+                var isOrganizator = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(album.EventId.Value, _accountDataHolder.AccountId.Value);
+                if (!isOrganizator && _accountDataHolder.AccountId != album.AccountId)
                 {
                     logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                     return CommandResult<List<MediaAlbum>>.Fail(ErrorCode.AccessError, "Удалить альбом может только организатор мероприятия");
@@ -330,8 +331,8 @@ namespace EList.Services.Impl
 
             if (album.EventId != null)
             {
-                var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(album.EventId.Value);
-                if (!organizators.Contains(_accountDataHolder.AccountId.Value) && _accountDataHolder.AccountId != album.AccountId)
+                var isOrganizator = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(album.EventId.Value, _accountDataHolder.AccountId.Value);
+                if (!isOrganizator && _accountDataHolder.AccountId != album.AccountId)
                 {
                     logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                     return CommandResult<List<MediaAlbum>>.Fail(ErrorCode.AccessError, "Удалить альбом может только организатор мероприятия");
@@ -367,9 +368,10 @@ namespace EList.Services.Impl
 
             if (album.EventId != null)
             {
-                var organizators = await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(album.EventId.Value);
+                var isOrganizator = _accountDataHolder.AccountId != null
+                    && await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(album.EventId.Value, _accountDataHolder.AccountId.Value);
 
-                if (_accountDataHolder.AccountId == null || !organizators.Contains(_accountDataHolder.AccountId.Value))
+                if (!isOrganizator)
                 {
                     var eventItem = await _eventsRepository.GetEventAsync(album.EventId.Value);
                     var participants = await _participationsRepository.GetEventParticipantIdsAsync(album.EventId.Value);

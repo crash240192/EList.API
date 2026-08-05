@@ -80,6 +80,17 @@ namespace EList.DbDataProvider.DataProviders
             var result = (Guid)await _connection.InsertWithIdentityAsync(relation);
         }
 
+        public async Task BindOrganizationAndContactAsync(Guid organizationId, Guid contactId)
+        {
+            var relation = new ContactOrganizationRelationDto
+            {
+                OrganizationId = organizationId,
+                ContactId = contactId
+            };
+
+            await _connection.InsertWithIdentityAsync(relation);
+        }
+
         public async Task<ContactDataDto?> GetAccountContactAsync(Guid id)
         {
             var result = await _connection.ContactData
@@ -90,11 +101,22 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<ContactDataDto?> GetOrganizationContactAsync(Guid id)
+        {
+            var result = await _connection.ContactData
+                .LoadWith(i => i.ContactType)
+                .LoadWith(i => i.OrganizationRelation)
+                .Where(i => i.Id == id && i.OrganizationRelation != null)
+                .FirstOrDefaultAsync();
+            return result;
+        }
+
         public async Task<ContactDataDto?> GetContactAsync(string contactValue)
         {
             var result = await _connection.ContactData
                 .LoadWith(i => i.ContactType)
                 .LoadWith(i => i.AccountRelation)
+                .LoadWith(i => i.OrganizationRelation)
                 .Where(i => i.Value.ToLower() == contactValue.ToLower())
                 .FirstOrDefaultAsync();
             return result;
@@ -116,6 +138,16 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.ContactType)
                 .LoadWith(i => i.AccountRelation)
                 .Where(i => i.AccountRelation.AccountId == accountId)
+                .ToListAsync();
+            return result;
+        }
+
+        public async Task<List<ContactDataDto>?> GetOrganizationContactsAsync(Guid organizationId)
+        {
+            var result = await _connection.ContactData
+                .LoadWith(i => i.ContactType)
+                .LoadWith(i => i.OrganizationRelation)
+                .Where(i => i.OrganizationRelation.OrganizationId == organizationId)
                 .ToListAsync();
             return result;
         }

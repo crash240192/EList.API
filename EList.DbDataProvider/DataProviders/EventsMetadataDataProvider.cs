@@ -162,6 +162,7 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.AgeLimit, item.AgeLimit)
                 .Set(i => i.Private, item.Private)
                 .Set(i => i.AllowUsersToInvite, item.AllowUsersToInvite)
+                .Set(i => i.TicketsEnabled, item.TicketsEnabled)
                 .UpdateAsync();
         }
 

@@ -27,6 +27,9 @@ namespace EList.DbDataProvider.Models
         [Column("allow_users_to_invite")]
         public bool? AllowUsersToInvite { get; set; }
 
+        [Column("tickets_enabled")]
+        public bool TicketsEnabled { get; set; }
+
         [Association(ThisKey = nameof(Id), OtherKey = nameof(EventDto.EventParametersId))]
         public EventDto Event { get; set; }
     }

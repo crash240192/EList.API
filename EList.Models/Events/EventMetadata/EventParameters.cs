@@ -11,5 +11,10 @@ namespace EList.Models.Events.EventMetadata
         public int? AgeLimit { get; set; }
         public Gender? AllowedGender { get; set; }
         public bool? AllowUsersToInvite { get; set; }
+
+        /// <summary>
+        /// Включена ли продажа билетов на мероприятие
+        /// </summary>
+        public bool TicketsEnabled { get; set; }
     }
 }

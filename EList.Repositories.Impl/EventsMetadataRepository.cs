@@ -146,7 +146,8 @@ namespace EList.Repositories.Impl
                 MaxPersonsCount = request.MaxPersonsCount,
                 Private = request.Private,
                 AllowUsersToInvite = request.AllowUsersToInvite,
-                Cost = request.Cost
+                Cost = request.Cost,
+                TicketsEnabled = request.TicketsEnabled
             };
             var result = await _eventsMetadataDataProvider.CreateEventParametersAsync(mappedRequest);
             return result;
@@ -167,6 +168,7 @@ namespace EList.Repositories.Impl
                 Private = request.Private,
                 AllowUsersToInvite = request.AllowUsersToInvite,
                 Cost = request.Cost,
+                TicketsEnabled = request.TicketsEnabled,
                 Id = id
             };
             await _eventsMetadataDataProvider.UpdateEventParametersAsync(mappedRequest);

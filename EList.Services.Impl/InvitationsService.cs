@@ -71,25 +71,21 @@ namespace EList.Services.Impl
             if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Мероприятие с id='{request.EventId}' не найдено");
 
-            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(curEvent.Id);
-
-            var isOrganizator = eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? false;
+            var isOrganizator = _accountDataHolder.AccountId != null
+                && await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(curEvent.Id, _accountDataHolder.AccountId.Value);
 
             if (!isOrganizator)
             {
                 //TODO: Тут надо реализовать проверку что указанным пользователям можно выслать приглашения по black/white list
-                //if (curEvent.Parameters?.Private ?? false)
-                //{
-                //    if (await _participantsBWListRepository.IsUserInWhiteListAsync(request.AccountIds))
-                //}
-
-                //if (await _participantsBWListRepository.IsUserInBlackListAsync)
             }
 
             if (request.InviterOrganizationId != null)
             {
-                //TODO Проверить, входит ли текущий аккаунт в состав организации
-                //TODO Проверить, является ли текущая организация организатором для данного мероприятия
+                var isOrgOrganizator = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(curEvent.Id, _accountDataHolder.AccountId.Value);
+                var orgIsEventOrganizator = (await _eventOrganizatorsRepository.GetByEventIdAsync(curEvent.Id))
+                    ?.Any(i => i.OrganizationId == request.InviterOrganizationId) ?? false;
+                if (!isOrgOrganizator || !orgIsEventOrganizator)
+                    return CommandResult.Fail(ErrorCode.AccessError, "Организация не является организатором мероприятия или у вас нет прав");
             }
 
             if (!curEvent.Parameters?.AllowUsersToInvite ?? false && !isOrganizator)

@@ -9,6 +9,7 @@ namespace EList.DbDataProvider.Interfaces
         Task<EventOrganizatorDto> GetByIdAsync (Guid id);
         Task<List<EventOrganizatorDto>> GetByEventIdAsync(Guid eventId);
         Task<List<Guid>> GetOrganizatorIdsByEventIdAsync(Guid eventId);
+        Task<bool> IsAccountEventOrganizatorAsync(Guid eventId, Guid accountId);
         Task AssignAsync(Guid eventId, List<Guid> accountIds, List<Guid> organizationIds);
     }
 }

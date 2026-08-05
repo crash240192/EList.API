@@ -39,6 +39,7 @@ namespace EList.Services.Impl
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
         private readonly INotificationsService _notificationsService;
         private readonly ISubscriptionsRepository _subscriptionsRepository;
+        private readonly IOrganizationsRepository _organizationsRepository;
 
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
@@ -52,7 +53,8 @@ namespace EList.Services.Impl
             IAccountDataHolder accountDataHolder,
             IParticipantsBWListRepository participantsBWListRepository,
             INotificationsService notificationsService,
-            ISubscriptionsRepository subscriptionsRepository)
+            ISubscriptionsRepository subscriptionsRepository,
+            IOrganizationsRepository organizationsRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
@@ -66,6 +68,7 @@ namespace EList.Services.Impl
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
             _walletsRepository = walletsRepository ?? throw new Exception(nameof(walletsRepository));
             _notificationsService = notificationsService ?? throw new Exception(nameof(notificationsService));
+            _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -372,9 +375,13 @@ namespace EList.Services.Impl
             if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
-            var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            if (!organizators?.Any(i => i.Account.Id == _accountDataHolder.AccountId) ?? true)
+            if (_accountDataHolder.AccountId == null
+                || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
+
+            var ticketSalesError = await EnsureTicketSalesAllowedAsync(eventId, parameters.TicketsEnabled);
+            if (ticketSalesError != null)
+                return ticketSalesError;
 
             //if (!Enum.IsDefined(typeof(AgeRating), parameters.AgeLimit))
             //    return CommandResult.Fail(ErrorCode.InvalidAgeLimitValue, "Значение возрастного ограничения может принимать значения '0', '6', '12', '16' или '18'");
@@ -393,6 +400,35 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
         #endregion
+
+        private async Task<CommandResult?> EnsureTicketSalesAllowedAsync(Guid eventId, bool ticketsEnabled)
+        {
+            if (!ticketsEnabled)
+                return null;
+
+            var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
+            var organizationIds = organizators?
+                .Where(i => i.OrganizationId != null)
+                .Select(i => i.OrganizationId!.Value)
+                .Distinct()
+                .ToList() ?? new List<Guid>();
+
+            if (organizationIds.Count == 0)
+            {
+                return CommandResult.Fail(ErrorCode.InvalidValue,
+                    "Продажу билетов можно включить только для мероприятия с организацией-организатором");
+            }
+
+            foreach (var organizationId in organizationIds)
+            {
+                var organization = await _organizationsRepository.GetOrganizationAsync(organizationId);
+                if (organization?.CanSellTickets == true)
+                    return null;
+            }
+
+            return CommandResult.Fail(ErrorCode.OrganizationNotVerified,
+                "Ни одна организация-организатор не имеет права продавать билеты");
+        }
 
         #region events
         public async Task<CommandResult<Guid?>> CreateEventAsync(CreateEventRequest request)
@@ -431,11 +467,23 @@ namespace EList.Services.Impl
             var eventId = await _eventsRepository.CreateEventAsync(request.Event);
             
             #region Привязываем идентификаторы организаторов к событию
-            if (request.OrganizatorAccountIds == null)
-                request.OrganizatorOrganizationIds = new List<Guid>();
+            request.OrganizatorAccountIds ??= new List<Guid>();
+            request.OrganizatorOrganizationIds ??= new List<Guid>();
 
-            if (!request.OrganizatorAccountIds.Contains(_accountDataHolder.AccountId.Value))
+            // Личный аккаунт добавляем автоматически только если организация-организатор не указана
+            if (request.OrganizatorOrganizationIds.Count == 0
+                && !request.OrganizatorAccountIds.Contains(_accountDataHolder.AccountId.Value))
+            {
                 request.OrganizatorAccountIds.Add(_accountDataHolder.AccountId.Value);
+            }
+
+            foreach (var organizationId in request.OrganizatorOrganizationIds)
+            {
+                var isMember = await _organizationsRepository.IsActiveMemberAsync(organizationId, _accountDataHolder.AccountId.Value);
+                if (!isMember)
+                    return CommandResult<Guid?>.Fail(ErrorCode.AccessError,
+                        $"Вы не являетесь участником организации '{organizationId}' и не можете указать её организатором");
+            }
 
             foreach (var accountId in request.OrganizatorAccountIds)
             {
@@ -534,24 +582,6 @@ namespace EList.Services.Impl
             if (!isPrivate)
                 await _notificationsService.NotifyEventCreatedAsync(eventId, subscribersList);
 
-            //TODO: С организациями разберёмся позже 
-
-            //#region привязываем идентификаторы организаций к событию
-            //if (request.OrganizatorOrganizationIds?.Count > 0)
-            //{
-            //    foreach (var organizationId in request.OrganizatorOrganizationIds)
-            //    {
-            //        //TODO: Сделать проверку, что пользователь имеет отношение к указанной организации
-            //        await _eventOrganizatorsRepository.CreateAsync(new EventOrganizatorRequest
-            //        {
-            //            OrganizationId = organizationId,
-            //            EventId = eventId,
-            //        });
-            //    }
-            //}
-            //#endregion
-
-
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(eventId);
         }
@@ -567,12 +597,9 @@ namespace EList.Services.Impl
             if (eventItem == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
-            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-
-            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? false)
+            if (_accountDataHolder.AccountId == null
+                || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
-
-            //TODO: Если у ивента организатором является какая-то компания, проверить, является ли accountId её участником
 
             await _eventsRepository.UpdateEventAsync(eventId, request);
 
@@ -595,12 +622,9 @@ namespace EList.Services.Impl
 
             //var accountInfo = await _authorizationRepository.GetAuthorizationDataAsync(token);
 
-            var eventOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-
-            if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? false)
+            if (_accountDataHolder.AccountId == null
+                || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
-
-            //TODO: Если у ивента организатором является какая-то компания, проверить, является ли accountId её участником
 
             await _eventsRepository.SetEventCoverImageAsync(eventId, imageId);
 
@@ -622,8 +646,8 @@ namespace EList.Services.Impl
             if (eventItem == null)
                 return CommandResult<Event>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
-            var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            var isOrganizator = organizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? false;
+            var isOrganizator = _accountDataHolder.AccountId != null
+                && await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value);
 
             if (!isOrganizator)
             {
@@ -750,8 +774,8 @@ namespace EList.Services.Impl
             if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Мероприятие с id='{eventId} не найдено'");
 
-            var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
-            if (!(organizators?.Any(i => i.Account.Id == _accountDataHolder.AccountId) ?? false))
+            if (_accountDataHolder.AccountId == null
+                || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
                 return CommandResult.Fail(ErrorCode.AccessError, $"У вас нет доступа к редактированию текущего мероприятия'");
 
             await _eventsRepository.CancelEventAsync(eventId);
