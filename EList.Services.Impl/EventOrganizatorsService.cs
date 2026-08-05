@@ -58,7 +58,7 @@ namespace EList.Services.Impl
             return new CommandResult<List<EventOrganizator>>(result);
         }
 
-        public async Task<CommandResult> AssignEventOrganizatorsAsync(Guid eventId, List<Guid> accountIds)
+        public async Task<CommandResult> AssignEventOrganizatorsAsync(Guid eventId, List<Guid> accountIds, List<Guid> organizationIds)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -74,7 +74,7 @@ namespace EList.Services.Impl
             if (!eventOrganizators?.Any(i => i.Account?.Id == _accountDataHolder.AccountId) ?? true)
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
 
-            await _organizatorsRepository.AssignAsync(eventId, accountIds);
+            await _organizatorsRepository.AssignAsync(eventId, accountIds, organizationIds);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

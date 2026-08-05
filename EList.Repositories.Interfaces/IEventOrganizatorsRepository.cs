@@ -9,6 +9,6 @@ namespace EList.Repositories.Interfaces
         Task<EventOrganizator?> GetByIdAsync(Guid id);
         Task<List<EventOrganizator>?> GetByEventIdAsync(Guid eventId);
         Task<List<Guid>> GetOrganizatorIdsByEventIdAsync(Guid eventId);
-        Task AssignAsync(Guid eventId, List<Guid> accountIds);
+        Task AssignAsync(Guid eventId, List<Guid> accountIds, List<Guid> organizationIds);
     }
 }
