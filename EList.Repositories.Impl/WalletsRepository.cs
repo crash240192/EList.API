@@ -54,6 +54,13 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task<TariffValidator?> GetOrganizationTariffValidatorAsync(Guid organizationId)
+        {
+            var validator = await _walletsDataProvider.GetOrganizationTariffValidatorAsync(organizationId);
+            var result = _mapper.Map<TariffValidator?>(validator);
+            return result;
+        }
+
         public async Task<Guid> CreateTariffValidatorAsync(TariffValidator item)
         {
             var mappedRequest = _mapper.Map<TariffValidatorDto>(item);
