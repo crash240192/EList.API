@@ -13,6 +13,7 @@ namespace EList.DbDataProvider.Models.SearchRequests
         public List<Guid> Categories { get; set; }
         public string Name { get; set; }
         public Guid? OrganizatorId { get; set; }
+        public Guid? OrganizationId { get; set; }
         public Guid? ParticipantId { get; set; }
         public double? Price { get; set; }
         public Gender? AllowedGender { get; set; }
