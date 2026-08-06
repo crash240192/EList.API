@@ -465,6 +465,32 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Поиск реквизитов организации/ИП по ИНН (автозаполнение формы)
+        /// </summary>
+        [HttpGet("lookup/inn/{inn}")]
+        public async Task<CommandResult<OrganizationRegistryParty?>> LookupByInnAsync(string inn)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(LookupByInnAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _organizationsService.LookupByInnAsync(inn);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Отправить организацию на верификацию
         /// </summary>
         [HttpPost("verification/submit/{organizationId}")]

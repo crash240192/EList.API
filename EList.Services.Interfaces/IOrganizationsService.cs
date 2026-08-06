@@ -25,5 +25,10 @@ namespace EList.Services.Interfaces
 
         Task<CommandResult> SubmitVerificationAsync(Guid organizationId);
         Task<CommandResult> SetCanSellTicketsAsync(Guid organizationId, bool canSellTickets);
+
+        /// <summary>
+        /// Поиск реквизитов организации/ИП по ИНН во внешнем реестре (для автозаполнения).
+        /// </summary>
+        Task<CommandResult<OrganizationRegistryParty?>> LookupByInnAsync(string inn);
     }
 }
