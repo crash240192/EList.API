@@ -23,6 +23,7 @@ namespace EList.Services.Impl
         private readonly IOrganizationsRepository _organizationsRepository;
         private readonly IAccountsRepository _accountsRepository;
         private readonly IWalletsRepository _walletsRepository;
+        private readonly IOrganizationRegistryClient _organizationRegistryClient;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IMapper _mapper;
@@ -30,6 +31,7 @@ namespace EList.Services.Impl
         public OrganizationsService(IOrganizationsRepository organizationsRepository,
             IAccountsRepository accountsRepository,
             IWalletsRepository walletsRepository,
+            IOrganizationRegistryClient organizationRegistryClient,
             IAccountDataHolder accountDataHolder,
             ICorrelationIdProvider correlationIdProvider,
             IMapper mapper)
@@ -37,6 +39,7 @@ namespace EList.Services.Impl
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _walletsRepository = walletsRepository ?? throw new ArgumentNullException(nameof(walletsRepository));
+            _organizationRegistryClient = organizationRegistryClient ?? throw new ArgumentNullException(nameof(organizationRegistryClient));
             _accountDataHolder = accountDataHolder;
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
@@ -507,6 +510,37 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
+        }
+
+        public async Task<CommandResult<OrganizationRegistryParty?>> LookupByInnAsync(string inn)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(LookupByInnAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<OrganizationRegistryParty?>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            if (string.IsNullOrWhiteSpace(inn))
+                return CommandResult<OrganizationRegistryParty?>.Fail(ErrorCode.IsNullOrEmpty, "ИНН обязателен");
+
+            OrganizationRegistryParty? party;
+            try
+            {
+                party = await _organizationRegistryClient.FindByInnAsync(inn);
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(correlationId, null, methodName, $"Lookup failed: {ex.Message}", null);
+                return CommandResult<OrganizationRegistryParty?>.Fail(ErrorCode.InternalError, "Сервис поиска организаций временно недоступен");
+            }
+
+            if (party == null)
+                return CommandResult<OrganizationRegistryParty?>.Fail(ErrorCode.OrganizationNotFound, "Организация/ИП не найдена по указанному ИНН");
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<OrganizationRegistryParty?>(party);
         }
 
         private async Task<CommandResult?> EnsureOwnerAsync(Guid organizationId)

@@ -4,10 +4,18 @@ using EList.Models.Organizations;
 namespace EList.Services.Interfaces
 {
     /// <summary>
-    /// Клиент проверки организации в государственном реестре (ЕГРЮЛ/ЕГРИП).
+    /// Клиент проверки организации во внешнем реестре (ЕГРЮЛ/ЕГРИП через провайдера).
     /// </summary>
     public interface IOrganizationRegistryClient
     {
+        /// <summary>
+        /// Поиск организации/ИП по ИНН (или ОГРН) для автозаполнения реквизитов.
+        /// </summary>
+        Task<OrganizationRegistryParty?> FindByInnAsync(string inn, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Сверка сохранённых реквизитов с реестром (фоновая верификация).
+        /// </summary>
         Task<OrganizationRegistryCheckResult> CheckOrganizationAsync(
             OrganizationLegal legal,
             string organizationName,
