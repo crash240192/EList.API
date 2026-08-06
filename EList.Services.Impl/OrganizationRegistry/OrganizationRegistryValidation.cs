@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+using System.Text;
 using EList.Models.Enums;
 using EList.Models.Organizations;
 
@@ -13,7 +13,26 @@ namespace EList.Services.Impl.OrganizationRegistry
         {
             if (string.IsNullOrWhiteSpace(value))
                 return string.Empty;
-            return Regex.Replace(value, @"\D", string.Empty);
+
+            var sb = new StringBuilder(value.Length);
+            foreach (var ch in value)
+            {
+                if (ch >= '0' && ch <= '9')
+                {
+                    sb.Append(ch);
+                    continue;
+                }
+
+                // полноширинные и прочие Unicode-цифры → ASCII
+                if (char.IsDigit(ch))
+                {
+                    var numeric = char.GetNumericValue(ch);
+                    if (numeric >= 0 && numeric <= 9)
+                        sb.Append((char)('0' + (int)numeric));
+                }
+            }
+
+            return sb.ToString();
         }
 
         /// <summary>
@@ -25,8 +44,8 @@ namespace EList.Services.Impl.OrganizationRegistry
             if (string.IsNullOrWhiteSpace(inn))
                 return "ИНН не указан";
 
-            if (!IsValidInn(inn))
-                return "ИНН не прошёл проверку контрольной суммы";
+            if (inn.Length != 10 && inn.Length != 12)
+                return $"ИНН должен содержать 10 (юрлицо) или 12 (ИП) цифр, сейчас: {inn.Length}";
 
             var expectedInnLength = legal.LegalForm == OrganizationLegalForm.LegalEntity ? 10 : 12;
             if (inn.Length != expectedInnLength)
@@ -36,12 +55,35 @@ namespace EList.Services.Impl.OrganizationRegistry
                     : "Для ИП/самозанятого ИНН должен содержать 12 цифр";
             }
 
-            if (legal.LegalForm == OrganizationLegalForm.LegalEntity && string.IsNullOrWhiteSpace(legal.Kpp))
-                return "Для юрлица необходимо указать КПП";
+            if (!IsValidInnChecksum(inn))
+                return "ИНН не прошёл проверку контрольной суммы";
+
+            if (legal.LegalForm == OrganizationLegalForm.LegalEntity)
+            {
+                var kpp = NormalizeDigits(legal.Kpp);
+                if (string.IsNullOrWhiteSpace(kpp))
+                    return "Для юрлица необходимо указать КПП";
+                if (kpp.Length != 9)
+                    return $"КПП должен содержать 9 цифр, сейчас: {kpp.Length}";
+            }
 
             var ogrn = NormalizeDigits(legal.Ogrn);
-            if (!string.IsNullOrWhiteSpace(ogrn) && !IsValidOgrn(ogrn))
-                return "ОГРН/ОГРНИП не прошёл проверку контрольной суммы";
+            if (!string.IsNullOrWhiteSpace(ogrn))
+            {
+                var expectedOgrnLength = legal.LegalForm == OrganizationLegalForm.LegalEntity ? 13 : 15;
+                if (ogrn.Length != 13 && ogrn.Length != 15)
+                    return $"ОГРН/ОГРНИП должен содержать 13 или 15 цифр, сейчас: {ogrn.Length}";
+
+                if (ogrn.Length != expectedOgrnLength)
+                {
+                    return legal.LegalForm == OrganizationLegalForm.LegalEntity
+                        ? "Для юрлица ОГРН должен содержать 13 цифр"
+                        : "Для ИП ОГРНИП должен содержать 15 цифр";
+                }
+
+                if (!IsValidOgrnChecksum(ogrn))
+                    return "ОГРН/ОГРНИП не прошёл проверку контрольной суммы";
+            }
 
             if (string.IsNullOrWhiteSpace(legal.HeadName))
                 return "Не указано ФИО руководителя";
@@ -50,6 +92,20 @@ namespace EList.Services.Impl.OrganizationRegistry
         }
 
         public static bool IsValidInn(string inn)
+        {
+            if (inn.Length != 10 && inn.Length != 12)
+                return false;
+            return IsValidInnChecksum(inn);
+        }
+
+        public static bool IsValidOgrn(string ogrn)
+        {
+            if (ogrn.Length != 13 && ogrn.Length != 15)
+                return false;
+            return IsValidOgrnChecksum(ogrn);
+        }
+
+        private static bool IsValidInnChecksum(string inn)
         {
             if (inn.Length == 10)
             {
@@ -83,7 +139,7 @@ namespace EList.Services.Impl.OrganizationRegistry
             return false;
         }
 
-        public static bool IsValidOgrn(string ogrn)
+        private static bool IsValidOgrnChecksum(string ogrn)
         {
             if (ogrn.Length == 13)
             {
