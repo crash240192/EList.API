@@ -155,12 +155,37 @@ namespace EList.DbDataProvider.DataProviders
                 .OrderByDescending(i => i.CreationDate)
                 .AsQueryable();
 
-            if (request.InviterOrgIds?.Any() ?? false)
-                invitationsRequest = invitationsRequest.Where(i => i.InviterOrganizationId != null)
-                    .Where(i => request.InviterOrgIds.Contains(i.InviterOrganizationId.Value));
+            var hasInviterAccounts = request.InviterAccountIds?.Any() ?? false;
+            var hasInviterOrgs = request.InviterOrgIds?.Any() ?? false;
 
-            if (request.InviterAccountIds?.Any() ?? false)
-                invitationsRequest = invitationsRequest.Where(i => request.InviterAccountIds.Contains(i.InviterAccountId));
+            if (hasInviterAccounts || hasInviterOrgs)
+            {
+                // При поиске «отправленных мной» также включаем приглашения от организаций,
+                // в которых указанные аккаунты — активные участники
+                var inviterOrganizationIds = hasInviterOrgs
+                    ? request.InviterOrgIds!.ToList()
+                    : new List<Guid>();
+
+                if (hasInviterAccounts)
+                {
+                    var memberOrganizationIds = await _connection.OrganizationMembers
+                        .Where(m => request.InviterAccountIds!.Contains(m.AccountId) && m.Active)
+                        .Select(m => m.OrganizationId)
+                        .Distinct()
+                        .ToListAsync();
+
+                    foreach (var organizationId in memberOrganizationIds)
+                    {
+                        if (!inviterOrganizationIds.Contains(organizationId))
+                            inviterOrganizationIds.Add(organizationId);
+                    }
+                }
+
+                invitationsRequest = invitationsRequest.Where(i =>
+                    (hasInviterAccounts && request.InviterAccountIds!.Contains(i.InviterAccountId))
+                    || (i.InviterOrganizationId != null
+                        && inviterOrganizationIds.Contains(i.InviterOrganizationId.Value)));
+            }
 
             if (request.InvitedAccountIds?.Any() ?? false)
                 invitationsRequest = invitationsRequest.Where(i => request.InvitedAccountIds.Contains(i.InvitedAccountId));
