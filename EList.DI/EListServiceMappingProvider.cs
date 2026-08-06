@@ -45,6 +45,7 @@ namespace EList.DI
             mapper.AddScoped<IConversationsDataProvider, ConversationsDataProvider>();
             mapper.AddScoped<IOrganizationsDataProvider, OrganizationsDataProvider>();
             mapper.AddScoped<IOrdersDataProvider, OrdersDataProvider>();
+            mapper.AddScoped<IEventTemplatesDataProvider, EventTemplatesDataProvider>();
 
             //Services
             mapper.AddScoped<IPersonsService, PersonService>();
@@ -64,6 +65,7 @@ namespace EList.DI
             mapper.AddScoped<INotificationsService, NotificationsService>();
             mapper.AddScoped<IAgreementService, AgreementService>();
             mapper.AddScoped<IOrganizationsService, OrganizationsService>();
+            mapper.AddScoped<IEventTemplatesService, EventTemplatesService>();
 
             mapper.AddSingleton<WebSocketConnectionManager>();
 
@@ -87,6 +89,7 @@ namespace EList.DI
             mapper.AddScoped<IConversationRepository, ConversationRepository>();
             mapper.AddScoped<IOrganizationsRepository, OrganizationsRepository>();
             mapper.AddScoped<IOrdersRepository, OrdersRepository>();
+            mapper.AddScoped<IEventTemplatesRepository, EventTemplatesRepository>();
 
             //Validators
             mapper.AddScoped<IPersonValidator, PersonValidator>();

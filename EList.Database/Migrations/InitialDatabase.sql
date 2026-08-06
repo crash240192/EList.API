@@ -856,6 +856,29 @@ CREATE INDEX IF NOT EXISTS contact_organization_organization_id_idx
 CREATE INDEX IF NOT EXISTS contact_organization_contact_data_id_idx
 	ON public.contact_organization_rls (contact_data_id);
 
+-- шаблоны создания мероприятий
+CREATE TABLE IF NOT EXISTS public.event_templates (
+	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
+	owner_account_id uuid NULL,
+	owner_organization_id uuid NULL,
+	"name" varchar(255) NOT NULL,
+	template_body jsonb NOT NULL,
+	create_date timestamptz NOT NULL DEFAULT now(),
+	update_date timestamptz NOT NULL DEFAULT now(),
+	CONSTRAINT event_templates_pk PRIMARY KEY (id),
+	CONSTRAINT event_templates_owner_account_fk FOREIGN KEY (owner_account_id) REFERENCES public.accounts(id),
+	CONSTRAINT event_templates_owner_organization_fk FOREIGN KEY (owner_organization_id) REFERENCES public.organizations(id),
+	CONSTRAINT event_templates_owner_check CHECK (
+		(owner_account_id IS NOT NULL AND owner_organization_id IS NULL)
+		OR (owner_account_id IS NULL AND owner_organization_id IS NOT NULL)
+	)
+);
+
+CREATE INDEX IF NOT EXISTS event_templates_owner_account_id_idx
+	ON public.event_templates (owner_account_id);
+CREATE INDEX IF NOT EXISTS event_templates_owner_organization_id_idx
+	ON public.event_templates (owner_organization_id);
+
 -- /organizations + payments
 
 
