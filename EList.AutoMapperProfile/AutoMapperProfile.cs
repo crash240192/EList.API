@@ -5,6 +5,7 @@ using EList.Models.Authorization;
 using EList.Models.ContactData;
 using EList.Models.Conversations;
 using EList.Models.EventOrganizators;
+using EList.Models.EventTemplates;
 using EList.Models.Events;
 using EList.Models.Events.EventMetadata;
 using EList.Models.EventsRating;
@@ -76,6 +77,12 @@ namespace EList.AutoMapperProfile
             CreateMap<EventParametersRequest, SetEventParametersRequest>().ReverseMap();
             CreateMap<EventsSearchRequest, DbDataProvider.Models.SearchRequests.EventsSearchRequest>().ReverseMap();
             CreateMap<EventParticipantsSearchRequest, DbDataProvider.Models.SearchRequests.EventParticipantsSearchRequest>().ReverseMap();
+
+            CreateMap<EventTemplateDto, EventTemplate>()
+                .ForMember(dest => dest.TemplateBody, opt => opt.MapFrom(src => !string.IsNullOrWhiteSpace(src.TemplateBody) ? JsonConvert.DeserializeObject<CreateEventRequest>(src.TemplateBody) : null));
+            CreateMap<EventTemplate, EventTemplateDto>()
+                .ForMember(dest => dest.TemplateBody, opt => opt.MapFrom(src => src.TemplateBody != null ? JsonConvert.SerializeObject(src.TemplateBody) : null));
+            CreateMap<EventTemplate, EventTemplateResponse>();
 
             CreateMap<ParticipantBlackListItem, ParticipantsBlackListItemDto>().ReverseMap();
             CreateMap<ParticipantWhiteListItem, ParticipantsWhiteListItemDto>().ReverseMap();
