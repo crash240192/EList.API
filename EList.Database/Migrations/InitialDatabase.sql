@@ -469,6 +469,8 @@ CREATE TABLE public.conversation (
 	id uuid DEFAULT uuid_generate_v4() NOT NULL,
 	event_id uuid NULL,
 	"name" varchar NULL,
+	participants_only_visible bool NOT NULL DEFAULT false,
+	participants_readonly bool NOT NULL DEFAULT false,
 	create_date timestamptz DEFAULT NOW() NOT NULL,
 	update_date timestamptz DEFAULT NOW() NOT NULL,
 	CONSTRAINT conversation_pk PRIMARY KEY (id),
@@ -878,6 +880,12 @@ CREATE INDEX IF NOT EXISTS event_templates_owner_account_id_idx
 	ON public.event_templates (owner_account_id);
 CREATE INDEX IF NOT EXISTS event_templates_owner_organization_id_idx
 	ON public.event_templates (owner_organization_id);
+
+-- параметры доступа к диалогам мероприятия (на случай если conversation уже создана)
+ALTER TABLE public.conversation
+	ADD COLUMN IF NOT EXISTS participants_only_visible bool NOT NULL DEFAULT false;
+ALTER TABLE public.conversation
+	ADD COLUMN IF NOT EXISTS participants_readonly bool NOT NULL DEFAULT false;
 
 -- /organizations + payments
 

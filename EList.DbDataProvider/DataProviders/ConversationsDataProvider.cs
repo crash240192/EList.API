@@ -103,6 +103,8 @@ namespace EList.DbDataProvider.DataProviders
             await _connection.Conversations.Where(i => i.Id == conversation.Id)
                 .Set(i => i.EventId, conversation.EventId)
                 .Set(i => i.Name, conversation.Name)
+                .Set(i => i.ParticipantsOnlyVisible, conversation.ParticipantsOnlyVisible)
+                .Set(i => i.ParticipantsReadonly, conversation.ParticipantsReadonly)
                 .Set(i => i.UpdateDate, DateTimeOffset.Now)
                 .UpdateAsync();
         }
