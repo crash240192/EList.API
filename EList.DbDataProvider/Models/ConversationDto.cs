@@ -14,6 +14,18 @@ namespace EList.DbDataProvider.Models
         [Column("event_id")]
         public Guid? EventId { get; set; }
 
+        /// <summary>
+        /// Диалог виден только участникам мероприятия (администраторы/организаторы — всегда)
+        /// </summary>
+        [Column("participants_only_visible")]
+        public bool ParticipantsOnlyVisible { get; set; }
+
+        /// <summary>
+        /// Участники могут только читать сообщения (администраторы/организаторы — всегда могут писать)
+        /// </summary>
+        [Column("participants_readonly")]
+        public bool ParticipantsReadonly { get; set; }
+
         [Column("create_date")]
         public DateTimeOffset CreateDate { get; set; }
 
