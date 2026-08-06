@@ -139,18 +139,39 @@ namespace EList.DbDataProvider.DataProviders
         public async Task<ListResponse<EventAlbumsGroupDto>> GetEventsAlbumsAsync(
             Guid accountId, Guid? curAccountId, int? pageIndex = null, int? pageSize = null)
         {
+            // Организации, в которых состоит владелец выборки (для «моих» мероприятий от имени орг.)
+            var accountOrganizationIds = await _connection.OrganizationMembers
+                .Where(m => m.AccountId == accountId && m.Active)
+                .Select(m => m.OrganizationId)
+                .ToListAsync();
+
+            // Организации текущего зрителя — полный доступ к альбомам как у организатора
+            var curAccountOrganizationIds = curAccountId == null
+                ? new List<Guid>()
+                : await _connection.OrganizationMembers
+                    .Where(m => m.AccountId == curAccountId && m.Active)
+                    .Select(m => m.OrganizationId)
+                    .ToListAsync();
+
             var eventsQuery = _connection.Events
                 .LoadWith(i => i.Parameters)
                 .LoadWith(i => i.Organizators)
                 .Where(e => e.Organizators.Any(o => o.AccountId == accountId)
-                    || e.Participants.Any(p => p.AccountId == accountId))
+                    || e.Participants.Any(p => p.AccountId == accountId)
+                    || (accountOrganizationIds.Count > 0
+                        && e.Organizators.Any(o => o.OrganizationId != null
+                            && accountOrganizationIds.Contains(o.OrganizationId.Value))))
                 .OrderByDescending(i => i.StartTime)
                 .AsQueryable();
 
             if (curAccountId != null)
+            {
                 eventsQuery = eventsQuery
                 .Where(e => e.Albums.Any(rel =>
                     e.Organizators.Any(o => o.AccountId == curAccountId)
+                    || (curAccountOrganizationIds.Count > 0
+                        && e.Organizators.Any(o => o.OrganizationId != null
+                            && curAccountOrganizationIds.Contains(o.OrganizationId.Value)))
                     || (
                         e.Parameters.Private == true
                         && (e.WhiteList.Any(w => w.AccountId == curAccountId) || !e.WhiteList.Any())
@@ -169,10 +190,13 @@ namespace EList.DbDataProvider.DataProviders
                             || !rel.Album.Parameters.Private
                         )
                     )));
+            }
             else
+            {
                 eventsQuery = eventsQuery
                     .Where(i => i.Albums.Any(a =>
                         i.Parameters.Private != null && a.Album.Parameters.Private != true));
+            }
 
             eventsQuery = eventsQuery.OrderBy(e => e.StartTime);
 
@@ -208,6 +232,9 @@ namespace EList.DbDataProvider.DataProviders
                 from rel in e.Albums
                 where
                     e.Organizators.Any(o => o.AccountId == curAccountId)
+                    || (curAccountOrganizationIds.Count > 0
+                        && e.Organizators.Any(o => o.OrganizationId != null
+                            && curAccountOrganizationIds.Contains(o.OrganizationId.Value)))
                     || (
                         e.Parameters.Private == true
                         && (e.WhiteList.Any(w => w.AccountId == curAccountId) || !e.WhiteList.Any())
