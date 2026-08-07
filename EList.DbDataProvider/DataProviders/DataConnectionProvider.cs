@@ -17,18 +17,24 @@ namespace EList.DbDataProvider.DataProviders
 
         public void Configure(string connectionStringName)
         {
+            NpgsqlEnumMappings.Register();
             ElistDataConnection.Configure(new[] { connectionStringName });
         }
 
         public void Configure()
         {
+            NpgsqlEnumMappings.Register();
             ElistDataConnection.Configure();
         }
 
         public ElistDataConnection GetConnection()
         {
             if (_connection == null)
+            {
+                NpgsqlEnumMappings.Register();
                 _connection = new ElistDataConnection();
+                NpgsqlEnumMappings.ReloadConnectionTypes(_connection);
+            }
             return _connection;
         }
 
