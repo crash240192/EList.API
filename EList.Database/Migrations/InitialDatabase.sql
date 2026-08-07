@@ -892,9 +892,20 @@ ALTER TABLE public.conversation
 -- =============================================================================
 CREATE SCHEMA IF NOT EXISTS bugreports;
 
+-- Enum MUST live in public (not bugreports).
+-- Npgsql resolves PG enums by unqualified typname / search_path; a type only in
+-- bugreports.bug_report_status yields: "A PostgreSQL type with the name
+-- 'bug_report_status' was not found in the database".
+-- Also: "IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = ...)" matches ANY
+-- schema — so CREATE TYPE bugreports.... is skipped when public already has it.
 do $CREATE_BUG_REPORT_STATUS$
 BEGIN
-	if not exists (select 1 from pg_type where typname = 'bug_report_status')
+	if not exists (
+		select 1
+		from pg_type t
+		join pg_namespace n on n.oid = t.typnamespace
+		where t.typname = 'bug_report_status' and n.nspname = 'public'
+	)
 	then
 		CREATE TYPE public.bug_report_status AS ENUM ('pending', 'resolved', 'cancelled');
 	end if;
@@ -923,6 +934,35 @@ CREATE TABLE IF NOT EXISTS bugreports.reports (
 	CONSTRAINT bug_reports_reporter_fk FOREIGN KEY (reporter_account_id) REFERENCES public.accounts(id),
 	CONSTRAINT bug_reports_category_fk FOREIGN KEY (category_id) REFERENCES bugreports.categories(id)
 );
+
+-- If an earlier script created bugreports.bug_report_status and the column uses it,
+-- move the column to public.bug_report_status and drop the schema-local type.
+do $FIX_BUG_REPORT_STATUS_SCHEMA$
+BEGIN
+	if exists (
+		select 1
+		from information_schema.columns
+		where table_schema = 'bugreports'
+		  and table_name = 'reports'
+		  and column_name = 'status'
+		  and udt_schema = 'bugreports'
+		  and udt_name = 'bug_report_status'
+	)
+	then
+		ALTER TABLE bugreports.reports
+			ALTER COLUMN status DROP DEFAULT,
+			ALTER COLUMN status TYPE public.bug_report_status
+				USING status::text::public.bug_report_status,
+			ALTER COLUMN status SET DEFAULT 'pending'::public.bug_report_status;
+	end if;
+
+	BEGIN
+		DROP TYPE IF EXISTS bugreports.bug_report_status;
+	EXCEPTION
+		WHEN dependent_objects_still_exist THEN
+			NULL; -- still referenced; leave it
+	END;
+end $FIX_BUG_REPORT_STATUS_SCHEMA$;
 
 CREATE INDEX IF NOT EXISTS bug_reports_reporter_account_id_idx ON bugreports.reports (reporter_account_id);
 CREATE INDEX IF NOT EXISTS bug_reports_category_id_idx ON bugreports.reports (category_id);
