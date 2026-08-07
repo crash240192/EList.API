@@ -34,6 +34,41 @@ namespace EList.DbDataProvider.DataProviders
             return (Guid)await _connection.InsertWithIdentityAsync(item);
         }
 
+        public async Task UpdateCategoryAsync(BugReportCategoryDto item)
+        {
+            await _connection.BugReportCategories.Where(i => i.Id == item.Id)
+                .Set(i => i.Code, item.Code)
+                .Set(i => i.Name, item.Name)
+                .Set(i => i.SortOrder, item.SortOrder)
+                .Set(i => i.Active, item.Active)
+                .UpdateAsync();
+        }
+
+        public async Task SetCategoryActiveAsync(Guid id, bool active)
+        {
+            await _connection.BugReportCategories.Where(i => i.Id == id)
+                .Set(i => i.Active, active)
+                .UpdateAsync();
+        }
+
+        public async Task<bool> CategoryCodeExistsAsync(string code, Guid? excludeId = null)
+        {
+            var query = _connection.BugReportCategories.Where(i => i.Code == code);
+            if (excludeId != null)
+                query = query.Where(i => i.Id != excludeId);
+            return await query.AnyAsync();
+        }
+
+        public async Task<int> CountReportsByCategoryAsync(Guid categoryId)
+        {
+            return await _connection.BugReports.CountAsync(i => i.CategoryId == categoryId);
+        }
+
+        public async Task DeleteCategoryAsync(Guid id)
+        {
+            await _connection.BugReportCategories.Where(i => i.Id == id).DeleteAsync();
+        }
+
         public async Task<Guid> CreateReportAsync(BugReportDto item, List<Guid>? fileIds)
         {
             var now = DateTimeOffset.UtcNow;

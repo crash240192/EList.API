@@ -63,6 +63,30 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Получить категорию по id
+        /// </summary>
+        [HttpGet("categories/get/{categoryId}")]
+        public async Task<CommandResult<BugReportCategory?>> GetCategoryAsync(Guid categoryId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetCategoryAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _bugReportsService.GetCategoryAsync(categoryId);
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Создать категорию (админ; пока любой авторизованный)
         /// </summary>
         [HttpPost("categories/create")]
@@ -78,6 +102,96 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _bugReportsService.CreateCategoryAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Обновить категорию (админ; пока любой авторизованный)
+        /// </summary>
+        [HttpPut("categories/update/{categoryId}")]
+        public async Task<CommandResult> UpdateCategoryAsync(Guid categoryId, [FromBody] UpdateBugReportCategoryRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(UpdateCategoryAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _bugReportsService.UpdateCategoryAsync(categoryId, request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Включить / выключить категорию (админ; пока любой авторизованный)
+        /// </summary>
+        [HttpPut("categories/setActive/{categoryId}")]
+        public async Task<CommandResult> SetCategoryActiveAsync(Guid categoryId, [FromQuery] bool active)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SetCategoryActiveAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _bugReportsService.SetCategoryActiveAsync(categoryId, active);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Удалить категорию без репортов (админ; пока любой авторизованный)
+        /// </summary>
+        [HttpDelete("categories/delete/{categoryId}")]
+        public async Task<CommandResult> DeleteCategoryAsync(Guid categoryId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteCategoryAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _bugReportsService.DeleteCategoryAsync(categoryId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 

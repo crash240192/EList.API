@@ -38,6 +38,32 @@ namespace EList.Repositories.Impl
             return await _bugReportsDataProvider.CreateCategoryAsync(mapped);
         }
 
+        public async Task UpdateCategoryAsync(BugReportCategory category)
+        {
+            var mapped = _mapper.Map<BugReportCategoryDto>(category);
+            await _bugReportsDataProvider.UpdateCategoryAsync(mapped);
+        }
+
+        public async Task SetCategoryActiveAsync(Guid id, bool active)
+        {
+            await _bugReportsDataProvider.SetCategoryActiveAsync(id, active);
+        }
+
+        public async Task<bool> CategoryCodeExistsAsync(string code, Guid? excludeId = null)
+        {
+            return await _bugReportsDataProvider.CategoryCodeExistsAsync(code, excludeId);
+        }
+
+        public async Task<int> CountReportsByCategoryAsync(Guid categoryId)
+        {
+            return await _bugReportsDataProvider.CountReportsByCategoryAsync(categoryId);
+        }
+
+        public async Task DeleteCategoryAsync(Guid id)
+        {
+            await _bugReportsDataProvider.DeleteCategoryAsync(id);
+        }
+
         public async Task<Guid> CreateReportAsync(BugReport report)
         {
             var mapped = _mapper.Map<BugReportDto>(report);

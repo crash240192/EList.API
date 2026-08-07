@@ -54,6 +54,24 @@ namespace EList.Services.Impl
             return new CommandResult<List<BugReportCategory>>(result);
         }
 
+        public async Task<CommandResult<BugReportCategory?>> GetCategoryAsync(Guid categoryId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetCategoryAsync)}";
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<BugReportCategory?>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var category = await _bugReportsRepository.GetCategoryByIdAsync(categoryId);
+            if (category == null)
+                return CommandResult<BugReportCategory?>.Fail(ErrorCode.BugReportCategoryNotFound, "Категория не найдена");
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<BugReportCategory?>(category);
+        }
+
         public async Task<CommandResult<Guid?>> CreateCategoryAsync(CreateBugReportCategoryRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -72,6 +90,9 @@ namespace EList.Services.Impl
             if (!Regex.IsMatch(code, @"^[a-z0-9_\-]{2,64}$"))
                 return CommandResult<Guid?>.Fail(ErrorCode.InvalidValue, "Код категории: латиница, цифры, _ и - (2-64 символа)");
 
+            if (await _bugReportsRepository.CategoryCodeExistsAsync(code))
+                return CommandResult<Guid?>.Fail(ErrorCode.InvalidValue, "Категория с таким кодом уже существует");
+
             var categoryId = await _bugReportsRepository.CreateCategoryAsync(new BugReportCategory
             {
                 Code = code,
@@ -82,6 +103,91 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(categoryId);
+        }
+
+        public async Task<CommandResult> UpdateCategoryAsync(Guid categoryId, UpdateBugReportCategoryRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(UpdateCategoryAsync)}";
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var category = await _bugReportsRepository.GetCategoryByIdAsync(categoryId);
+            if (category == null)
+                return CommandResult.Fail(ErrorCode.BugReportCategoryNotFound, "Категория не найдена");
+
+            if (!string.IsNullOrWhiteSpace(request?.Code))
+            {
+                var code = request.Code.Trim().ToLowerInvariant();
+                if (!Regex.IsMatch(code, @"^[a-z0-9_\-]{2,64}$"))
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Код категории: латиница, цифры, _ и - (2-64 символа)");
+
+                if (await _bugReportsRepository.CategoryCodeExistsAsync(code, categoryId))
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Категория с таким кодом уже существует");
+
+                category.Code = code;
+            }
+
+            if (!string.IsNullOrWhiteSpace(request?.Name))
+                category.Name = request.Name.Trim();
+
+            if (request?.SortOrder != null)
+                category.SortOrder = request.SortOrder.Value;
+
+            if (request?.Active != null)
+                category.Active = request.Active.Value;
+
+            await _bugReportsRepository.UpdateCategoryAsync(category);
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> SetCategoryActiveAsync(Guid categoryId, bool active)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SetCategoryActiveAsync)}";
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var category = await _bugReportsRepository.GetCategoryByIdAsync(categoryId);
+            if (category == null)
+                return CommandResult.Fail(ErrorCode.BugReportCategoryNotFound, "Категория не найдена");
+
+            await _bugReportsRepository.SetCategoryActiveAsync(categoryId, active);
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> DeleteCategoryAsync(Guid categoryId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteCategoryAsync)}";
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var category = await _bugReportsRepository.GetCategoryByIdAsync(categoryId);
+            if (category == null)
+                return CommandResult.Fail(ErrorCode.BugReportCategoryNotFound, "Категория не найдена");
+
+            var reportsCount = await _bugReportsRepository.CountReportsByCategoryAsync(categoryId);
+            if (reportsCount > 0)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Нельзя удалить категорию с существующими репортами — деактивируйте её");
+
+            await _bugReportsRepository.DeleteCategoryAsync(categoryId);
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
         }
 
         public async Task<CommandResult<Guid?>> CreateReportAsync(CreateBugReportRequest request)
