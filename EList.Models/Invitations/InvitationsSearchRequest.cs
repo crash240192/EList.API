@@ -6,12 +6,13 @@
     public class InvitationsSearchRequest
     {
         /// <summary>
-        /// Список идентификаторов приглашенных пользователей
+        /// Список идентификаторов пригласителей (аккаунтов).
+        /// Также включает приглашения от организаций, в которых эти аккаунты состоят.
         /// </summary>
         public List<Guid>? InviterAccountIds { get; set; }
 
         /// <summary>
-        /// Список идентификаторов пригласителей
+        /// Список идентификаторов приглашённых пользователей
         /// </summary>
         public List<Guid>? InvitedAccountIds { get; set; }
 
