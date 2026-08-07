@@ -2,6 +2,7 @@
 using EList.DbDataProvider.Models;
 using EList.Models.Accounts;
 using EList.Models.Authorization;
+using EList.Models.BugReports;
 using EList.Models.ContactData;
 using EList.Models.Conversations;
 using EList.Models.EventOrganizators;
@@ -125,6 +126,17 @@ namespace EList.AutoMapperProfile
             CreateMap<ConversationDto, Conversation>().ReverseMap();
             CreateMap<ConversationRequest, ConversationDto>().ReverseMap();
 
+            CreateMap<BugReportCategoryDto, BugReportCategory>().ReverseMap();
+            CreateMap<BugReportDto, BugReport>()
+                .ForMember(dest => dest.FileIds, opt => opt.Ignore())
+                .ForMember(dest => dest.Category, opt => opt.Ignore())
+                .ForMember(dest => dest.Reporter, opt => opt.Ignore());
+            CreateMap<BugReport, BugReportDto>()
+                .ForMember(dest => dest.Files, opt => opt.Ignore())
+                .ForMember(dest => dest.Category, opt => opt.Ignore())
+                .ForMember(dest => dest.ReporterAccount, opt => opt.Ignore());
+            CreateMap<BugReport, BugReportResponse>();
+
             CreateMap<Models.Enums.Gender, DbDataProvider.Models.Enums.Gender>().ReverseMap();
             CreateMap<Models.Enums.SystemNotificationType, DbDataProvider.Models.Enums.SystemNotificationType>().ReverseMap();
             CreateMap<Models.Enums.EventRatingType, DbDataProvider.Models.Enums.EventRatingType>().ReverseMap();
@@ -137,6 +149,7 @@ namespace EList.AutoMapperProfile
             CreateMap<Models.Enums.TicketStatus, DbDataProvider.Models.Enums.TicketStatus>().ReverseMap();
             CreateMap<Models.Enums.RefundStatus, DbDataProvider.Models.Enums.RefundStatus>().ReverseMap();
             CreateMap<Models.Enums.ProviderOnboardingStatus, DbDataProvider.Models.Enums.ProviderOnboardingStatus>().ReverseMap();
+            CreateMap<Models.Enums.BugReportStatus, DbDataProvider.Models.Enums.BugReportStatus>().ReverseMap();
         }
     }
 }

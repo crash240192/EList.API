@@ -80,5 +80,8 @@ namespace EList.DbDataProvider.DataConnections
         public ITable<AccountAgreementDto> Agreements => this.GetTable<AccountAgreementDto>();
         public ITable<OrganizationAgreementDto> OrganizationAgreements => this.GetTable<OrganizationAgreementDto>();
         public ITable<EventTemplateDto> EventTemplates => this.GetTable<EventTemplateDto>();
+        public ITable<BugReportCategoryDto> BugReportCategories => this.GetTable<BugReportCategoryDto>();
+        public ITable<BugReportDto> BugReports => this.GetTable<BugReportDto>();
+        public ITable<BugReportFileDto> BugReportFiles => this.GetTable<BugReportFileDto>();
     }
 }

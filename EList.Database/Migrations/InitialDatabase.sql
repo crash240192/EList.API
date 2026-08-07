@@ -887,6 +887,74 @@ ALTER TABLE public.conversation
 ALTER TABLE public.conversation
 	ADD COLUMN IF NOT EXISTS participants_readonly bool NOT NULL DEFAULT false;
 
+-- =============================================================================
+-- Bug reports (отдельная схема)
+-- =============================================================================
+CREATE SCHEMA IF NOT EXISTS bugreports;
+
+do $CREATE_BUG_REPORT_STATUS$
+BEGIN
+	if not exists (select 1 from pg_type where typname = 'bug_report_status')
+	then
+		CREATE TYPE public.bug_report_status AS ENUM ('pending', 'resolved', 'cancelled');
+	end if;
+end $CREATE_BUG_REPORT_STATUS$;
+
+CREATE TABLE IF NOT EXISTS bugreports.categories (
+	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
+	code varchar(64) NOT NULL,
+	"name" varchar(255) NOT NULL,
+	active bool NOT NULL DEFAULT true,
+	sort_order int NOT NULL DEFAULT 0,
+	create_date timestamptz NOT NULL DEFAULT now(),
+	CONSTRAINT bug_report_categories_pk PRIMARY KEY (id),
+	CONSTRAINT bug_report_categories_code_unique UNIQUE (code)
+);
+
+CREATE TABLE IF NOT EXISTS bugreports.reports (
+	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
+	reporter_account_id uuid NOT NULL,
+	category_id uuid NOT NULL,
+	description text NOT NULL,
+	status public.bug_report_status NOT NULL DEFAULT 'pending',
+	create_date timestamptz NOT NULL DEFAULT now(),
+	update_date timestamptz NOT NULL DEFAULT now(),
+	CONSTRAINT bug_reports_pk PRIMARY KEY (id),
+	CONSTRAINT bug_reports_reporter_fk FOREIGN KEY (reporter_account_id) REFERENCES public.accounts(id),
+	CONSTRAINT bug_reports_category_fk FOREIGN KEY (category_id) REFERENCES bugreports.categories(id)
+);
+
+CREATE INDEX IF NOT EXISTS bug_reports_reporter_account_id_idx ON bugreports.reports (reporter_account_id);
+CREATE INDEX IF NOT EXISTS bug_reports_category_id_idx ON bugreports.reports (category_id);
+CREATE INDEX IF NOT EXISTS bug_reports_status_idx ON bugreports.reports (status);
+CREATE INDEX IF NOT EXISTS bug_reports_create_date_idx ON bugreports.reports (create_date DESC);
+
+CREATE TABLE IF NOT EXISTS bugreports.report_files (
+	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
+	report_id uuid NOT NULL,
+	file_id uuid NOT NULL,
+	CONSTRAINT bug_report_files_pk PRIMARY KEY (id),
+	CONSTRAINT bug_report_files_report_fk FOREIGN KEY (report_id) REFERENCES bugreports.reports(id) ON DELETE CASCADE,
+	CONSTRAINT bug_report_files_report_file_unique UNIQUE (report_id, file_id)
+);
+
+CREATE INDEX IF NOT EXISTS bug_report_files_report_id_idx ON bugreports.report_files (report_id);
+
+INSERT INTO bugreports.categories (code, name, sort_order)
+SELECT v.code, v.name, v.sort_order
+FROM (VALUES
+	('ui', 'Интерфейс', 10),
+	('events', 'Мероприятия', 20),
+	('organizations', 'Организации', 30),
+	('payments', 'Платежи и билеты', 40),
+	('auth', 'Авторизация / аккаунт', 50),
+	('media', 'Медиа и альбомы', 60),
+	('other', 'Другое', 100)
+) AS v(code, name, sort_order)
+WHERE NOT EXISTS (
+	SELECT 1 FROM bugreports.categories c WHERE c.code = v.code
+);
+
 -- /organizations + payments
 
 
