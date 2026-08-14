@@ -81,6 +81,7 @@ namespace EList.Api.Infrastructure
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IPersonsService _personsService;
         private readonly IAgreementService _agreementService;
+        private readonly IAccountPlatformRolesService _platformRolesService;
         private bool IsAnonymousMethod // Не обязательны ни токен, ни jwt
         {
             get
@@ -123,7 +124,8 @@ namespace EList.Api.Infrastructure
             IEncryptionTool encryptionTool,
             IPersonsService personsService,
             IAccountDataHolder accountDataHolder,
-            IAgreementService agreementService) : base(options, logger, encoder, clock)
+            IAgreementService agreementService,
+            IAccountPlatformRolesService platformRolesService) : base(options, logger, encoder, clock)
         {
             _authorizationService = authorizationService ?? throw new ArgumentNullException(nameof(authorizationService));
             _encryptionTool = encryptionTool ?? throw new ArgumentNullException(nameof(encryptionTool));
@@ -131,6 +133,7 @@ namespace EList.Api.Infrastructure
             _accountDataHolder = accountDataHolder ?? throw new ArgumentNullException(nameof(accountDataHolder));
             _personsService = personsService ?? throw new ArgumentNullException(nameof(personsService));
             _agreementService = agreementService ?? throw new ArgumentNullException(nameof(agreementService));
+            _platformRolesService = platformRolesService ?? throw new ArgumentNullException(nameof(platformRolesService));
         }
 
         /// <summary>
@@ -239,6 +242,7 @@ namespace EList.Api.Infrastructure
 
                     _accountDataHolder.Account = account.Result;
                     _accountDataHolder.PersonInfo = (await _personsService.GetPersonInfoByAccountIdAsync(account.Result.Id))?.Result;
+                    _accountDataHolder.PlatformRole = await _platformRolesService.ResolveActiveRoleAsync(account.Result.Id);
                 }
 
                 logger.Debug("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Success");

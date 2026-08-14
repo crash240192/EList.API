@@ -1,6 +1,7 @@
 ﻿using EList.Models.Accounts;
 using EList.Models.Person;
 using EList.Services.Interfaces;
+using PlatformRoleEnum = EList.Models.Enums.PlatformRole;
 
 namespace EList.Services.Impl
 {
@@ -14,6 +15,21 @@ namespace EList.Services.Impl
         public Account? Account { get; set; }
         public PersonInfo? PersonInfo { get; set; }
         public Guid? AccountId => Account?.Id;
+
+        public PlatformRoleEnum? PlatformRole { get; set; }
+
+        public bool IsPlatformStaff =>
+            PlatformRole is PlatformRoleEnum.Superuser
+                or PlatformRoleEnum.Admin
+                or PlatformRoleEnum.Moderator;
+
+        public bool IsPlatformModeratorOrAbove => IsPlatformStaff;
+
+        public bool IsPlatformAdminOrAbove =>
+            PlatformRole is PlatformRoleEnum.Superuser
+                or PlatformRoleEnum.Admin;
+
+        public bool IsSuperuser => PlatformRole == PlatformRoleEnum.Superuser;
 
         public string AccountNameFullString
         {

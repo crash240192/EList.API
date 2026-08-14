@@ -3,6 +3,7 @@ using EList.DbDataProvider.Models;
 using EList.Models.Accounts;
 using EList.Models.Authorization;
 using EList.Models.BugReports;
+using EList.Models.ContentReports;
 using EList.Models.ContactData;
 using EList.Models.Conversations;
 using EList.Models.EventOrganizators;
@@ -17,6 +18,7 @@ using EList.Models.Orders;
 using EList.Models.Organizations;
 using EList.Models.Participation;
 using EList.Models.Person;
+using EList.Models.PlatformRoles;
 using EList.Models.Subscriptions;
 using EList.Models.UserAgreements;
 using EList.Models.Wallets;
@@ -137,6 +139,40 @@ namespace EList.AutoMapperProfile
                 .ForMember(dest => dest.ReporterAccount, opt => opt.Ignore());
             CreateMap<BugReport, BugReportResponse>();
 
+            CreateMap<AccountPlatformRoleDto, AccountPlatformRole>()
+                .ForMember(dest => dest.Account, opt => opt.Ignore())
+                .ForMember(dest => dest.AssignedByAccount, opt => opt.Ignore());
+            CreateMap<AccountPlatformRole, AccountPlatformRoleDto>()
+                .ForMember(dest => dest.Account, opt => opt.Ignore())
+                .ForMember(dest => dest.AssignedByAccount, opt => opt.Ignore());
+
+            CreateMap<ReportReasonDto, ReportReason>().ReverseMap();
+            CreateMap<ContentReportActionDto, ContentReportAction>()
+                .ForMember(dest => dest.ActorAccount, opt => opt.Ignore());
+            CreateMap<ContentReportAction, ContentReportActionDto>()
+                .ForMember(dest => dest.ActorAccount, opt => opt.Ignore())
+                .ForMember(dest => dest.Report, opt => opt.Ignore());
+
+            CreateMap<ContentReportDto, ContentReport>()
+                .ForMember(dest => dest.Reason, opt => opt.Ignore())
+                .ForMember(dest => dest.Reporter, opt => opt.Ignore())
+                .ForMember(dest => dest.AssignedToAccount, opt => opt.Ignore())
+                .ForMember(dest => dest.ResolvedByAccount, opt => opt.Ignore())
+                .ForMember(dest => dest.Event, opt => opt.Ignore())
+                .ForMember(dest => dest.Message, opt => opt.Ignore())
+                .ForMember(dest => dest.Actions, opt => opt.Ignore());
+            CreateMap<ContentReport, ContentReportDto>()
+                .ForMember(dest => dest.Reason, opt => opt.Ignore())
+                .ForMember(dest => dest.ReporterAccount, opt => opt.Ignore())
+                .ForMember(dest => dest.AssignedToAccount, opt => opt.Ignore())
+                .ForMember(dest => dest.ResolvedByAccount, opt => opt.Ignore())
+                .ForMember(dest => dest.Event, opt => opt.Ignore())
+                .ForMember(dest => dest.Message, opt => opt.Ignore())
+                .ForMember(dest => dest.Conversation, opt => opt.Ignore())
+                .ForMember(dest => dest.Actions, opt => opt.Ignore());
+            CreateMap<ContentReport, ContentReportResponse>();
+            CreateMap<ContentReportsSearchRequest, DbDataProvider.Models.SearchRequests.ContentReportsSearchRequest>().ReverseMap();
+
             CreateMap<Models.Enums.Gender, DbDataProvider.Models.Enums.Gender>().ReverseMap();
             CreateMap<Models.Enums.SystemNotificationType, DbDataProvider.Models.Enums.SystemNotificationType>().ReverseMap();
             CreateMap<Models.Enums.EventRatingType, DbDataProvider.Models.Enums.EventRatingType>().ReverseMap();
@@ -150,6 +186,14 @@ namespace EList.AutoMapperProfile
             CreateMap<Models.Enums.RefundStatus, DbDataProvider.Models.Enums.RefundStatus>().ReverseMap();
             CreateMap<Models.Enums.ProviderOnboardingStatus, DbDataProvider.Models.Enums.ProviderOnboardingStatus>().ReverseMap();
             CreateMap<Models.Enums.BugReportStatus, DbDataProvider.Models.Enums.BugReportStatus>().ReverseMap();
+            CreateMap<Models.Enums.PlatformRole, DbDataProvider.Models.Enums.PlatformRole>().ReverseMap();
+            CreateMap<Models.Enums.ReportTargetType, DbDataProvider.Models.Enums.ReportTargetType>().ReverseMap();
+            CreateMap<Models.Enums.ReportTargetScope, DbDataProvider.Models.Enums.ReportTargetScope>().ReverseMap();
+            CreateMap<Models.Enums.ReportSeverity, DbDataProvider.Models.Enums.ReportSeverity>().ReverseMap();
+            CreateMap<Models.Enums.ReportQueue, DbDataProvider.Models.Enums.ReportQueue>().ReverseMap();
+            CreateMap<Models.Enums.ReportStatus, DbDataProvider.Models.Enums.ReportStatus>().ReverseMap();
+            CreateMap<Models.Enums.ReportResolutionAction, DbDataProvider.Models.Enums.ReportResolutionAction>().ReverseMap();
+            CreateMap<Models.Enums.ReportActorContext, DbDataProvider.Models.Enums.ReportActorContext>().ReverseMap();
         }
     }
 }

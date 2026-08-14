@@ -50,6 +50,14 @@ namespace EList.Models.Conversations
         /// </summary>
         public DateTimeOffset UpdateDate { get; set; }
 
+        /// <summary>
+        /// Сообщение скрыто модерацией
+        /// </summary>
+        public bool Hidden { get; set; }
+
+        public DateTimeOffset? HiddenAt { get; set; }
+        public Guid? HiddenBy { get; set; }
+
 
         public AccountPublicData Account { get; set; }  
         public PersonInfo PersonInfo { get; set; }

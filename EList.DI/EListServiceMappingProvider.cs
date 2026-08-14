@@ -70,6 +70,8 @@ namespace EList.DI
             mapper.AddScoped<IOrganizationsService, OrganizationsService>();
             mapper.AddScoped<IEventTemplatesService, EventTemplatesService>();
             mapper.AddScoped<IBugReportsService, BugReportsService>();
+            mapper.AddScoped<IAccountPlatformRolesService, AccountPlatformRolesService>();
+            mapper.AddScoped<IContentReportsService, ContentReportsService>();
 
             mapper.AddSingleton<WebSocketConnectionManager>();
 
@@ -95,6 +97,8 @@ namespace EList.DI
             mapper.AddScoped<IOrdersRepository, OrdersRepository>();
             mapper.AddScoped<IEventTemplatesRepository, EventTemplatesRepository>();
             mapper.AddScoped<IBugReportsRepository, BugReportsRepository>();
+            mapper.AddScoped<IAccountPlatformRolesRepository, AccountPlatformRolesRepository>();
+            mapper.AddScoped<IContentReportsRepository, ContentReportsRepository>();
 
             //Validators
             mapper.AddScoped<IPersonValidator, PersonValidator>();
