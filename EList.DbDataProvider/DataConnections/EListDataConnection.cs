@@ -83,5 +83,10 @@ namespace EList.DbDataProvider.DataConnections
         public ITable<BugReportCategoryDto> BugReportCategories => this.GetTable<BugReportCategoryDto>();
         public ITable<BugReportDto> BugReports => this.GetTable<BugReportDto>();
         public ITable<BugReportFileDto> BugReportFiles => this.GetTable<BugReportFileDto>();
+
+        public ITable<AccountPlatformRoleDto> AccountPlatformRoles => this.GetTable<AccountPlatformRoleDto>();
+        public ITable<ReportReasonDto> ReportReasons => this.GetTable<ReportReasonDto>();
+        public ITable<ContentReportDto> ContentReports => this.GetTable<ContentReportDto>();
+        public ITable<ContentReportActionDto> ContentReportActions => this.GetTable<ContentReportActionDto>();
     }
 }

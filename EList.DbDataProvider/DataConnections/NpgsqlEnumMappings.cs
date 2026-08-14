@@ -30,6 +30,30 @@ namespace EList.DbDataProvider.DataConnections
                 NpgsqlConnection.GlobalTypeMapper.MapEnum<BugReportStatus>(
                     "public.bug_report_status",
                     translator);
+                NpgsqlConnection.GlobalTypeMapper.MapEnum<PlatformRole>(
+                    "public.platform_role",
+                    translator);
+                NpgsqlConnection.GlobalTypeMapper.MapEnum<ReportTargetType>(
+                    "public.report_target_type",
+                    translator);
+                NpgsqlConnection.GlobalTypeMapper.MapEnum<ReportTargetScope>(
+                    "public.report_target_scope",
+                    translator);
+                NpgsqlConnection.GlobalTypeMapper.MapEnum<ReportSeverity>(
+                    "public.report_severity",
+                    translator);
+                NpgsqlConnection.GlobalTypeMapper.MapEnum<ReportQueue>(
+                    "public.report_queue",
+                    translator);
+                NpgsqlConnection.GlobalTypeMapper.MapEnum<ReportStatus>(
+                    "public.report_status",
+                    translator);
+                NpgsqlConnection.GlobalTypeMapper.MapEnum<ReportResolutionAction>(
+                    "public.report_resolution_action",
+                    translator);
+                NpgsqlConnection.GlobalTypeMapper.MapEnum<ReportActorContext>(
+                    "public.report_actor_context",
+                    translator);
 #pragma warning restore CS0618
 
                 _registered = true;

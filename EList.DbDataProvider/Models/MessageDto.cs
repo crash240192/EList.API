@@ -32,9 +32,21 @@ namespace EList.DbDataProvider.Models
         [Column("update_date")]
         public DateTimeOffset UpdateDate { get; set; }
 
+        [Column("hidden")]
+        public bool Hidden { get; set; }
+
+        [Column("hidden_at")]
+        public DateTimeOffset? HiddenAt { get; set; }
+
+        [Column("hidden_by")]
+        public Guid? HiddenBy { get; set; }
+
 
         [Association (ThisKey = nameof (AccountId), OtherKey = nameof(AccountDto.Id))]
         public AccountDto Account { get; set; }
+
+        [Association(ThisKey = nameof(HiddenBy), OtherKey = nameof(AccountDto.Id))]
+        public AccountDto? HiddenByAccount { get; set; }
 
         [Association(ThisKey = nameof(OrganizationId), OtherKey = nameof(OrganizationDto.Id))]
         public OrganizationDto Organization { get; set; }

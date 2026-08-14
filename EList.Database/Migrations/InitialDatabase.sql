@@ -1007,3 +1007,248 @@ create table public.chat_administrator (
 	constraint chat_organization_fk foreign key (organization_id) references public.organization(id),
 	constraint chat_person_fk foreign key (person_id) references public.person(id)
 );*/
+-- =============================================================================
+-- Content moderation (жалобы на контент + роли площадки)
+-- =============================================================================
+
+do $CREATE_PLATFORM_ROLE$
+BEGIN
+	if not exists (
+		select 1 from pg_type t
+		join pg_namespace n on n.oid = t.typnamespace
+		where t.typname = 'platform_role' and n.nspname = 'public'
+	)
+	then
+		CREATE TYPE public.platform_role AS ENUM ('superuser', 'admin', 'moderator');
+	end if;
+end $CREATE_PLATFORM_ROLE$;
+
+do $CREATE_REPORT_TARGET_TYPE$
+BEGIN
+	if not exists (
+		select 1 from pg_type t
+		join pg_namespace n on n.oid = t.typnamespace
+		where t.typname = 'report_target_type' and n.nspname = 'public'
+	)
+	then
+		CREATE TYPE public.report_target_type AS ENUM ('event', 'message');
+	end if;
+end $CREATE_REPORT_TARGET_TYPE$;
+
+do $CREATE_REPORT_TARGET_SCOPE$
+BEGIN
+	if not exists (
+		select 1 from pg_type t
+		join pg_namespace n on n.oid = t.typnamespace
+		where t.typname = 'report_target_scope' and n.nspname = 'public'
+	)
+	then
+		CREATE TYPE public.report_target_scope AS ENUM ('event', 'message', 'both');
+	end if;
+end $CREATE_REPORT_TARGET_SCOPE$;
+
+do $CREATE_REPORT_SEVERITY$
+BEGIN
+	if not exists (
+		select 1 from pg_type t
+		join pg_namespace n on n.oid = t.typnamespace
+		where t.typname = 'report_severity' and n.nspname = 'public'
+	)
+	then
+		CREATE TYPE public.report_severity AS ENUM ('community', 'safety');
+	end if;
+end $CREATE_REPORT_SEVERITY$;
+
+do $CREATE_REPORT_QUEUE$
+BEGIN
+	if not exists (
+		select 1 from pg_type t
+		join pg_namespace n on n.oid = t.typnamespace
+		where t.typname = 'report_queue' and n.nspname = 'public'
+	)
+	then
+		CREATE TYPE public.report_queue AS ENUM ('organizers', 'platform', 'both');
+	end if;
+end $CREATE_REPORT_QUEUE$;
+
+do $CREATE_REPORT_STATUS$
+BEGIN
+	if not exists (
+		select 1 from pg_type t
+		join pg_namespace n on n.oid = t.typnamespace
+		where t.typname = 'report_status' and n.nspname = 'public'
+	)
+	then
+		CREATE TYPE public.report_status AS ENUM ('open', 'in_review', 'resolved', 'dismissed', 'escalated');
+	end if;
+end $CREATE_REPORT_STATUS$;
+
+do $CREATE_REPORT_RESOLUTION_ACTION$
+BEGIN
+	if not exists (
+		select 1 from pg_type t
+		join pg_namespace n on n.oid = t.typnamespace
+		where t.typname = 'report_resolution_action' and n.nspname = 'public'
+	)
+	then
+		CREATE TYPE public.report_resolution_action AS ENUM (
+			'hide_content',
+			'delete_content',
+			'warn',
+			'ban_from_event',
+			'cancel_event',
+			'dismiss',
+			'escalate',
+			'other'
+		);
+	end if;
+end $CREATE_REPORT_RESOLUTION_ACTION$;
+
+do $CREATE_REPORT_ACTOR_CONTEXT$
+BEGIN
+	if not exists (
+		select 1 from pg_type t
+		join pg_namespace n on n.oid = t.typnamespace
+		where t.typname = 'report_actor_context' and n.nspname = 'public'
+	)
+	then
+		CREATE TYPE public.report_actor_context AS ENUM ('reporter', 'organizer', 'platform_moderator', 'system');
+	end if;
+end $CREATE_REPORT_ACTOR_CONTEXT$;
+
+-- Роли площадки: нет записи = обычный пользователь
+CREATE TABLE IF NOT EXISTS public.account_platform_roles (
+	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
+	account_id uuid NOT NULL,
+	"role" public.platform_role NOT NULL,
+	active bool NOT NULL DEFAULT true,
+	assigned_at timestamptz NOT NULL DEFAULT now(),
+	assigned_by uuid NULL,
+	CONSTRAINT account_platform_roles_pk PRIMARY KEY (id),
+	CONSTRAINT account_platform_roles_account_unique UNIQUE (account_id),
+	CONSTRAINT account_platform_roles_account_fk FOREIGN KEY (account_id) REFERENCES public.accounts(id),
+	CONSTRAINT account_platform_roles_assigned_by_fk FOREIGN KEY (assigned_by) REFERENCES public.accounts(id)
+);
+
+CREATE INDEX IF NOT EXISTS account_platform_roles_role_idx ON public.account_platform_roles ("role");
+CREATE INDEX IF NOT EXISTS account_platform_roles_active_idx ON public.account_platform_roles (active);
+
+-- Справочник причин жалобы
+CREATE TABLE IF NOT EXISTS public.report_reasons (
+	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
+	code varchar(64) NOT NULL,
+	"name" varchar(255) NOT NULL,
+	description varchar(512) NULL,
+	target_scope public.report_target_scope NOT NULL DEFAULT 'both',
+	severity public.report_severity NOT NULL,
+	primary_queue public.report_queue NOT NULL,
+	sort_order int NOT NULL DEFAULT 0,
+	active bool NOT NULL DEFAULT true,
+	create_date timestamptz NOT NULL DEFAULT now(),
+	CONSTRAINT report_reasons_pk PRIMARY KEY (id),
+	CONSTRAINT report_reasons_code_unique UNIQUE (code)
+);
+
+CREATE INDEX IF NOT EXISTS report_reasons_active_sort_idx ON public.report_reasons (active, sort_order);
+
+-- Жалобы на контент (событие / сообщение)
+CREATE TABLE IF NOT EXISTS public.content_reports (
+	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
+	reporter_account_id uuid NOT NULL,
+	target_type public.report_target_type NOT NULL,
+	target_id uuid NOT NULL,
+	event_id uuid NULL,
+	message_id uuid NULL,
+	conversation_id uuid NULL,
+	reason_id uuid NOT NULL,
+	"comment" text NULL,
+	target_snapshot jsonb NULL,
+	status public.report_status NOT NULL DEFAULT 'open',
+	organizer_status public.report_status NULL,
+	platform_status public.report_status NULL,
+	assigned_to uuid NULL,
+	resolution_action public.report_resolution_action NULL,
+	resolution_comment text NULL,
+	resolved_by uuid NULL,
+	resolved_at timestamptz NULL,
+	created_at timestamptz NOT NULL DEFAULT now(),
+	updated_at timestamptz NOT NULL DEFAULT now(),
+	CONSTRAINT content_reports_pk PRIMARY KEY (id),
+	CONSTRAINT content_reports_reporter_fk FOREIGN KEY (reporter_account_id) REFERENCES public.accounts(id),
+	CONSTRAINT content_reports_event_fk FOREIGN KEY (event_id) REFERENCES public.events(id),
+	CONSTRAINT content_reports_message_fk FOREIGN KEY (message_id) REFERENCES public.message(id) ON DELETE SET NULL,
+	CONSTRAINT content_reports_conversation_fk FOREIGN KEY (conversation_id) REFERENCES public.conversation(id) ON DELETE SET NULL,
+	CONSTRAINT content_reports_reason_fk FOREIGN KEY (reason_id) REFERENCES public.report_reasons(id),
+	CONSTRAINT content_reports_assigned_to_fk FOREIGN KEY (assigned_to) REFERENCES public.accounts(id),
+	CONSTRAINT content_reports_resolved_by_fk FOREIGN KEY (resolved_by) REFERENCES public.accounts(id),
+	CONSTRAINT content_reports_message_target_chk CHECK (
+		(target_type = 'event' AND message_id IS NULL AND conversation_id IS NULL)
+		OR (target_type = 'message')
+	)
+);
+
+CREATE INDEX IF NOT EXISTS content_reports_status_created_idx ON public.content_reports (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS content_reports_event_status_idx ON public.content_reports (event_id, status);
+CREATE INDEX IF NOT EXISTS content_reports_target_idx ON public.content_reports (target_type, target_id);
+CREATE INDEX IF NOT EXISTS content_reports_platform_status_idx ON public.content_reports (platform_status, created_at DESC);
+CREATE INDEX IF NOT EXISTS content_reports_organizer_status_idx ON public.content_reports (organizer_status, created_at DESC);
+CREATE INDEX IF NOT EXISTS content_reports_reporter_idx ON public.content_reports (reporter_account_id);
+CREATE INDEX IF NOT EXISTS content_reports_reason_idx ON public.content_reports (reason_id);
+
+-- Одна активная жалоба от пользователя на один объект
+CREATE UNIQUE INDEX IF NOT EXISTS content_reports_open_target_reporter_uidx
+	ON public.content_reports (reporter_account_id, target_type, target_id)
+	WHERE status IN ('open', 'in_review', 'escalated');
+
+-- Аудит действий по жалобе
+CREATE TABLE IF NOT EXISTS public.content_report_actions (
+	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
+	report_id uuid NOT NULL,
+	actor_account_id uuid NULL,
+	actor_context public.report_actor_context NOT NULL,
+	"action" varchar(64) NOT NULL,
+	details jsonb NULL,
+	created_at timestamptz NOT NULL DEFAULT now(),
+	CONSTRAINT content_report_actions_pk PRIMARY KEY (id),
+	CONSTRAINT content_report_actions_report_fk FOREIGN KEY (report_id) REFERENCES public.content_reports(id) ON DELETE CASCADE,
+	CONSTRAINT content_report_actions_actor_fk FOREIGN KEY (actor_account_id) REFERENCES public.accounts(id)
+);
+
+CREATE INDEX IF NOT EXISTS content_report_actions_report_id_idx ON public.content_report_actions (report_id, created_at DESC);
+
+-- Состояние модерации сообщения (hide вместо физического удаления для legal)
+ALTER TABLE public.message
+	ADD COLUMN IF NOT EXISTS hidden bool NOT NULL DEFAULT false,
+	ADD COLUMN IF NOT EXISTS hidden_at timestamptz NULL,
+	ADD COLUMN IF NOT EXISTS hidden_by uuid NULL;
+
+DO $MESSAGE_HIDDEN_BY_FK$
+BEGIN
+	IF NOT EXISTS (
+		SELECT 1 FROM pg_constraint WHERE conname = 'message_hidden_by_fk'
+	)
+	THEN
+		ALTER TABLE public.message
+			ADD CONSTRAINT message_hidden_by_fk FOREIGN KEY (hidden_by) REFERENCES public.accounts(id);
+	END IF;
+END $MESSAGE_HIDDEN_BY_FK$;
+
+CREATE INDEX IF NOT EXISTS message_hidden_idx ON public.message (hidden) WHERE hidden = true;
+
+INSERT INTO public.report_reasons (code, name, description, target_scope, severity, primary_queue, sort_order)
+SELECT v.code, v.name, v.description, v.target_scope::public.report_target_scope, v.severity::public.report_severity, v.primary_queue::public.report_queue, v.sort_order
+FROM (VALUES
+	('spam', 'Спам', 'Реклама, флуд, повторяющиеся сообщения', 'both', 'community', 'organizers', 10),
+	('harassment', 'Оскорбления / травля', 'Оскорбительное поведение в обсуждении', 'message', 'community', 'organizers', 20),
+	('off_topic', 'Оффтоп', 'Сообщение не относится к мероприятию', 'message', 'community', 'organizers', 30),
+	('inappropriate_event', 'Неуместное мероприятие', 'Событие нарушает правила площадки', 'event', 'community', 'platform', 40),
+	('other', 'Другое', 'Иная причина (community)', 'both', 'community', 'organizers', 90),
+	('illegal_content', 'Неправомерный контент', 'Контент, нарушающий закон', 'both', 'safety', 'both', 100),
+	('threats', 'Угрозы / насилие', 'Угрозы или призывы к насилию', 'both', 'safety', 'both', 110),
+	('fraud', 'Мошенничество', 'Обман, скамы, фишинг', 'both', 'safety', 'both', 120),
+	('hate', 'Разжигание ненависти', 'Ненависть / экстремизм', 'both', 'safety', 'both', 130),
+	('sexual_exploitation', 'Сексуальная эксплуатация', 'Недопустимый сексуальный контент', 'both', 'safety', 'both', 140)
+) AS v(code, name, description, target_scope, severity, primary_queue, sort_order)
+WHERE NOT EXISTS (
+	SELECT 1 FROM public.report_reasons r WHERE r.code = v.code
+);

@@ -47,6 +47,8 @@ namespace EList.DI
             mapper.AddScoped<IOrdersDataProvider, OrdersDataProvider>();
             mapper.AddScoped<IEventTemplatesDataProvider, EventTemplatesDataProvider>();
             mapper.AddScoped<IBugReportsDataProvider, BugReportsDataProvider>();
+            mapper.AddScoped<IAccountPlatformRolesDataProvider, AccountPlatformRolesDataProvider>();
+            mapper.AddScoped<IContentReportsDataProvider, ContentReportsDataProvider>();
 
             //Services
             mapper.AddScoped<IPersonsService, PersonService>();
