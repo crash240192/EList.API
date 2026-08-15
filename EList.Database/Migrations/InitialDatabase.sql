@@ -1008,7 +1008,7 @@ create table public.chat_administrator (
 	constraint chat_person_fk foreign key (person_id) references public.person(id)
 );*/
 -- =============================================================================
--- Content moderation (Р¶Р°Р»РѕР±С‹ РЅР° РєРѕРЅС‚РµРЅС‚ + СЂРѕР»Рё РїР»РѕС‰Р°РґРєРё)
+-- Content moderation (жалобы на контент + роли площадки)
 -- =============================================================================
 
 do $CREATE_PLATFORM_ROLE$
@@ -1116,7 +1116,7 @@ BEGIN
 	end if;
 end $CREATE_REPORT_ACTOR_CONTEXT$;
 
--- Р РѕР»Рё РїР»РѕС‰Р°РґРєРё: РЅРµС‚ Р·Р°РїРёСЃРё = РѕР±С‹С‡РЅС‹Р№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ
+-- Роли площадки: нет записи = обычный пользователь
 CREATE TABLE IF NOT EXISTS public.account_platform_roles (
 	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
 	account_id uuid NOT NULL,
@@ -1133,7 +1133,7 @@ CREATE TABLE IF NOT EXISTS public.account_platform_roles (
 CREATE INDEX IF NOT EXISTS account_platform_roles_role_idx ON public.account_platform_roles ("role");
 CREATE INDEX IF NOT EXISTS account_platform_roles_active_idx ON public.account_platform_roles (active);
 
--- РЎРїСЂР°РІРѕС‡РЅРёРє РїСЂРёС‡РёРЅ Р¶Р°Р»РѕР±С‹
+-- Справочник причин жалобы
 CREATE TABLE IF NOT EXISTS public.report_reasons (
 	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
 	code varchar(64) NOT NULL,
@@ -1151,7 +1151,7 @@ CREATE TABLE IF NOT EXISTS public.report_reasons (
 
 CREATE INDEX IF NOT EXISTS report_reasons_active_sort_idx ON public.report_reasons (active, sort_order);
 
--- Р–Р°Р»РѕР±С‹ РЅР° РєРѕРЅС‚РµРЅС‚ (СЃРѕР±С‹С‚РёРµ / СЃРѕРѕР±С‰РµРЅРёРµ)
+-- Жалобы на контент (событие / сообщение)
 CREATE TABLE IF NOT EXISTS public.content_reports (
 	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
 	reporter_account_id uuid NOT NULL,
@@ -1195,12 +1195,12 @@ CREATE INDEX IF NOT EXISTS content_reports_organizer_status_idx ON public.conten
 CREATE INDEX IF NOT EXISTS content_reports_reporter_idx ON public.content_reports (reporter_account_id);
 CREATE INDEX IF NOT EXISTS content_reports_reason_idx ON public.content_reports (reason_id);
 
--- РћРґРЅР° Р°РєС‚РёРІРЅР°СЏ Р¶Р°Р»РѕР±Р° РѕС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РЅР° РѕРґРёРЅ РѕР±СЉРµРєС‚
+-- Одна активная жалоба от пользователя на один объект
 CREATE UNIQUE INDEX IF NOT EXISTS content_reports_open_target_reporter_uidx
 	ON public.content_reports (reporter_account_id, target_type, target_id)
 	WHERE status IN ('open', 'in_review', 'escalated');
 
--- РђСѓРґРёС‚ РґРµР№СЃС‚РІРёР№ РїРѕ Р¶Р°Р»РѕР±Рµ
+-- Аудит действий по жалобе
 CREATE TABLE IF NOT EXISTS public.content_report_actions (
 	id uuid NOT NULL DEFAULT public.uuid_generate_v4(),
 	report_id uuid NOT NULL,
@@ -1216,7 +1216,7 @@ CREATE TABLE IF NOT EXISTS public.content_report_actions (
 
 CREATE INDEX IF NOT EXISTS content_report_actions_report_id_idx ON public.content_report_actions (report_id, created_at DESC);
 
--- РЎРѕСЃС‚РѕСЏРЅРёРµ РјРѕРґРµСЂР°С†РёРё СЃРѕРѕР±С‰РµРЅРёСЏ (hide РІРјРµСЃС‚Рѕ С„РёР·РёС‡РµСЃРєРѕРіРѕ СѓРґР°Р»РµРЅРёСЏ РґР»СЏ legal)
+-- Состояние модерации сообщения (hide вместо физического удаления для legal)
 ALTER TABLE public.message
 	ADD COLUMN IF NOT EXISTS hidden bool NOT NULL DEFAULT false,
 	ADD COLUMN IF NOT EXISTS hidden_at timestamptz NULL,
@@ -1238,16 +1238,16 @@ CREATE INDEX IF NOT EXISTS message_hidden_idx ON public.message (hidden) WHERE h
 INSERT INTO public.report_reasons (code, name, description, target_scope, severity, primary_queue, sort_order)
 SELECT v.code, v.name, v.description, v.target_scope::public.report_target_scope, v.severity::public.report_severity, v.primary_queue::public.report_queue, v.sort_order
 FROM (VALUES
-	('spam', 'РЎРїР°Рј', 'Р РµРєР»Р°РјР°, С„Р»СѓРґ, РїРѕРІС‚РѕСЂСЏСЋС‰РёРµСЃСЏ СЃРѕРѕР±С‰РµРЅРёСЏ', 'both', 'community', 'organizers', 10),
-	('harassment', 'РћСЃРєРѕСЂР±Р»РµРЅРёСЏ / С‚СЂР°РІР»СЏ', 'РћСЃРєРѕСЂР±РёС‚РµР»СЊРЅРѕРµ РїРѕРІРµРґРµРЅРёРµ РІ РѕР±СЃСѓР¶РґРµРЅРёРё', 'message', 'community', 'organizers', 20),
-	('off_topic', 'РћС„С„С‚РѕРї', 'РЎРѕРѕР±С‰РµРЅРёРµ РЅРµ РѕС‚РЅРѕСЃРёС‚СЃСЏ Рє РјРµСЂРѕРїСЂРёСЏС‚РёСЋ', 'message', 'community', 'organizers', 30),
-	('inappropriate_event', 'РќРµСѓРјРµСЃС‚РЅРѕРµ РјРµСЂРѕРїСЂРёСЏС‚РёРµ', 'РЎРѕР±С‹С‚РёРµ РЅР°СЂСѓС€Р°РµС‚ РїСЂР°РІРёР»Р° РїР»РѕС‰Р°РґРєРё', 'event', 'community', 'platform', 40),
-	('other', 'Р”СЂСѓРіРѕРµ', 'РРЅР°СЏ РїСЂРёС‡РёРЅР° (community)', 'both', 'community', 'organizers', 90),
-	('illegal_content', 'РќРµРїСЂР°РІРѕРјРµСЂРЅС‹Р№ РєРѕРЅС‚РµРЅС‚', 'РљРѕРЅС‚РµРЅС‚, РЅР°СЂСѓС€Р°СЋС‰РёР№ Р·Р°РєРѕРЅ', 'both', 'safety', 'both', 100),
-	('threats', 'РЈРіСЂРѕР·С‹ / РЅР°СЃРёР»РёРµ', 'РЈРіСЂРѕР·С‹ РёР»Рё РїСЂРёР·С‹РІС‹ Рє РЅР°СЃРёР»РёСЋ', 'both', 'safety', 'both', 110),
-	('fraud', 'РњРѕС€РµРЅРЅРёС‡РµСЃС‚РІРѕ', 'РћР±РјР°РЅ, СЃРєР°РјС‹, С„РёС€РёРЅРі', 'both', 'safety', 'both', 120),
-	('hate', 'Р Р°Р·Р¶РёРіР°РЅРёРµ РЅРµРЅР°РІРёСЃС‚Рё', 'РќРµРЅР°РІРёСЃС‚СЊ / СЌРєСЃС‚СЂРµРјРёР·Рј', 'both', 'safety', 'both', 130),
-	('sexual_exploitation', 'РЎРµРєСЃСѓР°Р»СЊРЅР°СЏ СЌРєСЃРїР»СѓР°С‚Р°С†РёСЏ', 'РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ СЃРµРєСЃСѓР°Р»СЊРЅС‹Р№ РєРѕРЅС‚РµРЅС‚', 'both', 'safety', 'both', 140)
+	('spam', 'Спам', 'Реклама, флуд, повторяющиеся сообщения', 'both', 'community', 'organizers', 10),
+	('harassment', 'Оскорбления / травля', 'Оскорбительное поведение в обсуждении', 'message', 'community', 'organizers', 20),
+	('off_topic', 'Оффтоп', 'Сообщение не относится к мероприятию', 'message', 'community', 'organizers', 30),
+	('inappropriate_event', 'Неуместное мероприятие', 'Событие нарушает правила площадки', 'event', 'community', 'platform', 40),
+	('other', 'Другое', 'Иная причина (community)', 'both', 'community', 'organizers', 90),
+	('illegal_content', 'Неправомерный контент', 'Контент, нарушающий закон', 'both', 'safety', 'both', 100),
+	('threats', 'Угрозы / насилие', 'Угрозы или призывы к насилию', 'both', 'safety', 'both', 110),
+	('fraud', 'Мошенничество', 'Обман, скамы, фишинг', 'both', 'safety', 'both', 120),
+	('hate', 'Разжигание ненависти', 'Ненависть / экстремизм', 'both', 'safety', 'both', 130),
+	('sexual_exploitation', 'Сексуальная эксплуатация', 'Недопустимый сексуальный контент', 'both', 'safety', 'both', 140)
 ) AS v(code, name, description, target_scope, severity, primary_queue, sort_order)
 WHERE NOT EXISTS (
 	SELECT 1 FROM public.report_reasons r WHERE r.code = v.code
