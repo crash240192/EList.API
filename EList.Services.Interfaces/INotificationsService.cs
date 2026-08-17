@@ -1,5 +1,7 @@
 ﻿using System.Net.WebSockets;
 using EList.Common.Models;
+using EList.Models.ContentReports;
+using EList.Models.Enums;
 using EList.Models.Notifications;
 
 namespace EList.Services.Interfaces
@@ -42,6 +44,13 @@ namespace EList.Services.Interfaces
 
 
         Task<CommandResult> NotifyCommentRepliedsync(Guid? eventId, Guid messageId, Guid replyId);
+
+        Task<CommandResult> NotifyContentReportCreatedAsync(ContentReport report);
+        Task<CommandResult> NotifyContentReportResolvedAsync(
+            ContentReport report,
+            ReportResolutionAction action,
+            string? comment);
+        Task<CommandResult> NotifyContentReportEscalatedAsync(ContentReport report);
         //Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType);
     }
 }

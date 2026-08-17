@@ -6,6 +6,8 @@ using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
 using EList.Models.Accounts;
+using EList.Models.ContentReports;
+using EList.Models.Enums;
 using EList.Models.Events;
 using EList.Models.Notifications;
 using EList.Models.Subscriptions;
@@ -38,6 +40,8 @@ namespace EList.Services.Impl
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
         private readonly IEventsRatingRepository _eventsRatingRepository;
         private readonly IConversationRepository _conversationRepository;
+        private readonly IOrganizationsRepository _organizationsRepository;
+        private readonly IAccountPlatformRolesRepository _accountPlatformRolesRepository;
         public NotificationsService(
             WebSocketConnectionManager connectionManager,
             ICorrelationIdProvider correlationIdProvider,
@@ -51,7 +55,9 @@ namespace EList.Services.Impl
             ISubscriptionsRepository subscriptionsRepository,
             IEventOrganizatorsRepository eventOrganizatorsRepository,
             IEventsRatingRepository eventsRatingRepository,
-            IConversationRepository conversationRepository)
+            IConversationRepository conversationRepository,
+            IOrganizationsRepository organizationsRepository,
+            IAccountPlatformRolesRepository accountPlatformRolesRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _notificationsRepository = notificationsRepository ?? throw new ArgumentNullException(nameof(notificationsRepository));
@@ -64,6 +70,8 @@ namespace EList.Services.Impl
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _eventsRatingRepository = eventsRatingRepository ?? throw new ArgumentNullException(nameof(eventsRatingRepository));
             _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
+            _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
+            _accountPlatformRolesRepository = accountPlatformRolesRepository ?? throw new ArgumentNullException(nameof(accountPlatformRolesRepository));
             _connectionManager = connectionManager;
             _accountDataHolder = accountDataHolder;
         }
@@ -843,6 +851,378 @@ namespace EList.Services.Impl
             }
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
+        }
+        #endregion
+
+        #region content reports
+        public async Task<CommandResult> NotifyContentReportCreatedAsync(ContentReport report)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyContentReportCreatedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            var actorId = _accountDataHolder.AccountId;
+            var exclude = new HashSet<Guid>();
+            if (actorId != null)
+                exclude.Add(actorId.Value);
+
+            var data = BuildContentReportData(report, queue: null);
+            var notifications = new List<Notification>();
+
+            var subjectIds = await GetReportSubjectAccountIdsAsync(report, includeEventOrganizers: false);
+            foreach (var accountId in subjectIds.Where(id => !exclude.Contains(id)))
+            {
+                notifications.Add(BuildNotification(
+                    accountId,
+                    report.EventId,
+                    relatedAccountId: null,
+                    UserNotificationType.ContentReportFiledAgainstYou,
+                    "Жалоба на ваш контент",
+                    BuildFiledAgainstYouMessage(report),
+                    data));
+                exclude.Add(accountId);
+            }
+
+            if (report.OrganizerStatus != null && report.EventId != null)
+            {
+                var organizers = await _eventOrganizatorsRepository.GetAllOrganizerAccountIdsAsync(report.EventId.Value);
+                var organizerData = BuildContentReportData(report, queue: "organizers");
+                foreach (var accountId in organizers.Where(id => !exclude.Contains(id)))
+                {
+                    notifications.Add(BuildNotification(
+                        accountId,
+                        report.EventId,
+                        actorId,
+                        UserNotificationType.ContentReportNewInOrganizerQueue,
+                        "Новая жалоба по мероприятию",
+                        "Поступила жалоба на контент вашего мероприятия. Её нужно рассмотреть.",
+                        organizerData));
+                }
+            }
+
+            if (report.PlatformStatus != null)
+            {
+                var staff = await GetPlatformStaffAccountIdsAsync();
+                var staffData = BuildContentReportData(report, queue: "platform");
+                foreach (var accountId in staff.Where(id => !exclude.Contains(id)))
+                {
+                    notifications.Add(BuildNotification(
+                        accountId,
+                        report.EventId,
+                        actorId,
+                        UserNotificationType.ContentReportNewInPlatformQueue,
+                        "Новая жалоба на площадке",
+                        BuildPlatformQueueMessage(report),
+                        staffData));
+                }
+            }
+
+            await PersistAndSendAsync(notifications);
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> NotifyContentReportResolvedAsync(
+            ContentReport report,
+            ReportResolutionAction action,
+            string? comment)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyContentReportResolvedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            var actorId = _accountDataHolder.AccountId;
+            var exclude = new HashSet<Guid>();
+            if (actorId != null)
+                exclude.Add(actorId.Value);
+
+            var data = BuildContentReportData(report, queue: null, action);
+            var notifications = new List<Notification>();
+
+            if (report.ReporterAccountId != default && !exclude.Contains(report.ReporterAccountId))
+            {
+                var dismissed = action == ReportResolutionAction.Dismiss;
+                notifications.Add(BuildNotification(
+                    report.ReporterAccountId,
+                    report.EventId,
+                    actorId,
+                    UserNotificationType.ContentReportReviewed,
+                    dismissed ? "Жалоба отклонена" : "Жалоба рассмотрена",
+                    dismissed
+                        ? "Ваша жалоба рассмотрена: нарушений не найдено."
+                        : "Ваша жалоба рассмотрена, по ней приняты меры.",
+                    data));
+                exclude.Add(report.ReporterAccountId);
+            }
+
+            var includeEventOrganizers = action == ReportResolutionAction.Warn
+                && report.TargetType == ReportTargetType.Event;
+            var subjectIds = (await GetReportSubjectAccountIdsAsync(report, includeEventOrganizers))
+                .Where(id => !exclude.Contains(id))
+                .Distinct()
+                .ToList();
+
+            switch (action)
+            {
+                case ReportResolutionAction.Warn:
+                    foreach (var accountId in subjectIds)
+                    {
+                        notifications.Add(BuildNotification(
+                            accountId,
+                            report.EventId,
+                            actorId,
+                            UserNotificationType.ContentReportWarningIssued,
+                            "Предупреждение модерации",
+                            string.IsNullOrWhiteSpace(comment)
+                                ? "Модератор вынес предупреждение по вашей публикации или профилю."
+                                : comment.Trim(),
+                            data));
+                    }
+                    break;
+
+                case ReportResolutionAction.HideContent:
+                case ReportResolutionAction.DeleteContent:
+                    foreach (var accountId in subjectIds)
+                    {
+                        notifications.Add(BuildNotification(
+                            accountId,
+                            report.EventId,
+                            actorId,
+                            UserNotificationType.ContentReportContentModerated,
+                            action == ReportResolutionAction.DeleteContent
+                                ? "Контент удалён"
+                                : "Контент скрыт",
+                            action == ReportResolutionAction.DeleteContent
+                                ? "Ваш контент удалён по итогам рассмотрения жалобы."
+                                : "Ваш контент скрыт по итогам рассмотрения жалобы.",
+                            data));
+                    }
+                    break;
+
+                case ReportResolutionAction.SuspendAccount:
+                    foreach (var accountId in subjectIds)
+                    {
+                        notifications.Add(BuildNotification(
+                            accountId,
+                            report.EventId,
+                            actorId,
+                            UserNotificationType.ContentReportAccountSuspended,
+                            "Аккаунт приостановлен",
+                            "Ваш аккаунт приостановлен модерацией площадки.",
+                            data));
+                    }
+                    break;
+
+                case ReportResolutionAction.SuspendOrganization:
+                    foreach (var accountId in subjectIds)
+                    {
+                        notifications.Add(BuildNotification(
+                            accountId,
+                            report.EventId,
+                            actorId,
+                            UserNotificationType.ContentReportOrganizationSuspended,
+                            "Организация приостановлена",
+                            "Организация приостановлена модерацией площадки.",
+                            data));
+                    }
+                    break;
+
+                case ReportResolutionAction.RemoveOrganizator:
+                    foreach (var accountId in subjectIds)
+                    {
+                        notifications.Add(BuildNotification(
+                            accountId,
+                            report.EventId,
+                            actorId,
+                            UserNotificationType.ContentReportOrganizatorRemoved,
+                            "Сняты с организаторов",
+                            "Вы сняты с организаторов мероприятия по итогам модерации.",
+                            data));
+                    }
+                    break;
+
+                case ReportResolutionAction.ResetAvatar:
+                    foreach (var accountId in subjectIds)
+                    {
+                        notifications.Add(BuildNotification(
+                            accountId,
+                            report.EventId,
+                            actorId,
+                            UserNotificationType.ContentReportAvatarReset,
+                            "Аватарка сброшена",
+                            "Аватарка или обложка сброшена модерацией.",
+                            data));
+                    }
+                    break;
+            }
+
+            await PersistAndSendAsync(notifications);
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> NotifyContentReportEscalatedAsync(ContentReport report)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyContentReportEscalatedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            var actorId = _accountDataHolder.AccountId;
+            var exclude = new HashSet<Guid>();
+            if (actorId != null)
+                exclude.Add(actorId.Value);
+
+            var staff = await GetPlatformStaffAccountIdsAsync();
+            var data = BuildContentReportData(report, queue: "platform");
+            var notifications = staff
+                .Where(id => !exclude.Contains(id))
+                .Select(accountId => BuildNotification(
+                    accountId,
+                    report.EventId,
+                    actorId,
+                    UserNotificationType.ContentReportNewInPlatformQueue,
+                    "Жалоба эскалирована на площадку",
+                    "Организатор передал жалобу на рассмотрение площадке.",
+                    data))
+                .ToList();
+
+            await PersistAndSendAsync(notifications);
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        private async Task<List<Guid>> GetReportSubjectAccountIdsAsync(ContentReport report, bool includeEventOrganizers)
+        {
+            var ids = new List<Guid>();
+
+            switch (report.TargetType)
+            {
+                case ReportTargetType.Account:
+                    ids.Add(report.ReportedAccountId ?? report.TargetId);
+                    break;
+
+                case ReportTargetType.Message:
+                case ReportTargetType.Photo:
+                    if (report.ReportedAccountId != null)
+                        ids.Add(report.ReportedAccountId.Value);
+                    if (report.OrganizationId != null)
+                        ids.AddRange(await GetOrganizationMemberIdsAsync(report.OrganizationId.Value));
+                    break;
+
+                case ReportTargetType.Organization:
+                    if (report.OrganizationId != null)
+                        ids.AddRange(await GetOrganizationMemberIdsAsync(report.OrganizationId.Value));
+                    break;
+
+                case ReportTargetType.EventOrganizator:
+                    if (report.ReportedAccountId != null)
+                        ids.Add(report.ReportedAccountId.Value);
+                    if (report.OrganizationId != null)
+                        ids.AddRange(await GetOrganizationMemberIdsAsync(report.OrganizationId.Value));
+                    break;
+
+                case ReportTargetType.Event:
+                    if (includeEventOrganizers && report.EventId != null)
+                        ids.AddRange(await _eventOrganizatorsRepository.GetAllOrganizerAccountIdsAsync(report.EventId.Value));
+                    break;
+            }
+
+            return ids.Distinct().ToList();
+        }
+
+        private async Task<List<Guid>> GetOrganizationMemberIdsAsync(Guid organizationId)
+        {
+            var members = await _organizationsRepository.GetMembersByOrganizationIdAsync(organizationId, onlyActive: true);
+            return members?.Select(m => m.AccountId).Distinct().ToList() ?? new List<Guid>();
+        }
+
+        private async Task<List<Guid>> GetPlatformStaffAccountIdsAsync()
+        {
+            var roles = await _accountPlatformRolesRepository.GetAllAsync(role: null, onlyActive: true);
+            return roles?.Select(r => r.AccountId).Distinct().ToList() ?? new List<Guid>();
+        }
+
+        private static ContentReportNotificationData BuildContentReportData(
+            ContentReport report,
+            string? queue,
+            ReportResolutionAction? action = null)
+        {
+            return new ContentReportNotificationData
+            {
+                ReportId = report.Id,
+                TargetType = report.TargetType,
+                TargetId = report.TargetId,
+                EventId = report.EventId,
+                OrganizationId = report.OrganizationId,
+                ReasonCode = report.Reason?.Code,
+                ReasonName = report.Reason?.Name,
+                ResolutionAction = action ?? report.ResolutionAction,
+                Queue = queue
+            };
+        }
+
+        private static string BuildFiledAgainstYouMessage(ContentReport report)
+        {
+            return report.TargetType switch
+            {
+                ReportTargetType.Account => "На ваш профиль поступила жалоба. Её рассмотрит модерация площадки.",
+                ReportTargetType.Organization => "На организацию поступила жалоба. Её рассмотрит модерация площадки.",
+                ReportTargetType.EventOrganizator => "На вас как на организатора поступила жалоба. Её рассмотрит модерация площадки.",
+                ReportTargetType.Message => "На ваше сообщение поступила жалоба.",
+                ReportTargetType.Photo => "На ваше фото поступила жалоба.",
+                _ => "На ваш контент поступила жалоба."
+            };
+        }
+
+        private static string BuildPlatformQueueMessage(ContentReport report)
+        {
+            return report.TargetType switch
+            {
+                ReportTargetType.Event => "Поступила жалоба на мероприятие.",
+                ReportTargetType.Account => "Поступила жалоба на профиль пользователя.",
+                ReportTargetType.Organization => "Поступила жалоба на организацию.",
+                ReportTargetType.EventOrganizator => "Поступила жалоба на организатора.",
+                _ => "Поступила жалоба, требующая рассмотрения площадкой."
+            };
+        }
+
+        private static Notification BuildNotification(
+            Guid accountId,
+            Guid? eventId,
+            Guid? relatedAccountId,
+            UserNotificationType type,
+            string title,
+            string message,
+            object data)
+        {
+            return new Notification
+            {
+                Id = Guid.NewGuid(),
+                AccountId = accountId,
+                EventId = eventId,
+                CreatedAt = DateTime.UtcNow,
+                Title = title,
+                Message = message,
+                RelatedAccountId = relatedAccountId,
+                Type = type,
+                Data = data
+            };
+        }
+
+        private async Task PersistAndSendAsync(List<Notification> notifications)
+        {
+            if (notifications == null || notifications.Count == 0)
+                return;
+
+            await _notificationsRepository.CreateNotificationsAsync(notifications);
+            var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+            await Task.WhenAll(wsTasks);
         }
         #endregion
 

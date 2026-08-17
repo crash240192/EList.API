@@ -27,6 +27,27 @@
 
         NewEventRating = 60,
         EventRatingChanged = 61,
-        EventRatingDeleted = 62
+        EventRatingDeleted = 62,
+
+        /// <summary>На ваш профиль / контент поступила жалоба (без личности жалобщика).</summary>
+        ContentReportFiledAgainstYou = 70,
+        /// <summary>Новая жалоба в очереди организаторов события.</summary>
+        ContentReportNewInOrganizerQueue = 71,
+        /// <summary>Новая жалоба или эскалация в очереди площадки.</summary>
+        ContentReportNewInPlatformQueue = 72,
+        /// <summary>Модератор вынес предупреждение.</summary>
+        ContentReportWarningIssued = 73,
+        /// <summary>Контент скрыт или удалён по жалобе.</summary>
+        ContentReportContentModerated = 74,
+        /// <summary>Жалоба рассмотрена или отклонена (для автора жалобы).</summary>
+        ContentReportReviewed = 75,
+        /// <summary>Аккаунт приостановлен модерацией.</summary>
+        ContentReportAccountSuspended = 76,
+        /// <summary>Организация приостановлена модерацией.</summary>
+        ContentReportOrganizationSuspended = 77,
+        /// <summary>Снят с организаторов мероприятия.</summary>
+        ContentReportOrganizatorRemoved = 78,
+        /// <summary>Аватарка или обложка сброшена модерацией.</summary>
+        ContentReportAvatarReset = 79
     }
 }

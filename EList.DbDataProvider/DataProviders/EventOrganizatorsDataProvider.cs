@@ -59,6 +59,29 @@ namespace EList.DbDataProvider.DataProviders
             return organizatorIds;
         }
 
+        public async Task<List<Guid>> GetAllOrganizerAccountIdsAsync(Guid eventId)
+        {
+            var directIds = await _connection.Organizators
+                .Where(i => i.EventId == eventId && i.AccountId != null)
+                .Select(i => i.AccountId!.Value)
+                .ToListAsync();
+
+            var organizationIds = await _connection.Organizators
+                .Where(i => i.EventId == eventId && i.OrganizationId != null)
+                .Select(i => i.OrganizationId!.Value)
+                .ToListAsync();
+
+            if (organizationIds.Count == 0)
+                return directIds.Distinct().ToList();
+
+            var fromOrganizations = await _connection.OrganizationMembers
+                .Where(m => m.Active && organizationIds.Contains(m.OrganizationId))
+                .Select(m => m.AccountId)
+                .ToListAsync();
+
+            return directIds.Concat(fromOrganizations).Distinct().ToList();
+        }
+
         public async Task<bool> IsAccountEventOrganizatorAsync(Guid eventId, Guid accountId)
         {
             var isDirectOrganizator = await _connection.Organizators

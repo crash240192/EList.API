@@ -66,6 +66,11 @@ namespace EList.Repositories.Impl
             return organizators;
         }
 
+        public async Task<List<Guid>> GetAllOrganizerAccountIdsAsync(Guid eventId)
+        {
+            return await _eventOrganizatorsDataProvider.GetAllOrganizerAccountIdsAsync(eventId);
+        }
+
         public async Task<bool> IsAccountEventOrganizatorAsync(Guid eventId, Guid accountId)
         {
             return await _eventOrganizatorsDataProvider.IsAccountEventOrganizatorAsync(eventId, accountId);

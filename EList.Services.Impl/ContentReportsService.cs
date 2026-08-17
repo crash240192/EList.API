@@ -30,6 +30,7 @@ namespace EList.Services.Impl
         private readonly IAccountsRepository _accountsRepository;
         private readonly IOrganizationsRepository _organizationsRepository;
         private readonly IMediaRepository _mediaRepository;
+        private readonly INotificationsService _notificationsService;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IMapper _mapper;
@@ -43,6 +44,7 @@ namespace EList.Services.Impl
             IAccountsRepository accountsRepository,
             IOrganizationsRepository organizationsRepository,
             IMediaRepository mediaRepository,
+            INotificationsService notificationsService,
             IAccountDataHolder accountDataHolder,
             ICorrelationIdProvider correlationIdProvider,
             IMapper mapper)
@@ -55,6 +57,7 @@ namespace EList.Services.Impl
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
             _mediaRepository = mediaRepository ?? throw new ArgumentNullException(nameof(mediaRepository));
+            _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _accountDataHolder = accountDataHolder;
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
@@ -229,6 +232,8 @@ namespace EList.Services.Impl
 
             _contentReportsRepository.ApplyDefaultQueueStatuses(report, reason);
             var reportId = await _contentReportsRepository.CreateReportAsync(report);
+            report.Id = reportId;
+            report.Reason = reason;
 
             await _contentReportsRepository.AddActionAsync(new ContentReportAction
             {
@@ -238,6 +243,8 @@ namespace EList.Services.Impl
                 Action = "created",
                 Details = JsonSerializer.Serialize(new { reasonCode = reason.Code, targetType = request.TargetType.ToString() })
             });
+
+            await _notificationsService.NotifyContentReportCreatedAsync(report);
 
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(reportId);
@@ -455,6 +462,11 @@ namespace EList.Services.Impl
                 })
             });
 
+            await _notificationsService.NotifyContentReportResolvedAsync(
+                report,
+                request.ResolutionAction,
+                request.ResolutionComment);
+
             return CommandResult.OK;
         }
 
@@ -477,6 +489,8 @@ namespace EList.Services.Impl
                 reportId,
                 _accountDataHolder.AccountId,
                 request?.Comment);
+
+            await _notificationsService.NotifyContentReportEscalatedAsync(report);
 
             return CommandResult.OK;
         }
@@ -550,6 +564,9 @@ namespace EList.Services.Impl
                             EventId = report.EventId.Value,
                             AccountIds = new List<Guid> { accountId.Value }
                         });
+                    await _notificationsService.NotifyAddedToBlackListAsync(
+                        report.EventId.Value,
+                        new List<Guid> { accountId.Value });
                     return CommandResult.OK;
 
                 case ReportResolutionAction.CancelEvent:
@@ -559,6 +576,7 @@ namespace EList.Services.Impl
                         return CommandResult.Fail(ErrorCode.EventNotFound, "Мероприятие не найдено");
 
                     await _eventsRepository.CancelEventAsync(report.EventId.Value);
+                    await _notificationsService.NotifyEventCancelledAsync(report.EventId.Value);
                     return CommandResult.OK;
 
                 case ReportResolutionAction.SuspendAccount:
