@@ -156,6 +156,23 @@ namespace EList.Repositories.Impl
                 request.PageSize ?? Math.Max(result.TotalCount, 1));
         }
 
+        public async Task<PagedList<ContentReport>> SearchReportsConcerningAccountAsync(
+            Guid accountId,
+            List<Guid> organizationIds,
+            int pageIndex,
+            int pageSize)
+        {
+            var result = await _dataProvider.SearchReportsConcerningAccountAsync(accountId, organizationIds, pageIndex, pageSize);
+            var items = result.Items?.Select(MapReport).Where(i => i != null).Cast<ContentReport>().ToList()
+                ?? new List<ContentReport>();
+
+            return new PagedList<ContentReport>(
+                result.TotalCount,
+                items,
+                pageIndex,
+                pageSize);
+        }
+
         public async Task<int> CountReportsAsync(ContentReportsSearchRequest request)
         {
             var dbRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.ContentReportsSearchRequest>(request);

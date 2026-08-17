@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.Models.Enums;
@@ -49,6 +50,36 @@ namespace EList.Repositories.Impl
             var notifications = await _notificationsDataProvider.GetUnreadedUserNotificationsAsync(accountId);
             var result = _mapper.Map<List<Notification>>(notifications);
             return result;
+        }
+
+        public async Task<PagedList<Notification>> SearchUserNotificationsAsync(
+            Guid accountId,
+            UserNotificationType? type,
+            bool unreadOnly,
+            int pageIndex,
+            int pageSize)
+        {
+            var result = await _notificationsDataProvider.SearchUserNotificationsAsync(
+                accountId,
+                type == null ? null : (int?)type.Value,
+                unreadOnly,
+                pageIndex,
+                pageSize);
+
+            var items = _mapper.Map<List<Notification>>(result.Items ?? new List<NotificationDto>());
+            return new PagedList<Notification>(
+                result.TotalCount,
+                items,
+                pageIndex,
+                pageSize);
+        }
+
+        public async Task<int> CountUserNotificationsAsync(Guid accountId, UserNotificationType? type, bool unreadOnly)
+        {
+            return await _notificationsDataProvider.CountUserNotificationsAsync(
+                accountId,
+                type == null ? null : (int?)type.Value,
+                unreadOnly);
         }
 
         public async Task ReadAllUserNotificationsAsync(Guid accountId)

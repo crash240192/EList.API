@@ -19,6 +19,8 @@ namespace EList.Services.Interfaces
         Task<CommandResult<Guid?>> CreateReportAsync(CreateContentReportRequest request);
         Task<CommandResult<ContentReportResponse?>> GetReportAsync(Guid reportId);
         Task<CommandResult<PagedList<ContentReportResponse>>> GetMyReportsAsync(int? pageIndex = null, int? pageSize = null);
+        Task<CommandResult<PagedList<ContentReportSubjectView>>> GetReportsAgainstMeAsync(int? pageIndex = null, int? pageSize = null);
+        Task<CommandResult<ContentReportSubjectView?>> GetReportAgainstMeAsync(Guid reportId);
         Task<CommandResult<PagedList<ContentReportResponse>>> SearchPlatformQueueAsync(ContentReportsSearchRequest request);
         Task<CommandResult<PagedList<ContentReportResponse>>> SearchOrganizerQueueAsync(Guid eventId, ContentReportsSearchRequest? request = null);
         Task<CommandResult<int>> CountPlatformQueueAsync(bool onlyActive = true);

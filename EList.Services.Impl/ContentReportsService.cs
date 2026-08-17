@@ -280,6 +280,46 @@ namespace EList.Services.Impl
             return new CommandResult<PagedList<ContentReportResponse>>(MapPaged(result));
         }
 
+        public async Task<CommandResult<PagedList<ContentReportSubjectView>>> GetReportsAgainstMeAsync(
+            int? pageIndex = null,
+            int? pageSize = null)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<PagedList<ContentReportSubjectView>>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var organizationIds = (await _organizationsRepository.GetOrganizationsByAccountIdAsync(
+                    _accountDataHolder.AccountId.Value,
+                    onlyActiveMembers: true))
+                ?.Select(o => o.Id)
+                .ToList()
+                ?? new List<Guid>();
+
+            var result = await _contentReportsRepository.SearchReportsConcerningAccountAsync(
+                _accountDataHolder.AccountId.Value,
+                organizationIds,
+                pageIndex ?? 0,
+                pageSize ?? 20);
+
+            var items = result.Result?.Select(ToSubjectView).ToList() ?? new List<ContentReportSubjectView>();
+            return new CommandResult<PagedList<ContentReportSubjectView>>(
+                new PagedList<ContentReportSubjectView>(result.Total, items, result.PageIndex, result.PageSize));
+        }
+
+        public async Task<CommandResult<ContentReportSubjectView?>> GetReportAgainstMeAsync(Guid reportId)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<ContentReportSubjectView?>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var report = await _contentReportsRepository.GetReportByIdAsync(reportId);
+            if (report == null)
+                return CommandResult<ContentReportSubjectView?>.Fail(ErrorCode.ContentReportNotFound, "Жалоба не найдена");
+
+            if (!await IsReportSubjectAsync(report) && !_accountDataHolder.IsPlatformModeratorOrAbove)
+                return CommandResult<ContentReportSubjectView?>.Fail(ErrorCode.AccessError, "Недостаточно прав для просмотра");
+
+            return new CommandResult<ContentReportSubjectView?>(ToSubjectView(report));
+        }
+
         public async Task<CommandResult<PagedList<ContentReportResponse>>> SearchPlatformQueueAsync(ContentReportsSearchRequest request)
         {
             if (!_accountDataHolder.IsPlatformModeratorOrAbove)
@@ -503,6 +543,9 @@ namespace EList.Services.Impl
             var report = await _contentReportsRepository.GetReportByIdAsync(reportId);
             if (report == null)
                 return CommandResult<List<ContentReportAction>>.Fail(ErrorCode.ContentReportNotFound, "Жалоба не найдена");
+
+            if (await IsReportSubjectAsync(report) && !_accountDataHolder.IsPlatformModeratorOrAbove)
+                return CommandResult<List<ContentReportAction>>.Fail(ErrorCode.AccessError, "Недостаточно прав");
 
             if (!await CanViewReportAsync(report))
                 return CommandResult<List<ContentReportAction>>.Fail(ErrorCode.AccessError, "Недостаточно прав");
@@ -1019,6 +1062,46 @@ namespace EList.Services.Impl
             }
 
             return null;
+        }
+
+        private static ContentReportSubjectView ToSubjectView(ContentReport report)
+        {
+            var showRemark = report.ResolutionAction is ReportResolutionAction.Warn
+                or ReportResolutionAction.Other;
+
+            return new ContentReportSubjectView
+            {
+                Id = report.Id,
+                TargetType = report.TargetType,
+                TargetId = report.TargetId,
+                EventId = report.EventId,
+                MessageId = report.MessageId,
+                FileId = report.FileId,
+                AlbumId = report.AlbumId,
+                OrganizationId = report.OrganizationId,
+                EventOrganizatorId = report.EventOrganizatorId,
+                TargetSnapshot = report.TargetSnapshot,
+                Status = report.Status,
+                ResolutionAction = report.ResolutionAction,
+                ModeratorRemark = showRemark ? report.ResolutionComment : null,
+                ResolvedAt = report.ResolvedAt,
+                CreatedAt = report.CreatedAt,
+                UpdatedAt = report.UpdatedAt,
+                Reason = report.Reason == null
+                    ? null
+                    : new ReportReason
+                    {
+                        Id = report.Reason.Id,
+                        Code = report.Reason.Code,
+                        Name = report.Reason.Name,
+                        Description = report.Reason.Description,
+                        TargetScope = report.Reason.TargetScope,
+                        Severity = report.Reason.Severity,
+                        PrimaryQueue = report.Reason.PrimaryQueue,
+                        SortOrder = report.Reason.SortOrder,
+                        Active = report.Reason.Active
+                    }
+            };
         }
 
         private PagedList<ContentReportResponse> MapPaged(PagedList<ContentReport> result)

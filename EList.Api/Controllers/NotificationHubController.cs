@@ -151,6 +151,44 @@ namespace EList.Api.Controllers
 
 
         /// <summary>
+        /// История уведомлений текущего пользователя (входящие, включая замечания модерации)
+        /// </summary>
+        [HttpGet("my")]
+        public async Task<CommandResult<PagedList<Notification>>> GetMyNotificationsAsync(
+            [FromQuery] UserNotificationType? type = null,
+            [FromQuery] bool unreadOnly = false,
+            [FromQuery] int? pageIndex = 0,
+            [FromQuery] int? pageSize = 20)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(GetMyNotificationsAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            var result = await _notificationService.GetMyNotificationsAsync(new NotificationsSearchRequest
+            {
+                Type = type,
+                UnreadOnly = unreadOnly,
+                PageIndex = pageIndex,
+                PageSize = pageSize
+            });
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return result;
+        }
+
+        /// <summary>
+        /// Счётчик уведомлений текущего пользователя
+        /// </summary>
+        [HttpGet("my/count")]
+        public async Task<CommandResult<int>> CountMyNotificationsAsync(
+            [FromQuery] UserNotificationType? type = null,
+            [FromQuery] bool unreadOnly = true)
+        {
+            return await _notificationService.CountMyNotificationsAsync(type, unreadOnly);
+        }
+
+        /// <summary>
         /// Отметить оповещение как прочитанное
         /// </summary>
         [HttpGet("read/{notificationId}")]

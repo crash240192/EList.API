@@ -39,6 +39,11 @@ namespace EList.DbDataProvider.Interfaces
             Guid targetId);
         Task<ListResponse<ContentReportDto>> SearchReportsAsync(ContentReportsSearchRequest request);
         Task<int> CountReportsAsync(ContentReportsSearchRequest request);
+        Task<ListResponse<ContentReportDto>> SearchReportsConcerningAccountAsync(
+            Guid accountId,
+            List<Guid> organizationIds,
+            int pageIndex,
+            int pageSize);
 
         Task SetReportStatusAsync(Guid id, ReportStatus status);
         Task SetOrganizerStatusAsync(Guid id, ReportStatus status);

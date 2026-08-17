@@ -224,6 +224,40 @@ namespace EList.DbDataProvider.DataProviders
             return new ListResponse<ContentReportDto>(totalCount, items);
         }
 
+        public async Task<ListResponse<ContentReportDto>> SearchReportsConcerningAccountAsync(
+            Guid accountId,
+            List<Guid> organizationIds,
+            int pageIndex,
+            int pageSize)
+        {
+            var orgIds = organizationIds ?? new List<Guid>();
+            var query = _connection.ContentReports
+                .LoadWith(i => i.Reason)
+                .LoadWith(i => i.Event)
+                .AsQueryable();
+
+            if (orgIds.Count == 0)
+            {
+                query = query.Where(i =>
+                    i.ReportedAccountId == accountId
+                    || (i.TargetType == ReportTargetType.Account && i.TargetId == accountId));
+            }
+            else
+            {
+                query = query.Where(i =>
+                    i.ReportedAccountId == accountId
+                    || (i.TargetType == ReportTargetType.Account && i.TargetId == accountId)
+                    || (i.OrganizationId != null && orgIds.Contains(i.OrganizationId.Value))
+                    || (i.TargetType == ReportTargetType.Organization && orgIds.Contains(i.TargetId)));
+            }
+
+            query = query.OrderByDescending(i => i.CreatedAt);
+            var totalCount = await query.CountAsync();
+            var pageSz = Math.Max(pageSize, 1);
+            var items = await query.Skip(pageIndex * pageSz).Take(pageSz).ToListAsync();
+            return new ListResponse<ContentReportDto>(totalCount, items);
+        }
+
         public async Task<int> CountReportsAsync(ContentReportsSearchRequest request)
         {
             var query = ApplySearchFilters(_connection.ContentReports.AsQueryable(), request);

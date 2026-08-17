@@ -19,6 +19,8 @@ namespace EList.Services.Interfaces
 
         Task<CommandResult> ReadNotificationAsync(Guid notificationId);
         Task<CommandResult> ReadAllUserNotificationsAsync();
+        Task<CommandResult<PagedList<Notification>>> GetMyNotificationsAsync(NotificationsSearchRequest? request = null);
+        Task<CommandResult<int>> CountMyNotificationsAsync(UserNotificationType? type = null, bool unreadOnly = true);
 
 
         Task<CommandResult> NotifyEventCreatedAsync(Guid eventId, List<Guid> subscribers = null);

@@ -268,6 +268,44 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
+        public async Task<CommandResult<PagedList<Notification>>> GetMyNotificationsAsync(NotificationsSearchRequest? request = null)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(GetMyNotificationsAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<PagedList<Notification>>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            request ??= new NotificationsSearchRequest();
+            var pageIndex = request.PageIndex ?? 0;
+            var pageSize = request.PageSize ?? 20;
+            var unreadOnly = request.UnreadOnly == true;
+
+            var result = await _notificationsRepository.SearchUserNotificationsAsync(
+                _accountDataHolder.AccountId.Value,
+                request.Type,
+                unreadOnly,
+                pageIndex,
+                pageSize);
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<PagedList<Notification>>(result);
+        }
+
+        public async Task<CommandResult<int>> CountMyNotificationsAsync(UserNotificationType? type = null, bool unreadOnly = true)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<int>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var count = await _notificationsRepository.CountUserNotificationsAsync(
+                _accountDataHolder.AccountId.Value,
+                type,
+                unreadOnly);
+            return new CommandResult<int>(count);
+        }
+
         #endregion main logic
 
 

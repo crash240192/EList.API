@@ -127,7 +127,7 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
-        /// Мои жалобы
+        /// Мои жалобы (я отправитель)
         /// </summary>
         [HttpGet("my")]
         public async Task<CommandResult<PagedList<ContentReportResponse>>> GetMyReportsAsync(
@@ -137,6 +137,30 @@ namespace EList.Api.Controllers
             return await ExecuteAsync(
                 nameof(GetMyReportsAsync),
                 () => _contentReportsService.GetMyReportsAsync(pageIndex, pageSize));
+        }
+
+        /// <summary>
+        /// Жалобы и замечания, касающиеся текущего пользователя (без личности жалобщика)
+        /// </summary>
+        [HttpGet("againstMe")]
+        public async Task<CommandResult<PagedList<ContentReportSubjectView>>> GetReportsAgainstMeAsync(
+            [FromQuery] int? pageIndex = 0,
+            [FromQuery] int? pageSize = 20)
+        {
+            return await ExecuteAsync(
+                nameof(GetReportsAgainstMeAsync),
+                () => _contentReportsService.GetReportsAgainstMeAsync(pageIndex, pageSize));
+        }
+
+        /// <summary>
+        /// Карточка жалобы для адресата (без личности жалобщика)
+        /// </summary>
+        [HttpGet("againstMe/{reportId}")]
+        public async Task<CommandResult<ContentReportSubjectView?>> GetReportAgainstMeAsync(Guid reportId)
+        {
+            return await ExecuteAsync(
+                nameof(GetReportAgainstMeAsync),
+                () => _contentReportsService.GetReportAgainstMeAsync(reportId));
         }
 
         /// <summary>

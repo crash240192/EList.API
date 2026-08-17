@@ -163,6 +163,32 @@ Safety (всегда ещё и на площадку):
 
 ---
 
+## 7.1. «Жалобы на меня» и замечания модерации
+
+Две связанные страницы. Личность жалобщика адресату **не отдаём**.
+
+### Входящие замечания (инбокс)
+
+`GET /notifications/my?pageIndex=0&pageSize=20&unreadOnly=false`  
+Фильтр замечаний модерации: `type=ContentReportWarningIssued` (73) или другие 70–79.  
+Счётчик непрочитанных: `GET /notifications/my/count?unreadOnly=true`.  
+Прочитано: уже существующие `GET /notifications/read/{id}` и `GET /notifications/read/all`.
+
+Поля карточки: `title`, `message` (текст предупреждения), `type`, `createdAt`, `readAt`, `data.reportId`.
+
+### Жалобы, которые касаются меня
+
+`GET /contentReports/againstMe?pageIndex=0&pageSize=20`  
+Карточка: `GET /contentReports/againstMe/{reportId}`
+
+В выборку: профиль, ваши сообщения/фото (если заполнен `reportedAccountId`), организации, где вы активный участник. **Не** входит очередь организатора по чужому контенту события.
+
+Ответ `ContentReportSubjectView` — без `reporter`, комментария жалобщика, очередей и аудита. `moderatorRemark` заполняется только для `Warn` / `Other` (текст предупреждения).
+
+С `GET /contentReports/get/{id}` адресат по-прежнему получит 403 — для него только `againstMe`.
+
+---
+
 ## 8. Кабинет организатора (контекст события)
 
 ### Где живёт
@@ -447,7 +473,7 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
 
 | Type | Значение | Кому | Когда | Куда вести в UI |
 |---|---|---|---|---|
-| ContentReportFiledAgainstYou | 70 | владелец профиля / автор сообщения / участники организации / организатор-человек | создана жалоба на них | «Мои жалобы» не их — показать нейтральный экран «жалоба на ваш контент, ожидает модерации». Личность жалобщика **не** передаём (`RelatedAccountId` = null) |
+| ContentReportFiledAgainstYou | 70 | владелец профиля / автор сообщения / участники организации / организатор-человек | создана жалоба на них | `GET /contentReports/againstMe/{reportId}` |
 | ContentReportNewInOrganizerQueue | 71 | организаторы события (включая участников организаций-соорганизаторов), кроме жалобщика и предмета | жалоба попала в очередь события | вкладка «Жалобы» события (`EventId`) |
 | ContentReportNewInPlatformQueue | 72 | moderator/admin/superuser | новая площадочная жалоба или эскалация | кабинет площадки, карточка `ReportId` |
 | ContentReportWarningIssued | 73 | предмет жалобы (профиль, автор, организаторы события при Warn на ивент, участники орг.) | действие `Warn` | текст предупреждения в `Message` (если модератор оставил комментарий — он здесь) |
@@ -484,8 +510,14 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
 |---|---|---|
 | GET | `/api/contentReports/reasons?onlyActive=true&forTargetType=Photo` | все |
 | POST | `/api/contentReports/create` | все |
-| GET | `/api/contentReports/my` | все |
+| GET | `/api/contentReports/my` | все (я отправитель) |
+| GET | `/api/contentReports/againstMe` | все (жалобы на меня / мои орг.) |
+| GET | `/api/contentReports/againstMe/{id}` | адресат жалобы (без личности жалобщика) |
 | GET | `/api/contentReports/get/{id}` | автор / организатор очереди / staff |
+| GET | `/api/notifications/my` | все (история входящих) |
+| GET | `/api/notifications/my/count` | все |
+| GET | `/api/notifications/read/{id}` | все |
+| GET | `/api/notifications/read/all` | все |
 | GET | `/api/contentReports/actions/{id}` | те же |
 | POST | `/api/contentReports/organizer/{eventId}/search` | организатор / staff |
 | GET | `/api/contentReports/organizer/{eventId}/count` | организатор / staff |

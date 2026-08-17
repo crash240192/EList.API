@@ -29,6 +29,11 @@ namespace EList.Repositories.Interfaces
             Guid targetId);
         Task<PagedList<ContentReport>> SearchReportsAsync(ContentReportsSearchRequest request);
         Task<int> CountReportsAsync(ContentReportsSearchRequest request);
+        Task<PagedList<ContentReport>> SearchReportsConcerningAccountAsync(
+            Guid accountId,
+            List<Guid> organizationIds,
+            int pageIndex,
+            int pageSize);
 
         Task SetReportStatusAsync(Guid id, ReportStatus status);
         Task SetOrganizerStatusAsync(Guid id, ReportStatus status);
