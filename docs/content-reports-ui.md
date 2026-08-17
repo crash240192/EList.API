@@ -18,7 +18,7 @@
 | **Организаторы мероприятия** | Сообщения в чате события и фото события (альбом / обложка). Не видят жалобы на само мероприятие, профиль, организацию. |
 | **Модераторы площадки** (`moderator` / `admin` / `superuser`) | Всё, что ушло на площадку: события, профили, организации, организаторы, фото профиля/аватарки, safety-кейсы, эскалации. |
 
-Обычный пользователь (нет строки в `account_platform_roles`) видит только кнопку «Пожаловаться» и список своих жалоб.
+Обычный пользователь (нет строки в `account_platform_roles`) видит кнопку «Пожаловаться», **«Мои жалобы»** (исходящие) и **«Жалобы на меня» / входящие замечания**.
 
 **Правило:** предмет жалобы не модерирует её. Организатор не обрабатывает жалобу на своё событие/своё сообщение/своё фото профиля. Участник организации не обрабатывает жалобу на свою организацию.
 
@@ -28,7 +28,7 @@
 
 | Роль | Как определить | Что открыть в UI |
 |---|---|---|
-| Пользователь | `GET /platformRoles/my` → `result == null` или `active == false` | Подача жалобы, «Мои жалобы» |
+| Пользователь | `GET /platformRoles/my` → `result == null` или `active == false` | Подача жалобы, «Мои жалобы», «Жалобы на меня», инбокс замечаний |
 | Организатор события | `GET /EventOrganizators/isOrganizator/{eventId}` → `true` (прямой организатор **или** активный участник организации-соорганизатора) | Бейдж + очередь **этого** события |
 | Moderator / Admin / Superuser | `GET /platformRoles/my` → `role` | Кабинет площадки. Admin/Superuser ещё и справочник причин + назначение ролей |
 
@@ -165,27 +165,65 @@ Safety (всегда ещё и на площадку):
 
 ## 7.1. «Жалобы на меня» и замечания модерации
 
-Две связанные страницы. Личность жалобщика адресату **не отдаём**.
+Две связанные страницы в профиле. Личность жалобщика адресату **не отдаём** и не делаем экран «кто пожаловался».
+
+Страницу можно собрать **только на REST**. WebSocket — опциональный live-push; при открытии экрана всегда грузить историю с API, не полагаться на то, что сокет уже что-то прислал.
 
 ### Входящие замечания (инбокс)
 
-`GET /notifications/my?pageIndex=0&pageSize=20&unreadOnly=false`  
-Фильтр замечаний модерации: `type=ContentReportWarningIssued` (73) или другие 70–79.  
-Счётчик непрочитанных: `GET /notifications/my/count?unreadOnly=true`.  
-Прочитано: уже существующие `GET /notifications/read/{id}` и `GET /notifications/read/all`.
+Общий инбокс всех уведомлений аккаунта (подписки, приглашения, модерация).
 
-Поля карточки: `title`, `message` (текст предупреждения), `type`, `createdAt`, `readAt`, `data.reportId`.
+```
+GET /eList/api/notifications/my?pageIndex=0&pageSize=20&unreadOnly=false
+GET /eList/api/notifications/my?type=ContentReportWarningIssued
+GET /eList/api/notifications/my/count?unreadOnly=true
+GET /eList/api/notifications/read/{id}
+GET /eList/api/notifications/read/all
+```
+
+В REST `type` — **строка PascalCase** (`ContentReportWarningIssued`), не число. Число `73` — только в WebSocket (см. §18).
+
+Поля карточки (camelCase): `id`, `title`, `message`, `type`, `createdAt`, `readAt`, `eventId`, `data`.  
+В `data` для жалоб: `reportId`, `targetType`, `targetId`, `eventId`, `resolutionAction`, `reasonName`.
+
+Фильтр «только модерация» на клиенте: `type` в диапазоне ContentReport* (70–79) либо отдельные вкладки «Предупреждения» (`ContentReportWarningIssued`) / «Все».
+
+Тап по карточке с `data.reportId`:
+- автор жалобы (`ContentReportReviewed`) → `GET /contentReports/get/{reportId}` или «Мои жалобы»;
+- адресат / предупреждение / скрытие (`FiledAgainstYou`, `WarningIssued`, `ContentModerated`, блокировки) → `GET /contentReports/againstMe/{reportId}`;
+- очередь организатора (`NewInOrganizerQueue`) → вкладка жалоб события;
+- очередь площадки (`NewInPlatformQueue`) → кабинет площадки.
 
 ### Жалобы, которые касаются меня
 
-`GET /contentReports/againstMe?pageIndex=0&pageSize=20`  
-Карточка: `GET /contentReports/againstMe/{reportId}`
+```
+GET /eList/api/notifications/my   — не заменяет этот список
+GET /eList/api/contentReports/againstMe?pageIndex=0&pageSize=20
+GET /eList/api/contentReports/againstMe/{reportId}
+```
 
-В выборку: профиль, ваши сообщения/фото (если заполнен `reportedAccountId`), организации, где вы активный участник. **Не** входит очередь организатора по чужому контенту события.
+В выборку: ваш профиль; сообщения/фото, где заполнен `reportedAccountId`; организации, где вы активный участник; вы как организатор-человек.  
+**Не входит:** чужой контент в чате/альбоме события (это очередь организатора) и жалоба на само мероприятие (её видит площадка; вам придёт уведомление, только если вынесут `Warn` или отменят событие).
 
-Ответ `ContentReportSubjectView` — без `reporter`, комментария жалобщика, очередей и аудита. `moderatorRemark` заполняется только для `Warn` / `Other` (текст предупреждения).
+`GET /contentReports/get/{id}` и `GET /contentReports/actions/{id}` адресату дают **403**. Не использовать их с инбокса.
 
-С `GET /contentReports/get/{id}` адресат по-прежнему получит 403 — для него только `againstMe`.
+Ответ `ContentReportSubjectView`:
+
+| Поле | Смысл |
+|---|---|
+| `id` | id жалобы |
+| `targetType` / `targetId` | что затронуто |
+| `eventId`, `messageId`, `fileId`, `albumId`, `organizationId`, `eventOrganizatorId` | связи для превью и навигации |
+| `targetSnapshot` | JSON превью объекта (§12) |
+| `reason` | причина (без очередей модерации в UI) |
+| `status` | Open / InReview / Resolved / Dismissed / Escalated |
+| `resolutionAction` | что сделали, если уже решили |
+| `moderatorRemark` | текст замечания; **только** для `Warn` и `Other` |
+| `resolvedAt`, `createdAt`, `updatedAt` | даты |
+
+Нет полей: `reporter`, `reporterAccountId`, `comment` жалобщика, `assignedTo`, `resolvedBy`, `actions`, `organizerStatus`, `platformStatus`.
+
+Подписи статуса на этой странице лучше человеческие: «На рассмотрении» / «Предупреждение» / «Контент скрыт» / «Отклонено» — по `status` + `resolutionAction`, без слова «жалоба от пользователя X».
 
 ---
 
@@ -410,10 +448,13 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
 
 ```
 Профиль
-  └ Мои жалобы
+  ├ Мои жалобы              ← исходящие  GET /contentReports/my
+  ├ Жалобы на меня          ← входящие   GET /contentReports/againstMe
+  └ Уведомления             ← инбокс     GET /notifications/my
+       (бейдж: GET /notifications/my/count?unreadOnly=true)
 
 Событие (я организатор)
-  └ Жалобы   ← счётчик активных
+  └ Жалобы   ← счётчик GET /contentReports/organizer/{eventId}/count
 
 Меню staff (роль площадки)
   └ Модерация
@@ -422,7 +463,7 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
        └ Роли площадки  (admin+)
 ```
 
-Пункт «Пожаловаться» — контекстное меню объекта, не отдельный раздел.
+«Уведомления» можно совместить с уже существующим инбоксом платформы (подписки, приглашения) — не заводить второй колокольчик. Пункт «Пожаловаться» — контекстное меню объекта.
 
 ---
 
@@ -444,6 +485,10 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
 - [ ] Предупреждение: адресат получает `ContentReportWarningIssued`.
 - [ ] Автор жалобы после решения получает `ContentReportReviewed`.
 - [ ] Оффлайн: после reconnect непрочитанные приходят тем же JSON (как остальные уведомления).
+- [ ] Профиль содержит «Мои жалобы» и «Жалобы на меня» как разные списки.
+- [ ] `againstMe` не показывает, кто пожаловался; `get/{id}` с этого экрана не вызывать.
+- [ ] Предупреждение видно и в инбоксе (`notifications/my?type=ContentReportWarningIssued`), и в карточке `againstMe/{id}.moderatorRemark`.
+- [ ] Инбокс открывается по REST без активного WebSocket; сокет только добавляет новые карточки сверху.
 
 ---
 
@@ -452,6 +497,10 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
 Канал тот же, что у подписок, приглашений и чёрного списка: `ws(s)://{host}/eList/ws/notifications?authorization={token}&authorization-jwt={jwt}`.
 
 Тело — объект `Notification` (Newtonsoft, **PascalCase**, `Type` — **число** enum, как у остальных уведомлений). Непрочитанные уходят сразу при подключении.
+
+**REST и WS — разная сериализация.**  
+`GET /notifications/my` идёт через System.Text.Json: поля camelCase, `type` = `"ContentReportWarningIssued"`.  
+Сокет: поля PascalCase, `Type` = `73`. Клиент должен понимать оба формата (или нормализовать в одном слое).
 
 `Data` — объект:
 
@@ -476,7 +525,7 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
 | ContentReportFiledAgainstYou | 70 | владелец профиля / автор сообщения / участники организации / организатор-человек | создана жалоба на них | `GET /contentReports/againstMe/{reportId}` |
 | ContentReportNewInOrganizerQueue | 71 | организаторы события (включая участников организаций-соорганизаторов), кроме жалобщика и предмета | жалоба попала в очередь события | вкладка «Жалобы» события (`EventId`) |
 | ContentReportNewInPlatformQueue | 72 | moderator/admin/superuser | новая площадочная жалоба или эскалация | кабинет площадки, карточка `ReportId` |
-| ContentReportWarningIssued | 73 | предмет жалобы (профиль, автор, организаторы события при Warn на ивент, участники орг.) | действие `Warn` | текст предупреждения в `Message` (если модератор оставил комментарий — он здесь) |
+| ContentReportWarningIssued | 73 | предмет жалобы (профиль, автор, организаторы события при Warn на ивент, участники орг.) | действие `Warn` | `againstMe/{reportId}`; текст в `Message` и в `moderatorRemark` |
 | ContentReportContentModerated | 74 | автор контента | скрытие / удаление | объект из `TargetType`/`TargetId` |
 | ContentReportReviewed | 75 | автор жалобы | любое решение, включая отклонение | «Мои жалобы» → `ReportId` |
 | ContentReportAccountSuspended | 76 | заблокированный аккаунт | `SuspendAccount` | экран блокировки |
