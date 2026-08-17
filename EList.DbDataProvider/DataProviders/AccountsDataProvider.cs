@@ -67,5 +67,12 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.WalletId, walletId)
                 .UpdateAsync();
         }
+
+        public async Task SetAccountActiveAsync(Guid accountId, bool active)
+        {
+            await _connection.Accounts.Where(i => i.Id == accountId)
+                .Set(i => i.Active, active)
+                .UpdateAsync();
+        }
     }
 }

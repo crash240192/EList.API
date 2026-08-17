@@ -8,7 +8,7 @@ namespace EList.Models.ContentReports
         public string? ResolutionComment { get; set; }
 
         /// <summary>
-        /// Для ban_from_event / действий над автором сообщения — id аккаунта (если не из snapshot)
+        /// Для ban_from_event / suspend_account — id аккаунта (если не из snapshot)
         /// </summary>
         public Guid? TargetAccountId { get; set; }
     }

@@ -14,6 +14,11 @@ namespace EList.Models.ContentReports
         public Guid? EventId { get; set; }
         public Guid? MessageId { get; set; }
         public Guid? ConversationId { get; set; }
+        public Guid? FileId { get; set; }
+        public Guid? AlbumId { get; set; }
+        public Guid? ReportedAccountId { get; set; }
+        public Guid? OrganizationId { get; set; }
+        public Guid? EventOrganizatorId { get; set; }
         public Guid ReasonId { get; set; }
         public string? Comment { get; set; }
         public string? TargetSnapshot { get; set; }

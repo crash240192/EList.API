@@ -70,6 +70,11 @@ namespace EList.DbDataProvider.Interfaces
         Task SetMessageHiddenAsync(Guid messageId, bool hidden, Guid? hiddenBy);
         Task<MessageDto?> GetMessageAsync(Guid messageId);
 
+        Task<PhotoReportContextDto?> ResolvePhotoContextAsync(Guid fileId, Guid? albumId);
+        Task SetAlbumFileHiddenAsync(Guid fileId, Guid? albumId, bool hidden, Guid? hiddenBy);
+        Task DeleteAlbumFileAsync(Guid fileId, Guid? albumId);
+        Task<Guid?> GetEventIdByCoverImageAsync(Guid fileId);
+
         #endregion
     }
 }

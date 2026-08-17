@@ -1252,3 +1252,123 @@ FROM (VALUES
 WHERE NOT EXISTS (
 	SELECT 1 FROM public.report_reasons r WHERE r.code = v.code
 );
+
+
+-- =============================================================================
+-- Content reports: photo / account / organization / event_organizator
+-- =============================================================================
+
+do $ADD_REPORT_TARGET_TYPE_VALUES$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_target_type' AND e.enumlabel = 'photo') THEN
+		ALTER TYPE public.report_target_type ADD VALUE 'photo';
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_target_type' AND e.enumlabel = 'account') THEN
+		ALTER TYPE public.report_target_type ADD VALUE 'account';
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_target_type' AND e.enumlabel = 'organization') THEN
+		ALTER TYPE public.report_target_type ADD VALUE 'organization';
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_target_type' AND e.enumlabel = 'event_organizator') THEN
+		ALTER TYPE public.report_target_type ADD VALUE 'event_organizator';
+	END IF;
+END $ADD_REPORT_TARGET_TYPE_VALUES$;
+
+do $ADD_REPORT_TARGET_SCOPE_VALUES$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_target_scope' AND e.enumlabel = 'photo') THEN
+		ALTER TYPE public.report_target_scope ADD VALUE 'photo';
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_target_scope' AND e.enumlabel = 'account') THEN
+		ALTER TYPE public.report_target_scope ADD VALUE 'account';
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_target_scope' AND e.enumlabel = 'organization') THEN
+		ALTER TYPE public.report_target_scope ADD VALUE 'organization';
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_target_scope' AND e.enumlabel = 'event_organizator') THEN
+		ALTER TYPE public.report_target_scope ADD VALUE 'event_organizator';
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_target_scope' AND e.enumlabel = 'all') THEN
+		ALTER TYPE public.report_target_scope ADD VALUE 'all';
+	END IF;
+END $ADD_REPORT_TARGET_SCOPE_VALUES$;
+
+do $ADD_REPORT_RESOLUTION_ACTION_VALUES$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_resolution_action' AND e.enumlabel = 'suspend_account') THEN
+		ALTER TYPE public.report_resolution_action ADD VALUE 'suspend_account';
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_resolution_action' AND e.enumlabel = 'suspend_organization') THEN
+		ALTER TYPE public.report_resolution_action ADD VALUE 'suspend_organization';
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_resolution_action' AND e.enumlabel = 'remove_organizator') THEN
+		ALTER TYPE public.report_resolution_action ADD VALUE 'remove_organizator';
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_resolution_action' AND e.enumlabel = 'reset_avatar') THEN
+		ALTER TYPE public.report_resolution_action ADD VALUE 'reset_avatar';
+	END IF;
+END $ADD_REPORT_RESOLUTION_ACTION_VALUES$;
+
+ALTER TABLE public.content_reports DROP CONSTRAINT IF EXISTS content_reports_message_target_chk;
+
+ALTER TABLE public.content_reports
+	ADD COLUMN IF NOT EXISTS file_id uuid NULL,
+	ADD COLUMN IF NOT EXISTS album_id uuid NULL,
+	ADD COLUMN IF NOT EXISTS reported_account_id uuid NULL,
+	ADD COLUMN IF NOT EXISTS organization_id uuid NULL,
+	ADD COLUMN IF NOT EXISTS event_organizator_id uuid NULL;
+
+DO $CONTENT_REPORTS_NEW_FKS$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'content_reports_album_fk') THEN
+		ALTER TABLE public.content_reports
+			ADD CONSTRAINT content_reports_album_fk FOREIGN KEY (album_id) REFERENCES public.media_albums(id) ON DELETE SET NULL;
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'content_reports_reported_account_fk') THEN
+		ALTER TABLE public.content_reports
+			ADD CONSTRAINT content_reports_reported_account_fk FOREIGN KEY (reported_account_id) REFERENCES public.accounts(id);
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'content_reports_organization_fk') THEN
+		ALTER TABLE public.content_reports
+			ADD CONSTRAINT content_reports_organization_fk FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'content_reports_event_organizator_fk') THEN
+		ALTER TABLE public.content_reports
+			ADD CONSTRAINT content_reports_event_organizator_fk FOREIGN KEY (event_organizator_id) REFERENCES public.event_organizators(id) ON DELETE SET NULL;
+	END IF;
+END $CONTENT_REPORTS_NEW_FKS$;
+
+CREATE INDEX IF NOT EXISTS content_reports_file_id_idx ON public.content_reports (file_id);
+CREATE INDEX IF NOT EXISTS content_reports_reported_account_idx ON public.content_reports (reported_account_id);
+CREATE INDEX IF NOT EXISTS content_reports_organization_idx ON public.content_reports (organization_id);
+
+ALTER TABLE public.file_album_rls
+	ADD COLUMN IF NOT EXISTS hidden bool NOT NULL DEFAULT false,
+	ADD COLUMN IF NOT EXISTS hidden_at timestamptz NULL,
+	ADD COLUMN IF NOT EXISTS hidden_by uuid NULL;
+
+DO $FILE_ALBUM_HIDDEN_BY_FK$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'file_album_rls_hidden_by_fk') THEN
+		ALTER TABLE public.file_album_rls
+			ADD CONSTRAINT file_album_rls_hidden_by_fk FOREIGN KEY (hidden_by) REFERENCES public.accounts(id);
+	END IF;
+END $FILE_ALBUM_HIDDEN_BY_FK$;
+
+CREATE INDEX IF NOT EXISTS file_album_rls_hidden_idx ON public.file_album_rls (hidden) WHERE hidden = true;
+
+UPDATE public.report_reasons
+SET target_scope = 'all'::public.report_target_scope
+WHERE code IN ('spam', 'other', 'illegal_content', 'threats', 'fraud', 'hate', 'sexual_exploitation');
+
+INSERT INTO public.report_reasons (code, name, description, target_scope, severity, primary_queue, sort_order)
+SELECT v.code, v.name, v.description, v.target_scope::public.report_target_scope, v.severity::public.report_severity, v.primary_queue::public.report_queue, v.sort_order
+FROM (VALUES
+	('inappropriate_photo', 'Недопустимое фото', 'Фото нарушает правила площадки', 'photo', 'community', 'organizers', 50),
+	('fake_account', 'Поддельный / чужой профиль', 'Фейковый аккаунт или выдача себя за другого', 'account', 'community', 'platform', 60),
+	('organizer_misconduct', 'Нарушения организатора', 'Организатор события нарушает правила', 'event_organizator', 'community', 'platform', 70),
+	('inappropriate_organization', 'Нарушения организации', 'Организация нарушает правила площадки', 'organization', 'community', 'platform', 80)
+) AS v(code, name, description, target_scope, severity, primary_queue, sort_order)
+WHERE NOT EXISTS (
+	SELECT 1 FROM public.report_reasons r WHERE r.code = v.code
+);

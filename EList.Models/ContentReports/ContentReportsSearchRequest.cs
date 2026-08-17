@@ -8,6 +8,9 @@ namespace EList.Models.ContentReports
         public Guid? TargetId { get; set; }
         public Guid? EventId { get; set; }
         public Guid? MessageId { get; set; }
+        public Guid? FileId { get; set; }
+        public Guid? ReportedAccountId { get; set; }
+        public Guid? OrganizationId { get; set; }
         public Guid? ReasonId { get; set; }
         public ReportSeverity? Severity { get; set; }
         public Guid? ReporterAccountId { get; set; }

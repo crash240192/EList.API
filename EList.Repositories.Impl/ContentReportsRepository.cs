@@ -84,7 +84,14 @@ namespace EList.Repositories.Impl
 
         public void ApplyDefaultQueueStatuses(ContentReport report, ReportReason reason)
         {
-            if (report.TargetType == ReportTargetType.Event)
+            var platformOnly =
+                report.TargetType == ReportTargetType.Event
+                || report.TargetType == ReportTargetType.Account
+                || report.TargetType == ReportTargetType.Organization
+                || report.TargetType == ReportTargetType.EventOrganizator
+                || (report.TargetType == ReportTargetType.Photo && report.EventId == null);
+
+            if (platformOnly)
             {
                 report.PlatformStatus = ReportStatus.Open;
                 report.OrganizerStatus = null;
@@ -241,6 +248,33 @@ namespace EList.Repositories.Impl
                     message.PersonInfo = _mapper.Map<Models.Person.PersonInfo>(item.Account.PersonInfo);
             }
             return message;
+        }
+
+        public async Task<PhotoReportContext?> ResolvePhotoContextAsync(Guid fileId, Guid? albumId)
+        {
+            var item = await _dataProvider.ResolvePhotoContextAsync(fileId, albumId);
+            if (item == null)
+                return null;
+
+            return new PhotoReportContext
+            {
+                FileId = item.FileId,
+                AlbumId = item.AlbumId,
+                EventId = item.EventId,
+                AccountId = item.AccountId,
+                OrganizationId = item.OrganizationId,
+                Kind = item.Kind
+            };
+        }
+
+        public async Task SetAlbumFileHiddenAsync(Guid fileId, Guid? albumId, bool hidden, Guid? hiddenBy)
+        {
+            await _dataProvider.SetAlbumFileHiddenAsync(fileId, albumId, hidden, hiddenBy);
+        }
+
+        public async Task DeleteAlbumFileAsync(Guid fileId, Guid? albumId)
+        {
+            await _dataProvider.DeleteAlbumFileAsync(fileId, albumId);
         }
 
         private ContentReport? MapReport(ContentReportDto? item)

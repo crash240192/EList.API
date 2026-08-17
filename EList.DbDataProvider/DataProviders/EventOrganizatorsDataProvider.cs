@@ -29,7 +29,11 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<EventOrganizatorDto> GetByIdAsync(Guid id)
         {
-            var result = await _connection.Organizators.FirstOrDefaultAsync(i => i.Id == id);
+            var result = await _connection.Organizators
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Organization)
+                .FirstOrDefaultAsync(i => i.Id == id);
             return result;
         }
 
@@ -110,6 +114,11 @@ namespace EList.DbDataProvider.DataProviders
                 if (organizationOrganizators.Any())
                     await _connection.BulkCopyAsync(organizationOrganizators);
             }
+        }
+
+        public async Task DeleteAsync(Guid id)
+        {
+            await _connection.Organizators.DeleteAsync(i => i.Id == id);
         }
     }
 }

@@ -31,5 +31,6 @@ namespace EList.DbDataProvider.Interfaces
         Task SetNewOrganizationAvatarAsync(Guid organizationId, Guid fileId);
         Task<List<Guid>?> GetOrganizationAvatarsAsync(Guid organizationId);
         Task<Guid?> GetLastOrganizationAvatarAsync(Guid organizationId);
+        Task DeleteOrganizationAvatarAsync(Guid fileId);
     }
 }

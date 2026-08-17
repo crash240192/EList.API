@@ -11,5 +11,6 @@ namespace EList.Repositories.Interfaces
         Task<List<Guid>> GetOrganizatorIdsByEventIdAsync(Guid eventId);
         Task<bool> IsAccountEventOrganizatorAsync(Guid eventId, Guid accountId);
         Task AssignAsync(Guid eventId, List<Guid> accountIds, List<Guid> organizationIds);
+        Task DeleteAsync(Guid id);
     }
 }

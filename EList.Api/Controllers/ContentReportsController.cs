@@ -107,7 +107,7 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
-        /// Создать жалобу на событие или сообщение
+        /// Создать жалобу на событие, сообщение, фото, аккаунт, организацию или организатора
         /// </summary>
         [HttpPost("create")]
         public async Task<CommandResult<Guid?>> CreateReportAsync([FromBody] CreateContentReportRequest request)

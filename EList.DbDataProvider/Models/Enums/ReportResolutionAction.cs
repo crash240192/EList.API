@@ -26,6 +26,18 @@ namespace EList.DbDataProvider.Models.Enums
         Escalate = 6,
 
         [MapValue(Value = "other")]
-        Other = 7
+        Other = 7,
+
+        [MapValue(Value = "suspend_account")]
+        SuspendAccount = 8,
+
+        [MapValue(Value = "suspend_organization")]
+        SuspendOrganization = 9,
+
+        [MapValue(Value = "remove_organizator")]
+        RemoveOrganizator = 10,
+
+        [MapValue(Value = "reset_avatar")]
+        ResetAvatar = 11
     }
 }

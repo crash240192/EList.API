@@ -300,7 +300,7 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<ListResponse<FileAlbumRelationDto>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
         {
-            var request = _connection.AlbumFiles.Where(i => i.AlbumId == albumId);
+            var request = _connection.AlbumFiles.Where(i => i.AlbumId == albumId && !i.Hidden);
 
             var count = await request.CountAsync();
 
@@ -442,6 +442,12 @@ namespace EList.DbDataProvider.DataProviders
                 PhotoId = fileId,
                 AssignmentDate = DateTimeOffset.Now
             });
+        }
+
+        public async Task DeleteOrganizationAvatarAsync(Guid fileId)
+        {
+            await _connection.OrganizationAvatars.Where(i => i.PhotoId == fileId)
+                .DeleteAsync();
         }
         #endregion
     }

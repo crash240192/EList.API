@@ -54,6 +54,7 @@ namespace EList.Repositories.Impl
                 Organization = i.Organization != null ? _mapper.Map<Models.Organizations.Organization>(i.Organization) : null,
                 Id = i.Id,
                 EventId = eventId,
+                AccountId = i.AccountId,
                 OrganizationId = i.OrganizationId
             }).ToList();
             return result;
@@ -73,13 +74,27 @@ namespace EList.Repositories.Impl
         public async Task<EventOrganizator?> GetByIdAsync(Guid id)
         {
             var item = await _eventOrganizatorsDataProvider.GetByIdAsync(id);
+            if (item == null)
+                return null;
+
             var result = _mapper.Map<EventOrganizator>(item);
+            if (item?.Account != null)
+                result.Account = _mapper.Map<AccountPublicData>(item.Account);
+            if (item?.Account?.PersonInfo != null)
+                result.PersonInfo = _mapper.Map<PersonInfo>(item.Account.PersonInfo);
+            if (item?.Organization != null)
+                result.Organization = _mapper.Map<Models.Organizations.Organization>(item.Organization);
             return result;
         }
 
         public async Task AssignAsync(Guid eventId, List<Guid> accountIds, List<Guid> organizationIds)
         {
             await _eventOrganizatorsDataProvider.AssignAsync(eventId, accountIds, organizationIds);
+        }
+
+        public async Task DeleteAsync(Guid id)
+        {
+            await _eventOrganizatorsDataProvider.DeleteAsync(id);
         }
     }
 }

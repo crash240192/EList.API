@@ -27,6 +27,9 @@ namespace EList.Services.Impl
         private readonly IEventsRepository _eventsRepository;
         private readonly IConversationRepository _conversationRepository;
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
+        private readonly IAccountsRepository _accountsRepository;
+        private readonly IOrganizationsRepository _organizationsRepository;
+        private readonly IMediaRepository _mediaRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IMapper _mapper;
@@ -37,6 +40,9 @@ namespace EList.Services.Impl
             IEventsRepository eventsRepository,
             IConversationRepository conversationRepository,
             IParticipantsBWListRepository participantsBWListRepository,
+            IAccountsRepository accountsRepository,
+            IOrganizationsRepository organizationsRepository,
+            IMediaRepository mediaRepository,
             IAccountDataHolder accountDataHolder,
             ICorrelationIdProvider correlationIdProvider,
             IMapper mapper)
@@ -46,6 +52,9 @@ namespace EList.Services.Impl
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
             _participantsBWListRepository = participantsBWListRepository ?? throw new ArgumentNullException(nameof(participantsBWListRepository));
+            _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
+            _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
+            _mediaRepository = mediaRepository ?? throw new ArgumentNullException(nameof(mediaRepository));
             _accountDataHolder = accountDataHolder;
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
@@ -210,50 +219,13 @@ namespace EList.Services.Impl
                 TargetType = request.TargetType,
                 TargetId = request.TargetId,
                 ReasonId = request.ReasonId,
-                Comment = request.Comment?.Trim()
+                Comment = request.Comment?.Trim(),
+                AlbumId = request.AlbumId
             };
 
-            if (request.TargetType == ReportTargetType.Event)
-            {
-                var ev = await _eventsRepository.GetEventAsync(request.TargetId);
-                if (ev == null)
-                    return CommandResult<Guid?>.Fail(ErrorCode.EventNotFound, "Событие не найдено");
-
-                report.EventId = ev.Id;
-                report.TargetSnapshot = JsonSerializer.Serialize(new
-                {
-                    type = "event",
-                    eventId = ev.Id,
-                    name = ev.Name,
-                    description = ev.Description,
-                    active = ev.Active
-                });
-            }
-            else
-            {
-                var message = await _contentReportsRepository.GetMessageAsync(request.TargetId);
-                if (message == null)
-                    return CommandResult<Guid?>.Fail(ErrorCode.MessageNotFound, "Сообщение не найдено");
-
-                var conversation = await _conversationRepository.GetConversationAsync(message.ConversationId);
-                if (conversation?.EventId == null)
-                    return CommandResult<Guid?>.Fail(ErrorCode.InvalidValue, "Жалобы поддерживаются только для обсуждений мероприятий");
-
-                report.MessageId = message.Id;
-                report.ConversationId = message.ConversationId;
-                report.EventId = conversation.EventId;
-                report.TargetSnapshot = JsonSerializer.Serialize(new
-                {
-                    type = "message",
-                    messageId = message.Id,
-                    conversationId = message.ConversationId,
-                    eventId = conversation.EventId,
-                    accountId = message.AccountId,
-                    organizationId = message.OrganizationId,
-                    messageText = message.MessageText,
-                    createDate = message.CreateDate
-                });
-            }
+            var fillResult = await FillReportTargetAsync(report, request);
+            if (!fillResult.Success)
+                return CommandResult<Guid?>.Fail(fillResult.ErrorCode, fillResult.Message);
 
             _contentReportsRepository.ApplyDefaultQueueStatuses(report, reason);
             var reportId = await _contentReportsRepository.CreateReportAsync(report);
@@ -386,6 +358,9 @@ namespace EList.Services.Impl
             if (!asPlatform && !asOrganizer)
                 return CommandResult.Fail(ErrorCode.AccessError, "Недостаточно прав для обработки жалобы");
 
+            if (await IsReportSubjectAsync(report))
+                return CommandResult.Fail(ErrorCode.AccessError, "Нельзя модерировать жалобу, предметом которой вы являетесь");
+
             await _contentReportsRepository.AssignReportAsync(reportId, _accountDataHolder.AccountId);
 
             if (asOrganizer)
@@ -427,8 +402,11 @@ namespace EList.Services.Impl
             if (!asPlatform && !asOrganizer)
                 return CommandResult.Fail(ErrorCode.AccessError, "Недостаточно прав для обработки жалобы");
 
-            if (request.ResolutionAction == ReportResolutionAction.CancelEvent && !asPlatform)
-                return CommandResult.Fail(ErrorCode.AccessError, "Отменить мероприятие может только модератор площадки");
+            if (await IsReportSubjectAsync(report))
+                return CommandResult.Fail(ErrorCode.AccessError, "Нельзя модерировать жалобу, предметом которой вы являетесь");
+
+            if (!asPlatform && IsPlatformOnlyResolution(request.ResolutionAction))
+                return CommandResult.Fail(ErrorCode.AccessError, "Это действие доступно только модератору площадки");
 
             var applyResult = await ApplyResolutionActionAsync(report, request, asPlatform);
             if (!applyResult.Success)
@@ -538,7 +516,9 @@ namespace EList.Services.Impl
                             report.MessageId.Value, true, _accountDataHolder.AccountId);
                         return CommandResult.OK;
                     }
-                    return CommandResult.Fail(ErrorCode.InvalidValue, "Скрытие поддерживается для сообщений");
+                    if (report.TargetType == ReportTargetType.Photo)
+                        return await ApplyPhotoModerationAsync(report, delete: false);
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Скрытие поддерживается для сообщений и фото");
 
                 case ReportResolutionAction.DeleteContent:
                     if (report.TargetType == ReportTargetType.Message && report.MessageId != null)
@@ -548,13 +528,16 @@ namespace EList.Services.Impl
                         await _conversationRepository.DeleteMessageAsync(report.MessageId.Value);
                         return CommandResult.OK;
                     }
-                    return CommandResult.Fail(ErrorCode.InvalidValue, "Удаление контента поддерживается для сообщений");
+                    if (report.TargetType == ReportTargetType.Photo)
+                        return await ApplyPhotoModerationAsync(report, delete: true);
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Удаление контента поддерживается для сообщений и фото");
 
                 case ReportResolutionAction.BanFromEvent:
                     if (report.EventId == null)
                         return CommandResult.Fail(ErrorCode.InvalidValue, "Не указано мероприятие для бана");
 
                     var accountId = request.TargetAccountId
+                        ?? report.ReportedAccountId
                         ?? TryGetAccountIdFromSnapshot(report.TargetSnapshot)
                         ?? report.Message?.AccountId;
 
@@ -578,6 +561,62 @@ namespace EList.Services.Impl
                     await _eventsRepository.CancelEventAsync(report.EventId.Value);
                     return CommandResult.OK;
 
+                case ReportResolutionAction.SuspendAccount:
+                    if (!asPlatform)
+                        return CommandResult.Fail(ErrorCode.AccessError, "Блокировать аккаунт может только модератор площадки");
+
+                    var suspendAccountId = request.TargetAccountId
+                        ?? report.ReportedAccountId
+                        ?? (report.TargetType == ReportTargetType.Account ? report.TargetId : (Guid?)null)
+                        ?? TryGetAccountIdFromSnapshot(report.TargetSnapshot);
+
+                    if (suspendAccountId == null)
+                        return CommandResult.Fail(ErrorCode.InvalidValue, "Не удалось определить аккаунт для блокировки");
+
+                    var account = await _accountsRepository.GetAccountAsync(suspendAccountId.Value);
+                    if (account == null)
+                        return CommandResult.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
+
+                    await _accountsRepository.SetAccountActiveAsync(suspendAccountId.Value, false);
+                    return CommandResult.OK;
+
+                case ReportResolutionAction.SuspendOrganization:
+                    if (!asPlatform)
+                        return CommandResult.Fail(ErrorCode.AccessError, "Приостановить организацию может только модератор площадки");
+
+                    var suspendOrgId = report.OrganizationId
+                        ?? (report.TargetType == ReportTargetType.Organization ? report.TargetId : (Guid?)null);
+
+                    if (suspendOrgId == null)
+                        return CommandResult.Fail(ErrorCode.InvalidValue, "Не удалось определить организацию");
+
+                    var organization = await _organizationsRepository.GetOrganizationAsync(suspendOrgId.Value);
+                    if (organization == null)
+                        return CommandResult.Fail(ErrorCode.OrganizationNotFound, "Организация не найдена");
+
+                    await _organizationsRepository.SetOrganizationActiveAsync(suspendOrgId.Value, false);
+                    return CommandResult.OK;
+
+                case ReportResolutionAction.RemoveOrganizator:
+                    if (!asPlatform)
+                        return CommandResult.Fail(ErrorCode.AccessError, "Снять организатора может только модератор площадки");
+
+                    var organizatorId = report.EventOrganizatorId
+                        ?? (report.TargetType == ReportTargetType.EventOrganizator ? report.TargetId : (Guid?)null);
+
+                    if (organizatorId == null)
+                        return CommandResult.Fail(ErrorCode.InvalidValue, "Не указан организатор для снятия");
+
+                    var organizator = await _eventOrganizatorsRepository.GetByIdAsync(organizatorId.Value);
+                    if (organizator == null)
+                        return CommandResult.Fail(ErrorCode.InvalidValue, "Запись организатора не найдена");
+
+                    await _eventOrganizatorsRepository.DeleteAsync(organizatorId.Value);
+                    return CommandResult.OK;
+
+                case ReportResolutionAction.ResetAvatar:
+                    return await ResetAvatarAsync(report);
+
                 default:
                     return CommandResult.Fail(ErrorCode.InvalidValue, "Некорректное действие");
             }
@@ -594,10 +633,9 @@ namespace EList.Services.Impl
             if (_accountDataHolder.IsPlatformModeratorOrAbove)
                 return true;
 
-            if (report.EventId != null && await IsEventOrganizerAsync(report.EventId.Value))
-                return report.OrganizerStatus != null || report.PlatformStatus != null;
-
-            return false;
+            return report.OrganizerStatus != null
+                && report.EventId != null
+                && await IsEventOrganizerAsync(report.EventId.Value);
         }
 
         private async Task<bool> IsEventOrganizerAsync(Guid eventId)
@@ -613,9 +651,335 @@ namespace EList.Services.Impl
 
         private static bool IsReasonApplicable(ReportReason reason, ReportTargetType targetType)
         {
-            return reason.TargetScope == ReportTargetScope.Both
-                || (targetType == ReportTargetType.Event && reason.TargetScope == ReportTargetScope.Event)
-                || (targetType == ReportTargetType.Message && reason.TargetScope == ReportTargetScope.Message);
+            if (reason.TargetScope == ReportTargetScope.All)
+                return true;
+
+            if (reason.TargetScope == ReportTargetScope.Both)
+                return targetType == ReportTargetType.Event || targetType == ReportTargetType.Message;
+
+            return (targetType == ReportTargetType.Event && reason.TargetScope == ReportTargetScope.Event)
+                || (targetType == ReportTargetType.Message && reason.TargetScope == ReportTargetScope.Message)
+                || (targetType == ReportTargetType.Photo && reason.TargetScope == ReportTargetScope.Photo)
+                || (targetType == ReportTargetType.Account && reason.TargetScope == ReportTargetScope.Account)
+                || (targetType == ReportTargetType.Organization && reason.TargetScope == ReportTargetScope.Organization)
+                || (targetType == ReportTargetType.EventOrganizator && reason.TargetScope == ReportTargetScope.EventOrganizator);
+        }
+
+        private static bool IsPlatformOnlyResolution(ReportResolutionAction action)
+        {
+            return action is ReportResolutionAction.CancelEvent
+                or ReportResolutionAction.SuspendAccount
+                or ReportResolutionAction.SuspendOrganization
+                or ReportResolutionAction.RemoveOrganizator;
+        }
+
+        private async Task<CommandResult> FillReportTargetAsync(ContentReport report, CreateContentReportRequest request)
+        {
+            switch (request.TargetType)
+            {
+                case ReportTargetType.Event:
+                    {
+                        var ev = await _eventsRepository.GetEventAsync(request.TargetId);
+                        if (ev == null)
+                            return CommandResult.Fail(ErrorCode.EventNotFound, "Событие не найдено");
+
+                        if (await IsEventOrganizerAsync(ev.Id))
+                            return CommandResult.Fail(ErrorCode.InvalidValue, "Нельзя пожаловаться на собственное мероприятие");
+
+                        report.EventId = ev.Id;
+                        report.TargetSnapshot = JsonSerializer.Serialize(new
+                        {
+                            type = "event",
+                            eventId = ev.Id,
+                            name = ev.Name,
+                            description = ev.Description,
+                            active = ev.Active,
+                            coverImageId = ev.CoverImageId
+                        });
+                        return CommandResult.OK;
+                    }
+
+                case ReportTargetType.Message:
+                    {
+                        var message = await _contentReportsRepository.GetMessageAsync(request.TargetId);
+                        if (message == null)
+                            return CommandResult.Fail(ErrorCode.MessageNotFound, "Сообщение не найдено");
+
+                        if (message.AccountId != null && message.AccountId == _accountDataHolder.AccountId)
+                            return CommandResult.Fail(ErrorCode.InvalidValue, "Нельзя пожаловаться на собственное сообщение");
+
+                        var conversation = await _conversationRepository.GetConversationAsync(message.ConversationId);
+                        if (conversation?.EventId == null)
+                            return CommandResult.Fail(ErrorCode.InvalidValue, "Жалобы поддерживаются только для обсуждений мероприятий");
+
+                        report.MessageId = message.Id;
+                        report.ConversationId = message.ConversationId;
+                        report.EventId = conversation.EventId;
+                        report.ReportedAccountId = message.AccountId;
+                        report.OrganizationId = message.OrganizationId;
+                        report.TargetSnapshot = JsonSerializer.Serialize(new
+                        {
+                            type = "message",
+                            messageId = message.Id,
+                            conversationId = message.ConversationId,
+                            eventId = conversation.EventId,
+                            accountId = message.AccountId,
+                            organizationId = message.OrganizationId,
+                            messageText = message.MessageText,
+                            createDate = message.CreateDate
+                        });
+                        return CommandResult.OK;
+                    }
+
+                case ReportTargetType.Photo:
+                    {
+                        var context = await _contentReportsRepository.ResolvePhotoContextAsync(
+                            request.TargetId, request.AlbumId);
+                        if (context == null)
+                            return CommandResult.Fail(ErrorCode.AlbumItemNotFound, "Фото не найдено");
+
+                        var isOwnProfilePhoto = context.AccountId != null
+                            && context.AccountId == _accountDataHolder.AccountId
+                            && (context.Kind == "account_album" || context.Kind == "account_avatar");
+                        if (isOwnProfilePhoto)
+                            return CommandResult.Fail(ErrorCode.InvalidValue, "Нельзя пожаловаться на собственное фото профиля");
+
+                        report.FileId = context.FileId;
+                        report.AlbumId = context.AlbumId ?? request.AlbumId;
+                        report.EventId = context.EventId;
+                        report.ReportedAccountId = context.AccountId;
+                        report.OrganizationId = context.OrganizationId;
+                        report.TargetSnapshot = JsonSerializer.Serialize(new
+                        {
+                            type = "photo",
+                            kind = context.Kind,
+                            fileId = context.FileId,
+                            albumId = context.AlbumId,
+                            eventId = context.EventId,
+                            accountId = context.AccountId,
+                            organizationId = context.OrganizationId
+                        });
+                        return CommandResult.OK;
+                    }
+
+                case ReportTargetType.Account:
+                    {
+                        if (request.TargetId == _accountDataHolder.AccountId)
+                            return CommandResult.Fail(ErrorCode.InvalidValue, "Нельзя пожаловаться на собственный аккаунт");
+
+                        var account = await _accountsRepository.GetAccountAsync(request.TargetId);
+                        if (account == null)
+                            return CommandResult.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
+
+                        report.ReportedAccountId = account.Id;
+                        report.TargetSnapshot = JsonSerializer.Serialize(new
+                        {
+                            type = "account",
+                            accountId = account.Id,
+                            login = account.Login,
+                            active = account.Active,
+                            avatarId = account.AvatarId
+                        });
+                        return CommandResult.OK;
+                    }
+
+                case ReportTargetType.Organization:
+                    {
+                        var organization = await _organizationsRepository.GetOrganizationAsync(request.TargetId);
+                        if (organization == null)
+                            return CommandResult.Fail(ErrorCode.OrganizationNotFound, "Организация не найдена");
+
+                        report.OrganizationId = organization.Id;
+                        report.TargetSnapshot = JsonSerializer.Serialize(new
+                        {
+                            type = "organization",
+                            organizationId = organization.Id,
+                            name = organization.Name,
+                            active = organization.Active,
+                            createdByAccountId = organization.CreatedByAccountId
+                        });
+                        return CommandResult.OK;
+                    }
+
+                case ReportTargetType.EventOrganizator:
+                    {
+                        var organizator = await _eventOrganizatorsRepository.GetByIdAsync(request.TargetId);
+                        if (organizator == null)
+                            return CommandResult.Fail(ErrorCode.InvalidValue, "Организатор мероприятия не найден");
+
+                        if (organizator.AccountId != null && organizator.AccountId == _accountDataHolder.AccountId)
+                            return CommandResult.Fail(ErrorCode.InvalidValue, "Нельзя пожаловаться на себя как на организатора");
+
+                        report.EventOrganizatorId = organizator.Id;
+                        report.EventId = organizator.EventId;
+                        report.ReportedAccountId = organizator.AccountId;
+                        report.OrganizationId = organizator.OrganizationId;
+                        report.TargetSnapshot = JsonSerializer.Serialize(new
+                        {
+                            type = "event_organizator",
+                            eventOrganizatorId = organizator.Id,
+                            eventId = organizator.EventId,
+                            accountId = organizator.AccountId,
+                            organizationId = organizator.OrganizationId
+                        });
+                        return CommandResult.OK;
+                    }
+
+                default:
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Некорректный тип цели");
+            }
+        }
+
+        private async Task<bool> IsReportSubjectAsync(ContentReport report)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return false;
+
+            var me = _accountDataHolder.AccountId.Value;
+
+            if (report.ReportedAccountId == me)
+                return true;
+
+            switch (report.TargetType)
+            {
+                case ReportTargetType.Account:
+                    return report.TargetId == me;
+
+                case ReportTargetType.Event:
+                    return report.EventId != null && await IsEventOrganizerAsync(report.EventId.Value);
+
+                case ReportTargetType.Organization:
+                    return report.OrganizationId != null
+                        && await _organizationsRepository.IsActiveMemberAsync(report.OrganizationId.Value, me);
+
+                case ReportTargetType.EventOrganizator:
+                    if (report.ReportedAccountId == me)
+                        return true;
+                    return report.OrganizationId != null
+                        && await _organizationsRepository.IsActiveMemberAsync(report.OrganizationId.Value, me);
+
+                case ReportTargetType.Message:
+                    return report.ReportedAccountId == me
+                        || report.Message?.AccountId == me
+                        || TryGetAccountIdFromSnapshot(report.TargetSnapshot) == me;
+
+                case ReportTargetType.Photo:
+                    if (report.ReportedAccountId == me)
+                        return true;
+                    if (report.OrganizationId != null
+                        && await _organizationsRepository.IsActiveMemberAsync(report.OrganizationId.Value, me))
+                        return true;
+                    return false;
+
+                default:
+                    return false;
+            }
+        }
+
+        private async Task<CommandResult> ApplyPhotoModerationAsync(ContentReport report, bool delete)
+        {
+            var kind = TryGetStringFromSnapshot(report.TargetSnapshot, "kind");
+            var fileId = report.FileId ?? (report.TargetType == ReportTargetType.Photo ? report.TargetId : (Guid?)null);
+            if (fileId == null)
+                return CommandResult.Fail(ErrorCode.AlbumItemNotFound, "Фото не найдено");
+
+            switch (kind)
+            {
+                case "event_cover":
+                    if (report.EventId != null)
+                        await _eventsRepository.SetEventCoverImageAsync(report.EventId.Value, null);
+                    return CommandResult.OK;
+
+                case "account_avatar":
+                    await _mediaRepository.DeleteAvatarAsync(fileId.Value);
+                    return CommandResult.OK;
+
+                case "organization_avatar":
+                    await _mediaRepository.DeleteOrganizationAvatarAsync(fileId.Value);
+                    return CommandResult.OK;
+
+                default:
+                    if (delete)
+                        await _contentReportsRepository.DeleteAlbumFileAsync(fileId.Value, report.AlbumId);
+                    else
+                        await _contentReportsRepository.SetAlbumFileHiddenAsync(
+                            fileId.Value, report.AlbumId, true, _accountDataHolder.AccountId);
+                    return CommandResult.OK;
+            }
+        }
+
+        private async Task<CommandResult> ResetAvatarAsync(ContentReport report)
+        {
+            var kind = TryGetStringFromSnapshot(report.TargetSnapshot, "kind");
+            var fileId = report.FileId;
+
+            if (kind == "event_cover" || (report.TargetType == ReportTargetType.Photo && report.EventId != null && fileId != null && kind == "event_cover"))
+            {
+                if (report.EventId == null)
+                    return CommandResult.Fail(ErrorCode.EventNotFound, "Мероприятие не найдено");
+                await _eventsRepository.SetEventCoverImageAsync(report.EventId.Value, null);
+                return CommandResult.OK;
+            }
+
+            if (kind == "account_avatar" || report.TargetType == ReportTargetType.Account)
+            {
+                if (fileId != null)
+                {
+                    await _mediaRepository.DeleteAvatarAsync(fileId.Value);
+                    return CommandResult.OK;
+                }
+
+                var accountId = report.ReportedAccountId
+                    ?? (report.TargetType == ReportTargetType.Account ? report.TargetId : (Guid?)null);
+                if (accountId == null)
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Не удалось определить аккаунт для сброса аватарки");
+
+                var last = await _mediaRepository.GetLastAccountAvatarAsync(accountId.Value);
+                if (last != null)
+                    await _mediaRepository.DeleteAvatarAsync(last.Value);
+                return CommandResult.OK;
+            }
+
+            if (kind == "organization_avatar" || report.TargetType == ReportTargetType.Organization)
+            {
+                if (fileId != null)
+                {
+                    await _mediaRepository.DeleteOrganizationAvatarAsync(fileId.Value);
+                    return CommandResult.OK;
+                }
+
+                var organizationId = report.OrganizationId
+                    ?? (report.TargetType == ReportTargetType.Organization ? report.TargetId : (Guid?)null);
+                if (organizationId == null)
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Не удалось определить организацию для сброса аватарки");
+
+                var last = await _mediaRepository.GetLastOrganizationAvatarAsync(organizationId.Value);
+                if (last != null)
+                    await _mediaRepository.DeleteOrganizationAvatarAsync(last.Value);
+                return CommandResult.OK;
+            }
+
+            return CommandResult.Fail(ErrorCode.InvalidValue, "Сброс аватарки не применим к этой жалобе");
+        }
+
+        private static string? TryGetStringFromSnapshot(string? snapshot, string propertyName)
+        {
+            if (string.IsNullOrWhiteSpace(snapshot))
+                return null;
+
+            try
+            {
+                using var doc = JsonDocument.Parse(snapshot);
+                if (doc.RootElement.TryGetProperty(propertyName, out var prop)
+                    && prop.ValueKind == JsonValueKind.String)
+                    return prop.GetString();
+            }
+            catch
+            {
+                // ignore malformed snapshot
+            }
+
+            return null;
         }
 
         private static Guid? TryGetAccountIdFromSnapshot(string? snapshot)

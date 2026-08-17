@@ -180,6 +180,11 @@ namespace EList.Repositories.Impl
             var result = await _mediaDataProvider.GetLastOrganizationAvatarAsync(organizationId);
             return result;
         }
+
+        public async Task DeleteOrganizationAvatarAsync(Guid fileId)
+        {
+            await _mediaDataProvider.DeleteOrganizationAvatarAsync(fileId);
+        }
         #endregion
     }
 }

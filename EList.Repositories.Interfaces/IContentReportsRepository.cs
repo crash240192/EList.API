@@ -50,5 +50,9 @@ namespace EList.Repositories.Interfaces
 
         Task SetMessageHiddenAsync(Guid messageId, bool hidden, Guid? hiddenBy);
         Task<Message?> GetMessageAsync(Guid messageId);
+
+        Task<PhotoReportContext?> ResolvePhotoContextAsync(Guid fileId, Guid? albumId);
+        Task SetAlbumFileHiddenAsync(Guid fileId, Guid? albumId, bool hidden, Guid? hiddenBy);
+        Task DeleteAlbumFileAsync(Guid fileId, Guid? albumId);
     }
 }

@@ -38,9 +38,16 @@ namespace EList.DbDataProvider.DataProviders
 
             if (forTargetType != null)
             {
-                query = forTargetType == ReportTargetType.Event
-                    ? query.Where(i => i.TargetScope == ReportTargetScope.Event || i.TargetScope == ReportTargetScope.Both)
-                    : query.Where(i => i.TargetScope == ReportTargetScope.Message || i.TargetScope == ReportTargetScope.Both);
+                var target = forTargetType.Value;
+                query = query.Where(i =>
+                    i.TargetScope == ReportTargetScope.All
+                    || (i.TargetScope == ReportTargetScope.Both && (target == ReportTargetType.Event || target == ReportTargetType.Message))
+                    || (i.TargetScope == ReportTargetScope.Event && target == ReportTargetType.Event)
+                    || (i.TargetScope == ReportTargetScope.Message && target == ReportTargetType.Message)
+                    || (i.TargetScope == ReportTargetScope.Photo && target == ReportTargetType.Photo)
+                    || (i.TargetScope == ReportTargetScope.Account && target == ReportTargetType.Account)
+                    || (i.TargetScope == ReportTargetScope.Organization && target == ReportTargetType.Organization)
+                    || (i.TargetScope == ReportTargetScope.EventOrganizator && target == ReportTargetType.EventOrganizator));
             }
 
             return await query.OrderBy(i => i.SortOrder).ThenBy(i => i.Name).ToListAsync();
@@ -108,8 +115,14 @@ namespace EList.DbDataProvider.DataProviders
 
         public void ApplyDefaultQueueStatuses(ContentReportDto report, ReportReasonDto reason)
         {
-            // События всегда ведёт платформа.
-            if (report.TargetType == ReportTargetType.Event)
+            var platformOnly =
+                report.TargetType == ReportTargetType.Event
+                || report.TargetType == ReportTargetType.Account
+                || report.TargetType == ReportTargetType.Organization
+                || report.TargetType == ReportTargetType.EventOrganizator
+                || (report.TargetType == ReportTargetType.Photo && report.EventId == null);
+
+            if (platformOnly)
             {
                 report.PlatformStatus = ReportStatus.Open;
                 report.OrganizerStatus = null;
@@ -117,7 +130,7 @@ namespace EList.DbDataProvider.DataProviders
                 return;
             }
 
-            // Safety / both → параллельные очереди.
+            // Safety / both → параллельные очереди (сообщение или фото события).
             if (reason.Severity == ReportSeverity.Safety || reason.PrimaryQueue == ReportQueue.Both)
             {
                 report.OrganizerStatus = ReportStatus.Open;
@@ -134,7 +147,7 @@ namespace EList.DbDataProvider.DataProviders
                 return;
             }
 
-            // Community message → организаторы.
+            // Community message / event photo → организаторы.
             report.OrganizerStatus = ReportStatus.Open;
             report.PlatformStatus = null;
             report.Status = ReportStatus.Open;
@@ -160,6 +173,11 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.Event)
                 .LoadWith(i => i.Message)
                 .LoadWith(i => i.Conversation)
+                .LoadWith(i => i.ReportedAccount)
+                .ThenLoad(a => a.PersonInfo)
+                .LoadWith(i => i.Organization)
+                .LoadWith(i => i.EventOrganizator)
+                .LoadWith(i => i.Album)
                 .LoadWith(i => i.AssignedToAccount)
                 .ThenLoad(a => a.PersonInfo)
                 .LoadWith(i => i.ResolvedByAccount)
@@ -358,6 +376,141 @@ namespace EList.DbDataProvider.DataProviders
                 .FirstOrDefaultAsync(i => i.Id == messageId);
         }
 
+        public async Task<PhotoReportContextDto?> ResolvePhotoContextAsync(Guid fileId, Guid? albumId)
+        {
+            FileAlbumRelationDto? albumFile = null;
+            if (albumId != null)
+            {
+                albumFile = await _connection.AlbumFiles
+                    .FirstOrDefaultAsync(i => i.FileId == fileId && i.AlbumId == albumId.Value);
+            }
+            else
+            {
+                var eventAlbumFile = await (
+                    from f in _connection.AlbumFiles
+                    join e in _connection.EventAlbums on f.AlbumId equals e.AlbumId
+                    where f.FileId == fileId
+                    select f
+                ).FirstOrDefaultAsync();
+                albumFile = eventAlbumFile
+                    ?? await _connection.AlbumFiles.FirstOrDefaultAsync(i => i.FileId == fileId);
+            }
+
+            if (albumFile != null)
+            {
+                var eventRelation = await _connection.EventAlbums
+                    .FirstOrDefaultAsync(i => i.AlbumId == albumFile.AlbumId);
+                if (eventRelation != null)
+                {
+                    return new PhotoReportContextDto
+                    {
+                        FileId = fileId,
+                        AlbumId = albumFile.AlbumId,
+                        EventId = eventRelation.EventId,
+                        Kind = "event_album"
+                    };
+                }
+
+                var accountRelation = await _connection.AccountAlbums
+                    .FirstOrDefaultAsync(i => i.AlbumId == albumFile.AlbumId);
+                if (accountRelation != null)
+                {
+                    return new PhotoReportContextDto
+                    {
+                        FileId = fileId,
+                        AlbumId = albumFile.AlbumId,
+                        AccountId = accountRelation.AccountId,
+                        Kind = "account_album"
+                    };
+                }
+            }
+
+            var eventByCover = await _connection.Events.FirstOrDefaultAsync(i => i.CoverImageId == fileId);
+            if (eventByCover != null)
+            {
+                return new PhotoReportContextDto
+                {
+                    FileId = fileId,
+                    EventId = eventByCover.Id,
+                    Kind = "event_cover"
+                };
+            }
+
+            var accountAvatar = await _connection.AccountAvatars
+                .OrderByDescending(i => i.AssignmentDate)
+                .FirstOrDefaultAsync(i => i.PhotoId == fileId);
+            if (accountAvatar != null)
+            {
+                return new PhotoReportContextDto
+                {
+                    FileId = fileId,
+                    AccountId = accountAvatar.AccountId,
+                    Kind = "account_avatar"
+                };
+            }
+
+            var orgAvatar = await _connection.OrganizationAvatars
+                .OrderByDescending(i => i.AssignmentDate)
+                .FirstOrDefaultAsync(i => i.PhotoId == fileId);
+            if (orgAvatar != null)
+            {
+                return new PhotoReportContextDto
+                {
+                    FileId = fileId,
+                    OrganizationId = orgAvatar.OrganizationId,
+                    Kind = "organization_avatar"
+                };
+            }
+
+            return albumFile == null
+                ? null
+                : new PhotoReportContextDto
+                {
+                    FileId = fileId,
+                    AlbumId = albumFile.AlbumId,
+                    Kind = "album"
+                };
+        }
+
+        public async Task SetAlbumFileHiddenAsync(Guid fileId, Guid? albumId, bool hidden, Guid? hiddenBy)
+        {
+            var query = _connection.AlbumFiles.Where(i => i.FileId == fileId);
+            if (albumId != null)
+                query = query.Where(i => i.AlbumId == albumId.Value);
+
+            if (hidden)
+            {
+                await query
+                    .Set(i => i.Hidden, true)
+                    .Set(i => i.HiddenAt, DateTimeOffset.UtcNow)
+                    .Set(i => i.HiddenBy, hiddenBy)
+                    .UpdateAsync();
+            }
+            else
+            {
+                await query
+                    .Set(i => i.Hidden, false)
+                    .Set(i => i.HiddenAt, (DateTimeOffset?)null)
+                    .Set(i => i.HiddenBy, (Guid?)null)
+                    .UpdateAsync();
+            }
+        }
+
+        public async Task DeleteAlbumFileAsync(Guid fileId, Guid? albumId)
+        {
+            var query = _connection.AlbumFiles.Where(i => i.FileId == fileId);
+            if (albumId != null)
+                query = query.Where(i => i.AlbumId == albumId.Value);
+
+            await query.DeleteAsync();
+        }
+
+        public async Task<Guid?> GetEventIdByCoverImageAsync(Guid fileId)
+        {
+            var ev = await _connection.Events.FirstOrDefaultAsync(i => i.CoverImageId == fileId);
+            return ev?.Id;
+        }
+
         #endregion
 
         private IQueryable<ContentReportDto> ApplySearchFilters(
@@ -375,6 +528,15 @@ namespace EList.DbDataProvider.DataProviders
 
             if (request.MessageId != null)
                 query = query.Where(i => i.MessageId == request.MessageId);
+
+            if (request.FileId != null)
+                query = query.Where(i => i.FileId == request.FileId);
+
+            if (request.ReportedAccountId != null)
+                query = query.Where(i => i.ReportedAccountId == request.ReportedAccountId);
+
+            if (request.OrganizationId != null)
+                query = query.Where(i => i.OrganizationId == request.OrganizationId);
 
             if (request.ReasonId != null)
                 query = query.Where(i => i.ReasonId == request.ReasonId);

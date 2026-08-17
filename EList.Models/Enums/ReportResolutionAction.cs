@@ -9,6 +9,10 @@ namespace EList.Models.Enums
         CancelEvent = 4,
         Dismiss = 5,
         Escalate = 6,
-        Other = 7
+        Other = 7,
+        SuspendAccount = 8,
+        SuspendOrganization = 9,
+        RemoveOrganizator = 10,
+        ResetAvatar = 11
     }
 }

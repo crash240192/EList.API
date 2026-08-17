@@ -8,6 +8,18 @@ namespace EList.DbDataProvider.Models.Enums
         Event = 0,
 
         [MapValue(Value = "message")]
-        Message = 1
+        Message = 1,
+
+        [MapValue(Value = "photo")]
+        Photo = 2,
+
+        [MapValue(Value = "account")]
+        Account = 3,
+
+        [MapValue(Value = "organization")]
+        Organization = 4,
+
+        [MapValue(Value = "event_organizator")]
+        EventOrganizator = 5
     }
 }

@@ -169,6 +169,10 @@ namespace EList.AutoMapperProfile
                 .ForMember(dest => dest.Event, opt => opt.Ignore())
                 .ForMember(dest => dest.Message, opt => opt.Ignore())
                 .ForMember(dest => dest.Conversation, opt => opt.Ignore())
+                .ForMember(dest => dest.ReportedAccount, opt => opt.Ignore())
+                .ForMember(dest => dest.Organization, opt => opt.Ignore())
+                .ForMember(dest => dest.EventOrganizator, opt => opt.Ignore())
+                .ForMember(dest => dest.Album, opt => opt.Ignore())
                 .ForMember(dest => dest.Actions, opt => opt.Ignore());
             CreateMap<ContentReport, ContentReportResponse>();
             CreateMap<ContentReportsSearchRequest, DbDataProvider.Models.SearchRequests.ContentReportsSearchRequest>().ReverseMap();

@@ -13,5 +13,6 @@ namespace EList.Repositories.Interfaces
         Task UpdatePasswordAsync(Guid accountId, string newPasswordHash);
 
         Task SetAccountWalletAsync(Guid accountId, Guid walletId);
+        Task SetAccountActiveAsync(Guid accountId, bool active);
     }
 }

@@ -28,6 +28,21 @@ namespace EList.DbDataProvider.Models
         [Column("conversation_id")]
         public Guid? ConversationId { get; set; }
 
+        [Column("file_id")]
+        public Guid? FileId { get; set; }
+
+        [Column("album_id")]
+        public Guid? AlbumId { get; set; }
+
+        [Column("reported_account_id")]
+        public Guid? ReportedAccountId { get; set; }
+
+        [Column("organization_id")]
+        public Guid? OrganizationId { get; set; }
+
+        [Column("event_organizator_id")]
+        public Guid? EventOrganizatorId { get; set; }
+
         [Column("reason_id")]
         public Guid ReasonId { get; set; }
 
@@ -82,6 +97,18 @@ namespace EList.DbDataProvider.Models
 
         [Association(ThisKey = nameof(ConversationId), OtherKey = nameof(ConversationDto.Id))]
         public ConversationDto? Conversation { get; set; }
+
+        [Association(ThisKey = nameof(ReportedAccountId), OtherKey = nameof(AccountDto.Id))]
+        public AccountDto? ReportedAccount { get; set; }
+
+        [Association(ThisKey = nameof(OrganizationId), OtherKey = nameof(OrganizationDto.Id))]
+        public OrganizationDto? Organization { get; set; }
+
+        [Association(ThisKey = nameof(EventOrganizatorId), OtherKey = nameof(EventOrganizatorDto.Id))]
+        public EventOrganizatorDto? EventOrganizator { get; set; }
+
+        [Association(ThisKey = nameof(AlbumId), OtherKey = nameof(MediaAlbumDto.Id))]
+        public MediaAlbumDto? Album { get; set; }
 
         [Association(ThisKey = nameof(AssignedTo), OtherKey = nameof(AccountDto.Id))]
         public AccountDto? AssignedToAccount { get; set; }

@@ -5,14 +5,19 @@ namespace EList.Models.ContentReports
     public class CreateContentReportRequest
     {
         /// <summary>
-        /// Тип цели: событие или сообщение в обсуждении
+        /// Тип цели: событие, сообщение, фото, аккаунт, организация или организатор мероприятия
         /// </summary>
         public ReportTargetType TargetType { get; set; }
 
         /// <summary>
-        /// Id события или сообщения
+        /// Id цели: события, сообщения, файла, аккаунта, организации или записи event_organizators
         /// </summary>
         public Guid TargetId { get; set; }
+
+        /// <summary>
+        /// Для жалобы на фото в альбоме — id альбома (опционально, если файл однозначен)
+        /// </summary>
+        public Guid? AlbumId { get; set; }
 
         /// <summary>
         /// Причина жалобы

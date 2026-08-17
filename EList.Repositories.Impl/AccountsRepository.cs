@@ -60,6 +60,11 @@ namespace EList.Repositories.Impl
             await _accountsDataProvider.SetAccountWalletAsync(accountId, walletId);
         }
 
+        public async Task SetAccountActiveAsync(Guid accountId, bool active)
+        {
+            await _accountsDataProvider.SetAccountActiveAsync(accountId, active);
+        }
+
 
         #region locations
         public async Task UpdateLocationAsync(Guid accountId, double latitude, double longitude)
