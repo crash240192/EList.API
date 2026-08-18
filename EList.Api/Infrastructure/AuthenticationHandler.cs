@@ -82,6 +82,7 @@ namespace EList.Api.Infrastructure
         private readonly IPersonsService _personsService;
         private readonly IAgreementService _agreementService;
         private readonly IAccountPlatformRolesService _platformRolesService;
+        private readonly IModerationPenaltiesService _moderationPenaltiesService;
         private bool IsAnonymousMethod // Не обязательны ни токен, ни jwt
         {
             get
@@ -125,7 +126,8 @@ namespace EList.Api.Infrastructure
             IPersonsService personsService,
             IAccountDataHolder accountDataHolder,
             IAgreementService agreementService,
-            IAccountPlatformRolesService platformRolesService) : base(options, logger, encoder, clock)
+            IAccountPlatformRolesService platformRolesService,
+            IModerationPenaltiesService moderationPenaltiesService) : base(options, logger, encoder, clock)
         {
             _authorizationService = authorizationService ?? throw new ArgumentNullException(nameof(authorizationService));
             _encryptionTool = encryptionTool ?? throw new ArgumentNullException(nameof(encryptionTool));
@@ -134,6 +136,7 @@ namespace EList.Api.Infrastructure
             _personsService = personsService ?? throw new ArgumentNullException(nameof(personsService));
             _agreementService = agreementService ?? throw new ArgumentNullException(nameof(agreementService));
             _platformRolesService = platformRolesService ?? throw new ArgumentNullException(nameof(platformRolesService));
+            _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
         }
 
         /// <summary>
@@ -231,7 +234,13 @@ namespace EList.Api.Infrastructure
                         }
                     }
 
-                    if (!account.Result.Active)
+                    if (account.Result != null && !account.Result.Active)
+                    {
+                        await _moderationPenaltiesService.LiftExpiredForAccountAsync(account.Result.Id);
+                        account = await _accountsService.GetAccountAsync(account.Result.Id);
+                    }
+
+                    if (!account.Success || account.Result == null || !account.Result.Active)
                     {
                         if (!IsAnonymousMethod)
                         {

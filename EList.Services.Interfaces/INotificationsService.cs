@@ -53,6 +53,8 @@ namespace EList.Services.Interfaces
             ReportResolutionAction action,
             string? comment);
         Task<CommandResult> NotifyContentReportEscalatedAsync(ContentReport report);
+        Task<CommandResult> NotifyContentReportPenaltyIssuedAsync(ModerationPenalty penalty);
+        Task<CommandResult> NotifyEventRestoredAsync(Guid eventId);
         //Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType);
     }
 }

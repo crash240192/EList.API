@@ -80,6 +80,8 @@ namespace EList.DbDataProvider.Interfaces
         Task DeleteAlbumFileAsync(Guid fileId, Guid? albumId);
         Task<Guid?> GetEventIdByCoverImageAsync(Guid fileId);
 
+        Task<ContentReportTargetStatsDto> GetTargetStatsAsync(ReportTargetType targetType, Guid targetId);
+
         #endregion
     }
 }

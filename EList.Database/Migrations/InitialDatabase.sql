@@ -1372,3 +1372,76 @@ FROM (VALUES
 WHERE NOT EXISTS (
 	SELECT 1 FROM public.report_reasons r WHERE r.code = v.code
 );
+
+do $ADD_APPLY_PENALTY_RESOLUTION$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'report_resolution_action' AND e.enumlabel = 'apply_penalty') THEN
+		ALTER TYPE public.report_resolution_action ADD VALUE 'apply_penalty';
+	END IF;
+END $ADD_APPLY_PENALTY_RESOLUTION$;
+
+ALTER TABLE public.events
+	ADD COLUMN IF NOT EXISTS cancelled_at timestamptz NULL,
+	ADD COLUMN IF NOT EXISTS cancelled_by_account_id uuid NULL,
+	ADD COLUMN IF NOT EXISTS cancel_source varchar(32) NULL,
+	ADD COLUMN IF NOT EXISTS cancel_report_id uuid NULL;
+
+DO $EVENTS_CANCEL_FKS$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'events_cancelled_by_fk') THEN
+		ALTER TABLE public.events
+			ADD CONSTRAINT events_cancelled_by_fk FOREIGN KEY (cancelled_by_account_id) REFERENCES public.accounts(id);
+	END IF;
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'events_cancel_report_fk') THEN
+		ALTER TABLE public.events
+			ADD CONSTRAINT events_cancel_report_fk FOREIGN KEY (cancel_report_id) REFERENCES public.content_reports(id) ON DELETE SET NULL;
+	END IF;
+END $EVENTS_CANCEL_FKS$;
+
+CREATE INDEX IF NOT EXISTS events_cancel_source_idx ON public.events (cancel_source) WHERE cancel_source IS NOT NULL;
+
+DO $CREATE_MODERATION_PENALTY_TYPE$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname = 'moderation_penalty_type') THEN
+		CREATE TYPE public.moderation_penalty_type AS ENUM (
+			'suspend_account',
+			'suspend_organization',
+			'ban_event_create',
+			'ban_event_participate',
+			'ban_messaging',
+			'ban_organize',
+			'ban_from_event'
+		);
+	END IF;
+END $CREATE_MODERATION_PENALTY_TYPE$;
+
+CREATE TABLE IF NOT EXISTS public.moderation_penalties (
+	id uuid DEFAULT uuid_generate_v4() NOT NULL,
+	account_id uuid NULL,
+	organization_id uuid NULL,
+	event_id uuid NULL,
+	report_id uuid NULL,
+	penalty_type public.moderation_penalty_type NOT NULL,
+	reason varchar(500) NULL,
+	starts_at timestamptz DEFAULT now() NOT NULL,
+	ends_at timestamptz NULL,
+	revoked_at timestamptz NULL,
+	revoked_by uuid NULL,
+	lifted_at timestamptz NULL,
+	created_by uuid NOT NULL,
+	created_at timestamptz DEFAULT now() NOT NULL,
+	CONSTRAINT moderation_penalties_pk PRIMARY KEY (id),
+	CONSTRAINT moderation_penalties_account_fk FOREIGN KEY (account_id) REFERENCES public.accounts(id),
+	CONSTRAINT moderation_penalties_organization_fk FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+	CONSTRAINT moderation_penalties_event_fk FOREIGN KEY (event_id) REFERENCES public.events(id),
+	CONSTRAINT moderation_penalties_report_fk FOREIGN KEY (report_id) REFERENCES public.content_reports(id) ON DELETE SET NULL,
+	CONSTRAINT moderation_penalties_revoked_by_fk FOREIGN KEY (revoked_by) REFERENCES public.accounts(id),
+	CONSTRAINT moderation_penalties_created_by_fk FOREIGN KEY (created_by) REFERENCES public.accounts(id),
+	CONSTRAINT moderation_penalties_subject_chk CHECK (account_id IS NOT NULL OR organization_id IS NOT NULL)
+);
+
+CREATE INDEX IF NOT EXISTS moderation_penalties_account_idx ON public.moderation_penalties (account_id);
+CREATE INDEX IF NOT EXISTS moderation_penalties_organization_idx ON public.moderation_penalties (organization_id);
+CREATE INDEX IF NOT EXISTS moderation_penalties_event_idx ON public.moderation_penalties (event_id);
+CREATE INDEX IF NOT EXISTS moderation_penalties_active_idx ON public.moderation_penalties (penalty_type, ends_at)
+	WHERE revoked_at IS NULL AND lifted_at IS NULL;

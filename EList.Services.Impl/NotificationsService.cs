@@ -1135,6 +1135,88 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
+        public async Task<CommandResult> NotifyContentReportPenaltyIssuedAsync(ModerationPenalty penalty)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyContentReportPenaltyIssuedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            var accountIds = new List<Guid>();
+            if (penalty.AccountId != null)
+                accountIds.Add(penalty.AccountId.Value);
+
+            if (penalty.OrganizationId != null)
+            {
+                var members = await _organizationsRepository.GetMembersByOrganizationIdAsync(penalty.OrganizationId.Value);
+                accountIds.AddRange(members.Where(m => m.AccountId != Guid.Empty).Select(m => m.AccountId));
+            }
+
+            var actorId = _accountDataHolder.AccountId;
+            var message = ModerationPenaltiesService.FormatRestrictionMessage(penalty);
+            var data = new ContentReportNotificationData
+            {
+                ReportId = penalty.ReportId ?? Guid.Empty,
+                EventId = penalty.EventId,
+                OrganizationId = penalty.OrganizationId,
+                PenaltyType = penalty.PenaltyType,
+                PenaltyEndsAt = penalty.EndsAt,
+                ResolutionAction = ReportResolutionAction.ApplyPenalty
+            };
+
+            var notifications = accountIds
+                .Where(id => id != actorId)
+                .Distinct()
+                .Select(accountId => BuildNotification(
+                    accountId,
+                    penalty.EventId,
+                    actorId,
+                    UserNotificationType.ContentReportPenaltyIssued,
+                    "Ограничение от модерации",
+                    message,
+                    data))
+                .ToList();
+
+            await PersistAndSendAsync(notifications);
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> NotifyEventRestoredAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventRestoredAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            var participants = await _participationsRepository.GetEventParticipantIdsAsync(eventId);
+            var eventData = await _eventsRepository.GetEventAsync(eventId);
+
+            if (participants?.Any() ?? false)
+            {
+                var notifications = participants.Select(subscriberId => new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = subscriberId,
+                    EventId = eventId,
+                    CreatedAt = DateTime.UtcNow,
+                    Message = $"Мероприятие \"{eventData.Name}\" снова активно",
+                    Title = "Мероприятие восстановлено",
+                    RelatedAccountId = _accountDataHolder.AccountId,
+                    Type = UserNotificationType.EventRestored,
+                    Data = new EventShort(eventData)
+                }).ToList();
+
+                await _notificationsRepository.CreateNotificationsAsync(notifications);
+                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
+                await Task.WhenAll(wsTasks);
+            }
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
         private async Task<List<Guid>> GetReportSubjectAccountIdsAsync(ContentReport report, bool includeEventOrganizers)
         {
             var ids = new List<Guid>();

@@ -24,19 +24,22 @@ namespace EList.Services.Impl
         private readonly IParticipationsRepository _participationsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly INotificationsService _notificationsService;
+        private readonly IModerationPenaltiesService _moderationPenaltiesService;
 
         public ConversationService(ICorrelationIdProvider correlationIdProvider,
             IConversationRepository conversationsRepository,
             IEventOrganizatorsRepository eventOrganizatorsRepository,
             IParticipationsRepository participationsRepository,
             IAccountDataHolder accountDataHolder,
-            INotificationsService notificationsService)
+            INotificationsService notificationsService,
+            IModerationPenaltiesService moderationPenaltiesService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _conversationsRepository = conversationsRepository ?? throw new ArgumentNullException(nameof(conversationsRepository));
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _participationsRepository = participationsRepository ?? throw new ArgumentNullException(nameof(participationsRepository));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
+            _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -355,6 +358,14 @@ namespace EList.Services.Impl
 
             if (conversation.ParticipantsReadonly)
                 return CommandResult.Fail(ErrorCode.AccessError, "Участники могут только читать сообщения в этом диалоге");
+
+            if (_accountDataHolder.AccountId != null)
+            {
+                var messagingBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                    _accountDataHolder.AccountId.Value, EList.Models.Enums.ModerationPenaltyType.BanMessaging);
+                if (!messagingBan.Success)
+                    return CommandResult.Fail(messagingBan.ErrorCode, messagingBan.Message);
+            }
 
             return null;
         }

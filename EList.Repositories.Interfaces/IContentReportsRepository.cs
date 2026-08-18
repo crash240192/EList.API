@@ -34,6 +34,7 @@ namespace EList.Repositories.Interfaces
             List<Guid> organizationIds,
             int pageIndex,
             int pageSize);
+        Task<ContentReportTargetStats> GetTargetStatsAsync(ReportTargetType targetType, Guid targetId);
 
         Task SetReportStatusAsync(Guid id, ReportStatus status);
         Task SetOrganizerStatusAsync(Guid id, ReportStatus status);

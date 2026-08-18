@@ -104,9 +104,14 @@ namespace EList.Repositories.Impl
             return new PagedList<EventShort>(items.TotalCount, resultList, request.PageIndex ?? 0, request.PageSize ?? 20);
         }
 
-        public async Task CancelEventAsync(Guid eventId)
+        public async Task CancelEventAsync(Guid eventId, Guid? cancelledByAccountId = null, string? cancelSource = null, Guid? cancelReportId = null)
         {
-            await _eventsDataProvider.CancelEventAsync(eventId);
+            await _eventsDataProvider.CancelEventAsync(eventId, cancelledByAccountId, cancelSource, cancelReportId);
+        }
+
+        public async Task RestoreEventAsync(Guid eventId)
+        {
+            await _eventsDataProvider.RestoreEventAsync(eventId);
         }
     }
 }

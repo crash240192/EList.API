@@ -48,9 +48,29 @@ namespace EList.Models.Events
         public string Address { get; set; }
 
         /// <summary>
-        /// Флаг вкл/выкл
+        /// Флаг вкл/выкл. false — мероприятие отменено (организатором или модерацией).
         /// </summary>
         public bool Active { get; set; }
+
+        /// <summary>
+        /// Когда мероприятие было отменено.
+        /// </summary>
+        public DateTimeOffset? CancelledAt { get; set; }
+
+        /// <summary>
+        /// Кто отменил.
+        /// </summary>
+        public Guid? CancelledByAccountId { get; set; }
+
+        /// <summary>
+        /// Источник отмены: <c>organizer</c> или <c>moderation</c>.
+        /// </summary>
+        public string? CancelSource { get; set; }
+
+        /// <summary>
+        /// Жалоба, по которой модерация отменила мероприятие.
+        /// </summary>
+        public Guid? CancelReportId { get; set; }
 
         /// <summary>
         /// Указатель на параметры события

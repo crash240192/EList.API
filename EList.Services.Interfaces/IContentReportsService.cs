@@ -26,6 +26,11 @@ namespace EList.Services.Interfaces
         Task<CommandResult<int>> CountPlatformQueueAsync(bool onlyActive = true);
         Task<CommandResult<int>> CountOrganizerQueueAsync(Guid eventId, bool onlyActive = true);
 
+        Task<CommandResult<ContentReportTargetStats>> GetTargetStatsAsync(ReportTargetType targetType, Guid targetId);
+        Task<CommandResult<List<ModerationPenalty>>> GetMyPenaltiesAsync();
+        Task<CommandResult> RevokePenaltyAsync(Guid penaltyId, RevokeModerationPenaltyRequest? request = null);
+        Task<CommandResult> RestoreEventAsync(Guid eventId, RestoreEventRequest? request = null);
+
         Task<CommandResult> TakeInReviewAsync(Guid reportId);
         Task<CommandResult> ResolveAsync(Guid reportId, ResolveContentReportRequest request);
         Task<CommandResult> EscalateAsync(Guid reportId, EscalateContentReportRequest request);

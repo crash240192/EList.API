@@ -112,6 +112,10 @@ POST /eList/api/contentReports/create
 | 5 | причина не подходит / своё содержимое / чат без события | Нельзя отправить эту жалобу |
 | 20001 | причина не найдена | Выберите другую причину |
 | 20003 | уже есть открытая жалоба | Вы уже жаловались на это |
+| 20005 | resolve/escalate без take | Сначала возьмите жалобу в работу |
+| 20006 | действует штраф | текст с сервера (`message` уже содержит срок) |
+| 20007 | restore не модерационной отмены | Это мероприятие отменил организатор |
+| 20008 | штраф не найден | Ограничение не найдено |
 | 2002 / 6002 / 11001 / 14001 / 17003 | цель не найдена | Объект больше недоступен |
 
 ---
@@ -235,6 +239,23 @@ GET /eList/api/contentReports/againstMe/{reportId}
 
 Бейдж на иконке: `GET /contentReports/organizer/{eventId}/count?onlyActive=true`.
 
+На шапке события (организатор **и** staff) показать сводку:
+
+`GET /contentReports/stats/Event/{eventId}`
+
+| Поле | Что показать |
+|---|---|
+| `openReports` | открытые жалобы **на само мероприятие** |
+| `warningCount` | сколько предупреждений уже вынесено по событию |
+| `relatedOpenReports` | открытые жалобы на чат/фото/организаторов **этого** события |
+| `relatedWarningCount` | предупреждения по связанному контенту |
+| `activePenalties` | действующие баны на этом событии |
+
+Тот же эндпоинт универсален: `Account/{id}`, `Organization/{id}`, `Photo/{fileId}`, `Message/{id}`, `EventOrganizator/{id}`.  
+Доступ: staff — всё; организатор — своё событие и его контент; пользователь — свой аккаунт; участник организации — свою орг.
+
+На карточке профиля / организации в кабинете площадки вызывать stats и рисовать бейджи «жалоб: N · предупреждений: M».
+
 ### Важно для UX
 
 Очередь **пустая для жалоб на само мероприятие** — так задумано. Организатор обрабатывает только чат и фото события. Жалобы на ивент, профили и организации идут на площадку.
@@ -288,6 +309,8 @@ GET /eList/api/contentReports/againstMe/{reportId}
 
 Safety (`severity = Safety`) — отдельный таб или пин сверху: параллельно обрабатываются организаторами, площадка не должна «потерять» кейс, если организатор уже скрыл сообщение.
 
+Если `GET /events/get/{id}` вернул `active: false` и `cancelSource: "moderation"` — плашка «Отменено модерацией» и кнопка «Восстановить» (`POST /contentReports/restoreEvent/{eventId}` + комментарий). Организаторскую отмену (`cancelSource: "organizer"`) этим методом не восстанавливать.
+
 ---
 
 ## 10. Карточка жалобы (модератор)
@@ -314,9 +337,11 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
 
 ### Действия
 
-Рекомендуемый порядок: **Взять в работу** → действие. API позволяет решить и без take; take нужен, чтобы назначить `assignedTo` и статус `InReview`.
+**Обязательный порядок:** сначала **Взять в работу**, затем действие. `resolve` и `escalate` без take вернут `errorCode` **20005** (`ContentReportNotInReview`).
 
-`POST /contentReports/take/{reportId}` — без тела.
+Кнопки решения на карточке **неактивны**, пока `assignedTo` — не текущий пользователь и статус очереди не `InReview`. Если тикет взял другой модератор — кнопка «Перехватить» = повторный `take` (переназначает на себя).
+
+`POST /contentReports/take/{reportId}` — без тела. Нельзя взять уже закрытую очередь (`Resolved` / `Dismissed`).
 
 `POST /contentReports/resolve/{reportId}`
 
@@ -324,15 +349,19 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
 {
   "resolutionAction": "HideContent",
   "resolutionComment": "необязательный комментарий для аудита",
-  "targetAccountId": null
+  "targetAccountId": null,
+  "penaltyType": null,
+  "durationHours": null
 }
 ```
 
 `targetAccountId` передавать только если UI явно выбрал аккаунт (бан / блокировка) и его нет в `reportedAccountId`.
 
-`POST /contentReports/escalate/{reportId}` `{ "comment": "..." }` — **только организатор**, и только если `organizerStatus != null`.
+Для `ApplyPenalty` обязателен `penaltyType`. `durationHours` — срок в часах (`24`, `168`, `720`…); `null` = бессрочно до ручного снятия. Тот же `durationHours` можно передать с `SuspendAccount` / `SuspendOrganization` / `BanFromEvent`.
 
-После успеха — обновить карточку и счётчик очереди.
+`POST /contentReports/escalate/{reportId}` `{ "comment": "..." }` — **только организатор**, очередь должна быть `InReview`.
+
+После успеха — обновить карточку, счётчик очереди и блок статистики цели.
 
 ---
 
@@ -348,7 +377,8 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
 | Предупреждение | `Warn` | всегда; комментарий желателен | нет |
 | Скрыть | `HideContent` | сообщение или фото | да |
 | Удалить | `DeleteContent` | сообщение или фото | да |
-| Забанить на событии | `BanFromEvent` | есть `eventId` и аккаунт автора | да, показать кого |
+| Забанить на событии | `BanFromEvent` | есть `eventId` и аккаунт автора; можно указать `durationHours` | да, показать кого и срок |
+| Временное ограничение | `ApplyPenalty` | организатору доступен только `penaltyType = BanFromEvent` | да |
 | Сбросить обложку/аватар | `ResetAvatar` | фото обложки события | да |
 | Другое | `Other` | нужен комментарий | нет |
 | Передать на площадку | отдельный `escalate` | не финальный статус | да, комментарий |
@@ -364,6 +394,8 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
 | `SuspendOrganization` | есть `organizationId` или тип Organization |
 | `RemoveOrganizator` | тип EventOrganizator |
 | `ResetAvatar` | фото аватарки / обложки **или** жалоба на аккаунт/организацию |
+| `ApplyPenalty` | выбрать тип и срок (см. §11.1) |
+| Восстановить событие | не resolve, а `POST /contentReports/restoreEvent/{eventId}` — если событие отменено модерацией (`cancelSource = moderation`) |
 
 Эскалация площадке не нужна.
 
@@ -378,11 +410,30 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
 | Скрыть фото альбома | файл пропадает из `GET /media/albums/filesByAlbumId/{albumId}` |
 | Удалить фото альбома | связь файл–альбом удаляется |
 | Скрыть/удалить обложку или аватар | обложка события сбрасывается / запись аватарки удаляется |
-| Бан на событии | в чёрный список участников |
-| Отменить событие | `events/cancel` |
-| Заблокировать аккаунт / организацию | `active=false` |
+| Бан на событии | в чёрный список + снятие с участия и приглашений; при `durationHours` — автоснятие по истечении |
+| Отменить событие | `active=false`, `cancelSource=moderation`; приглашения отменяются |
+| Восстановить событие | `active=true`, метаданные отмены сбрасываются; участники получают `EventRestored` |
+| Заблокировать аккаунт / организацию | `active=false` + запись в `moderation_penalties`; при сроке — вход/орг. вернутся сами |
 | Снять организатора | удаляется запись `event_organizators` |
 | Сбросить аватар | текущая аватарка/обложка убирается |
+| ApplyPenalty | см. таблицу ограничений ниже |
+
+### 11.1 Временные ограничения (`ApplyPenalty` / `durationHours`)
+
+Пресеты в UI: 24 ч, 7 дней, 30 дней, 90 дней, бессрочно. Можно свой срок в часах (1…43800).
+
+| `penaltyType` | Кто может | Эффект |
+|---|---|---|
+| `BanFromEvent` | организатор и площадка | чёрный список этого события |
+| `BanEventCreate` | площадка | нельзя создавать мероприятия |
+| `BanEventParticipate` | площадка | нельзя вступать / принимать приглашения |
+| `BanMessaging` | площадка | нельзя писать в чаты мероприятий |
+| `BanOrganize` | площадка | нельзя быть назначенным организатором |
+| `SuspendAccount` | площадка | аккаунт не входит в систему |
+| `SuspendOrganization` | площадка | организация неактивна |
+
+Активные ограничения пользователя: `GET /contentReports/penalties/my`.  
+Досрочное снятие (staff): `POST /contentReports/penalties/revoke/{penaltyId}`.
 
 ---
 
@@ -532,11 +583,14 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
 | ContentReportOrganizationSuspended | 77 | активные участники организации | `SuspendOrganization` | страница организации |
 | ContentReportOrganizatorRemoved | 78 | снятый организатор / участники его организации | `RemoveOrganizator` | страница события |
 | ContentReportAvatarReset | 79 | владелец аватарки / участники орг. | `ResetAvatar` | профиль / организация / событие |
+| ContentReportPenaltyIssued | 80 | ограниченный аккаунт / участники орг. | `ApplyPenalty` и прочие timed-меры | настройки / `penalties/my` |
+| EventRestored | 4 | участники события | восстановление после модерационной отмены | страница события |
 
 Уже существующие типы **переиспользуются**:
 
 - бан на событии → `AddedToBlackList` (41);
-- отмена события → `EventCancelled` (2) участникам.
+- отмена события → `EventCancelled` (2) участникам;
+- восстановление → `EventRestored` (4).
 
 Жалоба на **само мероприятие** при создании **не** шлётся организаторам как «на вас пожаловались» — только staff в очередь площадки. Организаторы узнают, если площадка вынесет `Warn` / отменит событие.
 
@@ -573,8 +627,12 @@ Safety (`severity = Safety`) — отдельный таб или пин све�
 | POST | `/api/contentReports/platform/search` | staff |
 | GET | `/api/contentReports/platform/count` | staff |
 | POST | `/api/contentReports/take/{id}` | организатор очереди / staff |
-| POST | `/api/contentReports/resolve/{id}` | те же |
-| POST | `/api/contentReports/escalate/{id}` | организатор |
+| POST | `/api/contentReports/resolve/{id}` | те же, **только после take** (иначе 20005) |
+| POST | `/api/contentReports/escalate/{id}` | организатор, после take |
+| GET | `/api/contentReports/stats/{targetType}/{targetId}` | организатор события / staff / владелец цели |
+| GET | `/api/contentReports/penalties/my` | все |
+| POST | `/api/contentReports/penalties/revoke/{id}` | staff |
+| POST | `/api/contentReports/restoreEvent/{eventId}` | staff, только `cancelSource=moderation` |
 | GET | `/api/platformRoles/my` | все |
 | GET | `/api/EventOrganizators/isOrganizator/{eventId}` | все |
 | GET | `/api/EventOrganizators/getByEventId/{eventId}` | для жалобы на организатора |

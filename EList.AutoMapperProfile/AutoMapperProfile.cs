@@ -198,6 +198,8 @@ namespace EList.AutoMapperProfile
             CreateMap<Models.Enums.ReportStatus, DbDataProvider.Models.Enums.ReportStatus>().ReverseMap();
             CreateMap<Models.Enums.ReportResolutionAction, DbDataProvider.Models.Enums.ReportResolutionAction>().ReverseMap();
             CreateMap<Models.Enums.ReportActorContext, DbDataProvider.Models.Enums.ReportActorContext>().ReverseMap();
+            CreateMap<Models.Enums.ModerationPenaltyType, DbDataProvider.Models.Enums.ModerationPenaltyType>().ReverseMap();
+            CreateMap<ModerationPenaltyDto, ModerationPenalty>().ReverseMap();
         }
 
         private static UserNotificationType? MapNotificationTypeFromDb(string? type)

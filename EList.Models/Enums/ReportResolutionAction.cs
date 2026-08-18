@@ -13,6 +13,8 @@ namespace EList.Models.Enums
         SuspendAccount = 8,
         SuspendOrganization = 9,
         RemoveOrganizator = 10,
-        ResetAvatar = 11
+        ResetAvatar = 11,
+        /// <summary>Временное или постоянное ограничение (тип и срок — в теле resolve).</summary>
+        ApplyPenalty = 12
     }
 }

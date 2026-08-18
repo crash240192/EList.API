@@ -16,5 +16,7 @@ namespace EList.Models.Notifications
         public string? ReasonName { get; set; }
         public ReportResolutionAction? ResolutionAction { get; set; }
         public string? Queue { get; set; }
+        public ModerationPenaltyType? PenaltyType { get; set; }
+        public DateTimeOffset? PenaltyEndsAt { get; set; }
     }
 }

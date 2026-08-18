@@ -211,6 +211,54 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Сводка жалоб и предупреждений по сущности (мероприятие, аккаунт, организация, фото, сообщение, организатор)
+        /// </summary>
+        [HttpGet("stats/{targetType}/{targetId}")]
+        public async Task<CommandResult<ContentReportTargetStats>> GetTargetStatsAsync(
+            ReportTargetType targetType,
+            Guid targetId)
+        {
+            return await ExecuteAsync(
+                nameof(GetTargetStatsAsync),
+                () => _contentReportsService.GetTargetStatsAsync(targetType, targetId));
+        }
+
+        /// <summary>
+        /// Активные модерационные ограничения текущего пользователя
+        /// </summary>
+        [HttpGet("penalties/my")]
+        public async Task<CommandResult<List<ModerationPenalty>>> GetMyPenaltiesAsync()
+        {
+            return await ExecuteAsync(nameof(GetMyPenaltiesAsync), () => _contentReportsService.GetMyPenaltiesAsync());
+        }
+
+        /// <summary>
+        /// Досрочно снять ограничение (moderator/admin/superuser)
+        /// </summary>
+        [HttpPost("penalties/revoke/{penaltyId}")]
+        public async Task<CommandResult> RevokePenaltyAsync(
+            Guid penaltyId,
+            [FromBody] RevokeModerationPenaltyRequest? request)
+        {
+            return await ExecuteTransactionalAsync(
+                nameof(RevokePenaltyAsync),
+                () => _contentReportsService.RevokePenaltyAsync(penaltyId, request));
+        }
+
+        /// <summary>
+        /// Восстановить мероприятие, отменённое модерацией
+        /// </summary>
+        [HttpPost("restoreEvent/{eventId}")]
+        public async Task<CommandResult> RestoreEventAsync(
+            Guid eventId,
+            [FromBody] RestoreEventRequest? request)
+        {
+            return await ExecuteTransactionalAsync(
+                nameof(RestoreEventAsync),
+                () => _contentReportsService.RestoreEventAsync(eventId, request));
+        }
+
+        /// <summary>
         /// Взять жалобу в работу
         /// </summary>
         [HttpPost("take/{reportId}")]

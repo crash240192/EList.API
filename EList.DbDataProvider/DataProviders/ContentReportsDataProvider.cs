@@ -610,5 +610,60 @@ namespace EList.DbDataProvider.DataProviders
 
             return query;
         }
+
+        public async Task<ContentReportTargetStatsDto> GetTargetStatsAsync(ReportTargetType targetType, Guid targetId)
+        {
+            var direct = _connection.ContentReports
+                .Where(i => i.TargetType == targetType && i.TargetId == targetId);
+
+            var stats = new ContentReportTargetStatsDto
+            {
+                TotalReports = await direct.CountAsync(),
+                OpenReports = await direct.CountAsync(i => ActiveStatuses.Contains(i.Status)),
+                ResolvedReports = await direct.CountAsync(i => i.Status == ReportStatus.Resolved),
+                DismissedReports = await direct.CountAsync(i => i.Status == ReportStatus.Dismissed),
+                WarningCount = await direct.CountAsync(i => i.ResolutionAction == ReportResolutionAction.Warn)
+            };
+
+            stats.LastWarningAt = await direct
+                .Where(i => i.ResolutionAction == ReportResolutionAction.Warn)
+                .OrderByDescending(i => i.ResolvedAt)
+                .Select(i => i.ResolvedAt)
+                .FirstOrDefaultAsync();
+
+            stats.LastReportAt = await direct
+                .OrderByDescending(i => i.CreatedAt)
+                .Select(i => (DateTimeOffset?)i.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            IQueryable<ContentReportDto>? related = null;
+            if (targetType == ReportTargetType.Event)
+            {
+                related = _connection.ContentReports.Where(i =>
+                    i.EventId == targetId
+                    && (i.TargetType != ReportTargetType.Event || i.TargetId != targetId));
+            }
+            else if (targetType == ReportTargetType.Account)
+            {
+                related = _connection.ContentReports.Where(i =>
+                    i.ReportedAccountId == targetId
+                    && (i.TargetType != ReportTargetType.Account || i.TargetId != targetId));
+            }
+            else if (targetType == ReportTargetType.Organization)
+            {
+                related = _connection.ContentReports.Where(i =>
+                    i.OrganizationId == targetId
+                    && (i.TargetType != ReportTargetType.Organization || i.TargetId != targetId));
+            }
+
+            if (related != null)
+            {
+                stats.RelatedTotalReports = await related.CountAsync();
+                stats.RelatedOpenReports = await related.CountAsync(i => ActiveStatuses.Contains(i.Status));
+                stats.RelatedWarningCount = await related.CountAsync(i => i.ResolutionAction == ReportResolutionAction.Warn);
+            }
+
+            return stats;
+        }
     }
 }

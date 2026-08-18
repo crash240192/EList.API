@@ -31,6 +31,8 @@ namespace EList.Services.Impl
         private readonly IOrganizationsRepository _organizationsRepository;
         private readonly IMediaRepository _mediaRepository;
         private readonly INotificationsService _notificationsService;
+        private readonly IModerationPenaltiesService _moderationPenaltiesService;
+        private readonly IInvitationsRepository _invitationsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IMapper _mapper;
@@ -45,6 +47,8 @@ namespace EList.Services.Impl
             IOrganizationsRepository organizationsRepository,
             IMediaRepository mediaRepository,
             INotificationsService notificationsService,
+            IModerationPenaltiesService moderationPenaltiesService,
+            IInvitationsRepository invitationsRepository,
             IAccountDataHolder accountDataHolder,
             ICorrelationIdProvider correlationIdProvider,
             IMapper mapper)
@@ -58,6 +62,8 @@ namespace EList.Services.Impl
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
             _mediaRepository = mediaRepository ?? throw new ArgumentNullException(nameof(mediaRepository));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
+            _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
+            _invitationsRepository = invitationsRepository ?? throw new ArgumentNullException(nameof(invitationsRepository));
             _accountDataHolder = accountDataHolder;
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
@@ -388,6 +394,83 @@ namespace EList.Services.Impl
             return new CommandResult<int>(count);
         }
 
+        public async Task<CommandResult<ContentReportTargetStats>> GetTargetStatsAsync(
+            ReportTargetType targetType,
+            Guid targetId)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<ContentReportTargetStats>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            if (!Enum.IsDefined(typeof(ReportTargetType), targetType))
+                return CommandResult<ContentReportTargetStats>.Fail(ErrorCode.InvalidValue, "Некорректный тип цели");
+
+            if (!await CanViewTargetStatsAsync(targetType, targetId))
+                return CommandResult<ContentReportTargetStats>.Fail(ErrorCode.AccessError, "Недостаточно прав");
+
+            var stats = await _contentReportsRepository.GetTargetStatsAsync(targetType, targetId);
+
+            if (targetType == ReportTargetType.Account)
+                stats.ActivePenalties = await _moderationPenaltiesService.GetActiveForAccountAsync(targetId);
+            else if (targetType == ReportTargetType.Organization)
+                stats.ActivePenalties = await _moderationPenaltiesService.GetActiveForOrganizationAsync(targetId);
+            else if (targetType == ReportTargetType.Event)
+                stats.ActivePenalties = await _moderationPenaltiesService.GetActiveForEventAsync(targetId);
+
+            return new CommandResult<ContentReportTargetStats>(stats);
+        }
+
+        public async Task<CommandResult<List<ModerationPenalty>>> GetMyPenaltiesAsync()
+        {
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<List<ModerationPenalty>>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var penalties = await _moderationPenaltiesService.GetActiveForAccountAsync(_accountDataHolder.AccountId.Value);
+            return new CommandResult<List<ModerationPenalty>>(penalties);
+        }
+
+        public async Task<CommandResult> RevokePenaltyAsync(Guid penaltyId, RevokeModerationPenaltyRequest? request = null)
+        {
+            return await _moderationPenaltiesService.RevokeAsync(penaltyId, request?.Comment);
+        }
+
+        public async Task<CommandResult> RestoreEventAsync(Guid eventId, RestoreEventRequest? request = null)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            if (!_accountDataHolder.IsPlatformModeratorOrAbove)
+                return CommandResult.Fail(ErrorCode.AccessError, "Восстановить мероприятие может только модератор площадки");
+
+            var ev = await _eventsRepository.GetEventAsync(eventId);
+            if (ev == null)
+                return CommandResult.Fail(ErrorCode.EventNotFound, "Мероприятие не найдено");
+
+            if (ev.Active)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Мероприятие не отменено");
+
+            if (!string.Equals(ev.CancelSource, "moderation", StringComparison.OrdinalIgnoreCase))
+                return CommandResult.Fail(
+                    ErrorCode.EventNotCancelledByModeration,
+                    "Восстановление доступно только для мероприятий, отменённых модерацией");
+
+            await _eventsRepository.RestoreEventAsync(eventId);
+
+            if (ev.CancelReportId != null)
+            {
+                await _contentReportsRepository.AddActionAsync(new ContentReportAction
+                {
+                    ReportId = ev.CancelReportId.Value,
+                    ActorAccountId = _accountDataHolder.AccountId,
+                    ActorContext = ReportActorContext.PlatformModerator,
+                    Action = "event_restored",
+                    Details = JsonSerializer.Serialize(new { comment = request?.Comment })
+                });
+            }
+
+            await _notificationsService.NotifyEventRestoredAsync(eventId);
+            return CommandResult.OK;
+        }
+
         public async Task<CommandResult> TakeInReviewAsync(Guid reportId)
         {
             if (_accountDataHolder.AccountId == null)
@@ -407,6 +490,10 @@ namespace EList.Services.Impl
 
             if (await IsReportSubjectAsync(report))
                 return CommandResult.Fail(ErrorCode.AccessError, "Нельзя модерировать жалобу, предметом которой вы являетесь");
+
+            var takeBlock = EnsureQueueNotClosed(report, asPlatform, asOrganizer);
+            if (takeBlock != null)
+                return takeBlock;
 
             await _contentReportsRepository.AssignReportAsync(reportId, _accountDataHolder.AccountId);
 
@@ -452,8 +539,12 @@ namespace EList.Services.Impl
             if (await IsReportSubjectAsync(report))
                 return CommandResult.Fail(ErrorCode.AccessError, "Нельзя модерировать жалобу, предметом которой вы являетесь");
 
-            if (!asPlatform && IsPlatformOnlyResolution(request.ResolutionAction))
+            if (!asPlatform && IsPlatformOnlyResolution(request.ResolutionAction, request.PenaltyType))
                 return CommandResult.Fail(ErrorCode.AccessError, "Это действие доступно только модератору площадки");
+
+            var taken = EnsureTakenInReview(report, asPlatform, asOrganizer);
+            if (taken != null)
+                return taken;
 
             var applyResult = await ApplyResolutionActionAsync(report, request, asPlatform);
             if (!applyResult.Success)
@@ -525,6 +616,17 @@ namespace EList.Services.Impl
             if (report.OrganizerStatus == null)
                 return CommandResult.Fail(ErrorCode.InvalidValue, "Жалоба не находится в очереди организаторов");
 
+            if (report.OrganizerStatus == ReportStatus.Resolved || report.OrganizerStatus == ReportStatus.Dismissed)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Жалоба уже закрыта");
+
+            if (report.OrganizerStatus != ReportStatus.InReview
+                || report.AssignedTo != _accountDataHolder.AccountId)
+            {
+                return CommandResult.Fail(
+                    ErrorCode.ContentReportNotInReview,
+                    "Сначала возьмите жалобу в работу");
+            }
+
             await _contentReportsRepository.EscalateToPlatformAsync(
                 reportId,
                 _accountDataHolder.AccountId,
@@ -566,6 +668,9 @@ namespace EList.Services.Impl
                 case ReportResolutionAction.Other:
                     return CommandResult.OK;
 
+                case ReportResolutionAction.ApplyPenalty:
+                    return await ApplyPenaltyFromResolveAsync(report, request, asPlatform, request.PenaltyType);
+
                 case ReportResolutionAction.HideContent:
                     if (report.TargetType == ReportTargetType.Message && report.MessageId != null)
                     {
@@ -590,27 +695,7 @@ namespace EList.Services.Impl
                     return CommandResult.Fail(ErrorCode.InvalidValue, "Удаление контента поддерживается для сообщений и фото");
 
                 case ReportResolutionAction.BanFromEvent:
-                    if (report.EventId == null)
-                        return CommandResult.Fail(ErrorCode.InvalidValue, "Не указано мероприятие для бана");
-
-                    var accountId = request.TargetAccountId
-                        ?? report.ReportedAccountId
-                        ?? TryGetAccountIdFromSnapshot(report.TargetSnapshot)
-                        ?? report.Message?.AccountId;
-
-                    if (accountId == null)
-                        return CommandResult.Fail(ErrorCode.InvalidValue, "Не удалось определить аккаунт для бана");
-
-                    await _participantsBWListRepository.AddToBlackListAsync(
-                        new Models.Participation.AddUsersToBWListRequest
-                        {
-                            EventId = report.EventId.Value,
-                            AccountIds = new List<Guid> { accountId.Value }
-                        });
-                    await _notificationsService.NotifyAddedToBlackListAsync(
-                        report.EventId.Value,
-                        new List<Guid> { accountId.Value });
-                    return CommandResult.OK;
+                    return await ApplyPenaltyFromResolveAsync(report, request, asPlatform, ModerationPenaltyType.BanFromEvent);
 
                 case ReportResolutionAction.CancelEvent:
                     if (!asPlatform)
@@ -618,45 +703,20 @@ namespace EList.Services.Impl
                     if (report.EventId == null)
                         return CommandResult.Fail(ErrorCode.EventNotFound, "Мероприятие не найдено");
 
-                    await _eventsRepository.CancelEventAsync(report.EventId.Value);
+                    await _eventsRepository.CancelEventAsync(
+                        report.EventId.Value,
+                        _accountDataHolder.AccountId,
+                        "moderation",
+                        report.Id);
+                    await _invitationsRepository.CancelAllInvitationsAsync(report.EventId.Value);
                     await _notificationsService.NotifyEventCancelledAsync(report.EventId.Value);
                     return CommandResult.OK;
 
                 case ReportResolutionAction.SuspendAccount:
-                    if (!asPlatform)
-                        return CommandResult.Fail(ErrorCode.AccessError, "Блокировать аккаунт может только модератор площадки");
-
-                    var suspendAccountId = request.TargetAccountId
-                        ?? report.ReportedAccountId
-                        ?? (report.TargetType == ReportTargetType.Account ? report.TargetId : (Guid?)null)
-                        ?? TryGetAccountIdFromSnapshot(report.TargetSnapshot);
-
-                    if (suspendAccountId == null)
-                        return CommandResult.Fail(ErrorCode.InvalidValue, "Не удалось определить аккаунт для блокировки");
-
-                    var account = await _accountsRepository.GetAccountAsync(suspendAccountId.Value);
-                    if (account == null)
-                        return CommandResult.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
-
-                    await _accountsRepository.SetAccountActiveAsync(suspendAccountId.Value, false);
-                    return CommandResult.OK;
+                    return await ApplyPenaltyFromResolveAsync(report, request, asPlatform, ModerationPenaltyType.SuspendAccount);
 
                 case ReportResolutionAction.SuspendOrganization:
-                    if (!asPlatform)
-                        return CommandResult.Fail(ErrorCode.AccessError, "Приостановить организацию может только модератор площадки");
-
-                    var suspendOrgId = report.OrganizationId
-                        ?? (report.TargetType == ReportTargetType.Organization ? report.TargetId : (Guid?)null);
-
-                    if (suspendOrgId == null)
-                        return CommandResult.Fail(ErrorCode.InvalidValue, "Не удалось определить организацию");
-
-                    var organization = await _organizationsRepository.GetOrganizationAsync(suspendOrgId.Value);
-                    if (organization == null)
-                        return CommandResult.Fail(ErrorCode.OrganizationNotFound, "Организация не найдена");
-
-                    await _organizationsRepository.SetOrganizationActiveAsync(suspendOrgId.Value, false);
-                    return CommandResult.OK;
+                    return await ApplyPenaltyFromResolveAsync(report, request, asPlatform, ModerationPenaltyType.SuspendOrganization);
 
                 case ReportResolutionAction.RemoveOrganizator:
                     if (!asPlatform)
@@ -726,12 +786,186 @@ namespace EList.Services.Impl
                 || (targetType == ReportTargetType.EventOrganizator && reason.TargetScope == ReportTargetScope.EventOrganizator);
         }
 
-        private static bool IsPlatformOnlyResolution(ReportResolutionAction action)
+        private static bool IsPlatformOnlyResolution(ReportResolutionAction action, ModerationPenaltyType? penaltyType)
         {
+            if (action == ReportResolutionAction.ApplyPenalty)
+            {
+                return penaltyType == null || penaltyType != ModerationPenaltyType.BanFromEvent;
+            }
+
             return action is ReportResolutionAction.CancelEvent
                 or ReportResolutionAction.SuspendAccount
                 or ReportResolutionAction.SuspendOrganization
                 or ReportResolutionAction.RemoveOrganizator;
+        }
+
+        private static CommandResult? EnsureQueueNotClosed(ContentReport report, bool asPlatform, bool asOrganizer)
+        {
+            var closed = new[] { ReportStatus.Resolved, ReportStatus.Dismissed };
+            if (asOrganizer && report.OrganizerStatus != null && closed.Contains(report.OrganizerStatus.Value))
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Очередь организаторов по этой жалобе уже закрыта");
+            if (asPlatform && report.PlatformStatus != null && closed.Contains(report.PlatformStatus.Value))
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Очередь площадки по этой жалобе уже закрыта");
+            return null;
+        }
+
+        private CommandResult? EnsureTakenInReview(ContentReport report, bool asPlatform, bool asOrganizer)
+        {
+            var closed = EnsureQueueNotClosed(report, asPlatform, asOrganizer);
+            if (closed != null)
+                return closed;
+
+            if (asOrganizer && !asPlatform)
+            {
+                if (report.OrganizerStatus != ReportStatus.InReview)
+                    return CommandResult.Fail(ErrorCode.ContentReportNotInReview, "Сначала возьмите жалобу в работу");
+            }
+            else if (asPlatform && !asOrganizer)
+            {
+                if (report.PlatformStatus != ReportStatus.InReview)
+                    return CommandResult.Fail(ErrorCode.ContentReportNotInReview, "Сначала возьмите жалобу в работу");
+            }
+            else
+            {
+                var organizerReady = report.OrganizerStatus == null || report.OrganizerStatus == ReportStatus.InReview
+                    || report.OrganizerStatus == ReportStatus.Resolved || report.OrganizerStatus == ReportStatus.Dismissed;
+                var platformReady = report.PlatformStatus == ReportStatus.InReview;
+                if (!platformReady && report.OrganizerStatus != ReportStatus.InReview)
+                    return CommandResult.Fail(ErrorCode.ContentReportNotInReview, "Сначала возьмите жалобу в работу");
+                if (!organizerReady && !platformReady)
+                    return CommandResult.Fail(ErrorCode.ContentReportNotInReview, "Сначала возьмите жалобу в работу");
+            }
+
+            if (report.AssignedTo != _accountDataHolder.AccountId)
+                return CommandResult.Fail(ErrorCode.ContentReportNotInReview, "Сначала возьмите жалобу в работу");
+
+            return null;
+        }
+
+        private async Task<bool> CanViewTargetStatsAsync(ReportTargetType targetType, Guid targetId)
+        {
+            if (_accountDataHolder.IsPlatformModeratorOrAbove)
+                return true;
+
+            if (_accountDataHolder.AccountId == null)
+                return false;
+
+            switch (targetType)
+            {
+                case ReportTargetType.Event:
+                    return await IsEventOrganizerAsync(targetId);
+
+                case ReportTargetType.Account:
+                    return targetId == _accountDataHolder.AccountId;
+
+                case ReportTargetType.Organization:
+                    return await _organizationsRepository.IsActiveMemberAsync(targetId, _accountDataHolder.AccountId.Value);
+
+                case ReportTargetType.EventOrganizator:
+                    {
+                        var organizator = await _eventOrganizatorsRepository.GetByIdAsync(targetId);
+                        return organizator != null && await IsEventOrganizerAsync(organizator.EventId);
+                    }
+
+                case ReportTargetType.Message:
+                    {
+                        var message = await _contentReportsRepository.GetMessageAsync(targetId);
+                        if (message == null)
+                            return false;
+                        var conversation = await _conversationRepository.GetConversationAsync(message.ConversationId);
+                        return conversation?.EventId != null && await IsEventOrganizerAsync(conversation.EventId.Value);
+                    }
+
+                case ReportTargetType.Photo:
+                    {
+                        var photo = await _contentReportsRepository.ResolvePhotoContextAsync(targetId, null);
+                        if (photo?.EventId != null)
+                            return await IsEventOrganizerAsync(photo.EventId.Value);
+                        if (photo?.AccountId != null && photo.AccountId == _accountDataHolder.AccountId)
+                            return true;
+                        if (photo?.OrganizationId != null)
+                            return await _organizationsRepository.IsActiveMemberAsync(
+                                photo.OrganizationId.Value, _accountDataHolder.AccountId.Value);
+                        return false;
+                    }
+
+                default:
+                    return false;
+            }
+        }
+
+        private async Task<CommandResult> ApplyPenaltyFromResolveAsync(
+            ContentReport report,
+            ResolveContentReportRequest request,
+            bool asPlatform,
+            ModerationPenaltyType? penaltyType)
+        {
+            if (penaltyType == null || !Enum.IsDefined(typeof(ModerationPenaltyType), penaltyType.Value))
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Укажите тип ограничения (penaltyType)");
+
+            if (!asPlatform && penaltyType != ModerationPenaltyType.BanFromEvent)
+                return CommandResult.Fail(ErrorCode.AccessError, "Это ограничение может наложить только модератор площадки");
+
+            if (request.DurationHours != null && (request.DurationHours < 1 || request.DurationHours > 43800))
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Срок ограничения — от 1 часа до 5 лет");
+
+            DateTimeOffset? endsAt = request.DurationHours == null
+                ? null
+                : DateTimeOffset.UtcNow.AddHours(request.DurationHours.Value);
+
+            var penalty = new ModerationPenalty
+            {
+                ReportId = report.Id,
+                PenaltyType = penaltyType.Value,
+                Reason = request.ResolutionComment?.Trim(),
+                StartsAt = DateTimeOffset.UtcNow,
+                EndsAt = endsAt,
+                CreatedBy = _accountDataHolder.AccountId ?? Guid.Empty,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+
+            switch (penaltyType.Value)
+            {
+                case ModerationPenaltyType.SuspendOrganization:
+                    penalty.OrganizationId = report.OrganizationId
+                        ?? (report.TargetType == ReportTargetType.Organization ? report.TargetId : (Guid?)null);
+                    if (penalty.OrganizationId == null)
+                        return CommandResult.Fail(ErrorCode.InvalidValue, "Не удалось определить организацию");
+                    if (await _organizationsRepository.GetOrganizationAsync(penalty.OrganizationId.Value) == null)
+                        return CommandResult.Fail(ErrorCode.OrganizationNotFound, "Организация не найдена");
+                    break;
+
+                case ModerationPenaltyType.BanFromEvent:
+                    if (report.EventId == null)
+                        return CommandResult.Fail(ErrorCode.InvalidValue, "Не указано мероприятие для бана");
+                    penalty.EventId = report.EventId;
+                    penalty.AccountId = request.TargetAccountId
+                        ?? report.ReportedAccountId
+                        ?? TryGetAccountIdFromSnapshot(report.TargetSnapshot)
+                        ?? report.Message?.AccountId;
+                    if (penalty.AccountId == null)
+                        return CommandResult.Fail(ErrorCode.InvalidValue, "Не удалось определить аккаунт для бана");
+                    break;
+
+                default:
+                    penalty.AccountId = request.TargetAccountId
+                        ?? report.ReportedAccountId
+                        ?? (report.TargetType == ReportTargetType.Account ? report.TargetId : (Guid?)null)
+                        ?? TryGetAccountIdFromSnapshot(report.TargetSnapshot)
+                        ?? report.Message?.AccountId;
+                    if (penalty.AccountId == null)
+                        return CommandResult.Fail(ErrorCode.InvalidValue, "Не удалось определить аккаунт для ограничения");
+                    if (await _accountsRepository.GetAccountAsync(penalty.AccountId.Value) == null)
+                        return CommandResult.Fail(ErrorCode.AccountNotFound, "Аккаунт не найден");
+                    penalty.EventId = report.EventId;
+                    penalty.OrganizationId = report.OrganizationId;
+                    break;
+            }
+
+            var applied = await _moderationPenaltiesService.ApplyAsync(penalty);
+            if (!applied.Success)
+                return CommandResult.Fail(applied.ErrorCode, applied.Message);
+            return CommandResult.OK;
         }
 
         private async Task<CommandResult> FillReportTargetAsync(ContentReport report, CreateContentReportRequest request)

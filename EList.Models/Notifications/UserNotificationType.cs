@@ -6,6 +6,8 @@
         EventUpdated = 1,
         EventCancelled = 2,
         EventFinished = 3,
+        /// <summary>Мероприятие восстановлено после отмены модерацией.</summary>
+        EventRestored = 4,
 
         NewSubscription = 10,
         Unsubscribed = 11,
@@ -48,6 +50,8 @@
         /// <summary>Снят с организаторов мероприятия.</summary>
         ContentReportOrganizatorRemoved = 78,
         /// <summary>Аватарка или обложка сброшена модерацией.</summary>
-        ContentReportAvatarReset = 79
+        ContentReportAvatarReset = 79,
+        /// <summary>Наложен временный или постоянный модерационный штраф.</summary>
+        ContentReportPenaltyIssued = 80
     }
 }

@@ -49,6 +49,7 @@ namespace EList.DI
             mapper.AddScoped<IBugReportsDataProvider, BugReportsDataProvider>();
             mapper.AddScoped<IAccountPlatformRolesDataProvider, AccountPlatformRolesDataProvider>();
             mapper.AddScoped<IContentReportsDataProvider, ContentReportsDataProvider>();
+            mapper.AddScoped<IModerationPenaltiesDataProvider, ModerationPenaltiesDataProvider>();
 
             //Services
             mapper.AddScoped<IPersonsService, PersonService>();
@@ -72,6 +73,7 @@ namespace EList.DI
             mapper.AddScoped<IBugReportsService, BugReportsService>();
             mapper.AddScoped<IAccountPlatformRolesService, AccountPlatformRolesService>();
             mapper.AddScoped<IContentReportsService, ContentReportsService>();
+            mapper.AddScoped<IModerationPenaltiesService, ModerationPenaltiesService>();
 
             mapper.AddSingleton<WebSocketConnectionManager>();
 
@@ -99,6 +101,7 @@ namespace EList.DI
             mapper.AddScoped<IBugReportsRepository, BugReportsRepository>();
             mapper.AddScoped<IAccountPlatformRolesRepository, AccountPlatformRolesRepository>();
             mapper.AddScoped<IContentReportsRepository, ContentReportsRepository>();
+            mapper.AddScoped<IModerationPenaltiesRepository, ModerationPenaltiesRepository>();
 
             //Validators
             mapper.AddScoped<IPersonValidator, PersonValidator>();

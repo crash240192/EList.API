@@ -38,6 +38,9 @@ namespace EList.DbDataProvider.Models.Enums
         RemoveOrganizator = 10,
 
         [MapValue(Value = "reset_avatar")]
-        ResetAvatar = 11
+        ResetAvatar = 11,
+
+        [MapValue(Value = "apply_penalty")]
+        ApplyPenalty = 12
     }
 }

@@ -173,6 +173,27 @@ namespace EList.Repositories.Impl
                 pageSize);
         }
 
+        public async Task<ContentReportTargetStats> GetTargetStatsAsync(ReportTargetType targetType, Guid targetId)
+        {
+            var dbTarget = _mapper.Map<DbDataProvider.Models.Enums.ReportTargetType>(targetType);
+            var dto = await _dataProvider.GetTargetStatsAsync(dbTarget, targetId);
+            return new ContentReportTargetStats
+            {
+                TargetType = targetType,
+                TargetId = targetId,
+                TotalReports = dto.TotalReports,
+                OpenReports = dto.OpenReports,
+                ResolvedReports = dto.ResolvedReports,
+                DismissedReports = dto.DismissedReports,
+                WarningCount = dto.WarningCount,
+                LastWarningAt = dto.LastWarningAt,
+                LastReportAt = dto.LastReportAt,
+                RelatedTotalReports = dto.RelatedTotalReports,
+                RelatedOpenReports = dto.RelatedOpenReports,
+                RelatedWarningCount = dto.RelatedWarningCount
+            };
+        }
+
         public async Task<int> CountReportsAsync(ContentReportsSearchRequest request)
         {
             var dbRequest = _mapper.Map<DbDataProvider.Models.SearchRequests.ContentReportsSearchRequest>(request);

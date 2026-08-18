@@ -40,6 +40,7 @@ namespace EList.Services.Impl
         private readonly INotificationsService _notificationsService;
         private readonly ISubscriptionsRepository _subscriptionsRepository;
         private readonly IOrganizationsRepository _organizationsRepository;
+        private readonly IModerationPenaltiesService _moderationPenaltiesService;
 
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
@@ -54,7 +55,8 @@ namespace EList.Services.Impl
             IParticipantsBWListRepository participantsBWListRepository,
             INotificationsService notificationsService,
             ISubscriptionsRepository subscriptionsRepository,
-            IOrganizationsRepository organizationsRepository)
+            IOrganizationsRepository organizationsRepository,
+            IModerationPenaltiesService moderationPenaltiesService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
@@ -69,6 +71,7 @@ namespace EList.Services.Impl
             _walletsRepository = walletsRepository ?? throw new Exception(nameof(walletsRepository));
             _notificationsService = notificationsService ?? throw new Exception(nameof(notificationsService));
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
+            _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -475,6 +478,16 @@ namespace EList.Services.Impl
 
             if (request.EventParameters.Cost > 0 && !_accountDataHolder.AdultConfirmed)
                 return CommandResult<Guid?>.Fail(ErrorCode.InvalidAgeLimitValue, $"Несовершеннолетние пользователи не могут создавать платные мероприятия");
+
+            var createBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                _accountDataHolder.AccountId.Value, ModerationPenaltyType.BanEventCreate);
+            if (!createBan.Success)
+                return CommandResult<Guid?>.Fail(createBan.ErrorCode, createBan.Message);
+
+            var organizeBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                _accountDataHolder.AccountId.Value, ModerationPenaltyType.BanOrganize);
+            if (!organizeBan.Success)
+                return CommandResult<Guid?>.Fail(organizeBan.ErrorCode, organizeBan.Message);
             #endregion
 
             var eventId = await _eventsRepository.CreateEventAsync(request.Event);
@@ -493,6 +506,25 @@ namespace EList.Services.Impl
                 if (!isMember)
                     return CommandResult<Guid?>.Fail(ErrorCode.AccessError,
                         $"Вы не являетесь участником организации '{organizationId}' и не можете указать её организатором");
+
+                var organization = await _organizationsRepository.GetOrganizationAsync(organizationId);
+                if (organization == null || !organization.Active)
+                    return CommandResult<Guid?>.Fail(ErrorCode.AccessError,
+                        "Организация приостановлена и не может создавать мероприятия");
+
+                await _moderationPenaltiesService.LiftExpiredForOrganizationAsync(organizationId);
+                var orgPenalty = await _moderationPenaltiesService.GetActiveForOrganizationAsync(organizationId);
+                if (orgPenalty.Any(p => p.PenaltyType == ModerationPenaltyType.SuspendOrganization))
+                    return CommandResult<Guid?>.Fail(ErrorCode.ModerationPenaltyActive,
+                        "Организация приостановлена модерацией и не может создавать мероприятия");
+            }
+
+            foreach (var accountId in request.OrganizatorAccountIds)
+            {
+                var coOrganizerBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                    accountId, ModerationPenaltyType.BanOrganize);
+                if (!coOrganizerBan.Success)
+                    return CommandResult<Guid?>.Fail(coOrganizerBan.ErrorCode, coOrganizerBan.Message);
             }
 
             foreach (var accountId in request.OrganizatorAccountIds)
@@ -788,7 +820,11 @@ namespace EList.Services.Impl
                 || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
                 return CommandResult.Fail(ErrorCode.AccessError, $"У вас нет доступа к редактированию текущего мероприятия'");
 
-            await _eventsRepository.CancelEventAsync(eventId);
+            await _eventsRepository.CancelEventAsync(
+                eventId,
+                _accountDataHolder.AccountId,
+                "organizer",
+                null);
 
             await _invitationsRepository.CancelAllInvitationsAsync(eventId);
 

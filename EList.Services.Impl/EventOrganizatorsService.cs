@@ -24,18 +24,21 @@ namespace EList.Services.Impl
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IEventOrganizatorsRepository _organizatorsRepository;
         private readonly ISubscriptionsRepository _subscriptionsRepository;
+        private readonly IModerationPenaltiesService _moderationPenaltiesService;
 
         public EventOrganizatorsService(ICorrelationIdProvider correlationIdProvider,
             IEventsRepository eventsRepository,
             IAccountDataHolder accountDataHolder,
             IEventOrganizatorsRepository organizatorsRepository,
-            ISubscriptionsRepository subscriptionsRepository)
+            ISubscriptionsRepository subscriptionsRepository,
+            IModerationPenaltiesService moderationPenaltiesService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _accountDataHolder = accountDataHolder;
             _organizatorsRepository = organizatorsRepository ?? throw new ArgumentNullException(nameof(organizatorsRepository));
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
+            _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
         }
 
         public async Task<CommandResult<List<EventOrganizator>>> GetByEventIdAsync(Guid eventId)
@@ -74,6 +77,17 @@ namespace EList.Services.Impl
             if (_accountDataHolder.AccountId == null
                 || !await _organizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
                 return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+
+            if (accountIds != null)
+            {
+                foreach (var accountId in accountIds)
+                {
+                    var organizeBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                        accountId, EList.Models.Enums.ModerationPenaltyType.BanOrganize);
+                    if (!organizeBan.Success)
+                        return CommandResult.Fail(organizeBan.ErrorCode, organizeBan.Message);
+                }
+            }
 
             await _organizatorsRepository.AssignAsync(eventId, accountIds, organizationIds);
 

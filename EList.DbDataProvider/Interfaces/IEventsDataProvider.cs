@@ -10,6 +10,7 @@ namespace EList.DbDataProvider.Interfaces
         Task UpdateEventAsync(EventDto item);
         Task SetEventCoverImageAsync(Guid eventId, Guid? imageId);
         Task<ListResponse<EventDto>> SearchEventsAsync(EventsSearchRequest request, Guid? curAccountId = null, bool adultConfirmed = false);
-        Task CancelEventAsync(Guid eventId);
+        Task CancelEventAsync(Guid eventId, Guid? cancelledByAccountId, string? cancelSource, Guid? cancelReportId);
+        Task RestoreEventAsync(Guid eventId);
     }
 }

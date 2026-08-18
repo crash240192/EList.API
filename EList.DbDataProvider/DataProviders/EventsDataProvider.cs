@@ -265,10 +265,27 @@ namespace EList.DbDataProvider.DataProviders
             return new ListResponse<EventDto>(totalCount, resultList);
         }
 
-        public async Task CancelEventAsync(Guid eventId)
+        public async Task CancelEventAsync(Guid eventId, Guid? cancelledByAccountId, string? cancelSource, Guid? cancelReportId)
         {
             await _connection.Events.Where(i => i.Id == eventId)
                 .Set(i => i.Active, false)
+                .Set(i => i.CancelledAt, DateTimeOffset.UtcNow)
+                .Set(i => i.CancelledByAccountId, cancelledByAccountId)
+                .Set(i => i.CancelSource, cancelSource)
+                .Set(i => i.CancelReportId, cancelReportId)
+                .Set(i => i.UpdateDate, DateTimeOffset.UtcNow)
+                .UpdateAsync();
+        }
+
+        public async Task RestoreEventAsync(Guid eventId)
+        {
+            await _connection.Events.Where(i => i.Id == eventId)
+                .Set(i => i.Active, true)
+                .Set(i => i.CancelledAt, (DateTimeOffset?)null)
+                .Set(i => i.CancelledByAccountId, (Guid?)null)
+                .Set(i => i.CancelSource, (string?)null)
+                .Set(i => i.CancelReportId, (Guid?)null)
+                .Set(i => i.UpdateDate, DateTimeOffset.UtcNow)
                 .UpdateAsync();
         }
     }

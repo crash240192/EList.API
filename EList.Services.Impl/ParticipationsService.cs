@@ -3,6 +3,7 @@ using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
 using EList.Models.Accounts;
+using EList.Models.Enums;
 using EList.Models.Invitations;
 using EList.Models.Participation;
 using EList.Models.Person;
@@ -35,6 +36,7 @@ namespace EList.Services.Impl
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
         private readonly ISubscriptionsRepository _subscriptionsRepository;
         private readonly INotificationsService _notificationsService;
+        private readonly IModerationPenaltiesService _moderationPenaltiesService;
 
         public ParticipationsService(ICorrelationIdProvider correlationIdProvider,
             IEventsRepository eventsRepository,
@@ -47,7 +49,8 @@ namespace EList.Services.Impl
             IParticipantsBWListRepository participantsBWListRepository,
             IEventOrganizatorsRepository eventOrganizatorsRepository,
             ISubscriptionsRepository subscriptionsRepository,
-            INotificationsService notificationsService)
+            INotificationsService notificationsService,
+            IModerationPenaltiesService moderationPenaltiesService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
@@ -59,6 +62,7 @@ namespace EList.Services.Impl
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
+            _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -76,6 +80,16 @@ namespace EList.Services.Impl
 
             if (curEvent.Active == false)
                 return CommandResult<Guid?>.Fail(ErrorCode.EventCancelled, "Мероприятие было отменено");
+
+            var participateBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                _accountDataHolder.AccountId.Value, ModerationPenaltyType.BanEventParticipate);
+            if (!participateBan.Success)
+                return CommandResult<Guid?>.Fail(participateBan.ErrorCode, participateBan.Message);
+
+            var eventBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                _accountDataHolder.AccountId.Value, ModerationPenaltyType.BanFromEvent, eventId);
+            if (!eventBan.Success)
+                return CommandResult<Guid?>.Fail(eventBan.ErrorCode, eventBan.Message);
 
             if (curEvent.Parameters.Private ?? false)
             {

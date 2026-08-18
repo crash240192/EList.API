@@ -30,6 +30,7 @@ namespace EList.Services.Impl
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
         private readonly INotificationsService _notificationsService;
+        private readonly IModerationPenaltiesService _moderationPenaltiesService;
 
         public InvitationsService(ICorrelationIdProvider correlationIdProvider,
             IAccountsRepository accountsRepository,
@@ -41,7 +42,8 @@ namespace EList.Services.Impl
             IParticipationsRepository participationsRepository,
             IAccountDataHolder accountDataHolder,
             IParticipantsBWListRepository participantsBWListRepository,
-            INotificationsService notificationsService)
+            INotificationsService notificationsService,
+            IModerationPenaltiesService moderationPenaltiesService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
@@ -53,6 +55,7 @@ namespace EList.Services.Impl
             _participationsRepository = participationsRepository ?? throw new ArgumentNullException(nameof(participationsRepository));
             _participantsBWListRepository = participantsBWListRepository ?? throw new ArgumentNullException(nameof(participantsBWListRepository));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
+            _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -160,6 +163,16 @@ namespace EList.Services.Impl
 
             if (curEvent.Active == false)
                 return CommandResult.Fail(ErrorCode.EventCancelled, $"Мероприятие было отменено");
+
+            var participateBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                _accountDataHolder.AccountId.Value, EList.Models.Enums.ModerationPenaltyType.BanEventParticipate);
+            if (!participateBan.Success)
+                return CommandResult.Fail(participateBan.ErrorCode, participateBan.Message);
+
+            var eventBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                _accountDataHolder.AccountId.Value, EList.Models.Enums.ModerationPenaltyType.BanFromEvent, invitation.EventId);
+            if (!eventBan.Success)
+                return CommandResult.Fail(eventBan.ErrorCode, eventBan.Message);
 
             if (curEvent.Parameters.Private ?? false)
             {

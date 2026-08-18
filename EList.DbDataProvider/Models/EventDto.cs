@@ -33,6 +33,18 @@ namespace EList.DbDataProvider.Models
         [Column("active")]
         public bool Active { get; set; }
 
+        [Column("cancelled_at")]
+        public DateTimeOffset? CancelledAt { get; set; }
+
+        [Column("cancelled_by_account_id")]
+        public Guid? CancelledByAccountId { get; set; }
+
+        [Column("cancel_source")]
+        public string? CancelSource { get; set; }
+
+        [Column("cancel_report_id")]
+        public Guid? CancelReportId { get; set; }
+
         [Column("event_parameters_id")]
         public Guid? EventParametersId { get; set; }
 
