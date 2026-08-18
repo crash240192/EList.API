@@ -61,7 +61,7 @@ namespace EList.Repositories.Impl
         {
             var result = await _notificationsDataProvider.SearchUserNotificationsAsync(
                 accountId,
-                type == null ? null : (int?)type.Value,
+                type == null ? null : ((int)type.Value).ToString(),
                 unreadOnly,
                 pageIndex,
                 pageSize);
@@ -78,7 +78,7 @@ namespace EList.Repositories.Impl
         {
             return await _notificationsDataProvider.CountUserNotificationsAsync(
                 accountId,
-                type == null ? null : (int?)type.Value,
+                type == null ? null : ((int)type.Value).ToString(),
                 unreadOnly);
         }
 

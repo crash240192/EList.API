@@ -27,7 +27,7 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<ListResponse<NotificationDto>> SearchUserNotificationsAsync(
             Guid accountId,
-            int? type,
+            string? type,
             bool unreadOnly,
             int pageIndex,
             int pageSize)
@@ -41,7 +41,7 @@ namespace EList.DbDataProvider.DataProviders
             return new ListResponse<NotificationDto>(totalCount, items);
         }
 
-        public async Task<int> CountUserNotificationsAsync(Guid accountId, int? type, bool unreadOnly)
+        public async Task<int> CountUserNotificationsAsync(Guid accountId, string? type, bool unreadOnly)
         {
             return await ApplyUserNotificationFilters(_connection.UserNotifications.AsQueryable(), accountId, type, unreadOnly)
                 .CountAsync();
@@ -50,7 +50,7 @@ namespace EList.DbDataProvider.DataProviders
         private static IQueryable<NotificationDto> ApplyUserNotificationFilters(
             IQueryable<NotificationDto> query,
             Guid accountId,
-            int? type,
+            string? type,
             bool unreadOnly)
         {
             query = query.Where(i => i.AccountId == accountId);

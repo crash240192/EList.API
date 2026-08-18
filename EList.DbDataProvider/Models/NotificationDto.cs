@@ -20,7 +20,7 @@ namespace EList.DbDataProvider.Models
         public Guid? RelatedAccountId { get; set; }
 
         [Column("type")]
-        public int? Type { get; set; }
+        public string? Type { get; set; }
 
         [Column("title")]
         public string? Title { get; set; }

@@ -64,10 +64,10 @@ namespace EList.AutoMapperProfile
 
             CreateMap<SystemNotificationDto, SystemNotification>().ReverseMap();
             CreateMap<NotificationDto, Notification>()
-                .ForMember(dest => dest.Type, opt => opt.MapFrom(src => (UserNotificationType?)src.Type))
+                .ForMember(dest => dest.Type, opt => opt.MapFrom(src => MapNotificationTypeFromDb(src.Type)))
                 .ForMember(dest => dest.Data, opt => opt.MapFrom(src => !string.IsNullOrWhiteSpace(src.Data) ? JsonConvert.DeserializeObject(src.Data) : null));
             CreateMap<Notification, NotificationDto>()
-                .ForMember(dest => dest.Type, opt => opt.MapFrom(src => (int?)src.Type))
+                .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.Type == null ? null : ((int)src.Type.Value).ToString()))
                 .ForMember(dest => dest.Data, opt => opt.MapFrom(src => src.Data != null ? JObject.FromObject(src.Data).ToString() : null));
 
             CreateMap<EventCategoryDto, EventCategory>().ReverseMap();
@@ -198,6 +198,20 @@ namespace EList.AutoMapperProfile
             CreateMap<Models.Enums.ReportStatus, DbDataProvider.Models.Enums.ReportStatus>().ReverseMap();
             CreateMap<Models.Enums.ReportResolutionAction, DbDataProvider.Models.Enums.ReportResolutionAction>().ReverseMap();
             CreateMap<Models.Enums.ReportActorContext, DbDataProvider.Models.Enums.ReportActorContext>().ReverseMap();
+        }
+
+        private static UserNotificationType? MapNotificationTypeFromDb(string? type)
+        {
+            if (string.IsNullOrWhiteSpace(type))
+                return null;
+
+            if (int.TryParse(type, out var numericType) && Enum.IsDefined(typeof(UserNotificationType), numericType))
+                return (UserNotificationType)numericType;
+
+            if (Enum.TryParse<UserNotificationType>(type, ignoreCase: true, out var namedType))
+                return namedType;
+
+            return null;
         }
     }
 }

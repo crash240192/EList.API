@@ -9,11 +9,11 @@ namespace EList.DbDataProvider.Interfaces
         Task<List<NotificationDto>> GetUnreadedUserNotificationsAsync(Guid accountId);
         Task<ListResponse<NotificationDto>> SearchUserNotificationsAsync(
             Guid accountId,
-            int? type,
+            string? type,
             bool unreadOnly,
             int pageIndex,
             int pageSize);
-        Task<int> CountUserNotificationsAsync(Guid accountId, int? type, bool unreadOnly);
+        Task<int> CountUserNotificationsAsync(Guid accountId, string? type, bool unreadOnly);
 
         Task ReadNotificationAsync(Guid notificationId);
         Task ReadAllUserNotificationsAsync(Guid accountId);
