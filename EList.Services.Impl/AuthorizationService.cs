@@ -37,6 +37,7 @@ namespace EList.Services.Impl
         private readonly IEncryptionTool _encryptionTool;
         private readonly IFilestorageClient _filestorageClient;
         private readonly IAccountDataHolder _accountDataHolder;
+        private readonly IModerationPenaltiesService _moderationPenaltiesService;
 
         public AuthorizationService(ICorrelationIdProvider correlationIdProvider,
             IAccountsRepository accountsRepository,
@@ -46,7 +47,8 @@ namespace EList.Services.Impl
             ISystemNotificationsService notificationService,
             IEncryptionTool encryptionTool,
             IFilestorageClient filestorageClient,
-            IAccountDataHolder accountDataHolder)
+            IAccountDataHolder accountDataHolder,
+            IModerationPenaltiesService moderationPenaltiesService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _authorizationRepository = authorizationRepository ?? throw new ArgumentNullException(nameof(authorizationRepository));
@@ -56,6 +58,7 @@ namespace EList.Services.Impl
             _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
             _filestorageClient = filestorageClient ?? throw new ArgumentNullException();
             _accountDataHolder = accountDataHolder;
+            _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
         }
 
         public async Task<CommandResult<AuthorizationResponse>> AuthorizeAsync(string login, string password)
@@ -72,6 +75,17 @@ namespace EList.Services.Impl
 
             if (account == null)
                 return CommandResult<AuthorizationResponse>.Fail(ErrorCode.AuthenticationError, "Неправильное имя пользователя или пароль");
+
+            if (!account.Active)
+            {
+                await _moderationPenaltiesService.LiftExpiredForAccountAsync(account.Id);
+                account = await _accountsRepository.GetAccountAsync(account.Id);
+                if (account == null || !account.Active)
+                {
+                    var message = await BuildAccountDisabledMessageAsync(account?.Id);
+                    return CommandResult<AuthorizationResponse>.Fail(ErrorCode.ModerationPenaltyActive, message);
+                }
+            }
 
             var tokenSearchResult = await _authorizationRepository.GetAuthorizationDataAsync(account.Id, _accountDataHolder.ClientHash);
 
@@ -221,6 +235,18 @@ namespace EList.Services.Impl
                 }
 
                 return CommandResult.Fail(ErrorCode.InvalidActivationKey, $"Указан не верный код активации.\r\n Осталось попыток: {existingToken.ActivationAttemptsRemaining}");
+            }
+
+            var tokenAccount = await _accountsRepository.GetAccountAsync(existingToken.AccountId);
+            if (tokenAccount != null && !tokenAccount.Active)
+            {
+                await _moderationPenaltiesService.LiftExpiredForAccountAsync(tokenAccount.Id);
+                tokenAccount = await _accountsRepository.GetAccountAsync(tokenAccount.Id);
+                if (tokenAccount == null || !tokenAccount.Active)
+                {
+                    var message = await BuildAccountDisabledMessageAsync(tokenAccount?.Id);
+                    return CommandResult.Fail(ErrorCode.ModerationPenaltyActive, message);
+                }
             }
 
             await _authorizationRepository.ActivateTokenAsync(existingToken.Token);
@@ -483,6 +509,24 @@ namespace EList.Services.Impl
             }
 
             return account;
+        }
+
+        private async Task<string> BuildAccountDisabledMessageAsync(Guid? accountId)
+        {
+            if (accountId == null)
+                return "Ваш аккаунт заблокирован.";
+
+            var penalties = await _moderationPenaltiesService.GetActiveForAccountAsync(accountId.Value);
+            var suspend = penalties.FirstOrDefault(p =>
+                p.PenaltyType == Models.Enums.ModerationPenaltyType.SuspendAccount);
+
+            if (suspend != null)
+                return ModerationPenaltiesService.FormatRestrictionMessage(suspend);
+
+            if (penalties.Count > 0)
+                return ModerationPenaltiesService.FormatRestrictionMessage(penalties[0]);
+
+            return "Ваш аккаунт заблокирован. Обратитесь в поддержку.";
         }
     }
 }

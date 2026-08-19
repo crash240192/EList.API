@@ -1,5 +1,6 @@
 ﻿using EList.Common.Encryption;
 using EList.Models;
+using EList.Services.Impl;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
@@ -245,7 +246,22 @@ namespace EList.Api.Infrastructure
                         if (!IsAnonymousMethod)
                         {
                             logger.Error("Start BasicAuthenticationHandler 'HandleAuthenticateAsync' method - Account disabled");
-                            return AuthenticateResult.Fail("Account disabled");
+
+                            var penalties = account.Result != null
+                                ? await _moderationPenaltiesService.GetActiveForAccountAsync(account.Result.Id)
+                                : new List<Models.ContentReports.ModerationPenalty>();
+
+                            var suspend = penalties.FirstOrDefault(p =>
+                                p.PenaltyType == Models.Enums.ModerationPenaltyType.SuspendAccount);
+
+                            var reason = suspend != null
+                                ? ModerationPenaltiesService.FormatRestrictionMessage(suspend)
+                                : penalties.Count > 0
+                                    ? ModerationPenaltiesService.FormatRestrictionMessage(penalties[0])
+                                    : "Ваш аккаунт заблокирован. Обратитесь в поддержку.";
+
+                            Context.Items["AccountDisabledReason"] = reason;
+                            return AuthenticateResult.Fail(reason);
                         }
                     }
 

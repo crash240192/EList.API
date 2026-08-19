@@ -92,6 +92,26 @@ app.UseMiddleware<ClientInfoMiddleware>();
 app.UseMiddleware<WebSocketsTokenHandlerMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.Use(async (context, next) =>
+{
+    await next();
+
+    if (context.Response.StatusCode == 401 && !context.Response.HasStarted
+        && context.Items.TryGetValue("AccountDisabledReason", out var reasonObj)
+        && reasonObj is string reason)
+    {
+        context.Response.ContentType = "application/json";
+        var body = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            errorCode = 20006,
+            success = false,
+            message = reason
+        });
+        await context.Response.WriteAsync(body);
+    }
+});
+
 app.UseStaticFiles();
 
 
