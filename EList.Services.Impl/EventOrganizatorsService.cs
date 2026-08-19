@@ -41,6 +41,24 @@ namespace EList.Services.Impl
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
         }
 
+        public async Task<CommandResult<EventOrganizator?>> GetByIdAsync(Guid id)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetByIdAsync)}";
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<EventOrganizator?>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var item = await _organizatorsRepository.GetByIdAsync(id);
+            if (item == null)
+                return CommandResult<EventOrganizator?>.Fail(ErrorCode.InvalidValue, "Запись организатора не найдена");
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<EventOrganizator?>(item);
+        }
+
         public async Task<CommandResult<List<EventOrganizator>>> GetByEventIdAsync(Guid eventId)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -92,6 +110,40 @@ namespace EList.Services.Impl
             await _organizatorsRepository.AssignAsync(eventId, accountIds, organizationIds);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> RemoveOrganizatorAsync(Guid eventId, Guid organizatorId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(RemoveOrganizatorAsync)}";
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var curEvent = await _eventsRepository.GetEventAsync(eventId);
+            if (curEvent == null)
+                return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            if (!await _organizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
+                return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+
+            var organizator = await _organizatorsRepository.GetByIdAsync(organizatorId);
+            if (organizator == null || organizator.EventId != eventId)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Запись организатора не найдена для этого мероприятия");
+
+            var allOrganizators = await _organizatorsRepository.GetByEventIdAsync(eventId);
+            if (allOrganizators == null || allOrganizators.Count <= 1)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Нельзя удалить последнего организатора мероприятия");
+
+            if (organizator.AccountId == _accountDataHolder.AccountId && !_accountDataHolder.IsPlatformModeratorOrAbove)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Нельзя удалить себя из организаторов");
+
+            await _organizatorsRepository.DeleteAsync(organizatorId);
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
 

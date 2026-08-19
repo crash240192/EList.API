@@ -39,6 +39,30 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Получить запись организатора по id
+        /// </summary>
+        [HttpGet("get/{id}")]
+        public async Task<CommandResult<EventOrganizator?>> GetByIdAsync(Guid id)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetByIdAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _organizatorsService.GetByIdAsync(id);
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// список организаторов мероприятия
         /// </summary>
         /// <param name="eventId"></param>
@@ -89,6 +113,37 @@ namespace EList.Api.Controllers
                     await _connectionProvider.RollbackTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Удалить организатора из мероприятия
+        /// </summary>
+        [HttpDelete("{eventId}/remove/{organizatorId}")]
+        public async Task<CommandResult> RemoveOrganizatorAsync(Guid eventId, Guid organizatorId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(RemoveOrganizatorAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                await _connectionProvider.StartNewTransactionAsync();
+
+                var result = await _organizatorsService.RemoveOrganizatorAsync(eventId, organizatorId);
+
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return result;
             }
             catch (Exception ex)
