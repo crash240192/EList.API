@@ -6,6 +6,12 @@ namespace EList.DbDataProvider.Interfaces
     public interface INotificationsDataProvider
     {
         Task<SystemNotificationDto?> GetNotificationByTypeAsync(SystemNotificationType type);
+        Task<SystemNotificationDto?> GetSystemNotificationByIdAsync(Guid id);
+        Task<List<SystemNotificationDto>> GetAllSystemNotificationsAsync();
+        Task<Guid> CreateSystemNotificationAsync(SystemNotificationDto item);
+        Task UpdateSystemNotificationAsync(SystemNotificationDto item);
+        Task DeleteSystemNotificationAsync(Guid id);
+
         Task<List<NotificationDto>> GetUnreadedUserNotificationsAsync(Guid accountId);
         Task<ListResponse<NotificationDto>> SearchUserNotificationsAsync(
             Guid accountId,

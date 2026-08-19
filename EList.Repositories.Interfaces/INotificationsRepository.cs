@@ -8,6 +8,12 @@ namespace EList.Repositories.Interfaces
     public interface INotificationsRepository
     {
         Task<SystemNotification?> GetNotificationByTypeAsync(SystemNotificationType type);
+        Task<SystemNotification?> GetSystemNotificationByIdAsync(Guid id);
+        Task<List<SystemNotification>> GetAllSystemNotificationsAsync();
+        Task<Guid> CreateSystemNotificationAsync(SystemNotification item);
+        Task UpdateSystemNotificationAsync(SystemNotification item);
+        Task DeleteSystemNotificationAsync(Guid id);
+
         Task<List<Notification>?> GetUnreadedUserNotificationsAsync(Guid accountId);
         Task<PagedList<Notification>> SearchUserNotificationsAsync(
             Guid accountId,

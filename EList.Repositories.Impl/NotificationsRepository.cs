@@ -28,6 +28,35 @@ namespace EList.Repositories.Impl
             var result = _mapper.Map<SystemNotification>(notification);
             return result;
         }
+
+        public async Task<SystemNotification?> GetSystemNotificationByIdAsync(Guid id)
+        {
+            var item = await _notificationsDataProvider.GetSystemNotificationByIdAsync(id);
+            return _mapper.Map<SystemNotification>(item);
+        }
+
+        public async Task<List<SystemNotification>> GetAllSystemNotificationsAsync()
+        {
+            var items = await _notificationsDataProvider.GetAllSystemNotificationsAsync();
+            return _mapper.Map<List<SystemNotification>>(items);
+        }
+
+        public async Task<Guid> CreateSystemNotificationAsync(SystemNotification item)
+        {
+            var mapped = _mapper.Map<DbDataProvider.Models.SystemNotificationDto>(item);
+            return await _notificationsDataProvider.CreateSystemNotificationAsync(mapped);
+        }
+
+        public async Task UpdateSystemNotificationAsync(SystemNotification item)
+        {
+            var mapped = _mapper.Map<DbDataProvider.Models.SystemNotificationDto>(item);
+            await _notificationsDataProvider.UpdateSystemNotificationAsync(mapped);
+        }
+
+        public async Task DeleteSystemNotificationAsync(Guid id)
+        {
+            await _notificationsDataProvider.DeleteSystemNotificationAsync(id);
+        }
         #endregion
 
 

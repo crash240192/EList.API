@@ -19,6 +19,36 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<SystemNotificationDto?> GetSystemNotificationByIdAsync(Guid id)
+        {
+            return await _connection.SystemNotifications.FirstOrDefaultAsync(i => i.Id == id);
+        }
+
+        public async Task<List<SystemNotificationDto>> GetAllSystemNotificationsAsync()
+        {
+            return await _connection.SystemNotifications.ToListAsync();
+        }
+
+        public async Task<Guid> CreateSystemNotificationAsync(SystemNotificationDto item)
+        {
+            return (Guid)await _connection.InsertWithIdentityAsync(item);
+        }
+
+        public async Task UpdateSystemNotificationAsync(SystemNotificationDto item)
+        {
+            await _connection.SystemNotifications.Where(i => i.Id == item.Id)
+                .Set(i => i.Type, item.Type)
+                .Set(i => i.Header, item.Header)
+                .Set(i => i.Message, item.Message)
+                .Set(i => i.ShortMessage, item.ShortMessage)
+                .UpdateAsync();
+        }
+
+        public async Task DeleteSystemNotificationAsync(Guid id)
+        {
+            await _connection.SystemNotifications.DeleteAsync(i => i.Id == id);
+        }
+
         public async Task<List<NotificationDto>> GetUnreadedUserNotificationsAsync(Guid accountId)
         {
             var result = await _connection.UserNotifications.Where(i =>  i.AccountId == accountId && i.ReadAt == null).ToListAsync();

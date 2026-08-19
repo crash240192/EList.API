@@ -6,6 +6,7 @@ using EList.Common.Support;
 using EList.Common.TemplateParser;
 using EList.Models.ContactData;
 using EList.Models.Enums;
+using EList.Models.Notifications;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using EList.Sms;
@@ -104,6 +105,76 @@ namespace EList.Services.Impl
             }
 
             return CommandResult<string>.Fail(ErrorCode.UnableToNotifyUser, "Не удалось уведомить пользователя");
+        }
+
+        public async Task<CommandResult<List<SystemNotification>>> GetAllAsync()
+        {
+            if (!_accountDataHolder.IsPlatformAdminOrAbove)
+                return CommandResult<List<SystemNotification>>.Fail(ErrorCode.AccessError, "Недостаточно прав");
+
+            var items = await _notificationsRepository.GetAllSystemNotificationsAsync();
+            return new CommandResult<List<SystemNotification>>(items);
+        }
+
+        public async Task<CommandResult<SystemNotification?>> GetByIdAsync(Guid id)
+        {
+            if (!_accountDataHolder.IsPlatformAdminOrAbove)
+                return CommandResult<SystemNotification?>.Fail(ErrorCode.AccessError, "Недостаточно прав");
+
+            var item = await _notificationsRepository.GetSystemNotificationByIdAsync(id);
+            if (item == null)
+                return CommandResult<SystemNotification?>.Fail(ErrorCode.InvalidValue, "Системное уведомление не найдено");
+            return new CommandResult<SystemNotification?>(item);
+        }
+
+        public async Task<CommandResult<Guid>> CreateAsync(SystemNotification item)
+        {
+            if (!_accountDataHolder.IsPlatformAdminOrAbove)
+                return CommandResult<Guid>.Fail(ErrorCode.AccessError, "Недостаточно прав");
+
+            if (string.IsNullOrWhiteSpace(item.Header))
+                return CommandResult<Guid>.Fail(ErrorCode.IsNullOrEmpty, "Заголовок обязателен");
+            if (string.IsNullOrWhiteSpace(item.Message))
+                return CommandResult<Guid>.Fail(ErrorCode.IsNullOrEmpty, "Текст сообщения обязателен");
+            if (string.IsNullOrWhiteSpace(item.ShortMessage))
+                return CommandResult<Guid>.Fail(ErrorCode.IsNullOrEmpty, "Краткий текст обязателен");
+
+            var id = await _notificationsRepository.CreateSystemNotificationAsync(item);
+            return new CommandResult<Guid>(id);
+        }
+
+        public async Task<CommandResult> UpdateAsync(Guid id, SystemNotification item)
+        {
+            if (!_accountDataHolder.IsPlatformAdminOrAbove)
+                return CommandResult.Fail(ErrorCode.AccessError, "Недостаточно прав");
+
+            var existing = await _notificationsRepository.GetSystemNotificationByIdAsync(id);
+            if (existing == null)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Системное уведомление не найдено");
+
+            if (string.IsNullOrWhiteSpace(item.Header))
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Заголовок обязателен");
+            if (string.IsNullOrWhiteSpace(item.Message))
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Текст сообщения обязателен");
+            if (string.IsNullOrWhiteSpace(item.ShortMessage))
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Краткий текст обязателен");
+
+            item.Id = id;
+            await _notificationsRepository.UpdateSystemNotificationAsync(item);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> DeleteAsync(Guid id)
+        {
+            if (!_accountDataHolder.IsPlatformAdminOrAbove)
+                return CommandResult.Fail(ErrorCode.AccessError, "Недостаточно прав");
+
+            var existing = await _notificationsRepository.GetSystemNotificationByIdAsync(id);
+            if (existing == null)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Системное уведомление не найдено");
+
+            await _notificationsRepository.DeleteSystemNotificationAsync(id);
+            return CommandResult.OK;
         }
     }
 }
