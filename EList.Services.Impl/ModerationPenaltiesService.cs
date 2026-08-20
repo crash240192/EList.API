@@ -17,7 +17,6 @@ namespace EList.Services.Impl
         private readonly IParticipantsBWListRepository _blackListRepository;
         private readonly IParticipationsRepository _participationsRepository;
         private readonly IInvitationsRepository _invitationsRepository;
-        private readonly IAuthorizationRepository _authorizationRepository;
         private readonly INotificationsService _notificationsService;
         private readonly IAccountDataHolder _accountDataHolder;
 
@@ -28,7 +27,6 @@ namespace EList.Services.Impl
             IParticipantsBWListRepository blackListRepository,
             IParticipationsRepository participationsRepository,
             IInvitationsRepository invitationsRepository,
-            IAuthorizationRepository authorizationRepository,
             INotificationsService notificationsService,
             IAccountDataHolder accountDataHolder)
         {
@@ -38,7 +36,6 @@ namespace EList.Services.Impl
             _blackListRepository = blackListRepository;
             _participationsRepository = participationsRepository;
             _invitationsRepository = invitationsRepository;
-            _authorizationRepository = authorizationRepository;
             _notificationsService = notificationsService;
             _accountDataHolder = accountDataHolder;
         }
@@ -148,10 +145,7 @@ namespace EList.Services.Impl
             {
                 case ModerationPenaltyType.SuspendAccount:
                     if (penalty.AccountId != null)
-                    {
                         await _accountsRepository.SetAccountActiveAsync(penalty.AccountId.Value, false);
-                        await _authorizationRepository.DeactivateAccountTokensAsync(penalty.AccountId.Value);
-                    }
                     break;
 
                 case ModerationPenaltyType.SuspendOrganization:
