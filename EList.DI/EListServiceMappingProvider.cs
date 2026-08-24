@@ -106,6 +106,7 @@ namespace EList.DI
             //support
             mapper.AddSingleton<ITemplateParser, TemplateParser>();
             mapper.AddSingleton<IEncryptionTool, EncryptionTool>();
+            mapper.AddSingleton<IFieldEncryptor, FieldEncryptor>();
             mapper.AddScoped<IAccountDataHolder, AccountDataHolder>();
             mapper.AddScoped<IOrganizationRegistryClient, OrganizationRegistryClientFacade>();
 

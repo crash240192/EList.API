@@ -25,8 +25,9 @@ namespace EList.DbDataProvider.Models
         [Column("gender", DataType = DataType.Enum)]
         public Gender? Gender { get; set; }
 
+        /// <summary>Зашифрованная дата рождения (ISO) или legacy plaintext timestamp text.</summary>
         [Column("birthdate")]
-        public DateTime? Birthdate { get; set; }
+        public string? Birthdate { get; set; }
 
         [Association(ThisKey = nameof(AccountId), OtherKey = nameof(AccountDto.Id))]
         public AccountDto Account { get; set; }

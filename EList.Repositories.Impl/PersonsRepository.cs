@@ -4,6 +4,7 @@ using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.Enums;
 using EList.Models.Person;
 using EList.Repositories.Interfaces;
+using System.Globalization;
 
 namespace EList.Repositories.Impl
 {
@@ -25,24 +26,18 @@ namespace EList.Repositories.Impl
                 AccountId = accountId,
                 FirstName = request.FirstName,
                 LastName = request.LastName,
-                Birthdate = request.BirthDate,
+                Birthdate = request.BirthDate?.ToString("o", CultureInfo.InvariantCulture),
                 Gender = _mapper.Map<Gender>(request.Gender),
                 Patronymic = request.Patronymic
             };
-            mappedRequest.AccountId = accountId;
 
-            var result = await _personDataProvider.CreatePersonInfoAsync(mappedRequest);
-
-            return result;
+            return await _personDataProvider.CreatePersonInfoAsync(mappedRequest);
         }
 
         public async Task<PersonInfo?> GetPersonInfoAsync(Guid accountId)
         {
             var person = await _personDataProvider.GetPersonInfoAsync(accountId);
-
-            var result = person != null ? _mapper.Map<PersonInfoDto, PersonInfo>(person) : null;
-
-            return result;
+            return person != null ? _mapper.Map<PersonInfoDto, PersonInfo>(person) : null;
         }
 
         public async Task UpdatePersonInfoAsync(Guid accountId, PersonRequest request)
@@ -52,7 +47,7 @@ namespace EList.Repositories.Impl
                 AccountId = accountId,
                 FirstName = request.FirstName,
                 LastName = request.LastName,
-                Birthdate = request.BirthDate,
+                Birthdate = request.BirthDate?.ToString("o", CultureInfo.InvariantCulture),
                 Gender = _mapper.Map<Gender>(request.Gender),
                 Patronymic = request.Patronymic
             };

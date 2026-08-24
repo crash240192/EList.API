@@ -16,6 +16,9 @@ namespace EList.DbDataProvider.Models
         [Column("inn")]
         public string? Inn { get; set; }
 
+        [Column("inn_hash")]
+        public string? InnHash { get; set; }
+
         [Column("ogrn")]
         public string? Ogrn { get; set; }
 

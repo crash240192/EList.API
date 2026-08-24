@@ -1007,3 +1007,34 @@ create table public.chat_administrator (
 	constraint chat_organization_fk foreign key (organization_id) references public.organization(id),
 	constraint chat_person_fk foreign key (person_id) references public.person(id)
 );*/
+-- ---------------------------------------------------------------------------
+-- Field-level encryption for personal data (ciphertext in-place + blind hash)
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.contact_data
+	ALTER COLUMN value TYPE text;
+
+ALTER TABLE public.contact_data
+	ADD COLUMN IF NOT EXISTS value_hash varchar(128) NULL;
+
+CREATE INDEX IF NOT EXISTS contact_data_value_hash_idx ON public.contact_data (value_hash);
+
+ALTER TABLE public.person_info
+	ALTER COLUMN first_name TYPE text,
+	ALTER COLUMN last_name TYPE text,
+	ALTER COLUMN patronymic TYPE text;
+
+ALTER TABLE public.person_info
+	ALTER COLUMN birthdate TYPE text USING birthdate::text;
+
+ALTER TABLE public.organization_legal
+	ALTER COLUMN inn TYPE text,
+	ALTER COLUMN ogrn TYPE text,
+	ALTER COLUMN kpp TYPE text,
+	ALTER COLUMN legal_address TYPE text,
+	ALTER COLUMN head_name TYPE text,
+	ALTER COLUMN head_basis TYPE text;
+
+ALTER TABLE public.organization_legal
+	ADD COLUMN IF NOT EXISTS inn_hash varchar(128) NULL;
+
+CREATE INDEX IF NOT EXISTS organization_legal_inn_hash_idx ON public.organization_legal (inn_hash);

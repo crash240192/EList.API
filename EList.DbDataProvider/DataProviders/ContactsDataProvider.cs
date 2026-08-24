@@ -1,5 +1,7 @@
-﻿using EList.DbDataProvider.Interfaces;
+﻿using EList.Common.Encryption;
+using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Security;
 using EList.Models.ContactData;
 using LinqToDB;
 using LinqToDB.Async;
@@ -8,8 +10,13 @@ namespace EList.DbDataProvider.DataProviders
 {
     public class ContactsDataProvider : DataProviderBase, IContactsDataProvider
     {
-        public ContactsDataProvider(IDataConnectionProvider dataConnectionProvider) : base(dataConnectionProvider)
+        private readonly IFieldEncryptor _fieldEncryptor;
+
+        public ContactsDataProvider(
+            IDataConnectionProvider dataConnectionProvider,
+            IFieldEncryptor fieldEncryptor) : base(dataConnectionProvider)
         {
+            _fieldEncryptor = fieldEncryptor;
         }
 
         public async Task<Guid> CreateContactTypeAsync(ContactTypeDto item)
@@ -49,21 +56,37 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<Guid> CreateContactAsync(ContactDataDto item)
         {
+            PersonalDataCrypto.EncryptContact(item, _fieldEncryptor);
             var result = (Guid)await _connection.InsertWithIdentityAsync(item);
             return result;
         }
 
         public async Task<bool> CheckContactIsEmptyAsync(string contactValue, Guid contactType)
         {
-            var result = !await _connection.ContactData
-                .AnyAsync(i => i.Value == contactValue && i.TypeId == contactType);
-            return result;
+            var hash = _fieldEncryptor.BlindIndex(contactValue);
+            var existsByHash = !string.IsNullOrEmpty(hash)
+                && await _connection.ContactData.AnyAsync(i =>
+                    i.TypeId == contactType && i.ValueHash == hash);
+
+            if (existsByHash)
+                return false;
+
+            // Legacy plaintext rows (ещё не мигрированы)
+            var normalized = _fieldEncryptor.NormalizeContact(contactValue);
+            var existsPlain = await _connection.ContactData.AnyAsync(i =>
+                i.TypeId == contactType
+                && i.ValueHash == null
+                && i.Value.ToLower() == normalized);
+
+            return !existsPlain;
         }
 
         public async Task UpdateContactAsync(ContactDataDto item)
         {
+            PersonalDataCrypto.EncryptContact(item, _fieldEncryptor);
             await _connection.ContactData.Where(i => i.Id == item.Id)
                 .Set(i => i.Value, item.Value)
+                .Set(i => i.ValueHash, item.ValueHash)
                 .Set(i => i.TypeId, item.TypeId)
                 .Set(i => i.Show, item.Show)
                 .UpdateAsync();
@@ -98,6 +121,7 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.AccountRelation)
                 .Where(i => i.Id == id)
                 .FirstOrDefaultAsync();
+            PersonalDataCrypto.DecryptContact(result, _fieldEncryptor);
             return result;
         }
 
@@ -108,17 +132,37 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.OrganizationRelation)
                 .Where(i => i.Id == id && i.OrganizationRelation != null)
                 .FirstOrDefaultAsync();
+            PersonalDataCrypto.DecryptContact(result, _fieldEncryptor);
             return result;
         }
 
         public async Task<ContactDataDto?> GetContactAsync(string contactValue)
         {
-            var result = await _connection.ContactData
-                .LoadWith(i => i.ContactType)
-                .LoadWith(i => i.AccountRelation)
-                .LoadWith(i => i.OrganizationRelation)
-                .Where(i => i.Value.ToLower() == contactValue.ToLower())
-                .FirstOrDefaultAsync();
+            var hash = _fieldEncryptor.BlindIndex(contactValue);
+            ContactDataDto? result = null;
+
+            if (!string.IsNullOrEmpty(hash))
+            {
+                result = await _connection.ContactData
+                    .LoadWith(i => i.ContactType)
+                    .LoadWith(i => i.AccountRelation)
+                    .LoadWith(i => i.OrganizationRelation)
+                    .Where(i => i.ValueHash == hash)
+                    .FirstOrDefaultAsync();
+            }
+
+            if (result == null)
+            {
+                var normalized = _fieldEncryptor.NormalizeContact(contactValue);
+                result = await _connection.ContactData
+                    .LoadWith(i => i.ContactType)
+                    .LoadWith(i => i.AccountRelation)
+                    .LoadWith(i => i.OrganizationRelation)
+                    .Where(i => i.ValueHash == null && i.Value.ToLower() == normalized)
+                    .FirstOrDefaultAsync();
+            }
+
+            PersonalDataCrypto.DecryptContact(result, _fieldEncryptor);
             return result;
         }
 
@@ -129,6 +173,7 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.AccountRelation)
                 .Where(i => i.AccountRelation.AccountId == accountId)
                 .FirstOrDefaultAsync();
+            PersonalDataCrypto.DecryptContact(result, _fieldEncryptor);
             return result;
         }
 
@@ -139,6 +184,7 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.AccountRelation)
                 .Where(i => i.AccountRelation.AccountId == accountId)
                 .ToListAsync();
+            result?.ForEach(i => PersonalDataCrypto.DecryptContact(i, _fieldEncryptor));
             return result;
         }
 
@@ -149,6 +195,7 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.OrganizationRelation)
                 .Where(i => i.OrganizationRelation.OrganizationId == organizationId)
                 .ToListAsync();
+            result?.ForEach(i => PersonalDataCrypto.DecryptContact(i, _fieldEncryptor));
             return result;
         }
     }
