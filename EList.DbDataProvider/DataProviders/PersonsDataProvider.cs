@@ -1,5 +1,4 @@
-﻿using EList.Common.Encryption;
-using EList.DbDataProvider.DataConnections;
+﻿using EList.DbDataProvider.DataConnections;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Security;

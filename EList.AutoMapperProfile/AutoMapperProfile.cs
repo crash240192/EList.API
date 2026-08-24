@@ -1,5 +1,4 @@
 ﻿using AutoMapper;
-using EList.Common.Encryption;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Security;
 using EList.Models.Accounts;

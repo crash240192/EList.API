@@ -1,5 +1,5 @@
-using EList.Common.Encryption;
 using EList.DbDataProvider.Interfaces;
+using EList.DbDataProvider.Security;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.Enums;
 using EList.DbDataProvider.Security;

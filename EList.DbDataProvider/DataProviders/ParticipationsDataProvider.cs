@@ -1,5 +1,4 @@
-﻿using EList.Common.Encryption;
-using EList.Common.Extensions;
+﻿using EList.Common.Extensions;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.SearchRequests;

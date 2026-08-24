@@ -4,6 +4,7 @@ using EList.Common.Encryption;
 using EList.Common.TemplateParser;
 using EList.DbDataProvider.DataProviders;
 using EList.DbDataProvider.Interfaces;
+using EList.DbDataProvider.Security;
 using EList.FilestorageClient;
 using EList.Repositories.Impl;
 using EList.Repositories.Interfaces;
