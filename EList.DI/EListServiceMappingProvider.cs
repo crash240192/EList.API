@@ -4,6 +4,7 @@ using EList.Common.Encryption;
 using EList.Common.TemplateParser;
 using EList.DbDataProvider.DataProviders;
 using EList.DbDataProvider.Interfaces;
+using EList.DbDataProvider.Security;
 using EList.FilestorageClient;
 using EList.Repositories.Impl;
 using EList.Repositories.Interfaces;
@@ -115,6 +116,7 @@ namespace EList.DI
             //support
             mapper.AddSingleton<ITemplateParser, TemplateParser>();
             mapper.AddSingleton<IEncryptionTool, EncryptionTool>();
+            mapper.AddSingleton<IFieldEncryptor, FieldEncryptor>();
             mapper.AddScoped<IAccountDataHolder, AccountDataHolder>();
             mapper.AddScoped<IOrganizationRegistryClient, OrganizationRegistryClientFacade>();
 

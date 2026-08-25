@@ -21,6 +21,10 @@ namespace EList.DbDataProvider.Models
         [Column("value")]
         public string Value { get; set; }
 
+        /// <summary>HMAC blind-index для поиска по контакту (email/телефон).</summary>
+        [Column("value_hash")]
+        public string? ValueHash { get; set; }
+
 
         [Association(ThisKey = nameof(TypeId), OtherKey = nameof(ContactTypeDto.Id))]
         public ContactTypeDto ContactType { get; set; }

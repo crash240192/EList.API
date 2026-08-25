@@ -1,6 +1,7 @@
 ﻿using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.SearchRequests;
+using EList.DbDataProvider.Security;
 using EList.Models.Events;
 using LinqToDB;
 using LinqToDB.Async;
@@ -9,39 +10,56 @@ namespace EList.DbDataProvider.DataProviders
 {
     public class SubscriptionsDataProvider : DataProviderBase, ISubscriptionsDataProvider
     {
-        public SubscriptionsDataProvider(IDataConnectionProvider dataConnectionProvider) : base(dataConnectionProvider)
+        private readonly IFieldEncryptor _fieldEncryptor;
+
+        public SubscriptionsDataProvider(
+            IDataConnectionProvider dataConnectionProvider,
+            IFieldEncryptor fieldEncryptor) : base(dataConnectionProvider)
         {
+            _fieldEncryptor = fieldEncryptor;
         }
 
         public async Task<ListResponse<SubscriptionDto>> GetSubscriptionsAsync(SubscriptionsSearchRequest request)
         {
             var subscriptionsRequest = _connection.Subscriptions
-                //.LoadWith(i => i.Subscriber)
-                //.ThenLoad(i => i.PersonInfo)
                 .LoadWith(i => i.SubscribedTo)
                 .ThenLoad(i => i.PersonInfo)
                 .OrderBy(i => i.SubscribedTo.Login)
                 .Where(i => i.SubscriberId == request.AccountId);
 
-            if (!string.IsNullOrWhiteSpace(request.Name))
+            List<SubscriptionDto> result;
+            int count;
+
+            if (string.IsNullOrWhiteSpace(request.Name))
             {
-                var nameSubstrings = request.Name?.Split(' ').Where(i => i.Length > 0).ToList() ?? null;
-
-                if (nameSubstrings?.Count() > 0)
-                    subscriptionsRequest = subscriptionsRequest.Where(i => nameSubstrings.All(name => i.Subscriber.Login.ToLower().Contains(name.ToLower())
-                    || i.Subscriber.PersonInfo.LastName.ToLower().Contains(name.ToLower())
-                    || i.Subscriber.PersonInfo.Patronymic.ToLower().Contains(name.ToLower())
-                    || i.Subscriber.PersonInfo.FirstName.ToLower().Contains(name.ToLower())));
+                count = await subscriptionsRequest.CountAsync();
+                if (request.PageIndes != null && request.PageSize != null)
+                    result = await subscriptionsRequest.Skip(request.PageSize.Value * request.PageIndes.Value).Take(request.PageSize.Value).ToListAsync();
+                else
+                    result = await subscriptionsRequest.ToListAsync();
             }
-
-
-            var count = await subscriptionsRequest.CountAsync();
-
-            List<SubscriptionDto> result = null;
-            if (request.PageIndes != null && request.PageSize != null)
-                result = await subscriptionsRequest.Skip(request.PageSize.Value * request.PageIndes.Value).Take(request.PageSize.Value).ToListAsync();
             else
-                result = await subscriptionsRequest.ToListAsync();
+            {
+                var all = await subscriptionsRequest.ToListAsync();
+                foreach (var item in all)
+                    PersonalDataCrypto.DecryptPerson(item.SubscribedTo?.PersonInfo, _fieldEncryptor);
+
+                var nameSubstrings = request.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                all = all.Where(i => nameSubstrings.All(name =>
+                {
+                    var n = name.ToLowerInvariant();
+                    return (i.SubscribedTo?.Login?.ToLowerInvariant().Contains(n) ?? false)
+                        || (i.SubscribedTo?.PersonInfo?.LastName?.ToLowerInvariant().Contains(n) ?? false)
+                        || (i.SubscribedTo?.PersonInfo?.Patronymic?.ToLowerInvariant().Contains(n) ?? false)
+                        || (i.SubscribedTo?.PersonInfo?.FirstName?.ToLowerInvariant().Contains(n) ?? false);
+                })).ToList();
+
+                count = all.Count;
+                if (request.PageIndes != null && request.PageSize != null)
+                    result = all.Skip(request.PageSize.Value * request.PageIndes.Value).Take(request.PageSize.Value).ToList();
+                else
+                    result = all;
+            }
 
             return new ListResponse<SubscriptionDto>(count, result);
         }
@@ -67,22 +85,7 @@ namespace EList.DbDataProvider.DataProviders
             var subscriptionsRequest = _connection.Subscriptions
                 .LoadWith(i => i.Subscriber)
                 .ThenLoad(i => i.PersonInfo)
-                //.OrderBy(i => i.Subscriber.Login)
-                .OrderBy(i => i.Subscriber.PersonInfo.Patronymic)
-                .OrderBy(i => i.Subscriber.PersonInfo.LastName)
-                .OrderBy(i => i.Subscriber.PersonInfo.FirstName)
                 .Where(i => i.SubscribedToId == request.AccountId);
-
-            if (!string.IsNullOrWhiteSpace(request.Name))
-            {
-                var nameSubstrings = request.Name?.Split(' ').Where(i => i.Length > 0).ToList() ?? null;
-
-                if (nameSubstrings?.Count() > 0)
-                    subscriptionsRequest = subscriptionsRequest.Where(i => nameSubstrings.All(name => i.Subscriber.Login.ToLower().Contains(name.ToLower())
-                    || i.Subscriber.PersonInfo.LastName.ToLower().Contains(name.ToLower())
-                    || i.Subscriber.PersonInfo.Patronymic.ToLower().Contains(name.ToLower())
-                    || i.Subscriber.PersonInfo.FirstName.ToLower().Contains(name.ToLower())));
-            }
 
             if (request.NotifyParticipated != null)
                 subscriptionsRequest = subscriptionsRequest.Where(i => i.NotifyParticipated == request.NotifyParticipated);
@@ -93,13 +96,45 @@ namespace EList.DbDataProvider.DataProviders
             if (request.NotifySubscribed != null)
                 subscriptionsRequest = subscriptionsRequest.Where(i => i.NotifySubscribed == request.NotifySubscribed);
 
-            var count = await subscriptionsRequest.CountAsync();
+            List<SubscriptionDto> result;
+            int count;
 
-            List<SubscriptionDto> result = null;
-            if (request.PageIndes != null && request.PageSize != null)
-                result = await subscriptionsRequest.Skip(request.PageSize.Value * request.PageIndes.Value).Take(request.PageSize.Value).ToListAsync();
+            if (string.IsNullOrWhiteSpace(request.Name))
+            {
+                count = await subscriptionsRequest.CountAsync();
+                if (request.PageIndes != null && request.PageSize != null)
+                    result = await subscriptionsRequest.Skip(request.PageSize.Value * request.PageIndes.Value).Take(request.PageSize.Value).ToListAsync();
+                else
+                    result = await subscriptionsRequest.ToListAsync();
+            }
             else
-                result = await subscriptionsRequest.ToListAsync();
+            {
+                var all = await subscriptionsRequest.ToListAsync();
+                foreach (var item in all)
+                    PersonalDataCrypto.DecryptPerson(item.Subscriber?.PersonInfo, _fieldEncryptor);
+
+                var nameSubstrings = request.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                all = all.Where(i => nameSubstrings.All(name =>
+                {
+                    var n = name.ToLowerInvariant();
+                    return (i.Subscriber?.Login?.ToLowerInvariant().Contains(n) ?? false)
+                        || (i.Subscriber?.PersonInfo?.LastName?.ToLowerInvariant().Contains(n) ?? false)
+                        || (i.Subscriber?.PersonInfo?.Patronymic?.ToLowerInvariant().Contains(n) ?? false)
+                        || (i.Subscriber?.PersonInfo?.FirstName?.ToLowerInvariant().Contains(n) ?? false);
+                })).ToList();
+
+                all = all
+                    .OrderBy(i => i.Subscriber?.PersonInfo?.Patronymic)
+                    .ThenBy(i => i.Subscriber?.PersonInfo?.LastName)
+                    .ThenBy(i => i.Subscriber?.PersonInfo?.FirstName)
+                    .ToList();
+
+                count = all.Count;
+                if (request.PageIndes != null && request.PageSize != null)
+                    result = all.Skip(request.PageSize.Value * request.PageIndes.Value).Take(request.PageSize.Value).ToList();
+                else
+                    result = all;
+            }
 
             return new ListResponse<SubscriptionDto>(count, result);
         }

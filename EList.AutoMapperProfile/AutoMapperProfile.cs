@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Security;
 using EList.Models.Accounts;
 using EList.Models.Authorization;
 using EList.Models.BugReports;
@@ -29,7 +30,11 @@ namespace EList.AutoMapperProfile
 {
     public class AutoMapperProfile : Profile
     {
-        public AutoMapperProfile()
+        public AutoMapperProfile() : this(new FieldEncryptor())
+        {
+        }
+
+        public AutoMapperProfile(IFieldEncryptor fieldEncryptor)
         {
             //if (!int.TryParse(ConfigurationManager.AppSettings["maxPageSize"], out var defaultPageSize))
             //{
@@ -52,10 +57,29 @@ namespace EList.AutoMapperProfile
 
             CreateMap<AccountDto, AccountPublicData>();
 
-            CreateMap<PersonInfoDto, PersonInfo>().ReverseMap();
+            CreateMap<PersonInfoDto, PersonInfo>()
+                .ForMember(d => d.FirstName, o => o.MapFrom(s => fieldEncryptor.Decrypt(s.FirstName)))
+                .ForMember(d => d.LastName, o => o.MapFrom(s => fieldEncryptor.Decrypt(s.LastName)))
+                .ForMember(d => d.Patronymic, o => o.MapFrom(s => fieldEncryptor.Decrypt(s.Patronymic)))
+                .ForMember(d => d.BirthDate, o => o.MapFrom(s =>
+                    PersonalDataCrypto.ParseBirthdate(fieldEncryptor.Decrypt(s.Birthdate))));
+            CreateMap<PersonInfo, PersonInfoDto>()
+                .ForMember(d => d.Birthdate, o => o.MapFrom(s =>
+                    s.BirthDate == null ? null : s.BirthDate.Value.ToString("o")));
 
             CreateMap<ContactTypeDto, ContactType>().ReverseMap();
-            CreateMap<ContactDataDto, ContactDataItem>().ReverseMap();
+            CreateMap<ContactDataDto, ContactDataItem>()
+                .ForMember(d => d.Value, o => o.MapFrom(s => fieldEncryptor.Decrypt(s.Value)))
+                .ReverseMap();
+            CreateMap<OrganizationLegalDto, OrganizationLegal>()
+                .ForMember(d => d.Inn, o => o.MapFrom(s => fieldEncryptor.Decrypt(s.Inn)))
+                .ForMember(d => d.Ogrn, o => o.MapFrom(s => fieldEncryptor.Decrypt(s.Ogrn)))
+                .ForMember(d => d.Kpp, o => o.MapFrom(s => fieldEncryptor.Decrypt(s.Kpp)))
+                .ForMember(d => d.LegalAddress, o => o.MapFrom(s => fieldEncryptor.Decrypt(s.LegalAddress)))
+                .ForMember(d => d.HeadName, o => o.MapFrom(s => fieldEncryptor.Decrypt(s.HeadName)))
+                .ForMember(d => d.HeadBasis, o => o.MapFrom(s => fieldEncryptor.Decrypt(s.HeadBasis)));
+            CreateMap<OrganizationLegal, OrganizationLegalDto>()
+                .ForMember(d => d.InnHash, o => o.Ignore());
 
             CreateMap<Document, DocumentDto>().ReverseMap();
 
@@ -106,7 +130,6 @@ namespace EList.AutoMapperProfile
             CreateMap<OrganizationDto, Organization>().ReverseMap();
             CreateMap<OrganizationRequest, OrganizationDto>();
             CreateMap<OrganizationAccountRelationDto, OrganizationMember>().ReverseMap();
-            CreateMap<OrganizationLegalDto, OrganizationLegal>().ReverseMap();
             CreateMap<OrganizationLegalRequest, OrganizationLegal>();
             CreateMap<OrganizationPayoutDto, OrganizationPayout>().ReverseMap();
             CreateMap<OrganizationPayoutRequest, OrganizationPayout>();

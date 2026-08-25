@@ -1,6 +1,8 @@
 using EList.DbDataProvider.Interfaces;
+using EList.DbDataProvider.Security;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.Enums;
+using EList.DbDataProvider.Security;
 using LinqToDB;
 using LinqToDB.Async;
 
@@ -8,8 +10,13 @@ namespace EList.DbDataProvider.DataProviders
 {
     public class OrganizationsDataProvider : DataProviderBase, IOrganizationsDataProvider
     {
-        public OrganizationsDataProvider(IDataConnectionProvider dataConnectionProvider) : base(dataConnectionProvider)
+        private readonly IFieldEncryptor _fieldEncryptor;
+
+        public OrganizationsDataProvider(
+            IDataConnectionProvider dataConnectionProvider,
+            IFieldEncryptor fieldEncryptor) : base(dataConnectionProvider)
         {
+            _fieldEncryptor = fieldEncryptor;
         }
 
         #region organizations
@@ -37,6 +44,15 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.Payout)
                 .LoadWith(i => i.Wallet)
                 .FirstOrDefaultAsync(i => i.Id == id);
+
+            if (result?.Legal != null)
+                PersonalDataCrypto.DecryptLegal(result.Legal, _fieldEncryptor);
+            if (result?.Members != null)
+            {
+                foreach (var member in result.Members)
+                    PersonalDataCrypto.DecryptPerson(member.Account?.PersonInfo, _fieldEncryptor);
+            }
+
             return result;
         }
 
@@ -265,12 +281,14 @@ namespace EList.DbDataProvider.DataProviders
         #region legal
         public async Task UpsertLegalAsync(OrganizationLegalDto item)
         {
+            PersonalDataCrypto.EncryptLegal(item, _fieldEncryptor);
             var exists = await _connection.OrganizationLegal.AnyAsync(i => i.OrganizationId == item.OrganizationId);
             if (exists)
             {
                 await _connection.OrganizationLegal.Where(i => i.OrganizationId == item.OrganizationId)
                     .Set(i => i.LegalForm, item.LegalForm)
                     .Set(i => i.Inn, item.Inn)
+                    .Set(i => i.InnHash, item.InnHash)
                     .Set(i => i.Ogrn, item.Ogrn)
                     .Set(i => i.Kpp, item.Kpp)
                     .Set(i => i.LegalAddress, item.LegalAddress)
@@ -288,6 +306,7 @@ namespace EList.DbDataProvider.DataProviders
         public async Task<OrganizationLegalDto?> GetLegalAsync(Guid organizationId)
         {
             var result = await _connection.OrganizationLegal.FirstOrDefaultAsync(i => i.OrganizationId == organizationId);
+            PersonalDataCrypto.DecryptLegal(result, _fieldEncryptor);
             return result;
         }
 

@@ -2,6 +2,7 @@
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.SearchRequests;
+using EList.DbDataProvider.Security;
 using EList.Models.Invitations;
 using LinqToDB;
 using LinqToDB.Async;
@@ -10,9 +11,13 @@ namespace EList.DbDataProvider.DataProviders
 {
     public class ParticipationsDataProvider : DataProviderBase, IParticipationsDataProvider
     {
+        private readonly IFieldEncryptor _fieldEncryptor;
 
-        public ParticipationsDataProvider(IDataConnectionProvider dataConnectionProvider) : base(dataConnectionProvider)
+        public ParticipationsDataProvider(
+            IDataConnectionProvider dataConnectionProvider,
+            IFieldEncryptor fieldEncryptor) : base(dataConnectionProvider)
         {
+            _fieldEncryptor = fieldEncryptor;
         }
 
         public async Task LeaveEventAsync(Guid accountId, Guid eventId)
@@ -77,34 +82,10 @@ namespace EList.DbDataProvider.DataProviders
                 .ThenLoad(i => i.Avatars)
                 .Where(i => request.EventId == i.EventId)
                 .OrderBy(i => i.Account.Login)
-                .OrderBy(i => i.Account.PersonInfo.Patronymic)
-                .OrderBy(i => i.Account.PersonInfo.LastName)
-                .OrderBy(i => i.Account.PersonInfo.FirstName)
                 .Select(i => i.Account);
 
-            #region name
-            if (!string.IsNullOrWhiteSpace(request.Name))
-            {
-                var splitNameSubscrings = request.Name.ToLower().Split(' ');
-                accountsRequest = accountsRequest.Where(i => splitNameSubscrings.All(nameItem => 
-                i.Login.ToLower().Contains(nameItem)
-                || (!string.IsNullOrWhiteSpace(i.PersonInfo.FirstName)
-                    ? i.PersonInfo.FirstName.ToLower().Contains(nameItem)
-                    : false)
-                || (!string.IsNullOrWhiteSpace(i.PersonInfo.LastName)
-                    ? i.PersonInfo.LastName.ToLower().Contains(nameItem)
-                    : false)
-                || (!string.IsNullOrWhiteSpace(i.PersonInfo.Patronymic)
-                    ? i.PersonInfo.Patronymic.ToLower().Contains(nameItem)
-                    : false)
-                ));
-            }
-            #endregion
             if (request.Gender != null)
                 accountsRequest = accountsRequest.Where(i => i.PersonInfo.Gender == request.Gender);
-
-            if (request.Age != null)
-                accountsRequest = accountsRequest.Where(i => i.PersonInfo.Birthdate >= DateTime.Now.AddYears(-request.Age.Value));
 
             #region subscriptions
             if (request.SubscribedToId != null) // Список участников, подписанных на этого пользователя
@@ -120,13 +101,59 @@ namespace EList.DbDataProvider.DataProviders
             }
             #endregion
 
-            var count = await accountsRequest.CountAsync();
-
+            // ФИО/дата рождения зашифрованы — фильтр и сортировка по ним только после decrypt
+            var needsPersonFilter = !string.IsNullOrWhiteSpace(request.Name) || request.Age != null;
             List<AccountDto> resultList;
-            if (request.PageSize != null && request.PageIndex != null)
-                resultList = await accountsRequest.Skip(request.PageSize.Value * request.PageIndex.Value).Take(request.PageSize.Value).ToListAsync();
+            int count;
+
+            if (!needsPersonFilter)
+            {
+                count = await accountsRequest.CountAsync();
+                if (request.PageSize != null && request.PageIndex != null)
+                    resultList = await accountsRequest.Skip(request.PageSize.Value * request.PageIndex.Value).Take(request.PageSize.Value).ToListAsync();
+                else
+                    resultList = await accountsRequest.ToListAsync();
+            }
             else
-                resultList = await accountsRequest.ToListAsync();
+            {
+                var all = await accountsRequest.ToListAsync();
+                foreach (var account in all)
+                    PersonalDataCrypto.DecryptPerson(account.PersonInfo, _fieldEncryptor);
+
+                if (!string.IsNullOrWhiteSpace(request.Name))
+                {
+                    var splitNameSubstrings = request.Name.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    all = all.Where(i => splitNameSubstrings.All(nameItem =>
+                        (i.Login?.ToLower().Contains(nameItem) ?? false)
+                        || (i.PersonInfo?.FirstName?.ToLower().Contains(nameItem) ?? false)
+                        || (i.PersonInfo?.LastName?.ToLower().Contains(nameItem) ?? false)
+                        || (i.PersonInfo?.Patronymic?.ToLower().Contains(nameItem) ?? false)
+                    )).ToList();
+                }
+
+                if (request.Age != null)
+                {
+                    var minBirth = DateTime.Now.AddYears(-request.Age.Value);
+                    all = all.Where(i =>
+                    {
+                        var birth = PersonalDataCrypto.ParseBirthdate(i.PersonInfo?.Birthdate);
+                        return birth != null && birth >= minBirth;
+                    }).ToList();
+                }
+
+                all = all
+                    .OrderBy(i => i.Login)
+                    .ThenBy(i => i.PersonInfo?.Patronymic)
+                    .ThenBy(i => i.PersonInfo?.LastName)
+                    .ThenBy(i => i.PersonInfo?.FirstName)
+                    .ToList();
+
+                count = all.Count;
+                if (request.PageSize != null && request.PageIndex != null)
+                    resultList = all.Skip(request.PageSize.Value * request.PageIndex.Value).Take(request.PageSize.Value).ToList();
+                else
+                    resultList = all;
+            }
 
             return new ListResponse<AccountDto>(count, resultList);
         }
