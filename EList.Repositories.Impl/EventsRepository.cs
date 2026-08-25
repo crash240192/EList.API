@@ -113,5 +113,27 @@ namespace EList.Repositories.Impl
         {
             await _eventsDataProvider.RestoreEventAsync(eventId);
         }
+
+        public Task<int> CountActiveEventsByAccountOrganizatorAsync(Guid accountId)
+            => _eventsDataProvider.CountActiveEventsByAccountOrganizatorAsync(accountId);
+
+        public Task<int> CountActiveEventsByOrganizationOrganizatorAsync(Guid organizationId)
+            => _eventsDataProvider.CountActiveEventsByOrganizationOrganizatorAsync(organizationId);
+
+        public Task<int> CountEventsCreatedByAccountSinceAsync(Guid accountId, DateTimeOffset since)
+            => _eventsDataProvider.CountEventsCreatedByAccountSinceAsync(accountId, since);
+
+        public Task<int> CountEventsCreatedByOrganizationSinceAsync(Guid organizationId, DateTimeOffset since)
+            => _eventsDataProvider.CountEventsCreatedByOrganizationSinceAsync(organizationId, since);
+
+        public Task<int> CountEventsNearLocationSinceAsync(
+            Guid? accountId,
+            Guid? organizationId,
+            double latitude,
+            double longitude,
+            double radiusMeters,
+            DateTimeOffset since)
+            => _eventsDataProvider.CountEventsNearLocationSinceAsync(
+                accountId, organizationId, latitude, longitude, radiusMeters, since);
     }
 }

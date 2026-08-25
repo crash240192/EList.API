@@ -910,3 +910,11 @@ ALTER TABLE public.organization_legal
 	ADD COLUMN IF NOT EXISTS inn_hash varchar(128) NULL;
 
 CREATE INDEX IF NOT EXISTS organization_legal_inn_hash_idx ON public.organization_legal (inn_hash);
+
+-- ---------------------------------------------------------------------------
+-- Abuse-protection indexes (event create quotas / geo spam checks)
+-- ---------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS events_create_date_idx ON public.events (create_date);
+CREATE INDEX IF NOT EXISTS events_active_end_time_idx ON public.events (active, end_time)
+	WHERE active = true AND cancelled_at IS NULL;
+CREATE INDEX IF NOT EXISTS events_lat_lng_idx ON public.events (latitude, longitude);

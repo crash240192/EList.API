@@ -12,6 +12,7 @@ using EList.Models.Events;
 using EList.Models.Events.EventMetadata;
 using EList.Models.Participation;
 using EList.Repositories.Interfaces;
+using EList.Services.Impl.AbuseProtection;
 using EList.Services.Interfaces;
 using NLog;
 using Org.BouncyCastle.Ocsp;
@@ -41,6 +42,8 @@ namespace EList.Services.Impl
         private readonly ISubscriptionsRepository _subscriptionsRepository;
         private readonly IOrganizationsRepository _organizationsRepository;
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
+        private readonly IEventCreateRateLimiter _eventCreateRateLimiter;
+        private readonly AbuseProtectionOptions _abuseProtection;
 
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
@@ -56,7 +59,9 @@ namespace EList.Services.Impl
             INotificationsService notificationsService,
             ISubscriptionsRepository subscriptionsRepository,
             IOrganizationsRepository organizationsRepository,
-            IModerationPenaltiesService moderationPenaltiesService)
+            IModerationPenaltiesService moderationPenaltiesService,
+            IEventCreateRateLimiter eventCreateRateLimiter,
+            AbuseProtectionOptions abuseProtection)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
@@ -72,6 +77,8 @@ namespace EList.Services.Impl
             _notificationsService = notificationsService ?? throw new Exception(nameof(notificationsService));
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
+            _eventCreateRateLimiter = eventCreateRateLimiter ?? throw new ArgumentNullException(nameof(eventCreateRateLimiter));
+            _abuseProtection = abuseProtection ?? throw new ArgumentNullException(nameof(abuseProtection));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -454,6 +461,12 @@ namespace EList.Services.Impl
             request.OrganizatorAccountIds ??= new List<Guid>();
             request.OrganizatorOrganizationIds ??= new List<Guid>();
 
+            if (_abuseProtection.Enabled
+                && !_eventCreateRateLimiter.TryAcquire(_accountDataHolder.AccountId.Value, out var rateLimitReason))
+            {
+                return CommandResult<Guid?>.Fail(ErrorCode.EventCreationRateLimited, rateLimitReason!);
+            }
+
             // Для мероприятия от организации берём тариф кошелька организации, иначе — личного аккаунта
             Models.Wallets.TariffValidator? tariffValidator;
             if (request.OrganizatorOrganizationIds.Count > 0)
@@ -488,6 +501,14 @@ namespace EList.Services.Impl
                 _accountDataHolder.AccountId.Value, ModerationPenaltyType.BanOrganize);
             if (!organizeBan.Success)
                 return CommandResult<Guid?>.Fail(organizeBan.ErrorCode, organizeBan.Message);
+
+            if (_abuseProtection.Enabled)
+            {
+                var quotaCheck = await AssertEventCreateQuotaAsync(
+                    request, tariffValidator);
+                if (!quotaCheck.Success)
+                    return CommandResult<Guid?>.Fail(quotaCheck.ErrorCode, quotaCheck.Message);
+            }
             #endregion
 
             var eventId = await _eventsRepository.CreateEventAsync(request.Event);
@@ -786,6 +807,7 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SearchEventsAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            ClampSearchPageSize(request);
             var searchResult = await _eventsRepository.SearchEventsAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -799,6 +821,7 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SearchEventsShortAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            ClampSearchPageSize(request);
             var searchResult = await _eventsRepository.SearchEventsShortAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -831,6 +854,82 @@ namespace EList.Services.Impl
             await _notificationsService.NotifyEventCancelledAsync(eventId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        private void ClampSearchPageSize(EventsSearchRequest request)
+        {
+            if (request == null)
+                return;
+
+            var max = _abuseProtection.SearchMaxPageSize;
+            if (request.PageSize == null || request.PageSize <= 0)
+                request.PageSize = Math.Min(20, max);
+            else if (request.PageSize > max)
+                request.PageSize = max;
+        }
+
+        private async Task<CommandResult> AssertEventCreateQuotaAsync(
+            CreateEventRequest request,
+            Models.Wallets.TariffValidator? tariffValidator)
+        {
+            var sinceDay = DateTimeOffset.UtcNow.AddDays(-1);
+            Guid? orgId = request.OrganizatorOrganizationIds.Count > 0
+                ? request.OrganizatorOrganizationIds[0]
+                : null;
+            var accountId = _accountDataHolder.AccountId!.Value;
+
+            // Daily create safety cap (always, even on max tariff)
+            int createdToday;
+            if (orgId != null)
+                createdToday = await _eventsRepository.CountEventsCreatedByOrganizationSinceAsync(orgId.Value, sinceDay);
+            else
+                createdToday = await _eventsRepository.CountEventsCreatedByAccountSinceAsync(accountId, sinceDay);
+
+            if (createdToday >= _abuseProtection.MaxCreatesPerDay)
+            {
+                return CommandResult.Fail(ErrorCode.EventQuotaExceeded,
+                    $"Превышен суточный лимит создания мероприятий ({_abuseProtection.MaxCreatesPerDay}). Попробуйте позже.");
+            }
+
+            // Active events: tariff MaxEventsCount or safety hard cap when null
+            var maxActive = tariffValidator?.MaxEventsCount ?? _abuseProtection.SafetyMaxActiveEvents;
+            if (maxActive > 0)
+            {
+                int activeCount;
+                if (orgId != null)
+                    activeCount = await _eventsRepository.CountActiveEventsByOrganizationOrganizatorAsync(orgId.Value);
+                else
+                    activeCount = await _eventsRepository.CountActiveEventsByAccountOrganizatorAsync(accountId);
+
+                if (activeCount >= maxActive)
+                {
+                    var source = tariffValidator?.MaxEventsCount != null ? "тарифа" : "системы безопасности";
+                    return CommandResult.Fail(ErrorCode.EventQuotaExceeded,
+                        $"Достигнут лимит активных мероприятий ({maxActive}) в рамках {source}. Завершите или отмените существующие, чтобы создать новое.");
+                }
+            }
+
+            // Geo spam: too many events near the same point from the same organizer
+            if (request.Event != null
+                && _abuseProtection.MaxEventsNearLocationPerDay > 0
+                && _abuseProtection.GeoSpamRadiusMeters > 0)
+            {
+                var nearCount = await _eventsRepository.CountEventsNearLocationSinceAsync(
+                    orgId == null ? accountId : null,
+                    orgId,
+                    request.Event.Latitude,
+                    request.Event.Longitude,
+                    _abuseProtection.GeoSpamRadiusMeters,
+                    sinceDay);
+
+                if (nearCount >= _abuseProtection.MaxEventsNearLocationPerDay)
+                {
+                    return CommandResult.Fail(ErrorCode.EventGeoSpamDetected,
+                        $"Слишком много мероприятий в одной точке за сутки (лимит {_abuseProtection.MaxEventsNearLocationPerDay} в радиусе {_abuseProtection.GeoSpamRadiusMeters:0} м).");
+                }
+            }
+
             return CommandResult.OK;
         }
         #endregion

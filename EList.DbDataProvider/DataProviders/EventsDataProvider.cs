@@ -288,5 +288,73 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.UpdateDate, DateTimeOffset.UtcNow)
                 .UpdateAsync();
         }
+
+        public async Task<int> CountActiveEventsByAccountOrganizatorAsync(Guid accountId)
+        {
+            var now = DateTimeOffset.UtcNow;
+            return await _connection.Events
+                .Where(e => e.Active
+                    && e.CancelledAt == null
+                    && e.EndTime >= now
+                    && e.Organizators.Any(o => o.AccountId == accountId))
+                .CountAsync();
+        }
+
+        public async Task<int> CountActiveEventsByOrganizationOrganizatorAsync(Guid organizationId)
+        {
+            var now = DateTimeOffset.UtcNow;
+            return await _connection.Events
+                .Where(e => e.Active
+                    && e.CancelledAt == null
+                    && e.EndTime >= now
+                    && e.Organizators.Any(o => o.OrganizationId == organizationId))
+                .CountAsync();
+        }
+
+        public async Task<int> CountEventsCreatedByAccountSinceAsync(Guid accountId, DateTimeOffset since)
+        {
+            return await _connection.Events
+                .Where(e => e.CreateDate >= since
+                    && e.Organizators.Any(o => o.AccountId == accountId))
+                .CountAsync();
+        }
+
+        public async Task<int> CountEventsCreatedByOrganizationSinceAsync(Guid organizationId, DateTimeOffset since)
+        {
+            return await _connection.Events
+                .Where(e => e.CreateDate >= since
+                    && e.Organizators.Any(o => o.OrganizationId == organizationId))
+                .CountAsync();
+        }
+
+        public async Task<int> CountEventsNearLocationSinceAsync(
+            Guid? accountId,
+            Guid? organizationId,
+            double latitude,
+            double longitude,
+            double radiusMeters,
+            DateTimeOffset since)
+        {
+            var radiusKm = radiusMeters / 1000.0;
+            var latDelta = radiusKm / 111.0;
+            var cosLat = Math.Cos(latitude * Math.PI / 180.0);
+            var lngDelta = cosLat < 0.01 ? 180.0 : radiusKm / (111.0 * cosLat);
+
+            var query = _connection.Events
+                .Where(e => e.CreateDate >= since
+                    && e.Latitude >= latitude - latDelta
+                    && e.Latitude <= latitude + latDelta
+                    && e.Longitude >= longitude - lngDelta
+                    && e.Longitude <= longitude + lngDelta);
+
+            if (organizationId != null)
+                query = query.Where(e => e.Organizators.Any(o => o.OrganizationId == organizationId));
+            else if (accountId != null)
+                query = query.Where(e => e.Organizators.Any(o => o.AccountId == accountId));
+            else
+                return 0;
+
+            return await query.CountAsync();
+        }
     }
 }
