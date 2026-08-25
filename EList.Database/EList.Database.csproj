@@ -8,10 +8,12 @@
 
   <ItemGroup>
     <None Remove="Migrations\InitialDatabase.sql" />
+    <None Remove="Migrations\DevelopMigration.sql" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Migrations\InitialDatabase.sql" />
+    <EmbeddedResource Include="Migrations\DevelopMigration.sql" />
   </ItemGroup>
 
   <ItemGroup>
