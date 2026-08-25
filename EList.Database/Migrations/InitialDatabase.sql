@@ -1048,6 +1048,10 @@ CREATE INDEX IF NOT EXISTS events_start_time_idx ON public.events (start_time);
 CREATE INDEX IF NOT EXISTS events_active_start_time_idx ON public.events (active, start_time) WHERE active = true;
 CREATE INDEX IF NOT EXISTS events_event_parameters_id_idx ON public.events (event_parameters_id);
 CREATE INDEX IF NOT EXISTS events_cancel_source_idx ON public.events (cancel_source) WHERE cancel_source IS NOT NULL;
+CREATE INDEX IF NOT EXISTS events_create_date_idx ON public.events (create_date);
+CREATE INDEX IF NOT EXISTS events_active_end_time_idx ON public.events (active, end_time)
+	WHERE active = true AND cancelled_at IS NULL;
+CREATE INDEX IF NOT EXISTS events_lat_lng_idx ON public.events (latitude, longitude);
 CREATE INDEX IF NOT EXISTS event_type_rls_event_id_idx ON public.event_type_rls (event_id);
 CREATE INDEX IF NOT EXISTS event_type_rls_event_type_id_idx ON public.event_type_rls (event_type_id);
 CREATE INDEX IF NOT EXISTS participations_event_id_idx ON public.participations (event_id);

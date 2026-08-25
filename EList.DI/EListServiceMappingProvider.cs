@@ -9,6 +9,7 @@ using EList.FilestorageClient;
 using EList.Repositories.Impl;
 using EList.Repositories.Interfaces;
 using EList.Services.Impl;
+using EList.Services.Impl.AbuseProtection;
 using EList.Services.Impl.OrganizationRegistry;
 using EList.Services.Interfaces;
 using EList.Sms;
@@ -117,6 +118,8 @@ namespace EList.DI
             mapper.AddSingleton<ITemplateParser, TemplateParser>();
             mapper.AddSingleton<IEncryptionTool, EncryptionTool>();
             mapper.AddSingleton<IFieldEncryptor, FieldEncryptor>();
+            mapper.AddSingleton<AbuseProtectionOptions>();
+            mapper.AddSingleton<IEventCreateRateLimiter, EventCreateRateLimiter>();
             mapper.AddScoped<IAccountDataHolder, AccountDataHolder>();
             mapper.AddScoped<IOrganizationRegistryClient, OrganizationRegistryClientFacade>();
 

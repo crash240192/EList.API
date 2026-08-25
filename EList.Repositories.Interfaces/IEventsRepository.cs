@@ -13,5 +13,17 @@ namespace EList.Repositories.Interfaces
         Task<PagedList<EventShort>> SearchEventsShortAsync(EventsSearchRequest request, Guid? curAccountId, bool adultConfirmed);
         Task CancelEventAsync(Guid eventId, Guid? cancelledByAccountId = null, string? cancelSource = null, Guid? cancelReportId = null);
         Task RestoreEventAsync(Guid eventId);
+
+        Task<int> CountActiveEventsByAccountOrganizatorAsync(Guid accountId);
+        Task<int> CountActiveEventsByOrganizationOrganizatorAsync(Guid organizationId);
+        Task<int> CountEventsCreatedByAccountSinceAsync(Guid accountId, DateTimeOffset since);
+        Task<int> CountEventsCreatedByOrganizationSinceAsync(Guid organizationId, DateTimeOffset since);
+        Task<int> CountEventsNearLocationSinceAsync(
+            Guid? accountId,
+            Guid? organizationId,
+            double latitude,
+            double longitude,
+            double radiusMeters,
+            DateTimeOffset since);
     }
 }
