@@ -74,9 +74,11 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<double?> GetOrganizatorRatingAsync(Guid accountId)
         {
+            // Average() over empty set / no ratings returns SQL NULL — must use nullable selector
+            // (same pattern as GetEventRatingAsync).
             var result = await _connection.Organizators
                 .Where(i => i.AccountId == accountId)
-                .AverageAsync(i => i.Event.Rating.Value);
+                .AverageAsync(i => (double?)i.Event.Rating.Value);
             return result;
         }
     }
