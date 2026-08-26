@@ -1124,6 +1124,166 @@ CREATE INDEX IF NOT EXISTS moderation_penalties_organization_idx ON public.moder
 CREATE INDEX IF NOT EXISTS moderation_penalties_event_idx ON public.moderation_penalties (event_id);
 CREATE INDEX IF NOT EXISTS moderation_penalties_active_idx ON public.moderation_penalties (penalty_type, ends_at) WHERE revoked_at IS NULL AND lifted_at IS NULL;
 
+-- ---------------------------------------------------------------------------
+-- Additional query-driven indexes (auth, pairs, search, agreements, media)
+-- ---------------------------------------------------------------------------
+
+-- Login lookup (AccountsDataProvider). Multiple NULLs allowed in PG UNIQUE.
+CREATE UNIQUE INDEX IF NOT EXISTS accounts_login_uidx
+	ON public.accounts (login);
+
+CREATE INDEX IF NOT EXISTS accounts_wallet_id_idx
+	ON public.accounts (wallet_id)
+	WHERE wallet_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS wallets_tariff_id_idx
+	ON public.wallets (tariff_id)
+	WHERE tariff_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS authorization_token_account_client_idx
+	ON public.authorization_token (account_id, client_hash);
+
+CREATE INDEX IF NOT EXISTS system_notifications_type_idx
+	ON public.system_notifications ("type");
+
+CREATE INDEX IF NOT EXISTS event_types_category_id_idx
+	ON public.event_types (category_id);
+
+-- Hot pair lookups (app treats these as unique)
+CREATE UNIQUE INDEX IF NOT EXISTS participations_account_event_uidx
+	ON public.participations (account_id, event_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS subscriptions_pair_uidx
+	ON public.subscriptions (subscriber_id, subscribed_to_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS invitations_event_invited_uidx
+	ON public.invitations (event_id, invited_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS events_rating_event_voter_type_uidx
+	ON public.events_rating (event_id, rating_type, voter_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS event_organizators_event_account_uidx
+	ON public.event_organizators (event_id, account_id)
+	WHERE account_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS event_organizators_event_organization_uidx
+	ON public.event_organizators (event_id, organization_id)
+	WHERE organization_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS participants_white_list_event_account_uidx
+	ON public.participants_white_list (event_id, account_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS participants_black_list_event_account_uidx
+	ON public.participants_black_list (event_id, account_id);
+
+CREATE INDEX IF NOT EXISTS invitations_invited_unviewed_idx
+	ON public.invitations (invited_id)
+	WHERE viewed = false;
+
+CREATE INDEX IF NOT EXISTS invitations_inviter_org_id_idx
+	ON public.invitations (inviter_org_id)
+	WHERE inviter_org_id IS NOT NULL;
+
+-- Event search: time window + geo bbox
+CREATE INDEX IF NOT EXISTS events_end_time_idx
+	ON public.events (end_time);
+
+CREATE INDEX IF NOT EXISTS events_lat_lng_idx
+	ON public.events (latitude, longitude);
+
+CREATE INDEX IF NOT EXISTS events_create_date_idx
+	ON public.events (create_date);
+
+CREATE INDEX IF NOT EXISTS events_active_end_time_idx
+	ON public.events (active, end_time)
+	WHERE active = true AND cancelled_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS organization_accounts_account_active_idx
+	ON public.organization_accounts_rls (account_id)
+	WHERE active = true;
+
+CREATE INDEX IF NOT EXISTS organizations_active_verification_idx
+	ON public.organizations (verification_status, update_date)
+	WHERE active = true;
+
+CREATE INDEX IF NOT EXISTS notifications_account_unread_idx
+	ON public.notifications (account_id, created_at DESC)
+	WHERE read_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS notifications_event_id_idx
+	ON public.notifications (event_id)
+	WHERE event_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS message_conversation_created_idx
+	ON public.message (conversation_id, create_date);
+
+CREATE INDEX IF NOT EXISTS file_album_rls_album_visible_idx
+	ON public.file_album_rls (album_id)
+	WHERE hidden = false;
+
+CREATE UNIQUE INDEX IF NOT EXISTS account_album_rls_account_album_uidx
+	ON public.account_album_rls (account_id, album_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS event_album_rls_event_album_uidx
+	ON public.event_album_rls (event_id, album_id);
+
+CREATE INDEX IF NOT EXISTS contact_data_type_value_hash_idx
+	ON public.contact_data (type_id, value_hash);
+
+CREATE INDEX IF NOT EXISTS documents_type_created_idx
+	ON public.documents (type, creation_date DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS account_agreement_account_document_uidx
+	ON public.account_agreement_rls (account_id, document_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS organization_agreement_org_document_uidx
+	ON public.organization_agreement_rls (organization_id, document_id);
+
+CREATE INDEX IF NOT EXISTS anonymous_age_agreements_jwt_idx
+	ON public.anonymous_age_agreements (jwt);
+
+CREATE INDEX IF NOT EXISTS orders_buyer_created_idx
+	ON public.orders (buyer_account_id, create_date DESC);
+
+CREATE INDEX IF NOT EXISTS payment_webhook_events_unprocessed_idx
+	ON public.payment_webhook_events (received_at)
+	WHERE processed_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS accounts_avatars_history_account_assigned_idx
+	ON public.accounts_avatars_history (account_id, assignment_date DESC);
+
+CREATE INDEX IF NOT EXISTS accounts_avatars_history_photo_id_idx
+	ON public.accounts_avatars_history (photo_id);
+
+CREATE INDEX IF NOT EXISTS organization_avatars_history_org_assigned_idx
+	ON public.organization_avatars_history (organization_id, assignment_date DESC);
+
+CREATE INDEX IF NOT EXISTS organization_avatars_history_photo_id_idx
+	ON public.organization_avatars_history (photo_id);
+
+CREATE INDEX IF NOT EXISTS content_reports_assigned_to_idx
+	ON public.content_reports (assigned_to)
+	WHERE assigned_to IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS content_reports_message_id_idx
+	ON public.content_reports (message_id)
+	WHERE message_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS content_reports_conversation_id_idx
+	ON public.content_reports (conversation_id)
+	WHERE conversation_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS content_reports_album_id_idx
+	ON public.content_reports (album_id)
+	WHERE album_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS content_reports_event_organizator_id_idx
+	ON public.content_reports (event_organizator_id)
+	WHERE event_organizator_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS events_rating_voter_id_idx
+	ON public.events_rating (voter_id);
+
 DO $EVENTS_CANCEL_REPORT_FK$
 BEGIN
 	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'events_cancel_report_fk') THEN
