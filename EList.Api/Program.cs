@@ -39,8 +39,12 @@ builder.Services.AddSwaggerGen(c =>
             Description = "EList API"
         });
 
-        //var xmlCommentsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EList.API.xml");
-        //c.IncludeXmlComments(xmlCommentsPath);
+        // Assembly XML is EList.Api.xml (not EList.API.xml). Missing file used to 500 swagger.json on Linux.
+        var xmlCommentsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EList.Api.xml");
+        if (File.Exists(xmlCommentsPath))
+        {
+            c.IncludeXmlComments(xmlCommentsPath, includeControllerXmlComments: true);
+        }
 
         var apiSecurityScheme = AuthenticationSecuritySchemeFilter.GetOpenApiSecurityScheme();
         c.AddSecurityDefinition(apiSecurityScheme.Reference.Id, apiSecurityScheme);
@@ -69,7 +73,8 @@ var app = builder.Build();
 var pathBase = ConfigurationManager.AppSettings["pathBase"] ?? string.Empty;
 app.UsePathBase(pathBase);
 app.UseSwagger(c => { c.SerializeAsV2 = true; });
-app.UseSwaggerUI(c => { c.SwaggerEndpoint($"{pathBase}/swagger/v1/swagger.json", "EList API v1"); });
+// Relative URL so Swagger UI works behind pathBase / reverse proxy without double-prefixing.
+app.UseSwaggerUI(c => { c.SwaggerEndpoint("v1/swagger.json", "EList API v1"); });
 app.UseHttpsRedirection();
 app.UseWebSockets(new WebSocketOptions
 {
