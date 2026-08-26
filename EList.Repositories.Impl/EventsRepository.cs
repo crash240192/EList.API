@@ -97,7 +97,7 @@ namespace EList.Repositories.Impl
             var resultList = items.Items?.Select(i =>
             {
                 var item = _mapper.Map<EventShort>(i);
-                item.Colors = i.Types?.Select(i => i.Type.EventCategory.Color)?.ToArray();
+                item.Colors = i.Types?.Select(i => i.Type.EventCategory.Color)?.Distinct().ToArray();
                 return item;
             }).ToList();
 

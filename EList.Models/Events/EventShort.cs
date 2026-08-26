@@ -16,7 +16,7 @@ namespace EList.Models.Events
             Latitude = eventData.Latitude;
             Longitude = eventData.Longitude;
             StartTime = eventData.StartTime;
-            Colors = eventData.Types?.Select(i => i.EventCategory.Color)?.ToArray();
+            Colors = eventData.Types?.Select(i => i.EventCategory.Color)?.Distinct().ToArray();
         }   
 
         /// <summary>

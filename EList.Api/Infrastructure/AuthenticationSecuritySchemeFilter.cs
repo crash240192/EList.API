@@ -34,7 +34,7 @@ namespace EList.Api.Infrastructure
         /// </summary>
         public static OpenApiSecurityScheme GetOpenApiSecurityScheme()
         {
-            const string Scheme = "N3";
+            const string Scheme = "";
             return new OpenApiSecurityScheme
             {
                 Name = "Authorization",
