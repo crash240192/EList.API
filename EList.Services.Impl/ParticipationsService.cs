@@ -2,16 +2,13 @@
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
-using EList.Models.Accounts;
 using EList.Models.Enums;
 using EList.Models.Invitations;
 using EList.Models.Participation;
-using EList.Models.Person;
-using EList.Models.Subscriptions;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
+using EList.Validators.Interfaces;
 using NLog;
-using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 
 namespace EList.Services.Impl
@@ -26,43 +23,32 @@ namespace EList.Services.Impl
 
         private readonly IEventsRepository _eventsRepository;
         private readonly ICorrelationIdProvider _correlationIdProvider;
-        private readonly IAccountsRepository _accountsRepository;
-        private readonly IAuthorizationRepository _authorizationRepository;
         private readonly IParticipationsRepository _participationRepository;
-        private readonly ISystemNotificationsService _systemNotificationsService;
         private readonly IInvitationsRepository _invitationsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
-        private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
-        private readonly ISubscriptionsRepository _subscriptionsRepository;
         private readonly INotificationsService _notificationsService;
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
+        private readonly IParticipationAccessValidator _participationAccessValidator;
 
         public ParticipationsService(ICorrelationIdProvider correlationIdProvider,
             IEventsRepository eventsRepository,
-            IAccountsRepository accountsRepository,
-            IAuthorizationRepository authorizationRepository,
             IParticipationsRepository participationRepository,
-            ISystemNotificationsService SystemNotificationsService,
             IInvitationsRepository invitationsRepository,
             IAccountDataHolder accountDataHolder,
             IParticipantsBWListRepository participantsBWListRepository,
-            IEventOrganizatorsRepository eventOrganizatorsRepository,
-            ISubscriptionsRepository subscriptionsRepository,
             INotificationsService notificationsService,
-            IModerationPenaltiesService moderationPenaltiesService)
+            IModerationPenaltiesService moderationPenaltiesService,
+            IParticipationAccessValidator participationAccessValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
-            _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
-            _authorizationRepository = authorizationRepository ?? throw new ArgumentNullException(nameof(authorizationRepository));
             _participationRepository = participationRepository ?? throw new ArgumentNullException(nameof(participationRepository));
             _invitationsRepository = invitationsRepository ?? throw new ArgumentNullException(nameof(invitationsRepository));
             _participantsBWListRepository = participantsBWListRepository ?? throw new ArgumentNullException(nameof(participantsBWListRepository));
-            _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
-            _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
+            _participationAccessValidator = participationAccessValidator ?? throw new ArgumentNullException(nameof(participationAccessValidator));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -149,8 +135,6 @@ namespace EList.Services.Impl
             if (curEvent == null)
                 return CommandResult<Guid?>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
-            //TODO: Реализовать проверку на то что пользователь является инициатором события
-
             await _participationRepository.LeaveEventAsync(_accountDataHolder.AccountId.Value, eventId);
 
             await _notificationsService.NotifyEventLeftAsync(eventId);
@@ -171,7 +155,10 @@ namespace EList.Services.Impl
             if (curEvent == null)
                 return CommandResult<PagedList<Participant>>.Fail(ErrorCode.EventNotFound, $"Событие с id='{request.EventId}' не найдено");
 
-            //TODO: Реализовать проверку, доступен ли пользователю просмотр списка участников
+            var accessError = await _participationAccessValidator.AssertCanViewParticipantsAsync(
+                curEvent, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
+            if (!accessError.Success)
+                return CommandResult<PagedList<Participant>>.Fail(accessError.ErrorCode, accessError.Message);
 
             var result = await _participationRepository.GetEventParticipantsAsync(request);
 
@@ -188,6 +175,11 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(GetEventBlackListAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            var accessError = await _participationAccessValidator.AssertCanManageBwListsAsync(
+                eventId, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return CommandResult<PagedList<ParticipantBlackListItem>>.Fail(accessError.ErrorCode, accessError.Message);
+
             var result = await _participantsBWListRepository.GetEventBlackListAsync(eventId, pageIndex, pageSize);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -200,6 +192,11 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(GetEventWhiteListAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var accessError = await _participationAccessValidator.AssertCanManageBwListsAsync(
+                eventId, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return CommandResult<PagedList<ParticipantWhiteListItem>>.Fail(accessError.ErrorCode, accessError.Message);
 
             var result = await _participantsBWListRepository.GetEventWhiteListAsync(eventId, pageIndex, pageSize);
 
@@ -215,6 +212,11 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(GetEventBlackListShortAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            var accessError = await _participationAccessValidator.AssertCanManageBwListsAsync(
+                eventId, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return CommandResult<List<Guid>>.Fail(accessError.ErrorCode, accessError.Message);
+
             var result = await _participantsBWListRepository.GetEventBlackListShortAsync(eventId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -227,6 +229,11 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(GetEventWhiteListShortAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var accessError = await _participationAccessValidator.AssertCanManageBwListsAsync(
+                eventId, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return CommandResult<List<Guid>>.Fail(accessError.ErrorCode, accessError.Message);
 
             var result = await _participantsBWListRepository.GetEventWhiteListShortAsync(eventId);
 
@@ -245,9 +252,10 @@ namespace EList.Services.Impl
             if (!request.AccountIds?.Any() ?? true)
                 return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Список пользователей не указан");
 
-            if (_accountDataHolder.AccountId == null
-                || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(request.EventId, _accountDataHolder.AccountId.Value))
-                return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+            var accessError = await _participationAccessValidator.AssertCanManageBwListsAsync(
+                request.EventId, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return accessError;
 
             await _participantsBWListRepository.AddToBlackListAsync(request);
             var existingParticipants = await _participationRepository.GetEventParticipantIdsAsync(request.EventId);
@@ -274,9 +282,10 @@ namespace EList.Services.Impl
             if (!request.AccountIds?.Any() ?? true)
                 return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Список пользователей не указан");
 
-            if (_accountDataHolder.AccountId == null
-                || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(request.EventId, _accountDataHolder.AccountId.Value))
-                return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+            var accessError = await _participationAccessValidator.AssertCanManageBwListsAsync(
+                request.EventId, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return accessError;
 
             await _participantsBWListRepository.AddToWhiteListAsync(request);
             var whiteList = await _participantsBWListRepository.GetEventWhiteListShortAsync(request.EventId);
@@ -303,9 +312,10 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(DeleteFromBlackListAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            if (_accountDataHolder.AccountId == null
-                || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
-                return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+            var accessError = await _participationAccessValidator.AssertCanManageBwListsAsync(
+                eventId, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return accessError;
 
             await _participantsBWListRepository.DeleteFromBlackListAsync(eventId, accountId);
 
@@ -320,9 +330,10 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(DeleteFromWhiteListAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            if (_accountDataHolder.AccountId == null
-                || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
-                return CommandResult.Fail(ErrorCode.AccessError, "Пользователь не является организатором события");
+            var accessError = await _participationAccessValidator.AssertCanManageBwListsAsync(
+                eventId, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return accessError;
 
             await _participantsBWListRepository.DeleteFromWhiteListAsync(eventId, accountId);
 

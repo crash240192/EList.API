@@ -113,6 +113,9 @@ namespace EList.DI
             mapper.AddScoped<IContactAccessValidator, ContactAccessValidator>();
             mapper.AddScoped<IEventAccessValidator, EventAccessValidator>();
             mapper.AddScoped<IAlbumAccessValidator, AlbumAccessValidator>();
+            mapper.AddScoped<IParticipationAccessValidator, ParticipationAccessValidator>();
+            mapper.AddScoped<ISubscriptionAccessValidator, SubscriptionAccessValidator>();
+            mapper.AddScoped<IInvitationAccessValidator, InvitationAccessValidator>();
 
             //clients
             mapper.AddScoped<ISmtpClient, SmtpClientMailKit>();
