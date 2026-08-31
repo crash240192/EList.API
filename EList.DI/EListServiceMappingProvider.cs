@@ -107,7 +107,10 @@ namespace EList.DI
 
             //Validators
             mapper.AddScoped<IPersonValidator, PersonValidator>();
+            mapper.AddScoped<IPersonAccessValidator, PersonAccessValidator>();
             mapper.AddScoped<IUserDataValidator, UserDataValidator>();
+            mapper.AddScoped<IContactValidator, ContactValidator>();
+            mapper.AddScoped<IContactAccessValidator, ContactAccessValidator>();
 
             //clients
             mapper.AddScoped<ISmtpClient, SmtpClientMailKit>();

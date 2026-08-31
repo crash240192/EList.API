@@ -6,6 +6,7 @@ using EList.Localization;
 using EList.Models.ContactData;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
+using EList.Validators.Interfaces;
 using NLog;
 using System.Diagnostics;
 
@@ -25,13 +26,17 @@ namespace EList.Services.Impl
         private readonly IAccountsRepository _accountsRepository;
         private readonly IOrganizationsRepository _organizationsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
+        private readonly IContactValidator _contactValidator;
+        private readonly IContactAccessValidator _contactAccessValidator;
 
         public ContactDataService(ICorrelationIdProvider correlationIdProvider,
             IContactsRepository contactDataRepository,
             IAuthorizationService authorizationService,
             IAccountsRepository accountsRepository,
             IOrganizationsRepository organizationsRepository,
-            IAccountDataHolder accountDataHolder)
+            IAccountDataHolder accountDataHolder,
+            IContactValidator contactValidator,
+            IContactAccessValidator contactAccessValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _contactDataRepository = contactDataRepository ?? throw new ArgumentNullException(nameof(contactDataRepository));
@@ -39,6 +44,8 @@ namespace EList.Services.Impl
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
             _accountDataHolder = accountDataHolder;
+            _contactValidator = contactValidator ?? throw new ArgumentNullException(nameof(contactValidator));
+            _contactAccessValidator = contactAccessValidator ?? throw new ArgumentNullException(nameof(contactAccessValidator));
         }
 
         #region contact types
@@ -112,9 +119,11 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //var validationResult = _contactsValidator.ValidateCreation(request);
-            //if (!validationResult.Success)
-            //    return CommandResult<Guid>.Fail(validationResult.ErrorCode, validationResult.Message);
+            var validationResult = await _contactValidator.ValidateAsync(
+                request,
+                ownerAccountId: _accountDataHolder.AccountId);
+            if (!validationResult.Success)
+                return CommandResult<Guid?>.Fail(validationResult.ErrorCode, validationResult.Message);
 
             var result = await _contactDataRepository.CreateContactAsync(request);
 
@@ -143,6 +152,10 @@ namespace EList.Services.Impl
             if (!isOwnerOrManager)
                 return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Добавлять контакты может только владелец или менеджер организации");
 
+            var validationResult = await _contactValidator.ValidateAsync(request);
+            if (!validationResult.Success)
+                return CommandResult<Guid?>.Fail(validationResult.ErrorCode, validationResult.Message);
+
             var result = await _contactDataRepository.CreateContactAsync(request);
             await _contactDataRepository.BindOrganizationAndContactAsync(organizationId, result);
 
@@ -158,9 +171,20 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //var validationResult = _contactsValidator.ValidateCreation(request);
-            //if (!validationResult.Success)
-            //    return CommandResult<Guid>.Fail(validationResult.ErrorCode, validationResult.Message);
+            var contact = await _contactDataRepository.GetAccountContactAsync(id);
+            if (contact?.AccountId == null)
+                return CommandResult.Fail(ErrorCode.ContactNotFound, "Контакт пользователя не найден");
+
+            var modifyAccess = _contactAccessValidator.CanModifyAccountContact(contact, _accountDataHolder.AccountId!.Value);
+            if (!modifyAccess.Success)
+                return modifyAccess;
+
+            var validationResult = await _contactValidator.ValidateAsync(
+                request,
+                existingContact: contact,
+                ownerAccountId: contact.AccountId);
+            if (!validationResult.Success)
+                return validationResult;
 
             await _contactDataRepository.UpdateContactAsync(id, request);
 
@@ -187,6 +211,10 @@ namespace EList.Services.Impl
             if (!isOwnerOrManager)
                 return CommandResult.Fail(ErrorCode.AccessError, "Изменять контакты может только владелец или менеджер организации");
 
+            var validationResult = await _contactValidator.ValidateAsync(request, existingContact: contact);
+            if (!validationResult.Success)
+                return validationResult;
+
             await _contactDataRepository.UpdateContactAsync(id, request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -201,14 +229,13 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //var validationResult = _contactsValidator.ValidateCreation(request);
-            //if (!validationResult.Success)
-            //    return CommandResult<Guid>.Fail(validationResult.ErrorCode, validationResult.Message);
-
             var contact = await _contactDataRepository.GetAccountContactAsync(id);
+            if (contact?.AccountId == null)
+                return CommandResult<ContactDataItem?>.Fail(ErrorCode.ContactNotFound, "Контакт пользователя не найден");
 
-            if (contact.AccountId != _accountDataHolder.AccountId && !contact.Show)
-                return CommandResult<ContactDataItem?>.Fail(ErrorCode.AccessError, "Контакт недоступен для просмотра");
+            var viewAccess = _contactAccessValidator.CanViewAccountContact(contact, _accountDataHolder.AccountId);
+            if (!viewAccess.Success)
+                return CommandResult<ContactDataItem?>.Fail(viewAccess.ErrorCode, viewAccess.Message);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<ContactDataItem?>(contact);
@@ -222,18 +249,12 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //var validationResult = _contactsValidator.ValidateCreation(request);
-            //if (!validationResult.Success)
-            //    return CommandResult<Guid>.Fail(validationResult.ErrorCode, validationResult.Message);
-
             var account = await _accountsRepository.GetAccountAsync(accountId);
             if (account == null)
                 return CommandResult<List<ContactDataItem>?>.Fail(ErrorCode.AccountNotFound, $"Аккаунт с id='{accountId}' не найден");
 
             var contacts = await _contactDataRepository.GetAccountContactsAsync(accountId);
-
-            if (accountId != _accountDataHolder.AccountId)
-                contacts = contacts.Where(i => i.Show).ToList();
+            contacts = _contactAccessValidator.FilterAccountContacts(contacts, accountId, _accountDataHolder.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<ContactDataItem>?>(contacts);
@@ -265,11 +286,11 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //var validationResult = _contactsValidator.ValidateCreation(request);
-            //if (!validationResult.Success)
-            //    return CommandResult<Guid>.Fail(validationResult.ErrorCode, validationResult.Message);
-
-            var contacts = await _contactDataRepository.GetAccountContactsAsync(_accountDataHolder.AccountId.Value);
+            var contacts = await _contactDataRepository.GetAccountContactsAsync(_accountDataHolder.AccountId!.Value);
+            contacts = _contactAccessValidator.FilterAccountContacts(
+                contacts,
+                _accountDataHolder.AccountId.Value,
+                _accountDataHolder.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<ContactDataItem>?>(contacts);
@@ -314,8 +335,7 @@ namespace EList.Services.Impl
             var canManage = _accountDataHolder.AccountId != null
                 && await _organizationsRepository.IsOwnerOrManagerAsync(organizationId, _accountDataHolder.AccountId.Value);
 
-            if (!canManage)
-                contacts = contacts.Where(i => i.Show).ToList();
+            contacts = _contactAccessValidator.FilterOrganizationContacts(contacts, canManage);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<ContactDataItem>?>(contacts);
