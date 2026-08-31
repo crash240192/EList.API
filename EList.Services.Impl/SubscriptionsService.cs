@@ -24,18 +24,21 @@ namespace EList.Services.Impl
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly INotificationsService _notificationsService;
         private readonly ISubscriptionAccessValidator _subscriptionAccessValidator;
+        private readonly IPagingValidator _pagingValidator;
 
         public SubscriptionsService(
             ICorrelationIdProvider correlationIdProvider,
             ISubscriptionsRepository subscriptionsRepository,
             IAccountDataHolder accountDataHolder,
             INotificationsService notificationsService,
-            ISubscriptionAccessValidator subscriptionAccessValidator)
+            ISubscriptionAccessValidator subscriptionAccessValidator,
+            IPagingValidator pagingValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _subscriptionAccessValidator = subscriptionAccessValidator ?? throw new ArgumentNullException(nameof(subscriptionAccessValidator));
+            _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -105,6 +108,16 @@ namespace EList.Services.Impl
             if (!accessError.Success)
                 return CommandResult<PagedList<Subscription>?>.Fail(accessError.ErrorCode, accessError.Message);
 
+            var pageIndex = request.PageIndes;
+            var pageSize = request.PageSize;
+            var pagingError = _pagingValidator.Validate(pageIndex, pageSize);
+            if (!pagingError.Success)
+                return CommandResult<PagedList<Subscription>?>.Fail(pagingError.ErrorCode, pagingError.Message);
+
+            _pagingValidator.Normalize(ref pageIndex, ref pageSize);
+            request.PageIndes = pageIndex;
+            request.PageSize = pageSize;
+
             var subscriptions = await _subscriptionsRepository.GetSubscriptionsAsync(request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -142,6 +155,16 @@ namespace EList.Services.Impl
                 request.AccountId, _accountDataHolder.AccountId);
             if (!accessError.Success)
                 return CommandResult<PagedList<Subscription>?>.Fail(accessError.ErrorCode, accessError.Message);
+
+            var pageIndex = request.PageIndes;
+            var pageSize = request.PageSize;
+            var pagingError = _pagingValidator.Validate(pageIndex, pageSize);
+            if (!pagingError.Success)
+                return CommandResult<PagedList<Subscription>?>.Fail(pagingError.ErrorCode, pagingError.Message);
+
+            _pagingValidator.Normalize(ref pageIndex, ref pageSize);
+            request.PageIndes = pageIndex;
+            request.PageSize = pageSize;
 
             var subscriptions = await _subscriptionsRepository.GetSubscribersAsync(request);
 

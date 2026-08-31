@@ -30,6 +30,7 @@ namespace EList.Services.Impl
         private readonly INotificationsService _notificationsService;
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
         private readonly IParticipationAccessValidator _participationAccessValidator;
+        private readonly IPagingValidator _pagingValidator;
 
         public ParticipationsService(ICorrelationIdProvider correlationIdProvider,
             IEventsRepository eventsRepository,
@@ -39,7 +40,8 @@ namespace EList.Services.Impl
             IParticipantsBWListRepository participantsBWListRepository,
             INotificationsService notificationsService,
             IModerationPenaltiesService moderationPenaltiesService,
-            IParticipationAccessValidator participationAccessValidator)
+            IParticipationAccessValidator participationAccessValidator,
+            IPagingValidator pagingValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
@@ -49,6 +51,7 @@ namespace EList.Services.Impl
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _participationAccessValidator = participationAccessValidator ?? throw new ArgumentNullException(nameof(participationAccessValidator));
+            _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -160,6 +163,16 @@ namespace EList.Services.Impl
             if (!accessError.Success)
                 return CommandResult<PagedList<Participant>>.Fail(accessError.ErrorCode, accessError.Message);
 
+            var pageIndex = request.PageIndex;
+            var pageSize = request.PageSize;
+            var pagingError = _pagingValidator.Validate(pageIndex, pageSize);
+            if (!pagingError.Success)
+                return CommandResult<PagedList<Participant>>.Fail(pagingError.ErrorCode, pagingError.Message);
+
+            _pagingValidator.Normalize(ref pageIndex, ref pageSize);
+            request.PageIndex = pageIndex;
+            request.PageSize = pageSize;
+
             var result = await _participationRepository.GetEventParticipantsAsync(request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -180,6 +193,12 @@ namespace EList.Services.Impl
             if (!accessError.Success)
                 return CommandResult<PagedList<ParticipantBlackListItem>>.Fail(accessError.ErrorCode, accessError.Message);
 
+            var pagingError = _pagingValidator.Validate(pageIndex, pageSize);
+            if (!pagingError.Success)
+                return CommandResult<PagedList<ParticipantBlackListItem>>.Fail(pagingError.ErrorCode, pagingError.Message);
+
+            _pagingValidator.Normalize(ref pageIndex, ref pageSize);
+
             var result = await _participantsBWListRepository.GetEventBlackListAsync(eventId, pageIndex, pageSize);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -197,6 +216,12 @@ namespace EList.Services.Impl
                 eventId, _accountDataHolder.AccountId);
             if (!accessError.Success)
                 return CommandResult<PagedList<ParticipantWhiteListItem>>.Fail(accessError.ErrorCode, accessError.Message);
+
+            var pagingError = _pagingValidator.Validate(pageIndex, pageSize);
+            if (!pagingError.Success)
+                return CommandResult<PagedList<ParticipantWhiteListItem>>.Fail(pagingError.ErrorCode, pagingError.Message);
+
+            _pagingValidator.Normalize(ref pageIndex, ref pageSize);
 
             var result = await _participantsBWListRepository.GetEventWhiteListAsync(eventId, pageIndex, pageSize);
 

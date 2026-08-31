@@ -49,6 +49,8 @@ namespace EList.Services.Impl
         private readonly IEventCreateRateLimiter _eventCreateRateLimiter;
         private readonly AbuseProtectionOptions _abuseProtection;
         private readonly IEventAccessValidator _eventAccessValidator;
+        private readonly IEventValidator _eventValidator;
+        private readonly IPagingValidator _pagingValidator;
 
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
@@ -67,7 +69,9 @@ namespace EList.Services.Impl
             IModerationPenaltiesService moderationPenaltiesService,
             IEventCreateRateLimiter eventCreateRateLimiter,
             AbuseProtectionOptions abuseProtection,
-            IEventAccessValidator eventAccessValidator)
+            IEventAccessValidator eventAccessValidator,
+            IEventValidator eventValidator,
+            IPagingValidator pagingValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
@@ -87,6 +91,8 @@ namespace EList.Services.Impl
             _abuseProtection = abuseProtection ?? throw new ArgumentNullException(nameof(abuseProtection));
             _accountDataHolder = accountDataHolder;
             _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
+            _eventValidator = eventValidator ?? throw new ArgumentNullException(nameof(eventValidator));
+            _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
         }
 
 
@@ -220,6 +226,10 @@ namespace EList.Services.Impl
 
             if (eventItem == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            var typesError = _eventValidator.ValidateEventTypeIds(typeIds);
+            if (!typesError.Success)
+                return typesError;
 
             await _eventsMetadataRepository.BindEventTypesAsync(eventId, typeIds);
 
@@ -392,6 +402,10 @@ namespace EList.Services.Impl
             if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
+            var parametersError = _eventValidator.ValidateParameters(parameters);
+            if (!parametersError.Success)
+                return parametersError;
+
             if (_accountDataHolder.AccountId == null
                 || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
@@ -467,6 +481,10 @@ namespace EList.Services.Impl
 
             request.OrganizatorAccountIds ??= new List<Guid>();
             request.OrganizatorOrganizationIds ??= new List<Guid>();
+
+            var dataError = _eventValidator.ValidateCreateRequest(request);
+            if (!dataError.Success)
+                return CommandResult<Guid?>.Fail(dataError.ErrorCode, dataError.Message);
 
             if (_abuseProtection.Enabled
                 && !_eventCreateRateLimiter.TryAcquire(_accountDataHolder.AccountId.Value, out var rateLimitReason))
@@ -667,6 +685,10 @@ namespace EList.Services.Impl
             if (eventItem == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
+            var bodyError = _eventValidator.ValidateEventBody(request);
+            if (!bodyError.Success)
+                return bodyError;
+
             if (_accountDataHolder.AccountId == null
                 || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
@@ -771,7 +793,10 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SearchEventsAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            ClampSearchPageSize(request);
+            var searchError = PrepareEventsSearchRequest(request);
+            if (!searchError.Success)
+                return CommandResult<PagedList<Event>?>.Fail(searchError.ErrorCode, searchError.Message);
+
             var searchResult = await _eventsRepository.SearchEventsAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -785,7 +810,10 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SearchEventsShortAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            ClampSearchPageSize(request);
+            var searchError = PrepareEventsSearchRequest(request);
+            if (!searchError.Success)
+                return CommandResult<PagedList<EventShort>?>.Fail(searchError.ErrorCode, searchError.Message);
+
             var searchResult = await _eventsRepository.SearchEventsShortAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -821,16 +849,19 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
-        private void ClampSearchPageSize(EventsSearchRequest request)
+        private CommandResult PrepareEventsSearchRequest(EventsSearchRequest request)
         {
-            if (request == null)
-                return;
+            var searchError = _eventValidator.ValidateSearchRequest(request);
+            if (!searchError.Success)
+                return searchError;
 
-            var max = _abuseProtection.SearchMaxPageSize;
-            if (request.PageSize == null || request.PageSize <= 0)
-                request.PageSize = Math.Min(20, max);
-            else if (request.PageSize > max)
-                request.PageSize = max;
+            var pageIndex = request.PageIndex;
+            var pageSize = request.PageSize;
+            _pagingValidator.Normalize(ref pageIndex, ref pageSize, _abuseProtection.SearchMaxPageSize);
+            request.PageIndex = pageIndex;
+            request.PageSize = pageSize;
+
+            return CommandResult.OK;
         }
 
         private async Task<CommandResult> AssertEventCreateQuotaAsync(

@@ -30,6 +30,7 @@ namespace EList.Services.Impl
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
         private readonly IOrganizationsRepository _organizationsRepository;
         private readonly IAlbumAccessValidator _albumAccessValidator;
+        private readonly IMediaAlbumValidator _mediaAlbumValidator;
         private readonly IFilestorageClient _filestorageClient;
 
         public MediaService(ICorrelationIdProvider correlationIdProvider,
@@ -38,6 +39,7 @@ namespace EList.Services.Impl
             IEventOrganizatorsRepository eventOrganizatorsRepository,
             IOrganizationsRepository organizationsRepository,
             IAlbumAccessValidator albumAccessValidator,
+            IMediaAlbumValidator mediaAlbumValidator,
             IFilestorageClient filestorageClient)
         {
             _correlationIdProvider = correlationIdProvider;
@@ -46,6 +48,7 @@ namespace EList.Services.Impl
             _eventOrganizatorsRepository = eventOrganizatorsRepository;
             _organizationsRepository = organizationsRepository;
             _albumAccessValidator = albumAccessValidator;
+            _mediaAlbumValidator = mediaAlbumValidator;
             _filestorageClient = filestorageClient;
         }
 
@@ -55,6 +58,11 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(CreateAlbumAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var albumError = _mediaAlbumValidator.ValidateAlbumRequest(request);
+            if (!albumError.Success)
+                return CommandResult<Guid?>.Fail(albumError.ErrorCode, albumError.Message);
+
             request.AccountId = _accountDataHolder.AccountId;
             var result = await _mediaRepository.CreateAlbumAsync(request);
 
@@ -71,6 +79,10 @@ namespace EList.Services.Impl
 
             if (request.Id == null)
                 return CommandResult.Fail(ErrorCode.AlbumNotFound, "Не указан идентификатор альбома");
+
+            var albumError = _mediaAlbumValidator.ValidateAlbumRequest(request, requireName: false);
+            if (!albumError.Success)
+                return albumError;
 
             var album = await _mediaRepository.GetAlbumAsync(request.Id.Value);
             if (album == null)
@@ -150,13 +162,14 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(AddFilesToAlbumAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            var filesError = _mediaAlbumValidator.ValidateAddFilesRequest(request);
+            if (!filesError.Success)
+                return filesError;
+
             var album = await _mediaRepository.GetAlbumAsync(request.AlbumId);
 
             if (album == null)
                 return CommandResult.Fail(ErrorCode.AlbumNotFound, $"Альбом {request.AlbumId} не найден");
-
-            if (!request.FileIds?.Any() ?? true)
-                return CommandResult.Fail(ErrorCode.AlbumNotFound, $"Перечень файлов не должен быть пустым");
 
             var accessError = await _albumAccessValidator.AssertCanModifyAlbumAsync(
                 album, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed, AlbumAccessOperation.AddFiles);

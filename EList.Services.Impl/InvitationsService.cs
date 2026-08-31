@@ -28,6 +28,8 @@ namespace EList.Services.Impl
         private readonly INotificationsService _notificationsService;
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
         private readonly IInvitationAccessValidator _invitationAccessValidator;
+        private readonly IInvitationDataValidator _invitationDataValidator;
+        private readonly IPagingValidator _pagingValidator;
 
         public InvitationsService(ICorrelationIdProvider correlationIdProvider,
             IEventsRepository eventsRepository,
@@ -37,7 +39,9 @@ namespace EList.Services.Impl
             IParticipantsBWListRepository participantsBWListRepository,
             INotificationsService notificationsService,
             IModerationPenaltiesService moderationPenaltiesService,
-            IInvitationAccessValidator invitationAccessValidator)
+            IInvitationAccessValidator invitationAccessValidator,
+            IInvitationDataValidator invitationDataValidator,
+            IPagingValidator pagingValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
@@ -47,6 +51,8 @@ namespace EList.Services.Impl
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _invitationAccessValidator = invitationAccessValidator ?? throw new ArgumentNullException(nameof(invitationAccessValidator));
+            _invitationDataValidator = invitationDataValidator ?? throw new ArgumentNullException(nameof(invitationDataValidator));
+            _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -58,8 +64,9 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            if (!request.AccountIds?.Any() ?? true)
-                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Список пользователей пуст");
+            var dataError = _invitationDataValidator.ValidateCreateRequest(request);
+            if (!dataError.Success)
+                return dataError;
 
             var curEvent = await _eventsRepository.GetEventAsync(request.EventId);
             if (curEvent == null)
@@ -236,11 +243,19 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            int? pageIndexValue = pageIndex;
+            int? pageSizeValue = pageSize;
+            var pagingError = _pagingValidator.Validate(pageIndexValue, pageSizeValue);
+            if (!pagingError.Success)
+                return CommandResult<PagedList<Invitation>>.Fail(pagingError.ErrorCode, pagingError.Message);
+
+            _pagingValidator.Normalize(ref pageIndexValue, ref pageSizeValue);
+
             var invitations = await _invitationsRepository.SearchInvitationsAsync(new InvitationsSearchRequest
             {
                 InvitedAccountIds = new List<Guid> { _accountDataHolder.AccountId.Value },
-                PageIndex = pageIndex,
-                PageSize = pageSize,
+                PageIndex = pageIndexValue,
+                PageSize = pageSizeValue,
             });
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -257,6 +272,16 @@ namespace EList.Services.Impl
 
             if (_accountDataHolder.AccountId == null)
                 return CommandResult<PagedList<Invitation>>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var pageIndex = request.PageIndex;
+            var pageSize = request.PageSize;
+            var pagingError = _pagingValidator.Validate(pageIndex, pageSize);
+            if (!pagingError.Success)
+                return CommandResult<PagedList<Invitation>>.Fail(pagingError.ErrorCode, pagingError.Message);
+
+            _pagingValidator.Normalize(ref pageIndex, ref pageSize);
+            request.PageIndex = pageIndex;
+            request.PageSize = pageSize;
 
             var invitations = await _invitationsRepository.SearchInvitationsAsync(request);
             var visible = new List<Invitation>();
