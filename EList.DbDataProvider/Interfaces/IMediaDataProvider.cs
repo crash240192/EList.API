@@ -7,8 +7,8 @@ namespace EList.DbDataProvider.Interfaces
         Task<Guid?> CreateAlbumAsync(AlbumRequest request);
         Task UpdateAlbumAsync(AlbumRequest item);
 
-        Task AssingAlbumToAccountAsync(Guid accountId, Guid albumId);
-        Task AssingAlbumToEventAsync(Guid eventId, Guid albumId);
+        Task AssignAlbumToAccountAsync(Guid accountId, Guid albumId);
+        Task AssignAlbumToEventAsync(Guid eventId, Guid albumId);
         Task AddFilesToAlbumAsync(Guid albumId, List<Guid> fileIds);
         Task<MediaAlbumDto> GetAlbumAsync(Guid id);
         Task<List<MediaAlbumDto>> GetAccountAlbumsAsync(Guid accountId);

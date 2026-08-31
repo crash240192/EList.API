@@ -6,12 +6,11 @@ using EList.Common.Support;
 using EList.Common.Threading;
 using EList.FilestorageClient;
 using EList.Models.Accounts;
-using EList.Models.Events;
 using EList.Models.Media;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
+using EList.Validators.Interfaces;
 using NLog;
-using Org.BouncyCastle.Ocsp;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 
@@ -28,27 +27,25 @@ namespace EList.Services.Impl
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IMediaRepository _mediaRepository;
         private readonly IAccountDataHolder _accountDataHolder;
-        private readonly IParticipationsRepository _participationsRepository;
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
-        private readonly IEventsRepository _eventsRepository;
-        private readonly IInvitationsRepository _invitationsRepository;
+        private readonly IOrganizationsRepository _organizationsRepository;
+        private readonly IAlbumAccessValidator _albumAccessValidator;
         private readonly IFilestorageClient _filestorageClient;
+
         public MediaService(ICorrelationIdProvider correlationIdProvider,
             IMediaRepository mediaRepository,
             IAccountDataHolder accountDataHolder,
-            IParticipationsRepository participationsRepository,
             IEventOrganizatorsRepository eventOrganizatorsRepository,
-            IEventsRepository eventsRepository,
-            IInvitationsRepository invitationsRepository,
+            IOrganizationsRepository organizationsRepository,
+            IAlbumAccessValidator albumAccessValidator,
             IFilestorageClient filestorageClient)
         {
             _correlationIdProvider = correlationIdProvider;
             _mediaRepository = mediaRepository;
             _accountDataHolder = accountDataHolder;
-            _participationsRepository = participationsRepository;
             _eventOrganizatorsRepository = eventOrganizatorsRepository;
-            _eventsRepository = eventsRepository;
-            _invitationsRepository = invitationsRepository;
+            _organizationsRepository = organizationsRepository;
+            _albumAccessValidator = albumAccessValidator;
             _filestorageClient = filestorageClient;
         }
 
@@ -72,7 +69,17 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(UpdateAlbumAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //TODO: Добавить проверку что пользователь может редактировать альбом
+            if (request.Id == null)
+                return CommandResult.Fail(ErrorCode.AlbumNotFound, "Не указан идентификатор альбома");
+
+            var album = await _mediaRepository.GetAlbumAsync(request.Id.Value);
+            if (album == null)
+                return CommandResult.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
+
+            var accessError = await _albumAccessValidator.AssertCanModifyAlbumAsync(
+                album, _accountDataHolder.AccountId, AlbumAccessOperation.ModifyMetadata);
+            if (!accessError.Success)
+                return accessError;
 
             await _mediaRepository.UpdateAlbumAsync(request);
 
@@ -80,31 +87,57 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
-        public async Task<CommandResult> AssingAlbumToEventAsync(Guid eventId, Guid albumId)
+        public async Task<CommandResult> AssignAlbumToEventAsync(Guid eventId, Guid albumId)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(AssingAlbumToEventAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(AssignAlbumToEventAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //TODO: Добавить проверку что пользователь может редактировать альбом
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
 
-            await _mediaRepository.AssingAlbumToEventAsync(eventId, albumId);
+            var album = await _mediaRepository.GetAlbumAsync(albumId);
+            if (album == null)
+                return CommandResult.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
+
+            var accessError = await _albumAccessValidator.AssertCanModifyAlbumAsync(
+                album, _accountDataHolder.AccountId, AlbumAccessOperation.Assign);
+            if (!accessError.Success)
+                return accessError;
+
+            if (!await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
+                return CommandResult.Fail(ErrorCode.AccessError, "Привязать альбом к мероприятию может только организатор");
+
+            await _mediaRepository.AssignAlbumToEventAsync(eventId, albumId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
 
-        public async Task<CommandResult> AssingAlbumToAccountAsync(Guid accountId, Guid albumId)
+        public async Task<CommandResult> AssignAlbumToAccountAsync(Guid accountId, Guid albumId)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(AssingAlbumToAccountAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(AssignAlbumToAccountAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //TODO: Добавить проверку что пользователь может редактировать альбом
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
 
-            await _mediaRepository.AssingAlbumToAccountAsync(accountId, albumId);
+            if (_accountDataHolder.AccountId != accountId)
+                return CommandResult.Fail(ErrorCode.AccessError, "Альбом можно привязать только к своему аккаунту");
+
+            var album = await _mediaRepository.GetAlbumAsync(albumId);
+            if (album == null)
+                return CommandResult.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
+
+            var accessError = await _albumAccessValidator.AssertCanModifyAlbumAsync(
+                album, _accountDataHolder.AccountId, AlbumAccessOperation.Assign);
+            if (!accessError.Success)
+                return accessError;
+
+            await _mediaRepository.AssignAlbumToAccountAsync(accountId, albumId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -125,44 +158,10 @@ namespace EList.Services.Impl
             if (!request.FileIds?.Any() ?? true)
                 return CommandResult.Fail(ErrorCode.AlbumNotFound, $"Перечень файлов не должен быть пустым");
 
-            if (album.EventId != null)
-            {
-                var isOrganizator = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(album.EventId.Value, _accountDataHolder.AccountId.Value);
-                if (!isOrganizator)
-                {
-                    var eventItem = await _eventsRepository.GetEventAsync(album.EventId.Value);
-                    var participants = await _participationsRepository.GetEventParticipantIdsAsync(album.EventId.Value);
-                    var invitedUsers = await _invitationsRepository.GetInvitedUsersAsync(album.EventId.Value);
-
-                    if (eventItem?.Parameters?.Private ?? false)
-                    {
-                        if (!participants.Contains(_accountDataHolder.AccountId.Value) && !invitedUsers.Contains(_accountDataHolder.AccountId.Value))
-                        {
-                            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                            return CommandResult<PagedList<AlbumFile>>.Fail(ErrorCode.AccessError, "Альбом доступен только участникам мероприятия");
-                        }
-                    }
-                    else
-                    {
-                        if (album.Parameters?.Private ?? false)
-                        {
-                            if (!participants.Contains(_accountDataHolder.AccountId.Value) && !invitedUsers.Contains(_accountDataHolder.AccountId.Value))
-                            {
-                                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                                return CommandResult<PagedList<AlbumFile>>.Fail(ErrorCode.AccessError, "Альбом доступен для просмотра только участникам мероприятия");
-                            }
-                        }
-                    }
-
-                    if (album.Parameters?.ParticipantsReadonly ?? false)
-                    {
-                        logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                        return CommandResult.Fail(ErrorCode.AddPhotosNotAllowed, "Организатор запретил добавление фотографий в этот альбом");
-                    }
-                }
-            }
-
-            //TODO: Добавить проверку доступа для добавления файлов в альбом без привязки к мероприятию
+            var accessError = await _albumAccessValidator.AssertCanModifyAlbumAsync(
+                album, _accountDataHolder.AccountId, AlbumAccessOperation.AddFiles);
+            if (!accessError.Success)
+                return accessError;
 
             await _mediaRepository.AddFilesToAlbumAsync(request.AlbumId, request.FileIds);
 
@@ -181,7 +180,8 @@ namespace EList.Services.Impl
 
             if (_accountDataHolder.AccountId != accountId)
             {
-                //TODO: отобрать только те альбомы, которые доступны для просмотра
+                result = await _albumAccessValidator.FilterViewableAlbumsAsync(
+                    result, accountId, _accountDataHolder.AccountId);
             }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -196,11 +196,12 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _mediaRepository.GetAlbumAsync(id);
+            if (result == null)
+                return CommandResult<MediaAlbum>.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
 
-            if (_accountDataHolder.AccountId != result.AccountId)
-            {
-                //TODO: Проверить альбом на доступность просмотра
-            }
+            var accessError = await _albumAccessValidator.AssertCanViewAlbumAsync(result, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return CommandResult<MediaAlbum>.Fail(accessError.ErrorCode, accessError.Message);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<MediaAlbum>(result);
@@ -214,33 +215,8 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _mediaRepository.GetEventAlbumsAsync(eventId);
-            var eventItem = await _eventsRepository.GetEventAsync(eventId);
-            var participants = await _participationsRepository.GetEventParticipantIdsAsync(eventId);
-            var isOrganizator = _accountDataHolder.AccountId != null
-                && await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value);
-            var invitedUsers = await _invitationsRepository.GetInvitedUsersAsync(eventId);
-
-            if (isOrganizator)
-            {
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return new CommandResult<List<MediaAlbum>>(result);
-            }
-
-            if (eventItem.Parameters?.Private ?? false)
-            {
-                if (_accountDataHolder.AccountId == null || (!participants.Contains(_accountDataHolder.AccountId.Value) && !invitedUsers.Contains(_accountDataHolder.AccountId.Value)))
-                {
-                    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                    return CommandResult<List<MediaAlbum>>.Fail(ErrorCode.AccessError, "Просмотр альбомов закрытого мероприятия доступен только участникам");
-                }
-            }
-            else
-            {
-                if (_accountDataHolder.AccountId == null || (!participants.Contains(_accountDataHolder.AccountId.Value) && !invitedUsers.Contains(_accountDataHolder.AccountId.Value)))
-                {
-                    result = result?.Where(i => !i.Parameters?.Private ?? true)?.ToList();
-                }
-            }
+            result = await _albumAccessValidator.FilterViewableAlbumsAsync(
+                result, Guid.Empty, _accountDataHolder.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<MediaAlbum>>(result);
@@ -272,23 +248,10 @@ namespace EList.Services.Impl
             if (album == null)
                 return CommandResult.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
 
-            if (album.EventId != null)
-            {
-                var isOrganizator = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(album.EventId.Value, _accountDataHolder.AccountId.Value);
-                if (!isOrganizator && _accountDataHolder.AccountId != album.AccountId)
-                {
-                    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                    return CommandResult<List<MediaAlbum>>.Fail(ErrorCode.AccessError, "Удалить альбом может только организатор мероприятия");
-                }
-            }
-            else
-            {
-                if (_accountDataHolder.AccountId != album.AccountId)
-                {
-                    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                    return CommandResult<List<MediaAlbum>>.Fail(ErrorCode.AccessError, "Удалить альбом может только его владелец");
-                }
-            }
+            var accessError = await _albumAccessValidator.AssertCanModifyAlbumAsync(
+                album, _accountDataHolder.AccountId, AlbumAccessOperation.Delete);
+            if (!accessError.Success)
+                return accessError;
 
             var files = await _mediaRepository.GetAlbumFilesAsync(albumId);
             var fileIds = files.Result?.Select(i => i.Id)?.ToList();
@@ -329,23 +292,10 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
             }
 
-            if (album.EventId != null)
-            {
-                var isOrganizator = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(album.EventId.Value, _accountDataHolder.AccountId.Value);
-                if (!isOrganizator && _accountDataHolder.AccountId != album.AccountId)
-                {
-                    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                    return CommandResult<List<MediaAlbum>>.Fail(ErrorCode.AccessError, "Удалить альбом может только организатор мероприятия");
-                }
-            }
-            else
-            {
-                if (_accountDataHolder.AccountId != album.AccountId)
-                {
-                    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                    return CommandResult<List<MediaAlbum>>.Fail(ErrorCode.AccessError, "Удалить альбом может только его владелец");
-                }
-            }
+            var accessError = await _albumAccessValidator.AssertCanModifyAlbumAsync(
+                album, _accountDataHolder.AccountId, AlbumAccessOperation.Delete);
+            if (!accessError.Success)
+                return accessError;
 
             await _mediaRepository.DeleteFilesAsync(fileIds);
 
@@ -365,44 +315,14 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var album = await _mediaRepository.GetAlbumAsync(albumId);
+            if (album == null)
+                return CommandResult<PagedList<AlbumFile>>.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
 
-            if (album.EventId != null)
-            {
-                var isOrganizator = _accountDataHolder.AccountId != null
-                    && await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(album.EventId.Value, _accountDataHolder.AccountId.Value);
-
-                if (!isOrganizator)
-                {
-                    var eventItem = await _eventsRepository.GetEventAsync(album.EventId.Value);
-                    var participants = await _participationsRepository.GetEventParticipantIdsAsync(album.EventId.Value);
-                    var invitedUsers = await _invitationsRepository.GetInvitedUsersAsync(album.EventId.Value);
-
-                    if (eventItem?.Parameters?.Private ?? false)
-                    {
-                        if (_accountDataHolder.AccountId == null || (!participants.Contains(_accountDataHolder.AccountId.Value) && !invitedUsers.Contains(_accountDataHolder.AccountId.Value)))
-                        {
-                            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                            return CommandResult<PagedList<AlbumFile>>.Fail(ErrorCode.AccessError, "Просмотр альбомов закрытого мероприятия доступен только участникам");
-                        }
-                    }
-                    else
-                    {
-                        if (album.Parameters?.Private ?? false)
-                        {
-                            if (_accountDataHolder.AccountId == null || (!participants.Contains(_accountDataHolder.AccountId.Value) && !invitedUsers.Contains(_accountDataHolder.AccountId.Value)))
-                            {
-                                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                                return CommandResult<PagedList<AlbumFile>>.Fail(ErrorCode.AccessError, "Альбом доступен для просмотра только участникам мероприятия");
-                            }
-                        }
-                    }
-                }
-            }
+            var accessError = await _albumAccessValidator.AssertCanViewAlbumAsync(album, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return CommandResult<PagedList<AlbumFile>>.Fail(accessError.ErrorCode, accessError.Message);
 
             var result = await _mediaRepository.GetAlbumFilesAsync(albumId);
-            {
-                //TODO: отобрать только те файлы, которые доступны для просмотра, с учетом доступности альбома другим пользователям
-            }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<AlbumFile>>(result);
@@ -436,6 +356,9 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SetNewAccountAvatarAsync)}";
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
 
             await _mediaRepository.SetNewAccountAvatarAsync(_accountDataHolder.AccountId.Value, fileId);
 
@@ -549,7 +472,11 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var curAccountId = _accountDataHolder.AccountId;
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            if (!await _organizationsRepository.IsOwnerOrManagerAsync(organizationId, _accountDataHolder.AccountId.Value))
+                return CommandResult.Fail(ErrorCode.AccessError, "Изменить аватар организации может только владелец или менеджер");
 
             await _mediaRepository.SetNewOrganizationAvatarAsync(organizationId, fileId);
 

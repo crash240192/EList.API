@@ -1076,3 +1076,12 @@ CREATE INDEX IF NOT EXISTS content_reports_event_organizator_id_idx
 
 CREATE INDEX IF NOT EXISTS events_rating_voter_id_idx
 	ON public.events_rating (voter_id);
+
+CREATE TABLE IF NOT EXISTS public.account_album_parameters(
+	album_id uuid not null,
+	head_album bool not null default false,
+	participants_readonly bool not null default false,
+	private_album bool not null default true,
+	constraint account_album_parameters_pk primary key (album_id),
+	constraint account_album_parameters_album_fk foreign key (album_id) references public.media_albums (id)
+);

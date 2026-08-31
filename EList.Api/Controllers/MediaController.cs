@@ -114,18 +114,18 @@ namespace EList.Api.Controllers
         /// <param name="albumId"></param>
         /// <returns></returns>
         [HttpGet("albums/assign/toEvent")]
-        public async Task<CommandResult> AssingAlbumToEventAsync(Guid eventId, Guid albumId)
+        public async Task<CommandResult> AssignAlbumToEventAsync(Guid eventId, Guid albumId)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(AssingAlbumToEventAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(AssignAlbumToEventAsync)}";
 
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _mediaService.AssingAlbumToEventAsync(eventId, albumId);
+                var result = await _mediaService.AssignAlbumToEventAsync(eventId, albumId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
@@ -148,18 +148,18 @@ namespace EList.Api.Controllers
         /// <param name="albumId"></param>
         /// <returns></returns>
         [HttpGet("albums/assign/toAccount")]
-        public async Task<CommandResult> AssingAlbumToAccountAsync(Guid accountId, Guid albumId)
+        public async Task<CommandResult> AssignAlbumToAccountAsync(Guid accountId, Guid albumId)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(AssingAlbumToAccountAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(AssignAlbumToAccountAsync)}";
 
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _mediaService.AssingAlbumToAccountAsync(accountId, albumId);
+                var result = await _mediaService.AssignAlbumToAccountAsync(accountId, albumId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
