@@ -77,7 +77,7 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
 
             var accessError = await _albumAccessValidator.AssertCanModifyAlbumAsync(
-                album, _accountDataHolder.AccountId, AlbumAccessOperation.ModifyMetadata);
+                album, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed, AlbumAccessOperation.ModifyMetadata);
             if (!accessError.Success)
                 return accessError;
 
@@ -102,7 +102,7 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
 
             var accessError = await _albumAccessValidator.AssertCanModifyAlbumAsync(
-                album, _accountDataHolder.AccountId, AlbumAccessOperation.Assign);
+                album, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed, AlbumAccessOperation.Assign);
             if (!accessError.Success)
                 return accessError;
 
@@ -133,7 +133,7 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
 
             var accessError = await _albumAccessValidator.AssertCanModifyAlbumAsync(
-                album, _accountDataHolder.AccountId, AlbumAccessOperation.Assign);
+                album, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed, AlbumAccessOperation.Assign);
             if (!accessError.Success)
                 return accessError;
 
@@ -159,7 +159,7 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AlbumNotFound, $"Перечень файлов не должен быть пустым");
 
             var accessError = await _albumAccessValidator.AssertCanModifyAlbumAsync(
-                album, _accountDataHolder.AccountId, AlbumAccessOperation.AddFiles);
+                album, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed, AlbumAccessOperation.AddFiles);
             if (!accessError.Success)
                 return accessError;
 
@@ -181,7 +181,7 @@ namespace EList.Services.Impl
             if (_accountDataHolder.AccountId != accountId)
             {
                 result = await _albumAccessValidator.FilterViewableAlbumsAsync(
-                    result, accountId, _accountDataHolder.AccountId);
+                    result, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
             }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -199,7 +199,8 @@ namespace EList.Services.Impl
             if (result == null)
                 return CommandResult<MediaAlbum>.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
 
-            var accessError = await _albumAccessValidator.AssertCanViewAlbumAsync(result, _accountDataHolder.AccountId);
+            var accessError = await _albumAccessValidator.AssertCanViewAlbumAsync(
+                result, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
             if (!accessError.Success)
                 return CommandResult<MediaAlbum>.Fail(accessError.ErrorCode, accessError.Message);
 
@@ -216,7 +217,7 @@ namespace EList.Services.Impl
 
             var result = await _mediaRepository.GetEventAlbumsAsync(eventId);
             result = await _albumAccessValidator.FilterViewableAlbumsAsync(
-                result, Guid.Empty, _accountDataHolder.AccountId);
+                result, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<MediaAlbum>>(result);
@@ -249,7 +250,7 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
 
             var accessError = await _albumAccessValidator.AssertCanModifyAlbumAsync(
-                album, _accountDataHolder.AccountId, AlbumAccessOperation.Delete);
+                album, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed, AlbumAccessOperation.Delete);
             if (!accessError.Success)
                 return accessError;
 
@@ -293,7 +294,7 @@ namespace EList.Services.Impl
             }
 
             var accessError = await _albumAccessValidator.AssertCanModifyAlbumAsync(
-                album, _accountDataHolder.AccountId, AlbumAccessOperation.Delete);
+                album, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed, AlbumAccessOperation.Delete);
             if (!accessError.Success)
                 return accessError;
 
@@ -318,7 +319,8 @@ namespace EList.Services.Impl
             if (album == null)
                 return CommandResult<PagedList<AlbumFile>>.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
 
-            var accessError = await _albumAccessValidator.AssertCanViewAlbumAsync(album, _accountDataHolder.AccountId);
+            var accessError = await _albumAccessValidator.AssertCanViewAlbumAsync(
+                album, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
             if (!accessError.Success)
                 return CommandResult<PagedList<AlbumFile>>.Fail(accessError.ErrorCode, accessError.Message);
 

@@ -140,6 +140,23 @@ namespace EList.DbDataProvider.DataProviders
                     EventId = eventId,
                     AlbumId = albumId
                 });
+
+            // После привязки к событию приоритет у event_album_parameters:
+            // переносим настройки из account_album_parameters, если event-параметров ещё нет.
+            var hasEventParameters = await _connection.EventAlbumParameters
+                .AnyAsync(i => i.AlbumId == albumId);
+            if (!hasEventParameters)
+            {
+                var accountParameters = await _connection.AccountAlbumParameters
+                    .FirstOrDefaultAsync(i => i.AlbumId == albumId);
+                await _connection.InsertAsync(new EventAlbumParametersDto
+                {
+                    AlbumId = albumId,
+                    HeadAlbum = accountParameters?.HeadAlbum ?? false,
+                    ParticipantsReadonly = accountParameters?.ParticipantsReadonly ?? false,
+                    Private = accountParameters?.Private ?? false
+                });
+            }
         }
 
         public async Task<List<MediaAlbumDto>> GetAccountAlbumsAsync(Guid accountId)

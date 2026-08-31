@@ -111,6 +111,7 @@ namespace EList.DI
             mapper.AddScoped<IUserDataValidator, UserDataValidator>();
             mapper.AddScoped<IContactValidator, ContactValidator>();
             mapper.AddScoped<IContactAccessValidator, ContactAccessValidator>();
+            mapper.AddScoped<IEventAccessValidator, EventAccessValidator>();
             mapper.AddScoped<IAlbumAccessValidator, AlbumAccessValidator>();
 
             //clients

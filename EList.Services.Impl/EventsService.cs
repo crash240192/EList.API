@@ -1,21 +1,25 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using AutoMapper;
 using EList.Common.Configuration;
 using EList.Common.CorrelationId;
+using EList.Common.Extensions;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
 using EList.Localization;
+using EList.Models.Accounts;
 using EList.Models.Enums;
 using EList.Models.EventOrganizators;
 using EList.Models.Events;
 using EList.Models.Events.EventMetadata;
+using EList.Models.Invitations;
+using EList.Models.Notifications;
 using EList.Models.Participation;
 using EList.Repositories.Interfaces;
 using EList.Services.Impl.AbuseProtection;
 using EList.Services.Interfaces;
+using EList.Validators.Interfaces;
 using NLog;
-using Org.BouncyCastle.Ocsp;
 
 namespace EList.Services.Impl
 {
@@ -44,6 +48,7 @@ namespace EList.Services.Impl
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
         private readonly IEventCreateRateLimiter _eventCreateRateLimiter;
         private readonly AbuseProtectionOptions _abuseProtection;
+        private readonly IEventAccessValidator _eventAccessValidator;
 
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
@@ -61,7 +66,8 @@ namespace EList.Services.Impl
             IOrganizationsRepository organizationsRepository,
             IModerationPenaltiesService moderationPenaltiesService,
             IEventCreateRateLimiter eventCreateRateLimiter,
-            AbuseProtectionOptions abuseProtection)
+            AbuseProtectionOptions abuseProtection,
+            IEventAccessValidator eventAccessValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
@@ -80,6 +86,7 @@ namespace EList.Services.Impl
             _eventCreateRateLimiter = eventCreateRateLimiter ?? throw new ArgumentNullException(nameof(eventCreateRateLimiter));
             _abuseProtection = abuseProtection ?? throw new ArgumentNullException(nameof(abuseProtection));
             _accountDataHolder = accountDataHolder;
+            _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
         }
 
 
@@ -709,62 +716,19 @@ namespace EList.Services.Impl
             if (eventItem == null)
                 return CommandResult<Event>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
-            var isOrganizator = _accountDataHolder.AccountId != null
-                && await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value);
+            
+            var accessError = await _eventAccessValidator.AssertCanViewEventAsync(
+                eventItem,
+                _accountDataHolder.AccountId,
+                _accountDataHolder.AdultConfirmed);
+            if (!accessError.Success)
+                return CommandResult<Event>.Fail(accessError.ErrorCode, accessError.Message);
 
-            if (!isOrganizator)
-            {
-                if (eventItem.Parameters?.Private == true)
-                {
-                    if (_accountDataHolder.AccountId == null)
-                        return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Сначала Необходимо авторизоваться");
+            if (eventItem.Parameters == null)
+                eventItem.Parameters = new EventParameters { AgeLimit = 0 };
+            else
+                eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
 
-                    var isUserInWhiteList = await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId.Value);
-                    if (!isUserInWhiteList)
-                    {
-                        var whiteListIsEmpty = await _participantsBWListRepository.IsWhiteListEmptyAsync(eventId);
-                        if (whiteListIsEmpty)
-                        {
-                            var isUserParticipated = await _participationsRepository.IsUserParticipatedAsync(_accountDataHolder.AccountId.Value, eventId);
-                            if (!isUserParticipated)
-                            {
-                                var invitation = await _invitationsRepository.GetInvitationAsync(_accountDataHolder.AccountId.Value, eventId);
-                                if (invitation == null)
-                                    return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Посещать закрытые мероприятия можно только приглашению");
-                            }
-                        }
-                        else
-                        {
-                            return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Посещать закрытые мероприятия можно только приглашению");
-                        }
-                    }
-                }
-                else
-                {
-                    if (_accountDataHolder.AccountId != null)
-                    {
-                        var isUserInBlackList = await _participantsBWListRepository.IsUserInBlackListAsync(eventId, _accountDataHolder.AccountId.Value);
-                        if (isUserInBlackList)
-                            return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Организатор добавил вас в чёрный список мероприятия");
-                    }
-                }
-            }
-
-            #region age validation
-            if (!isOrganizator)
-            {
-                if (eventItem.Parameters == null)
-                    eventItem.Parameters = new EventParameters
-                    {
-                        AgeLimit = 0,
-                    };
-                else
-                    eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
-
-                if (eventItem.Parameters.AgeLimit >= 18 && !_accountDataHolder.AdultConfirmed)
-                    return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, $"Просмотр мероприятий 18+ недоступен");
-            }
-            #endregion
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Event>(eventItem);
