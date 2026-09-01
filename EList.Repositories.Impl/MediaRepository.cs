@@ -32,14 +32,14 @@ namespace EList.Repositories.Impl
             await _mediaDataProvider.UpdateAlbumAsync(mappedRequest);
         }
 
-        public async Task AssingAlbumToAccountAsync(Guid accountId, Guid albumId)
+        public async Task AssignAlbumToAccountAsync(Guid accountId, Guid albumId)
         { 
-            await _mediaDataProvider.AssingAlbumToAccountAsync(accountId, albumId);
+            await _mediaDataProvider.AssignAlbumToAccountAsync(accountId, albumId);
         }
 
-        public async Task AssingAlbumToEventAsync(Guid eventId, Guid albumId)
+        public async Task AssignAlbumToEventAsync(Guid eventId, Guid albumId)
         {
-            await _mediaDataProvider.AssingAlbumToEventAsync(eventId, albumId);
+            await _mediaDataProvider.AssignAlbumToEventAsync(eventId, albumId);
         }
 
         public async Task AddFilesToAlbumAsync(Guid albumId, List<Guid> fileIds)

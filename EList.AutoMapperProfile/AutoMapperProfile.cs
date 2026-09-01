@@ -117,10 +117,13 @@ namespace EList.AutoMapperProfile
             CreateMap<Invitation, InvitationDto>().ReverseMap().ForMember(dest => dest.Inviter, opt => opt.Ignore());
 
             CreateMap<EventAlbumParameters, EventAlbumParametersDto>().ReverseMap();
+            CreateMap<AccountAlbumParameters, AccountAlbumParametersDto>().ReverseMap();
             CreateMap<EventAlbumRequest, AlbumRequest>().ReverseMap();
             CreateMap<MediaAlbum, MediaAlbumDto>();
             CreateMap<MediaAlbumDto, MediaAlbum>()
-                .ForMember(dest => dest.EventId, opt => opt.MapFrom(src => src.EventRelation != null ? src.EventRelation.EventId : (Guid?)null));
+                .ForMember(dest => dest.EventId, opt => opt.MapFrom(src => src.EventRelation != null ? src.EventRelation.EventId : (Guid?)null))
+                .ForMember(dest => dest.AccountId, opt => opt.MapFrom(src => src.AccountRelation != null ? src.AccountRelation.AccountId : Guid.Empty))
+                .ForMember(dest => dest.AccountParameters, opt => opt.MapFrom(src => src.AccountParameters));
             CreateMap<FileAlbumRelationDto, AlbumFile>().ReverseMap();
 
             CreateMap<TariffDto, Tariff>().ReverseMap();

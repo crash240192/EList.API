@@ -16,36 +16,29 @@ namespace EList.Services.Impl
         #region logger
         private static readonly ILogger log = LogManager.GetCurrentClassLogger();
         private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
-        private const string LOGGER_NAME = "EList.Services.Impl.AccountsService.";
+        private const string LOGGER_NAME = "EList.Services.Impl.SubscriptionsService.";
         #endregion
 
         private readonly ICorrelationIdProvider _correlationIdProvider;
-        private readonly IAccountsRepository _accountsRepository;
-        private readonly IAuthorizationRepository _authorizationRepository;
-        private readonly IContactsRepository _contactsRepository;
-        private readonly IUserDataValidator _userDataValidationService;
-        private readonly ISystemNotificationsService _systemNotificationsService;
         private readonly ISubscriptionsRepository _subscriptionsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly INotificationsService _notificationsService;
-        public SubscriptionsService(ICorrelationIdProvider correlationIdProvider,
-            IAccountsRepository accountsRepository,
-            IAuthorizationRepository authorizationRepository,
-            IContactsRepository contactsRepository,
-            IUserDataValidator userDataValidationService,
-            ISystemNotificationsService systemNotificationsService,
+        private readonly ISubscriptionAccessValidator _subscriptionAccessValidator;
+        private readonly IPagingValidator _pagingValidator;
+
+        public SubscriptionsService(
+            ICorrelationIdProvider correlationIdProvider,
             ISubscriptionsRepository subscriptionsRepository,
             IAccountDataHolder accountDataHolder,
-            INotificationsService notificationsService)
+            INotificationsService notificationsService,
+            ISubscriptionAccessValidator subscriptionAccessValidator,
+            IPagingValidator pagingValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
-            _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
-            _authorizationRepository = authorizationRepository ?? throw new ArgumentNullException(nameof(authorizationRepository));
-            _contactsRepository = contactsRepository ?? throw new ArgumentNullException(nameof(contactsRepository));
-            _userDataValidationService = userDataValidationService ?? throw new ArgumentNullException(nameof(userDataValidationService));
-            _systemNotificationsService = systemNotificationsService ?? throw new ArgumentNullException(nameof(systemNotificationsService));
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
+            _subscriptionAccessValidator = subscriptionAccessValidator ?? throw new ArgumentNullException(nameof(subscriptionAccessValidator));
+            _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -57,10 +50,13 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var isSubscribed = await _subscriptionsRepository.IsSubscriptionExistAsync(_accountDataHolder.AccountId.Value, subscribeToId);
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
 
-            if (isSubscribed)
-                return CommandResult.Fail(ErrorCode.SubscriptionAlreadyExists, "Подписка уже существует");
+            var accessError = await _subscriptionAccessValidator.AssertCanSubscribeAsync(
+                _accountDataHolder.AccountId.Value, subscribeToId);
+            if (!accessError.Success)
+                return accessError;
 
             await _subscriptionsRepository.SubscribeToAccountAsync(_accountDataHolder.AccountId.Value, subscribeToId);
 
@@ -78,13 +74,16 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var isSubscribed = await _subscriptionsRepository.IsSubscriptionExistAsync(_accountDataHolder.AccountId.Value, subscribedToId);
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
 
-            if (!isSubscribed)
-                return CommandResult.Fail(ErrorCode.SubscriptionAlreadyExists, "Подписка не найдена");
+            var accessError = await _subscriptionAccessValidator.AssertCanManageOwnSubscriptionAsync(
+                _accountDataHolder.AccountId.Value, subscribedToId);
+            if (!accessError.Success)
+                return accessError;
 
             await _subscriptionsRepository.UpdateSubscriptionAsync(new UpdateSubscriptionRequest
-            { 
+            {
                 SubscribedToId = subscribedToId,
                 SubscriberId = _accountDataHolder.AccountId.Value,
                 NotifyEventCreated = request.NotifyEventCreated,
@@ -104,6 +103,21 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            var accessError = await _subscriptionAccessValidator.AssertCanViewSubscriptionsAsync(
+                request.AccountId, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return CommandResult<PagedList<Subscription>?>.Fail(accessError.ErrorCode, accessError.Message);
+
+            var pageIndex = request.PageIndes;
+            var pageSize = request.PageSize;
+            var pagingError = _pagingValidator.Validate(pageIndex, pageSize);
+            if (!pagingError.Success)
+                return CommandResult<PagedList<Subscription>?>.Fail(pagingError.ErrorCode, pagingError.Message);
+
+            _pagingValidator.Normalize(ref pageIndex, ref pageSize);
+            request.PageIndes = pageIndex;
+            request.PageSize = pageSize;
+
             var subscriptions = await _subscriptionsRepository.GetSubscriptionsAsync(request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -117,6 +131,11 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(GetSubscriptionsCountAsync)}";
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var accessError = await _subscriptionAccessValidator.AssertCanViewSubscriptionsAsync(
+                accountId, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return CommandResult<int>.Fail(accessError.ErrorCode, accessError.Message);
 
             var subscriptionsCount = await _subscriptionsRepository.GetSubscriptionsCountAsync(accountId);
 
@@ -132,6 +151,21 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            var accessError = await _subscriptionAccessValidator.AssertCanViewSubscriptionsAsync(
+                request.AccountId, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return CommandResult<PagedList<Subscription>?>.Fail(accessError.ErrorCode, accessError.Message);
+
+            var pageIndex = request.PageIndes;
+            var pageSize = request.PageSize;
+            var pagingError = _pagingValidator.Validate(pageIndex, pageSize);
+            if (!pagingError.Success)
+                return CommandResult<PagedList<Subscription>?>.Fail(pagingError.ErrorCode, pagingError.Message);
+
+            _pagingValidator.Normalize(ref pageIndex, ref pageSize);
+            request.PageIndes = pageIndex;
+            request.PageSize = pageSize;
+
             var subscriptions = await _subscriptionsRepository.GetSubscribersAsync(request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -146,6 +180,11 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            var accessError = await _subscriptionAccessValidator.AssertCanViewSubscriptionsAsync(
+                accountId, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return CommandResult<int>.Fail(accessError.ErrorCode, accessError.Message);
+
             var subscriptionsCount = await _subscriptionsRepository.GetSubscribersCountAsync(accountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -159,10 +198,14 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(DeleteSubscriptionAsync)}";
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
-                
-            var isSubscribed = await _subscriptionsRepository.IsSubscriptionExistAsync(_accountDataHolder.AccountId.Value, subscribedToId);
-            if (!isSubscribed)
-                return CommandResult.Fail(ErrorCode.SubscriptionAlreadyExists, "Подписка не найдена");
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var accessError = await _subscriptionAccessValidator.AssertCanManageOwnSubscriptionAsync(
+                _accountDataHolder.AccountId.Value, subscribedToId);
+            if (!accessError.Success)
+                return accessError;
 
             await _subscriptionsRepository.DeleteSubscriptionAsync(_accountDataHolder.AccountId.Value, subscribedToId);
 

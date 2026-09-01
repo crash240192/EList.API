@@ -6,13 +6,13 @@ using EList.Common.Support;
 using EList.Models.Invitations;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
+using EList.Validators.Interfaces;
 using NLog;
 
 namespace EList.Services.Impl
 {
     public class InvitationsService : IInvitationsService
     {
-
         #region logger
         private static readonly ILogger log = LogManager.GetCurrentClassLogger();
         private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
@@ -20,42 +20,39 @@ namespace EList.Services.Impl
         #endregion
 
         private readonly ICorrelationIdProvider _correlationIdProvider;
-        private readonly IAccountsRepository _accountsRepository;
-        private readonly IAuthorizationRepository _authorizationRepository;
         private readonly IEventsRepository _eventsRepository;
-        private readonly IEventsMetadataRepository _eventsMetadataRepository;
         private readonly IInvitationsRepository _invitationsRepository;
-        private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
         private readonly IParticipationsRepository _participationsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
         private readonly INotificationsService _notificationsService;
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
+        private readonly IInvitationAccessValidator _invitationAccessValidator;
+        private readonly IInvitationDataValidator _invitationDataValidator;
+        private readonly IPagingValidator _pagingValidator;
 
         public InvitationsService(ICorrelationIdProvider correlationIdProvider,
-            IAccountsRepository accountsRepository,
-            IAuthorizationRepository authorizationRepository,
             IEventsRepository eventsRepository,
-            IEventsMetadataRepository eventsMetadataRepository,
             IInvitationsRepository invitationsRepository,
-            IEventOrganizatorsRepository eventOrganizatorsRepository,
             IParticipationsRepository participationsRepository,
             IAccountDataHolder accountDataHolder,
             IParticipantsBWListRepository participantsBWListRepository,
             INotificationsService notificationsService,
-            IModerationPenaltiesService moderationPenaltiesService)
+            IModerationPenaltiesService moderationPenaltiesService,
+            IInvitationAccessValidator invitationAccessValidator,
+            IInvitationDataValidator invitationDataValidator,
+            IPagingValidator pagingValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
-            _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
-            _authorizationRepository = authorizationRepository ?? throw new ArgumentNullException(nameof(authorizationRepository));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
-            _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
             _invitationsRepository = invitationsRepository ?? throw new ArgumentNullException(nameof(invitationsRepository));
-            _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _participationsRepository = participationsRepository ?? throw new ArgumentNullException(nameof(participationsRepository));
             _participantsBWListRepository = participantsBWListRepository ?? throw new ArgumentNullException(nameof(participantsBWListRepository));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
+            _invitationAccessValidator = invitationAccessValidator ?? throw new ArgumentNullException(nameof(invitationAccessValidator));
+            _invitationDataValidator = invitationDataValidator ?? throw new ArgumentNullException(nameof(invitationDataValidator));
+            _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -67,36 +64,18 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            if (!request.AccountIds?.Any() ?? true)
-                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Список пользователей пуст");
+            var dataError = _invitationDataValidator.ValidateCreateRequest(request);
+            if (!dataError.Success)
+                return dataError;
 
             var curEvent = await _eventsRepository.GetEventAsync(request.EventId);
             if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Мероприятие с id='{request.EventId}' не найдено");
 
-            var isOrganizator = _accountDataHolder.AccountId != null
-                && await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(curEvent.Id, _accountDataHolder.AccountId.Value);
-
-            if (!isOrganizator)
-            {
-                //TODO: Тут надо реализовать проверку что указанным пользователям можно выслать приглашения по black/white list
-            }
-
-            if (request.InviterOrganizationId != null)
-            {
-                var isOrgOrganizator = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(curEvent.Id, _accountDataHolder.AccountId.Value);
-                var orgIsEventOrganizator = (await _eventOrganizatorsRepository.GetByEventIdAsync(curEvent.Id))
-                    ?.Any(i => i.OrganizationId == request.InviterOrganizationId) ?? false;
-                if (!isOrgOrganizator || !orgIsEventOrganizator)
-                    return CommandResult.Fail(ErrorCode.AccessError, "Организация не является организатором мероприятия или у вас нет прав");
-            }
-
-            if (!curEvent.Parameters?.AllowUsersToInvite ?? false && !isOrganizator)
-            {
-                return CommandResult.Fail(ErrorCode.AccessError, $"Приглашения на текущее события запрещены администратором");
-
-                //TODO Сделать аналогичную проверку для организаций
-            }
+            var createAccess = await _invitationAccessValidator.AssertCanCreateInvitationsAsync(
+                curEvent, _accountDataHolder.AccountId, request.InviterOrganizationId);
+            if (!createAccess.Success)
+                return createAccess;
 
             if (curEvent.Active == false)
                 return CommandResult.Fail(ErrorCode.EventCancelled, $"Мероприятие было отменено");
@@ -133,6 +112,9 @@ namespace EList.Services.Impl
             }
             #endregion
 
+            if (!request.AccountIds?.Any() ?? true)
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, message.Length > 0 ? message : "Список пользователей пуст");
+
             await _invitationsRepository.CreateInvitationsAsync(request, _accountDataHolder.AccountId.Value);
 
             await _notificationsService.NotifyUsersInvitedAsync(request.EventId, request.AccountIds);
@@ -157,6 +139,11 @@ namespace EList.Services.Impl
             if (invitation == null)
                 return CommandResult.Fail(ErrorCode.InvitationNotFound, $"Приглашение с id='{invitationId}' не найдено");
 
+            var acceptAccess = await _invitationAccessValidator.AssertCanAcceptOrDeclineAsync(
+                invitation, _accountDataHolder.AccountId);
+            if (!acceptAccess.Success)
+                return acceptAccess;
+
             var curEvent = await _eventsRepository.GetEventAsync(invitation.EventId);
             if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Мероприятие с id='{invitation.EventId}' не найдено");
@@ -174,15 +161,17 @@ namespace EList.Services.Impl
             if (!eventBan.Success)
                 return CommandResult.Fail(eventBan.ErrorCode, eventBan.Message);
 
-            if (curEvent.Parameters.Private ?? false)
+            // Согласовано с ParticipateAsync: при пустом WL достаточно самого приглашения.
+            if (curEvent.Parameters?.Private ?? false)
             {
-                if (!await _participantsBWListRepository.IsUserInWhiteListAsync(curEvent.Id, _accountDataHolder.AccountId.Value))
-                    return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
+                var whiteListCount = await _participantsBWListRepository.WhiteListPersonsCountAsync(curEvent.Id);
+                if (whiteListCount > 0
+                    && !await _participantsBWListRepository.IsUserInWhiteListAsync(curEvent.Id, _accountDataHolder.AccountId.Value))
+                    return CommandResult.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
             }
-            else
+            else if (await _participantsBWListRepository.IsUserInBlackListAsync(curEvent.Id, _accountDataHolder.AccountId.Value))
             {
-                if (await _participantsBWListRepository.IsUserInBlackListAsync(curEvent.Id, _accountDataHolder.AccountId.Value))
-                    return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
+                return CommandResult.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
             }
 
             if (curEvent.Parameters?.MaxPersonsCount > 0)
@@ -191,9 +180,6 @@ namespace EList.Services.Impl
                 if (participantsCount >= curEvent.Parameters.MaxPersonsCount)
                     return CommandResult.Fail(ErrorCode.EventIsFull, $"В мероприятии уже участвует максимальное количество человек");
             }
-
-            if (invitation.InvitedAccountId != _accountDataHolder.AccountId)
-                return CommandResult.Fail(ErrorCode.AccessError, $"У текущего пользователя нет доступа для взаимодействия с этим приглашением");
 
             await _participationsRepository.ParticipateAsync(_accountDataHolder.AccountId.Value, invitation.EventId);
 
@@ -215,8 +201,10 @@ namespace EList.Services.Impl
             if (invitation == null)
                 return CommandResult.Fail(ErrorCode.InvitationNotFound, $"Приглашение с id='{invitationId}' не найдено");
 
-            if (invitation.InvitedAccountId != _accountDataHolder.AccountId)
-                return CommandResult.Fail(ErrorCode.AccessError, $"У текущего пользователя нет доступа для взаимодействия с этим приглашением");
+            var accessError = await _invitationAccessValidator.AssertCanAcceptOrDeclineAsync(
+                invitation, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return accessError;
 
             await _invitationsRepository.DeleteInvitationAsync(invitationId);
 
@@ -228,7 +216,7 @@ namespace EList.Services.Impl
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeclineAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(CancelInvitationAsync)}";
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
@@ -236,17 +224,10 @@ namespace EList.Services.Impl
             if (invitation == null)
                 return CommandResult.Fail(ErrorCode.InvitationNotFound, $"Приглашение с id='{invitationId}' не найдено");
 
-            if (invitation.InviterAccountId != _accountDataHolder.AccountId)
-            {
-                if (invitation.InviterOrganizationId != null)
-                {
-                    //TODO: Проверить, является ли текущий пользователь администратором организации, если она указана
-                }
-                else
-                {
-                    return CommandResult.Fail(ErrorCode.AccessError, $"У текущего пользователя нет доступа отмены этого приглашения");
-                }
-            }
+            var accessError = await _invitationAccessValidator.AssertCanCancelInvitationAsync(
+                invitation, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return accessError;
 
             await _invitationsRepository.DeleteInvitationAsync(invitationId);
 
@@ -262,11 +243,19 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            int? pageIndexValue = pageIndex;
+            int? pageSizeValue = pageSize;
+            var pagingError = _pagingValidator.Validate(pageIndexValue, pageSizeValue);
+            if (!pagingError.Success)
+                return CommandResult<PagedList<Invitation>>.Fail(pagingError.ErrorCode, pagingError.Message);
+
+            _pagingValidator.Normalize(ref pageIndexValue, ref pageSizeValue);
+
             var invitations = await _invitationsRepository.SearchInvitationsAsync(new InvitationsSearchRequest
             {
                 InvitedAccountIds = new List<Guid> { _accountDataHolder.AccountId.Value },
-                PageIndex = pageIndex,
-                PageSize = pageSize,
+                PageIndex = pageIndexValue,
+                PageSize = pageSizeValue,
             });
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -277,21 +266,46 @@ namespace EList.Services.Impl
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetUserInvitationsAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(SearchAsync)}";
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<PagedList<Invitation>>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var pageIndex = request.PageIndex;
+            var pageSize = request.PageSize;
+            var pagingError = _pagingValidator.Validate(pageIndex, pageSize);
+            if (!pagingError.Success)
+                return CommandResult<PagedList<Invitation>>.Fail(pagingError.ErrorCode, pagingError.Message);
+
+            _pagingValidator.Normalize(ref pageIndex, ref pageSize);
+            request.PageIndex = pageIndex;
+            request.PageSize = pageSize;
+
             var invitations = await _invitationsRepository.SearchInvitationsAsync(request);
+            var visible = new List<Invitation>();
+            foreach (var invitation in invitations.Result ?? Enumerable.Empty<Invitation>())
+            {
+                if (await _invitationAccessValidator.CanViewInvitationAsync(invitation, _accountDataHolder.AccountId))
+                    visible.Add(invitation);
+            }
+
+            var filtered = new PagedList<Invitation>(
+                visible.Count,
+                visible,
+                request.PageIndex ?? 0,
+                request.PageSize ?? visible.Count);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<PagedList<Invitation>>(invitations);
+            return new CommandResult<PagedList<Invitation>>(filtered);
         }
 
         public async Task<CommandResult<int>> GetNotViewedInvitationsCountAsync()
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(ViewInvitationAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(GetNotViewedInvitationsCountAsync)}";
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
@@ -313,9 +327,11 @@ namespace EList.Services.Impl
             if (invitation == null)
                 return CommandResult.Fail(ErrorCode.InvitationNotFound, $"Приглашение с id='{invitationId}' не найдено");
 
-            if (invitation.InvitedAccountId != _accountDataHolder.AccountId)
-                return CommandResult.Fail(ErrorCode.AccessError, $"Пометить приглашение прочитанным может только приглашённый");
-            
+            var accessError = await _invitationAccessValidator.AssertCanAcceptOrDeclineAsync(
+                invitation, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return CommandResult.Fail(ErrorCode.AccessError, "Пометить приглашение прочитанным может только приглашённый");
+
             await _invitationsRepository.ViewInvitationAsync(invitationId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);

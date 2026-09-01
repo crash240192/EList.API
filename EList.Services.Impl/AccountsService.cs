@@ -26,6 +26,7 @@ namespace EList.Services.Impl
         private readonly IAuthorizationRepository _authorizationRepository;
         private readonly IContactsRepository _contactsRepository;
         private readonly IUserDataValidator _userDataValidationService;
+        private readonly IContactValidator _contactValidator;
         private readonly ISystemNotificationsService _notificationsService;
         private readonly IEncryptionTool _encryptionTool;
         private readonly IAccountDataHolder _accountDataHolder;
@@ -37,6 +38,7 @@ namespace EList.Services.Impl
             IAuthorizationRepository authorizationRepository,
             IContactsRepository contactsRepository,
             IUserDataValidator userDataValidationService,
+            IContactValidator contactValidator,
             ISystemNotificationsService notificationsService,
             IEncryptionTool encryptionTool,
             IWalletsService walletsService,
@@ -48,6 +50,7 @@ namespace EList.Services.Impl
             _authorizationRepository = authorizationRepository ?? throw new ArgumentNullException(nameof(authorizationRepository));
             _contactsRepository = contactsRepository ?? throw new ArgumentNullException(nameof(contactsRepository));
             _userDataValidationService = userDataValidationService ?? throw new ArgumentNullException(nameof(userDataValidationService));
+            _contactValidator = contactValidator ?? throw new ArgumentNullException(nameof(contactValidator));
             _encryptionTool = encryptionTool ?? throw new ArgumentNullException(nameof(encryptionTool));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _walletsService = walletsService ?? throw new ArgumentNullException(nameof(walletsService));
@@ -63,17 +66,24 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            //TODO: Валидация контактных данных
+            var contactValidation = await _contactValidator.ValidateAsync(
+                new ContactRequest
+                {
+                    TypeId = request.AuthorizationContactType,
+                    Value = request.AuthorizationContactValue,
+                    IsAuthorizationContact = true,
+                    Show = request.ShowContact
+                },
+                allowAuthorizationContact: true);
+            if (!contactValidation.Success)
+                return CommandResult<Guid?>.Fail(contactValidation.ErrorCode, contactValidation.Message);
+
             var existingAccount = await _accountsRepository.GetAccountAsync(request.Login);
             if (existingAccount != null)
                 return CommandResult<Guid?>.Fail(ErrorCode.DublicateAccount, "Указанный логин уже занят");
 
             if (request.Password != request.PasswordConfirmation)
                 return CommandResult<Guid?>.Fail(ErrorCode.PasswordsDontMatch, "Пароль и подтверждение пароля не совпадают");
-
-            var existingContact = await _contactsRepository.CheckContactIsEmptyAsync(request.AuthorizationContactValue, request.AuthorizationContactType);
-            if (!existingContact) 
-                return CommandResult<Guid?>.Fail(ErrorCode.AuthorizationContactIsNotEmpty, $"Аккаунт, зарегистрированный на {request.AuthorizationContactValue}, уже существует");
 
             request.Password = _encryptionTool.CalculateStringHash(request.Password);
 

@@ -31,7 +31,16 @@ namespace EList.DbDataProvider.DataProviders
             if (request.Parameters != null)
             {
                 request.Parameters.AlbumId = result;
-                await _connection.InsertAsync(request.Parameters);
+                if (request.EventId != null)
+                    await _connection.InsertAsync(request.Parameters);
+                else
+                    await _connection.InsertAsync(new AccountAlbumParametersDto
+                    {
+                        AlbumId = result,
+                        HeadAlbum = request.Parameters.HeadAlbum,
+                        ParticipantsReadonly = request.Parameters.ParticipantsReadonly,
+                        Private = request.Parameters.Private
+                    });
             }
 
             await _connection.InsertWithIdentityAsync(new AccountAlbumRelationDto
@@ -65,28 +74,55 @@ namespace EList.DbDataProvider.DataProviders
 
             var album = await _connection.Albums
                 .LoadWith(i => i.Parameters)
+                .LoadWith(i => i.AccountParameters)
+                .LoadWith(i => i.EventRelation)
                 .FirstOrDefaultAsync(i => i.Id == request.Id);
 
-            if (request.Parameters != null)
+            if (request.Parameters != null && album != null)
             {
-                if (album.Parameters != null)
+                if (album.EventRelation != null)
                 {
-                    await _connection.EventAlbumParameters
-                        .Where(i => i.AlbumId == request.Id)
-                        .Set(i => i.ParticipantsReadonly, request.Parameters.ParticipantsReadonly)
-                        .Set(i => i.HeadAlbum, request.Parameters.HeadAlbum)
-                        .Set(i => i.Private, request.Parameters.Private)
-                        .UpdateAsync();
+                    if (album.Parameters != null)
+                    {
+                        await _connection.EventAlbumParameters
+                            .Where(i => i.AlbumId == request.Id)
+                            .Set(i => i.ParticipantsReadonly, request.Parameters.ParticipantsReadonly)
+                            .Set(i => i.HeadAlbum, request.Parameters.HeadAlbum)
+                            .Set(i => i.Private, request.Parameters.Private)
+                            .UpdateAsync();
+                    }
+                    else
+                    {
+                        request.Parameters.AlbumId = request.Id.Value;
+                        await _connection.InsertAsync(request.Parameters);
+                    }
                 }
                 else
                 {
-                    request.Parameters.AlbumId = request.Id.Value;
-                    await _connection.InsertAsync(request.Parameters);
+                    if (album.AccountParameters != null)
+                    {
+                        await _connection.AccountAlbumParameters
+                            .Where(i => i.AlbumId == request.Id)
+                            .Set(i => i.ParticipantsReadonly, request.Parameters.ParticipantsReadonly)
+                            .Set(i => i.HeadAlbum, request.Parameters.HeadAlbum)
+                            .Set(i => i.Private, request.Parameters.Private)
+                            .UpdateAsync();
+                    }
+                    else
+                    {
+                        await _connection.InsertAsync(new AccountAlbumParametersDto
+                        {
+                            AlbumId = request.Id.Value,
+                            HeadAlbum = request.Parameters.HeadAlbum,
+                            ParticipantsReadonly = request.Parameters.ParticipantsReadonly,
+                            Private = request.Parameters.Private
+                        });
+                    }
                 }
             }
         }
 
-        public async Task AssingAlbumToAccountAsync(Guid accountId, Guid albumId)
+        public async Task AssignAlbumToAccountAsync(Guid accountId, Guid albumId)
         {
             if (!await _connection.AccountAlbums.AnyAsync(i => i.AccountId == accountId && i.AlbumId == albumId))
                 await _connection.InsertAsync(new AccountAlbumRelationDto
@@ -96,7 +132,7 @@ namespace EList.DbDataProvider.DataProviders
                 });
         }
 
-        public async Task AssingAlbumToEventAsync(Guid eventId, Guid albumId)
+        public async Task AssignAlbumToEventAsync(Guid eventId, Guid albumId)
         {
             if (!await _connection.EventAlbums.AnyAsync(i => i.EventId == eventId && i.AlbumId == albumId))
                 await _connection.InsertAsync(new EventAlbumRelationDto
@@ -104,12 +140,30 @@ namespace EList.DbDataProvider.DataProviders
                     EventId = eventId,
                     AlbumId = albumId
                 });
+
+            // После привязки к событию приоритет у event_album_parameters:
+            // переносим настройки из account_album_parameters, если event-параметров ещё нет.
+            var hasEventParameters = await _connection.EventAlbumParameters
+                .AnyAsync(i => i.AlbumId == albumId);
+            if (!hasEventParameters)
+            {
+                var accountParameters = await _connection.AccountAlbumParameters
+                    .FirstOrDefaultAsync(i => i.AlbumId == albumId);
+                await _connection.InsertAsync(new EventAlbumParametersDto
+                {
+                    AlbumId = albumId,
+                    HeadAlbum = accountParameters?.HeadAlbum ?? false,
+                    ParticipantsReadonly = accountParameters?.ParticipantsReadonly ?? false,
+                    Private = accountParameters?.Private ?? false
+                });
+            }
         }
 
         public async Task<List<MediaAlbumDto>> GetAccountAlbumsAsync(Guid accountId)
         {
             var result = await _connection.Albums
                 .LoadWith(i => i.Parameters)
+                .LoadWith(i => i.AccountParameters)
                 .LoadWith(i => i.AccountRelation)
                 .Where(i => i.AccountRelation.AccountId == accountId).ToListAsync();
             return result;
@@ -120,7 +174,7 @@ namespace EList.DbDataProvider.DataProviders
             var result = await _connection.Albums
                 .LoadWith(i => i.EventRelation)
                 .LoadWith(i => i.Parameters)
-                .LoadWith(i => i.EventRelation)
+                .LoadWith(i => i.AccountParameters)
                 .LoadWith(i => i.AccountRelation)
                 .FirstOrDefaultAsync(i => i.Id == id);
             return result;
@@ -130,6 +184,7 @@ namespace EList.DbDataProvider.DataProviders
         {
             var result = await _connection.Albums
                 .LoadWith(i => i.Parameters)
+                .LoadWith(i => i.AccountParameters)
                 .LoadWith(i => i.EventRelation)
                 .Where(i => i.EventRelation.EventId == eventId)
                 .ToListAsync();
@@ -368,6 +423,9 @@ namespace EList.DbDataProvider.DataProviders
                 .DeleteAsync();
 
             await _connection.EventAlbumParameters.Where(i => i.AlbumId == albumId)
+                .DeleteAsync();
+
+            await _connection.AccountAlbumParameters.Where(i => i.AlbumId == albumId)
                 .DeleteAsync();
 
             await _connection.AlbumFiles.Where(i => i.AlbumId == albumId)

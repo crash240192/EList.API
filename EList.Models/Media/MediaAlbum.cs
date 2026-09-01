@@ -46,8 +46,13 @@
         public Guid? WallpaperId { get; set; }
 
         /// <summary>
-        /// Параметры альбома
+        /// Параметры альбома мероприятия
         /// </summary>
         public EventAlbumParameters Parameters { get; set; }
+
+        /// <summary>
+        /// Параметры доступа к персональному альбому
+        /// </summary>
+        public AccountAlbumParameters AccountParameters { get; set; }
     }
 }

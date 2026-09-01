@@ -29,6 +29,9 @@ namespace EList.DbDataProvider.Models
         [Association(ThisKey = nameof(Id), OtherKey = nameof(EventAlbumParametersDto.AlbumId))]
         public EventAlbumParametersDto Parameters { get; set; }
 
+        [Association(ThisKey = nameof(Id), OtherKey = nameof(AccountAlbumParametersDto.AlbumId))]
+        public AccountAlbumParametersDto AccountParameters { get; set; }
+
         [Association(ThisKey = nameof(Id), OtherKey = nameof(EventAlbumRelationDto.AlbumId))]
         public EventAlbumRelationDto EventRelation { get; set; }
 

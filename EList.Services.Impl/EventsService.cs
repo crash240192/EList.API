@@ -1,21 +1,25 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using AutoMapper;
 using EList.Common.Configuration;
 using EList.Common.CorrelationId;
+using EList.Common.Extensions;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
 using EList.Localization;
+using EList.Models.Accounts;
 using EList.Models.Enums;
 using EList.Models.EventOrganizators;
 using EList.Models.Events;
 using EList.Models.Events.EventMetadata;
+using EList.Models.Invitations;
+using EList.Models.Notifications;
 using EList.Models.Participation;
 using EList.Repositories.Interfaces;
 using EList.Services.Impl.AbuseProtection;
 using EList.Services.Interfaces;
+using EList.Validators.Interfaces;
 using NLog;
-using Org.BouncyCastle.Ocsp;
 
 namespace EList.Services.Impl
 {
@@ -44,6 +48,9 @@ namespace EList.Services.Impl
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
         private readonly IEventCreateRateLimiter _eventCreateRateLimiter;
         private readonly AbuseProtectionOptions _abuseProtection;
+        private readonly IEventAccessValidator _eventAccessValidator;
+        private readonly IEventValidator _eventValidator;
+        private readonly IPagingValidator _pagingValidator;
 
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
@@ -61,7 +68,10 @@ namespace EList.Services.Impl
             IOrganizationsRepository organizationsRepository,
             IModerationPenaltiesService moderationPenaltiesService,
             IEventCreateRateLimiter eventCreateRateLimiter,
-            AbuseProtectionOptions abuseProtection)
+            AbuseProtectionOptions abuseProtection,
+            IEventAccessValidator eventAccessValidator,
+            IEventValidator eventValidator,
+            IPagingValidator pagingValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
@@ -80,6 +90,9 @@ namespace EList.Services.Impl
             _eventCreateRateLimiter = eventCreateRateLimiter ?? throw new ArgumentNullException(nameof(eventCreateRateLimiter));
             _abuseProtection = abuseProtection ?? throw new ArgumentNullException(nameof(abuseProtection));
             _accountDataHolder = accountDataHolder;
+            _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
+            _eventValidator = eventValidator ?? throw new ArgumentNullException(nameof(eventValidator));
+            _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
         }
 
 
@@ -213,6 +226,10 @@ namespace EList.Services.Impl
 
             if (eventItem == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            var typesError = _eventValidator.ValidateEventTypeIds(typeIds);
+            if (!typesError.Success)
+                return typesError;
 
             await _eventsMetadataRepository.BindEventTypesAsync(eventId, typeIds);
 
@@ -385,6 +402,10 @@ namespace EList.Services.Impl
             if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
+            var parametersError = _eventValidator.ValidateParameters(parameters);
+            if (!parametersError.Success)
+                return parametersError;
+
             if (_accountDataHolder.AccountId == null
                 || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
@@ -460,6 +481,10 @@ namespace EList.Services.Impl
 
             request.OrganizatorAccountIds ??= new List<Guid>();
             request.OrganizatorOrganizationIds ??= new List<Guid>();
+
+            var dataError = _eventValidator.ValidateCreateRequest(request);
+            if (!dataError.Success)
+                return CommandResult<Guid?>.Fail(dataError.ErrorCode, dataError.Message);
 
             if (_abuseProtection.Enabled
                 && !_eventCreateRateLimiter.TryAcquire(_accountDataHolder.AccountId.Value, out var rateLimitReason))
@@ -660,6 +685,10 @@ namespace EList.Services.Impl
             if (eventItem == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
+            var bodyError = _eventValidator.ValidateEventBody(request);
+            if (!bodyError.Success)
+                return bodyError;
+
             if (_accountDataHolder.AccountId == null
                 || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
@@ -709,62 +738,19 @@ namespace EList.Services.Impl
             if (eventItem == null)
                 return CommandResult<Event>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
-            var isOrganizator = _accountDataHolder.AccountId != null
-                && await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value);
+            
+            var accessError = await _eventAccessValidator.AssertCanViewEventAsync(
+                eventItem,
+                _accountDataHolder.AccountId,
+                _accountDataHolder.AdultConfirmed);
+            if (!accessError.Success)
+                return CommandResult<Event>.Fail(accessError.ErrorCode, accessError.Message);
 
-            if (!isOrganizator)
-            {
-                if (eventItem.Parameters?.Private == true)
-                {
-                    if (_accountDataHolder.AccountId == null)
-                        return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Сначала Необходимо авторизоваться");
+            if (eventItem.Parameters == null)
+                eventItem.Parameters = new EventParameters { AgeLimit = 0 };
+            else
+                eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
 
-                    var isUserInWhiteList = await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId.Value);
-                    if (!isUserInWhiteList)
-                    {
-                        var whiteListIsEmpty = await _participantsBWListRepository.IsWhiteListEmptyAsync(eventId);
-                        if (whiteListIsEmpty)
-                        {
-                            var isUserParticipated = await _participationsRepository.IsUserParticipatedAsync(_accountDataHolder.AccountId.Value, eventId);
-                            if (!isUserParticipated)
-                            {
-                                var invitation = await _invitationsRepository.GetInvitationAsync(_accountDataHolder.AccountId.Value, eventId);
-                                if (invitation == null)
-                                    return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Посещать закрытые мероприятия можно только приглашению");
-                            }
-                        }
-                        else
-                        {
-                            return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Посещать закрытые мероприятия можно только приглашению");
-                        }
-                    }
-                }
-                else
-                {
-                    if (_accountDataHolder.AccountId != null)
-                    {
-                        var isUserInBlackList = await _participantsBWListRepository.IsUserInBlackListAsync(eventId, _accountDataHolder.AccountId.Value);
-                        if (isUserInBlackList)
-                            return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, "Организатор добавил вас в чёрный список мероприятия");
-                    }
-                }
-            }
-
-            #region age validation
-            if (!isOrganizator)
-            {
-                if (eventItem.Parameters == null)
-                    eventItem.Parameters = new EventParameters
-                    {
-                        AgeLimit = 0,
-                    };
-                else
-                    eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
-
-                if (eventItem.Parameters.AgeLimit >= 18 && !_accountDataHolder.AdultConfirmed)
-                    return CommandResult<Event>.Fail(ErrorCode.EventAccessDenied, $"Просмотр мероприятий 18+ недоступен");
-            }
-            #endregion
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Event>(eventItem);
@@ -807,7 +793,10 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SearchEventsAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            ClampSearchPageSize(request);
+            var searchError = PrepareEventsSearchRequest(request);
+            if (!searchError.Success)
+                return CommandResult<PagedList<Event>?>.Fail(searchError.ErrorCode, searchError.Message);
+
             var searchResult = await _eventsRepository.SearchEventsAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -821,7 +810,10 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SearchEventsShortAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            ClampSearchPageSize(request);
+            var searchError = PrepareEventsSearchRequest(request);
+            if (!searchError.Success)
+                return CommandResult<PagedList<EventShort>?>.Fail(searchError.ErrorCode, searchError.Message);
+
             var searchResult = await _eventsRepository.SearchEventsShortAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -857,16 +849,19 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
-        private void ClampSearchPageSize(EventsSearchRequest request)
+        private CommandResult PrepareEventsSearchRequest(EventsSearchRequest request)
         {
-            if (request == null)
-                return;
+            var searchError = _eventValidator.ValidateSearchRequest(request);
+            if (!searchError.Success)
+                return searchError;
 
-            var max = _abuseProtection.SearchMaxPageSize;
-            if (request.PageSize == null || request.PageSize <= 0)
-                request.PageSize = Math.Min(20, max);
-            else if (request.PageSize > max)
-                request.PageSize = max;
+            var pageIndex = request.PageIndex;
+            var pageSize = request.PageSize;
+            _pagingValidator.Normalize(ref pageIndex, ref pageSize, _abuseProtection.SearchMaxPageSize);
+            request.PageIndex = pageIndex;
+            request.PageSize = pageSize;
+
+            return CommandResult.OK;
         }
 
         private async Task<CommandResult> AssertEventCreateQuotaAsync(

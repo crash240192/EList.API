@@ -8,8 +8,8 @@ namespace EList.Repositories.Interfaces
         Task<Guid?> CreateAlbumAsync(EventAlbumRequest request);
         Task UpdateAlbumAsync(EventAlbumRequest request);
 
-        Task AssingAlbumToAccountAsync(Guid accountId, Guid albumId);
-        Task AssingAlbumToEventAsync(Guid eventId, Guid albumId);
+        Task AssignAlbumToAccountAsync(Guid accountId, Guid albumId);
+        Task AssignAlbumToEventAsync(Guid eventId, Guid albumId);
         Task AddFilesToAlbumAsync(Guid albumId, List<Guid> fileIds);
 
         Task<MediaAlbum> GetAlbumAsync(Guid id);
