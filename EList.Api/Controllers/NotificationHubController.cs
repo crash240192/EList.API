@@ -105,6 +105,9 @@ namespace EList.Api.Controllers
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            if (!_accountDataHolder.IsPlatformAdminOrAbove)
+                return CommandResult.Fail(EList.Common.Support.ErrorCode.AccessError, "Отправка уведомлений доступна только администраторам площадки");
+
             var result = await _notificationService.SendToUserAsync(accountId, request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -124,6 +127,9 @@ namespace EList.Api.Controllers
             var methodName = $"{LOGGER_NAME}{nameof(BroadcastAsync)}";
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (!_accountDataHolder.IsPlatformAdminOrAbove)
+                return CommandResult.Fail(EList.Common.Support.ErrorCode.AccessError, "Broadcast уведомлений доступен только администраторам площадки");
             
             var result = await _notificationService.BroadcastAsync(request);
 

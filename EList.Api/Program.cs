@@ -16,6 +16,8 @@ using ConfigurationManager = EList.Common.Configuration.ConfigurationManager;
 
 var builder = WebApplication.CreateBuilder(args);
 
+ConfigurationManager.Initialize(builder.Configuration);
+
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddControllers().AddJsonOptions(options =>
@@ -119,25 +121,58 @@ app.Use(async (context, next) =>
 
 app.UseStaticFiles();
 
+app.UseCors(cors =>
+{
+    var allowedOriginsRaw = ConfigurationManager.AppSettings.Contains("AllowedOrigins")
+        ? ConfigurationManager.AppSettings["AllowedOrigins"]
+        : string.Empty;
 
-app.UseCors(builder => builder.SetIsOriginAllowed(origin => true).AllowAnyMethod().AllowAnyHeader().AllowCredentials());
-//app.UseCors(builder =>
-//{
-//    if (ConfigurationManager.AppSettings.Contains("AllowedOrigins") &&
-//        ConfigurationManager.AppSettings["AllowedOrigins"].Length > 0 &&
-//        ConfigurationManager.AppSettings["AllowedOrigins"] != "*")
-//    {
-//        builder.WithOrigins(ConfigurationManager.AppSettings["AllowedOrigins"].Split(",").Select(x => x.Trim()).ToArray());
-//    }
-//    else
-//    {
-//        builder.AllowAnyOrigin();
-//    }
-//    builder.AllowAnyMethod()
-//        .AllowAnyHeader()
-//        .WithExposedHeaders("content-disposition");
-//});
-app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
+    var origins = (allowedOriginsRaw ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Where(o => o != "*")
+        .ToArray();
+
+    if (origins.Length > 0)
+    {
+        cors.WithOrigins(origins)
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials()
+            .WithExposedHeaders("content-disposition");
+    }
+    else if (app.Environment.IsDevelopment())
+    {
+        // Dev fallback: open CORS only when AllowedOrigins is empty.
+        cors.SetIsOriginAllowed(_ => true)
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
+    }
+    else
+    {
+        // Production without whitelist: deny cross-origin browser calls.
+        cors.WithOrigins(Array.Empty<string>());
+    }
+});
+
+app.UseEndpoints(endpoints =>
+{
+    endpoints.MapControllers();
+    endpoints.MapGet("/health", () => Results.Ok(new
+    {
+        status = "Healthy",
+        service = "EList.Api",
+        version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown",
+        utc = DateTimeOffset.UtcNow
+    }));
+    endpoints.MapGet("/version", () => Results.Ok(new
+    {
+        service = "EList.Api",
+        version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown",
+        environment = app.Environment.EnvironmentName,
+        utc = DateTimeOffset.UtcNow
+    }));
+});
 var minThreads = Convert.ToInt32(ConfigurationManager.AppSettings["minThreads"] ?? "0");
 if (minThreads > 0)
 {

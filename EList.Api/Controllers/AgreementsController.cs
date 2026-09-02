@@ -30,15 +30,18 @@ namespace EList.Api.Controllers
         private readonly IAgreementService _agreementService;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
+        private readonly IAccountDataHolder _accountDataHolder;
 
         public AgreementsController(IAgreementService agreementService,
             ICorrelationIdProvider correlationIdProvider,
-            IDataConnectionProvider connectionProvider)
+            IDataConnectionProvider connectionProvider,
+            IAccountDataHolder accountDataHolder)
         {
             
             _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
             _agreementService = agreementService;
+            _accountDataHolder = accountDataHolder;
         }
 
 
@@ -136,7 +139,6 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="documentType"></param>
         /// <returns></returns>
-        [AllowAnonymous]
         [HttpGet("agree/{documentType}")]
         public async Task<CommandResult> SaveUserAgreementAsync(DocumentType documentType)
         {
@@ -153,7 +155,7 @@ namespace EList.Api.Controllers
                     await _connectionProvider.RollbackTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return CommandResult.OK;
+                return result;
             }
             catch (Exception ex)
             {
@@ -229,12 +231,15 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+                if (!_accountDataHolder.IsPlatformAdminOrAbove)
+                    return CommandResult.Fail(ErrorCode.AccessError, "Добавление юридических документов доступно только администраторам площадки");
+
                 var result = await _agreementService.AddNewDocumentAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return CommandResult.OK;
+                return result;
             }
             catch (Exception ex)
             {

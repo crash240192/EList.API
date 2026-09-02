@@ -47,6 +47,8 @@ namespace EList.DbDataProvider.DataProviders
 
             if (result?.Legal != null)
                 PersonalDataCrypto.DecryptLegal(result.Legal, _fieldEncryptor);
+            if (result?.Payout != null)
+                PersonalDataCrypto.DecryptPayout(result.Payout, _fieldEncryptor);
             if (result?.Members != null)
             {
                 foreach (var member in result.Members)
@@ -320,6 +322,7 @@ namespace EList.DbDataProvider.DataProviders
         public async Task UpsertPayoutAsync(OrganizationPayoutDto item)
         {
             item.UpdateDate = DateTimeOffset.Now.ToUniversalTime();
+            PersonalDataCrypto.EncryptPayout(item, _fieldEncryptor);
             var exists = await _connection.OrganizationPayout.AnyAsync(i => i.OrganizationId == item.OrganizationId);
             if (exists)
             {
@@ -344,14 +347,19 @@ namespace EList.DbDataProvider.DataProviders
         public async Task<OrganizationPayoutDto?> GetPayoutAsync(Guid organizationId)
         {
             var result = await _connection.OrganizationPayout.FirstOrDefaultAsync(i => i.OrganizationId == organizationId);
+            PersonalDataCrypto.DecryptPayout(result, _fieldEncryptor);
             return result;
         }
 
         public async Task SetProviderOnboardingAsync(Guid organizationId, PaymentProvider? provider, string? providerSellerId, ProviderOnboardingStatus status)
         {
+            var encryptedSellerId = providerSellerId;
+            if (!string.IsNullOrEmpty(providerSellerId) && _fieldEncryptor != null && !_fieldEncryptor.IsEncrypted(providerSellerId))
+                encryptedSellerId = _fieldEncryptor.Encrypt(providerSellerId);
+
             await _connection.OrganizationPayout.Where(i => i.OrganizationId == organizationId)
                 .Set(i => i.Provider, provider)
-                .Set(i => i.ProviderSellerId, providerSellerId)
+                .Set(i => i.ProviderSellerId, encryptedSellerId)
                 .Set(i => i.OnboardingStatus, status)
                 .Set(i => i.UpdateDate, DateTimeOffset.Now.ToUniversalTime())
                 .UpdateAsync();

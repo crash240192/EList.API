@@ -129,5 +129,29 @@ namespace EList.DbDataProvider.Security
             item.HeadName = crypto.Decrypt(item.HeadName);
             item.HeadBasis = crypto.Decrypt(item.HeadBasis);
         }
+
+        public static void EncryptPayout(OrganizationPayoutDto item, IFieldEncryptor crypto)
+        {
+            if (item == null || crypto == null)
+                return;
+
+            item.BankAccount = crypto.Encrypt(item.BankAccount);
+            item.Bik = crypto.Encrypt(item.Bik);
+            item.BankName = crypto.Encrypt(item.BankName);
+            item.TaxRegime = crypto.Encrypt(item.TaxRegime);
+            item.ProviderSellerId = crypto.Encrypt(item.ProviderSellerId);
+        }
+
+        public static void DecryptPayout(OrganizationPayoutDto? item, IFieldEncryptor crypto)
+        {
+            if (item == null || crypto == null)
+                return;
+
+            item.BankAccount = crypto.Decrypt(item.BankAccount);
+            item.Bik = crypto.Decrypt(item.Bik);
+            item.BankName = crypto.Decrypt(item.BankName);
+            item.TaxRegime = crypto.Decrypt(item.TaxRegime);
+            item.ProviderSellerId = crypto.Decrypt(item.ProviderSellerId);
+        }
     }
 }
