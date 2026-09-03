@@ -22,5 +22,8 @@ namespace EList.DbDataProvider.Models
 
         [Column("allow_notifications")]
         public bool AllowNotifications { get; set; }
+
+        [Column("active")]
+        public bool Active { get; set; } = true;
     }
 }

@@ -44,5 +44,20 @@
         /// Флаг включения отображения контакта другим пользователям
         /// </summary>
         public bool ShowContact { get; set; }
+
+        /// <summary>
+        /// Согласие с Политикой обработки ПДн (обязательно)
+        /// </summary>
+        public bool AcceptPolicy { get; set; }
+
+        /// <summary>
+        /// Согласие на обработку ПДн (обязательно)
+        /// </summary>
+        public bool AcceptConsent { get; set; }
+
+        /// <summary>
+        /// Согласие с Пользовательским соглашением (обязательно)
+        /// </summary>
+        public bool AcceptAgreement { get; set; }
     }
 }

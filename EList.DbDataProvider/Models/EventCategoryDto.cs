@@ -22,5 +22,8 @@ namespace EList.DbDataProvider.Models
 
         [Column("color")]
         public string Color { get; set; }
+
+        [Column("active")]
+        public bool Active { get; set; } = true;
     }
 }

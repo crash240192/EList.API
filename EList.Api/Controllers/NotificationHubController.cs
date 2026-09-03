@@ -149,6 +149,9 @@ namespace EList.Api.Controllers
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            if (!_accountDataHolder.IsPlatformAdminOrAbove)
+                return CommandResult<ConnectionStats>.Fail(EList.Common.Support.ErrorCode.AccessError, "Статистика соединений доступна только администраторам площадки");
+
             var result = _notificationService.GetConnectionStats();
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);

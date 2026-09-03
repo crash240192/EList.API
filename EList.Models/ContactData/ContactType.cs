@@ -34,5 +34,10 @@
         /// Флаг доступности типа контакта для рассылки уведомлений
         /// </summary>
         public bool AllowNotifications { get; set; }
+
+        /// <summary>
+        /// Активен ли тип контакта (soft-delete)
+        /// </summary>
+        public bool Active { get; set; } = true;
     }
 }

@@ -100,6 +100,8 @@ app.UseMiddleware<WebSocketsTokenHandlerMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.UseMiddleware<ReConsentMiddleware>();
+
 app.Use(async (context, next) =>
 {
     await next();

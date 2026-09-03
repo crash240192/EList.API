@@ -9,6 +9,8 @@ namespace EList.Repositories.Interfaces
         Task<ContactType?> GetContactTypeAsync(Guid id);
         Task UpdateContactTypeAsync(Guid id, ContactTypeRequest request);
 
+        Task DeleteContactTypeAsync(Guid id);
+
         Task<Guid> CreateContactAsync(ContactRequest request);
         Task<bool> CheckContactIsEmptyAsync(string contactValue, Guid contactType);
         Task UpdateContactAsync(Guid id, ContactRequest request);

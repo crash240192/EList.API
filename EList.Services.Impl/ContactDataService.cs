@@ -108,6 +108,27 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
+
+        public async Task<CommandResult> DeleteContactTypeAsync(Guid id)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteContactTypeAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (!_accountDataHolder.IsPlatformAdminOrAbove)
+                return CommandResult.Fail(ErrorCode.AccessError, "Удаление типов контактов доступно только администраторам");
+
+            var existing = await _contactDataRepository.GetContactTypeAsync(id);
+            if (existing == null)
+                return CommandResult.Fail(ErrorCode.ContactNotFound, "Тип контакта не найден");
+
+            await _contactDataRepository.DeleteContactTypeAsync(id);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
         #endregion
 
         #region contact data

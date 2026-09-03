@@ -9,11 +9,13 @@
   <ItemGroup>
     <None Remove="Migrations\InitialDatabase.sql" />
     <None Remove="Migrations\DevelopMigration.sql" />
+    <None Remove="Migrations\SoftDeleteCatalogs.sql" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Migrations\InitialDatabase.sql" />
     <EmbeddedResource Include="Migrations\DevelopMigration.sql" />
+    <EmbeddedResource Include="Migrations\SoftDeleteCatalogs.sql" />
   </ItemGroup>
 
   <ItemGroup>
