@@ -2,6 +2,7 @@
 
 > Первичный аудит: 31 августа 2026  
 > Актуализация: 3 сентября 2026 (`origin/develop` @ `0f57cf8`)  
+> Уточнения от владельца: 3 сентября 2026 (секреты через `.env` на проде; юр. документы в БД, не в git; rate limiter → P1)  
 > Рекомендуемый scope MVP v1: **бесплатная социальная платформа событий** (продажа билетов через API выключена)
 
 ---
@@ -30,8 +31,8 @@
 | Организации + модерация | 🟢 ~80% | 🟢 ~85% | Payout encryption |
 | Медиа | 🟡 ~50% | 🟢 ~85% | AlbumAccessValidator |
 | Платежи/билеты | 🔴 ~5% | 🔴 ~5% | Schema only; `ticketSalesEnabled=false` |
-| Юридика / compliance | 🟡 ~30% | 🟡 ~65% | Enforce + re-consent + export; нет текстов документов |
-| Production hardening | 🔴 ~20% | 🟡 ~60% | CORS/errors/CI/health; секреты всё ещё в git |
+| Юридика / compliance | 🟡 ~30% | 🟢 ~80% | Enforce + re-consent + export; документы в prod БД (не в git) |
+| Production hardening | 🔴 ~20% | 🟢 ~75% | CORS/errors/CI/health; prod secrets из `.env` |
 
 ---
 
@@ -51,7 +52,7 @@
 | **ContentReports / BugReports / PlatformRoles** | ✅ | |
 | **Notifications** | ✅ | Admin-only send/broadcast |
 | **SystemNotifications** | ✅ | |
-| **Agreements** | ✅/⚠️ | Enforcement есть; **текстов документов в репо/БД нет** |
+| **Agreements** | ✅ | Enforcement есть; тексты загружены в prod БД (в git не хранятся — ок) |
 | **Media** | ✅ | ACL через AlbumAccessValidator |
 | **Participations / Invitations** | ✅ | BW + visibility; нет notify об исключении |
 | **Wallets/Tariffs** | ⚠️ | CRUD есть; Deposite API нет; DebtCollector выкл. |
@@ -79,10 +80,9 @@
 - [x] **ConfigurationManager из host config** — env vars / `appsettings.{env}.json`
 - [x] **Health check** — `GET /health`, `GET /version`
 - [x] **CI build** — `.github/workflows/build.yml`
-- [ ] **Убрать секреты из `appsettings.json` + ротация** — БД, SMTP, SMS, DaData, filestorage, encryption salt всё ещё в репо
-- [ ] **Production encryption keys** — salt `"per rectum ad astra"`; задать `fieldKey`/`indexKey`, ротация
-- [ ] **Rate limiter multi-instance** — `EventCreateRateLimiter` всё ещё in-memory
-- [ ] **HTTPS / reverse proxy / HSTS** — операционный деплой
+- [x] **Prod secrets из `.env` / host config** — на проде секретное убрано из appsettings; подтягивается при деплое
+- [ ] **(опционально) Почистить секреты в git-истории / dev appsettings** — в репозитории всё ещё лежат plaintext значения; для prod не блокер, но риск утечки через историю/форки. Ротация ключей, если они когда-либо светились публично.
+- [ ] **HTTPS / reverse proxy / HSTS** — операционный деплой (если ещё не закрыто инфраструктурой)
 
 ### ⚖️ Юридика
 
@@ -92,17 +92,17 @@
 - [x] **Account deletion API** — `DELETE /api/accounts/me` (анонимизация + deactivate)
 - [x] **`documents/add` admin-only**
 - [x] **Баги AgreementsController** — agree не anonymous, возвращает результат сервиса
-- [ ] **Юридические тексты Policy / Consent / Agreement** — подготовить юристом и загрузить в `documents` (seed или admin)
-- [ ] **Договоры поручения с процессорами** — DaData, GreenSMS, Yandex SMTP, filestorage
-- [ ] **Контакт оператора / DPO** в Policy
-- [ ] **Углубить delete** — cascade/anonymize messages, media, agreements (сейчас soft anonymize person/contacts)
+- [x] **Юридические тексты Policy / Consent / Agreement** — загружены в prod БД; в git не дублируем (source of truth = `documents`)
+- [ ] **Договоры поручения с процессорами** — DaData, GreenSMS, Yandex SMTP, filestorage (бумажная/договорная работа, не код)
+- [ ] **Контакт оператора / DPO** в Policy (если ещё не указан в загруженном тексте)
+- [ ] **Углубить delete** — cascade/anonymize messages, media, agreements (сейчас soft anonymize person/contacts) → можно P1
 
 ### 🛡️ Возраст
 
 - [x] **TTL anonymous age configurable** — `agreements.anonymousAgeTtlHours` (default 24)
-- [ ] **Исправить `Age > 18` → `>= 18`** в `AccountDataHolder.AdultConfirmed`
-- [ ] **Age gate при регистрации** — сейчас только self-declaration для 18+/платных событий
-- [ ] **Зафиксировать в Policy**, что age = self-declaration
+- [ ] **Исправить `Age > 18` → `>= 18`** в `AccountDataHolder.AdultConfirmed` — в работе
+- [ ] **Age gate при регистрации** — сейчас только self-declaration для 18+/платных событий (P1, если Policy это покрывает)
+- [ ] **Зафиксировать в Policy**, что age = self-declaration (если ещё не зафиксировано)
 
 ### 🔧 Функциональные блокеры
 
@@ -112,23 +112,30 @@
 - [x] **Шифрование organization_payout**
 - [x] **Privacy ACL persons** — BirthDate/Gender/Patronymic скрыты; ФИО всё ещё видны всем
 - [x] **`ticketSalesEnabled: false`** — продажа билетов через API заблокирована
-- [ ] **Уведомления об исключении** из участников / BW (TODO в `ParticipationsService`)
-- [ ] **Список организаторов события** — TODO доступа в `EventOrganizatorsService.GetByEventIdAsync`
-- [ ] **Event-чаты в Conversations** — TODO byAccount/byEvent
+- [ ] **Уведомления об исключении** из участников / BW (TODO в `ParticipationsService`) → P1
+- [ ] **Список организаторов события** — TODO доступа в `EventOrganizatorsService.GetByEventIdAsync` → P1
+- [ ] **Event-чаты в Conversations** — TODO byAccount/byEvent → P1
 
 ### 📋 Операционка
 
+См. подробную расшифровку в разделе [Monitoring / backup / LICENSE](#ops-monitoring-backup-license) ниже.
+
 - [x] Health endpoint
 - [x] CI restore/build
-- [ ] **LICENSE**
-- [ ] **Deploy pipeline** (сейчас только build)
-- [ ] **Мониторинг / алерты** (5xx, DB, SMTP/SMS)
-- [ ] **Backup strategy** (PostgreSQL + filestorage)
-- [ ] **README** вместо GitLab template
+- [ ] **Мониторинг / алерты** — см. детали ниже
+- [ ] **Backup & restore** — см. детали ниже
+- [ ] **LICENSE** — см. детали ниже
+- [ ] **README** вместо GitLab template (желательно, не блокер)
 
 ---
 
 ## P1 — Второй порядок
+
+### Инфра (перенесено из P0)
+
+- [ ] **Rate limiter multi-instance** — `EventCreateRateLimiter` in-memory; на старте при одном инстансе достаточно; при scale-out → Redis/DB shared store
+- [ ] Углубить account delete (media/messages/agreements)
+- [ ] Notify об исключении / event-чаты в Conversations / GetByEventId ACL
 
 ### Функциональность (остатки кода)
 
@@ -168,13 +175,89 @@
 
 | Область | P0 остаток | P1 | v1.1+ |
 |---------|------------|----|-------|
-| Secrets / encryption keys | ❗ открыто | — | — |
-| Legal texts + DPO | ❗ открыто | — | ticketing agreement |
-| Age `>= 18` | ❗ открыто | age gate на signup | — |
-| Conversations event-chats | желательно | — | — |
-| Monitoring / backup / LICENSE | ❗ открыто | — | — |
+| Secrets (prod `.env`) | ✅ закрыто | опционально: чистка git history | — |
+| Legal texts в БД | ✅ закрыто | DPO/процессоры если не в тексте | ticketing agreement |
+| Age `>= 18` | ❗ в работе | age gate на signup | — |
+| Monitoring / backup / LICENSE | желательно до soft launch | — | — |
+| Rate limiter shared | — | ❗ при multi-instance | — |
+| Conversations event-chats | — | желательно | — |
 | Платежи | выкл. флагом | — | full stack |
 | Product UX (ниже) | — | discovery + reminders | tickets UX |
+
+---
+
+<a id="ops-monitoring-backup-license"></a>
+
+## Monitoring / backup / LICENSE — что имеется в виду
+
+Это не одна задача в коде, а **три операционных пакета**. Для MVP достаточно минимального набора; полный — по мере роста трафика.
+
+### 1. Monitoring (наблюдаемость + алерты)
+
+**Цель:** узнать о проблеме раньше пользователей.
+
+| Слой | Минимум для soft launch | Дальше (P1) |
+|------|-------------------------|-------------|
+| **Liveness** | Уже есть `GET /health` — дергать из LB / Docker / k8s probe каждые 10–30с | Readiness: проверка соединения с PostgreSQL (+ опционально filestorage) отдельным `/ready` |
+| **Метрики** | Счётчик 5xx / latency на reverse proxy (nginx/Caddy/Traefik access log) или простой uptime-check (UptimeRobot / Better Stack / Grafana Cloud free) на `/health` и на `https://tvoy-spot.ru` | Prometheus + `/metrics` (request duration, DB pool, WS connections) |
+| **Логи** | Централизованный сбор NLog (файл → stdout уже есть) в одно место: Docker logs / Loki / CloudWatch / journald | Алерт по паттернам: `Failed to call`, SMTP/SMS errors, spike `InternalError` |
+| **Алерты «болит»** | 1–2 канала (Telegram/email): API down > 2 мин; error rate > N%/5 мин | Отдельно: SMS-провайдер 4xx/5xx, DaData timeout, disk > 80%, PG connections |
+| **Бизнес-сигналы (опционально)** | — | Регистрации/день, create event fail, activation code fail rate |
+
+**Конкретные работы (чеклист):**
+- [ ] Uptime-check на `/eList/health` (или `/health` с учётом pathBase) + уведомление в Telegram/почту
+- [ ] Reverse proxy логирует status/latency; раз в день глазами или простой dashboard
+- [ ] Понимание, куда пишутся `logs/yyyy-MM-dd.log` на проде и сколько места занимают
+- [ ] (желательно) алерт на рост 5xx
+
+**Не требуется для MVP:** полный APM (AppInsights/Jaeger), distributed tracing, SLO dashboard.
+
+### 2. Backup (резервное копирование и восстановление)
+
+**Цель:** не потерять ПДн и контент при падении диска / ошибке миграции / ransomware.
+
+| Что бэкапить | Минимум | Проверка |
+|--------------|---------|----------|
+| **PostgreSQL** | Ежедневный logical dump (`pg_dump`) или snapshot тома; хранение ≥ 7 дней off-host (S3/другой сервер) | Раз в месяц: restore на staging и `SELECT count(*)` по `accounts`/`events` |
+| **Filestorage** | Копия object storage / volume с медиа (аватары, альбомы) с той же периодичностью | Выборочно открыть 2–3 файла после restore |
+| **Секреты / `.env`** | Отдельный сейф (1Password/Bitwarden/sealed secret), не только на сервере | Доступ у ≥ 2 человек |
+| **Точка отката миграций** | Перед каждой schema-migration — ручной dump | Документированный rollback |
+
+**Конкретные работы (чеклист):**
+- [ ] Cron/скрипт ночного `pg_dump` (custom или plain) → удалённое хранилище
+- [ ] Retention policy: например 7 daily + 4 weekly
+- [ ] Бэкап filestorage (rsync/S3 sync)
+- [ ] Письменный runbook: «как восстановить за ≤ 1–2 часа»
+- [ ] Один успешный drill restore до публичного анонса (или сразу после soft launch)
+
+**152-ФЗ / здравый смысл:** ПДн в бэкапах тоже ПДн — шифрование at-rest бэкапов и ограничение доступа.
+
+### 3. LICENSE (правовой статус кода репозитория)
+
+**Цель:** явно зафиксировать, **кому принадлежит код** и можно ли его копировать/форкать.
+
+| Вариант | Когда выбирать |
+|---------|----------------|
+| **Нет публичного LICENSE + private repo** | Коммерческий продукт: код не open source. Тогда LICENSE в git **не обязателен**; важнее NDA/договоры с подрядчиками и © в Policy |
+| **Proprietary LICENSE / «All rights reserved»** | Если репо когда-либо станет видимым: короткий файл «© … Все права защищены. Использование без согласия запрещено» |
+| **Open source (MIT/Apache-2.0)** | Только если сознательно открываете код |
+
+**Конкретные работы:**
+- [ ] Решить: репо остаётся private commercial → достаточно © в пользовательском соглашении / Policy; файл `LICENSE` опционален
+- [ ] Если репо public или есть внешние контрибьюторы → добавить явный `LICENSE` + CLA/условия вклада
+- [ ] Проверить, что сторонние NuGet-пакеты совместимы с выбранной моделью (обычно ок для proprietary backend)
+
+**Итог по LICENSE для EList:** скорее всего достаточно private repo + формулировки в Agreement/Policy; отдельный MIT/Apache не нужен, если не планируете open source.
+
+### Приоритет ops для soft launch
+
+```
+Must:   uptime-check /health + алерт «сервис лежит»
+Must:   ежедневный pg_dump off-host + понимание, как restore
+Should: бэкап filestorage + retention
+Nice:   LICENSE/© формулировка; README; deploy pipeline в CI
+Later:  Prometheus, ready-probe с DB, drill restore по расписанию
+```
 
 ---
 
@@ -259,26 +342,23 @@
 
 | # | Проблема | Где | Приоритет |
 |---|----------|-----|-----------|
-| 1 | Секреты в git | `appsettings.json` | 🔴 P0 |
-| 2 | Шуточный encryption salt | `encryption.salt` | 🔴 P0 |
-| 3 | Нет загруженных Policy/Consent/Agreement | таблица `documents` | 🔴 P0 |
-| 4 | `Age > 18` вместо `>= 18` | `AccountDataHolder.cs:66` | 🟡 P0 |
-| 5 | Rate limiter in-memory | `EventCreateRateLimiter` | 🟡 P0 (multi-node) |
-| 6 | Нет monitoring/backup/LICENSE | ops | 🟡 P0 |
-| 7 | Delete аккаунта не чистит media/messages | `AccountsService.DeleteMyAccountAsync` | 🟡 P0/P1 |
-| 8 | Платежи — только schema | `IOrdersDataProvider` | ⚪ v1.1 |
+| 1 | `Age > 18` вместо `>= 18` | `AccountDataHolder.cs:66` | 🟡 P0 (в работе) |
+| 2 | Monitoring / backup (минимум) | ops | 🟡 желательно до soft launch |
+| 3 | Секреты plaintext в git-истории / dev appsettings | репозиторий | ⚪ не блокер prod (prod на `.env`) |
+| 4 | Rate limiter in-memory | `EventCreateRateLimiter` | ⚪ P1 (при multi-instance) |
+| 5 | Delete аккаунта не чистит media/messages | `AccountsService` | ⚪ P1 |
+| 6 | Платежи — только schema | `IOrdersDataProvider` | ⚪ v1.1 |
 
 ---
 
-## Рекомендуемый порядок до закрытия P0
+## Рекомендуемый порядок до soft launch
 
 ```
-1. Ротация всех секретов + вынос в secrets/env; новые encryption keys
-2. Юр. тексты → upload documents → smoke re-consent
-3. Fix Age >= 18; DPO contact в Policy
-4. Monitoring + backups + LICENSE
-5. (желательно) Event-чаты в Conversations + notify об исключении
-6. Soft launch на tvoy-spot.ru
+1. Fix Age >= 18
+2. Минимум ops: uptime на /health + ежедневный pg_dump off-host
+3. (по желанию) бэкап filestorage, ©/LICENSE формулировка
+4. Soft launch на tvoy-spot.ru
+5. Итерация 2: shared rate limiter, event-чаты, notify об исключении, product UX
 ```
 
 ---
