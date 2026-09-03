@@ -1,89 +1,68 @@
 # EList 3.0.1 — Чеклист готовности к продакшн-релизу
 
-> Дата аудита: 31 августа 2026  
-> Ветка: `develop`  
-> Рекомендуемый scope MVP v1: **бесплатная социальная платформа событий** (без платёжного контура)
+> Первичный аудит: 31 августа 2026  
+> Актуализация: 3 сентября 2026 (`origin/develop` @ `0f57cf8`)  
+> Рекомендуемый scope MVP v1: **бесплатная социальная платформа событий** (продажа билетов через API выключена)
 
 ---
 
-## Обзор готовности
+## Что изменилось с 31 августа
 
-| Категория | Оценка | Комментарий |
-|-----------|--------|-------------|
-| Ядро (аккаунты, auth, события, подписки) | 🟢 ~75% | Рабочий happy path |
-| Социальное (участие, приглашения, чаты) | 🟡 ~60% | TODO по правам и BW-листам |
-| Организации + модерация | 🟢 ~80% | Сильная сторона |
-| Медиа | 🟡 ~50% | ~10 TODO по ACL |
-| Платежи/билеты | 🔴 ~5% | Только схема БД + repository |
-| Юридика / compliance | 🟡 ~30% | Инфраструктура есть, enforcement нет |
-| Production hardening | 🔴 ~20% | Секреты в репо, CORS, stack trace |
+С момента первого чеклиста закрыт большой блок P0 по hardening, ACL и compliance. Ключевые коммиты:
 
----
-
-## Карта модулей
-
-### ✅ Реализовано (пригодно для MVP с доработками)
-
-| Модуль | Эндпоинты | Статус |
-|--------|-----------|--------|
-| **Accounts** | create, getData, updateLocation | ✅ |
-| **Authorization** | login, activate, check, сброс пароля | ✅ |
-| **Events** | CRUD, search, categories/types, cancel | ✅ (delete категорий/типов — crash) |
-| **EventTemplates** | CRUD + search | ✅ |
-| **Subscriptions** | subscribe/unsubscribe, counts | ✅ |
-| **Rating** | vote, get, delete | ✅ |
-| **Organizations** | CRUD, members, legal, payout, verification, INN lookup | ✅ |
-| **ContentReports** | жалобы, очереди, penalties, resolve | ✅ |
-| **BugReports** | категории + отчёты | ✅ |
-| **PlatformRoles** | moderator/admin/superuser | ✅ |
-| **Notifications** | WebSocket + REST (my, read, send) | ✅ |
-| **SystemNotifications** | admin CRUD шаблонов, SMTP/SMS | ✅ |
-| **Agreements** | документы, age gate, user/org consent | ⚠️ инфраструктура без enforcement |
-
-### 🟡 Частично — нужно закрыть до prod
-
-| Модуль | Проблемы |
-|--------|----------|
-| **Media** | Нет ACL: любой может редактировать/смотреть чужие альбомы |
-| **Participations** | BW-листы не проверяются; нет уведомлений об исключении |
-| **Invitations** | BW-листы и права организации — TODO |
-| **Conversations** | Event-чаты не попадают в списки byAccount/byEvent |
-| **Persons** | `PUT update` закомментирован; валидация отключена |
-| **Contacts** | Валидация телефона — `NotImplementedException` |
-| **Wallets** | Deposite/Charge есть в сервисе, но не в API |
-| **Events** | DELETE categories/types → `NotImplementedException` |
-
-### 🔴 Не реализовано (можно отложить для MVP v1)
-
-| Модуль | Что есть в коде |
-|--------|-----------------|
-| **Payments/Orders/Tickets** | Таблицы + `IOrdersDataProvider`, модели, enum провайдеров — **нет контроллера/сервиса** |
-| **Payment webhooks** | Таблица `payment_webhook_events` — нет обработчиков |
-| **Auto-invitations** | Только таблицы в InitialDatabase.sql |
-| **DebtCollectorWorker** | Реализован, но `active: false` |
-| **Account deletion / data export** | Полностью отсутствует |
-| **Automated tests** | Нет test projects |
+| Коммит | Суть |
+|--------|------|
+| `581a9dc` … `219a012` | Person/contact/album/event/invitation validators + ACL |
+| `f3a45ed` | CORS whitelist, safe errors, admin roles, payout crypto, `/health` |
+| `80a4bc4` | Soft-delete каталогов, consent при регистрации, delete/export аккаунта, `ticketSalesEnabled` |
+| `6102148` | `ReConsentMiddleware` |
+| `566d96d` | Configurable age TTL, PII redaction в логах, GitHub Actions CI |
+| `902616b` / `0f57cf8` | Host configuration + CI sibling layout для EList.Common |
 
 ---
 
-## Scope первой итерации (MVP v1)
+## Обзор готовности (актуально)
 
-### В scope v1
+| Категория | Было (31.08) | Сейчас (03.09) | Комментарий |
+|-----------|--------------|----------------|-------------|
+| Ядро (аккаунты, auth, события, подписки) | 🟢 ~75% | 🟢 ~85% | Consent, delete/export, validators |
+| Социальное (участие, приглашения, чаты) | 🟡 ~60% | 🟢 ~80% | BW/access validators; чаты event — TODO |
+| Организации + модерация | 🟢 ~80% | 🟢 ~85% | Payout encryption |
+| Медиа | 🟡 ~50% | 🟢 ~85% | AlbumAccessValidator |
+| Платежи/билеты | 🔴 ~5% | 🔴 ~5% | Schema only; `ticketSalesEnabled=false` |
+| Юридика / compliance | 🟡 ~30% | 🟡 ~65% | Enforce + re-consent + export; нет текстов документов |
+| Production hardening | 🔴 ~20% | 🟡 ~60% | CORS/errors/CI/health; секреты всё ещё в git |
 
-- [ ] Регистрация → активация → профиль → поиск/создание **бесплатных** событий
-- [ ] Участие, приглашения, подписки, рейтинг
-- [ ] Медиа (фото событий, аватары)
-- [ ] Чаты и push-уведомления
-- [ ] Организации (информационные, без `can_sell_tickets`)
-- [ ] Модерация + bug reports
-- [ ] Юридические документы + обязательное согласие при регистрации
+---
 
-### За пределами v1 (v1.1+)
+## Карта модулей (актуально)
 
-- [ ] Платные события и билеты (YooKassa/TBank)
-- [ ] Кошельки с пополнением
-- [ ] Auto-invitations
-- [ ] Premium-тарифы и DebtCollector
+### ✅ Готово к MVP
+
+| Модуль | Статус | Примечание |
+|--------|--------|------------|
+| **Accounts** | ✅ | + `DELETE /me`, `GET /me/export`, consent flags на create |
+| **Authorization** | ✅ | |
+| **Events** | ✅ | Soft-delete categories/types; geo search |
+| **EventTemplates** | ✅ | |
+| **Subscriptions** | ✅ | Access validators |
+| **Rating** | ✅ | |
+| **Organizations** | ✅ | Payout encrypted; verification via DaData |
+| **ContentReports / BugReports / PlatformRoles** | ✅ | |
+| **Notifications** | ✅ | Admin-only send/broadcast |
+| **SystemNotifications** | ✅ | |
+| **Agreements** | ✅/⚠️ | Enforcement есть; **текстов документов в репо/БД нет** |
+| **Media** | ✅ | ACL через AlbumAccessValidator |
+| **Participations / Invitations** | ✅ | BW + visibility; нет notify об исключении |
+| **Wallets/Tariffs** | ⚠️ | CRUD есть; Deposite API нет; DebtCollector выкл. |
+
+### 🔴 Вне MVP v1
+
+| Модуль | Статус |
+|--------|--------|
+| Payments / Orders / Tickets / Refunds / Webhooks | Schema + `IOrdersDataProvider`, нет API |
+| Auto-invitations | Только таблицы |
+| Automated tests | Нет test projects |
 
 ---
 
@@ -91,155 +70,215 @@
 
 ### 🔒 Инфраструктура и безопасность
 
-- [ ] **Убрать все секреты из `appsettings.json`** — сейчас в репозитории лежат пароли БД, SMTP, SMS API, DaData, filestorage token, encryption salt
-- [ ] **Secrets manager / env vars** — доработать `ConfigurationManager` (сейчас читает только `appsettings.json`)
-- [ ] **CORS** — заменить `SetIsOriginAllowed(origin => true)` на whitelist доменов клиентов
-- [ ] **Stack trace в ответах** — убрать из `ErrorHandlingMiddleware` для prod (сейчас отдаётся клиенту)
-- [ ] **Media ACL** — закрыть ~10 TODO в `MediaService` (утечка/редактирование чужих альбомов)
-- [ ] **Role checks** — `notifications/send`, `notifications/broadcast`, `agreements/documents/add` доступны любому авторизованному пользователю
-- [ ] **Rate limiter** — `EventCreateRateLimiter` in-memory; для multi-instance нужен Redis/DB
-- [ ] **Исправить `ErrorCode.AgreementNotFound`** — используется в `AgreementService`, но отсутствует в enum
-- [ ] **HTTPS + reverse proxy** — cert management, HSTS
-- [ ] **Ротация encryption keys** — заменить salt `"per rectum ad astra"` на production-grade ключи
+- [x] **CORS whitelist** — `AllowedOrigins` → `tvoy-spot.ru` (`Program.cs`)
+- [x] **Stack trace в ответах** — только Development (`ErrorHandlingMiddleware`)
+- [x] **Media ACL** — `AlbumAccessValidator` + event visibility
+- [x] **Role checks** — notifications send/broadcast; `documents/add`
+- [x] **ErrorCode.AgreementNotFound** — добавлен в EList.Common
+- [x] **PII redaction в API-логах** — `LoggerHandlerWebApiFilter.RedactJson`
+- [x] **ConfigurationManager из host config** — env vars / `appsettings.{env}.json`
+- [x] **Health check** — `GET /health`, `GET /version`
+- [x] **CI build** — `.github/workflows/build.yml`
+- [ ] **Убрать секреты из `appsettings.json` + ротация** — БД, SMTP, SMS, DaData, filestorage, encryption salt всё ещё в репо
+- [ ] **Production encryption keys** — salt `"per rectum ad astra"`; задать `fieldKey`/`indexKey`, ротация
+- [ ] **Rate limiter multi-instance** — `EventCreateRateLimiter` всё ещё in-memory
+- [ ] **HTTPS / reverse proxy / HSTS** — операционный деплой
 
-### ⚖️ Юридика (обязательно для публичного запуска в РФ)
+### ⚖️ Юридика
 
-- [ ] **Подготовить и опубликовать юридические тексты** (юрист):
-  - [ ] Политика обработки ПДн (`Policy`)
-  - [ ] Согласие на обработку ПДн (`Consent`)
-  - [ ] Пользовательское соглашение (`Agreement`)
-- [ ] **Seed migration или admin upload** — загрузить документы v1.0.0 в таблицу `documents`
-- [ ] **Enforce consent при регистрации** — блокировать `POST /accounts/create` без принятия Policy + Consent + Agreement
-- [ ] **Middleware re-consent** — при новой версии документа блокировать API до повторного согласия
-- [ ] **Account deletion API** — право на удаление (152-ФЗ ст. 14, GDPR Art. 17): cascade/anonymization person, contacts, messages, media, agreements
-- [ ] **Data export API** — machine-readable dump данных пользователя (GDPR Art. 20)
-- [ ] **Защитить `POST documents/add`** — только admin/superuser
-- [ ] **Исправить баги AgreementsController** — `SaveUserAgreementAsync` с `[AllowAnonymous]` но требует AccountId; контроллер игнорирует результат сервиса
-- [ ] **Privacy notice для процессоров** — DaData, GreenSMS, Yandex SMTP, filestorage (договоры поручения обработки ПДн)
-- [ ] **Контакт оператора / DPO** — email в Policy и в API/docs
+- [x] **Enforce consent при регистрации** — `AcceptPolicy/Consent/Agreement`
+- [x] **Re-consent middleware** — `features.reConsentEnforcementEnabled`
+- [x] **Data export API** — `GET /api/accounts/me/export`
+- [x] **Account deletion API** — `DELETE /api/accounts/me` (анонимизация + deactivate)
+- [x] **`documents/add` admin-only**
+- [x] **Баги AgreementsController** — agree не anonymous, возвращает результат сервиса
+- [ ] **Юридические тексты Policy / Consent / Agreement** — подготовить юристом и загрузить в `documents` (seed или admin)
+- [ ] **Договоры поручения с процессорами** — DaData, GreenSMS, Yandex SMTP, filestorage
+- [ ] **Контакт оператора / DPO** в Policy
+- [ ] **Углубить delete** — cascade/anonymize messages, media, agreements (сейчас soft anonymize person/contacts)
 
-### 🛡️ Возрастные ограничения
+### 🛡️ Возраст
 
-- [ ] **Исправить `Age > 18` → `>= 18`** в `EventsService` (пользователь ровно 18 лет блокируется)
-- [ ] **Обязательный age gate** перед регистрацией или созданием события
-- [ ] **Решить TTL anonymous agreement (1 час)** — слишком короткий для UX; сделать persistent или привязать к сессии
-- [ ] **Документировать self-declaration** — юридически зафиксировать, что верификация возраста = галочка, не документ
+- [x] **TTL anonymous age configurable** — `agreements.anonymousAgeTtlHours` (default 24)
+- [ ] **Исправить `Age > 18` → `>= 18`** в `AccountDataHolder.AdultConfirmed`
+- [ ] **Age gate при регистрации** — сейчас только self-declaration для 18+/платных событий
+- [ ] **Зафиксировать в Policy**, что age = self-declaration
 
 ### 🔧 Функциональные блокеры
 
-- [ ] **DELETE eventCategories/eventTypes** — реализовать или убрать endpoint (сейчас `NotImplementedException`)
-- [ ] **Валидация телефона** — `ContactDataValidator.ValidatePhoneNumber` бросает exception
-- [ ] **BW-листы в Invitations/Participations** — enforce при invite/participate
-- [ ] **Проверки прав организатора** — TODO в ParticipationsService, EventOrganizatorsService
-- [ ] **Шифрование payout-данных** — `organization_payout` (bank_account, BIK) хранится в plaintext
-- [ ] **Privacy ACL на `GET /persons/get/{accountId}`** — доступ к чужим PII без проверки
-- [ ] **Отключить платные события в v1** — feature flag `paidEventsEnabled: false`
+- [x] **Soft-delete eventCategories / eventTypes / contactTypes**
+- [x] **Валидация телефона/email** — `ContactValidator`
+- [x] **BW-листы + visibility** в invitations/participations
+- [x] **Шифрование organization_payout**
+- [x] **Privacy ACL persons** — BirthDate/Gender/Patronymic скрыты; ФИО всё ещё видны всем
+- [x] **`ticketSalesEnabled: false`** — продажа билетов через API заблокирована
+- [ ] **Уведомления об исключении** из участников / BW (TODO в `ParticipationsService`)
+- [ ] **Список организаторов события** — TODO доступа в `EventOrganizatorsService.GetByEventIdAsync`
+- [ ] **Event-чаты в Conversations** — TODO byAccount/byEvent
 
 ### 📋 Операционка
 
-- [ ] **LICENSE** — файл отсутствует
-- [ ] **CI/CD pipeline** — нет GitLab CI config в репо
-- [ ] **Health check endpoint** — для k8s/load balancer
-- [ ] **Мониторинг** — алерты на 5xx, DB connection, SMS/SMTP failures
-- [ ] **Backup strategy** — PostgreSQL + filestorage
-- [ ] **Логирование PII** — audit: не логировать plaintext email/phone в NLog
+- [x] Health endpoint
+- [x] CI restore/build
+- [ ] **LICENSE**
+- [ ] **Deploy pipeline** (сейчас только build)
+- [ ] **Мониторинг / алерты** (5xx, DB, SMTP/SMS)
+- [ ] **Backup strategy** (PostgreSQL + filestorage)
+- [ ] **README** вместо GitLab template
 
 ---
 
-## P1 — Второй порядок (после v1 / параллельно)
+## P1 — Второй порядок
 
-### Функциональность
+### Функциональность (остатки кода)
 
-- [ ] **Person update endpoint** — раскомментировать `PUT /persons/update`
-- [ ] **Media: `setParameters` для альбомов** — закомментированный endpoint
-- [ ] **Event-чаты в Conversations** — TODO в byAccount/byEvent
-- [ ] **Уведомления об исключении** из BW-листа / участников
-- [ ] **Invitations: заполнить `result.Event`** — TODO в repository
-- [ ] **Premium-параметры событий** — валидация по тарифу
-- [ ] **Wallets Deposite API** — если нужен ручной billing до платёжного провайдера
-- [ ] **DebtCollectorWorker** — включить после тестирования тарифной логики
-- [ ] **Auto-invitations** — реализовать поверх существующих таблиц
-- [ ] **Локализация** — `localization.enabled: false`, подготовить i18n
+- [ ] Person `PUT update` (если ещё закомментирован)
+- [ ] Media album `setParameters`
+- [ ] Invitations: заполнить `result.Event`
+- [ ] Premium-параметры событий по тарифу
+- [ ] Wallets Deposite API / DebtCollector
+- [ ] Auto-invitations
+- [ ] Локализация (`localization.enabled: false`)
+- [ ] Swagger v3
+- [ ] Route conflict `WalletsController.GetWalletAsync` (`[HttpGet("/{walletId}")]`)
+- [ ] Порядок таблиц в `InitialDatabase.sql` для fresh install
+- [ ] Unit/integration smoke tests (auth, events, agreements)
 
-### Платежи (v1.1 — отдельный релиз)
+### Платежи (v1.1)
 
-- [ ] **OrdersService + PaymentsController** — create order, initiate payment
-- [ ] **Webhook controller** — YooKassa/TBank, idempotency через `payment_webhook_events`
-- [ ] **Tickets API** — issue, validate, mark used
-- [ ] **Refunds** — partial/full
-- [ ] **TicketingAgreement** — юридический документ для организаций с `can_sell_tickets`
-- [ ] **54-ФЗ / онлайн-касса** — интеграция с фискализацией
-- [ ] **Organization onboarding** — payment provider seller ID flow
+- [ ] OrdersService + PaymentsController
+- [ ] Webhook controller (YooKassa/TBank) + idempotency
+- [ ] Tickets API (issue / validate / used)
+- [ ] Refunds
+- [ ] TicketingAgreement
+- [ ] 54-ФЗ / онлайн-касса
+- [ ] Organization payment-provider onboarding
 
-### Юридика / compliance (P1)
+### Compliance (P1)
 
-- [ ] **Отзыв согласия** — механизм withdraw consent + последствия
-- [ ] **Retention policy** — автоочистка: inactive tokens, anonymous_age_agreements, logs
-- [ ] **Appeal workflow** — user-facing обжалование модерационных санкций
-- [ ] **Audit log staff-доступа к PII**
-- [ ] **Cookie policy** — на стороне web-клиента (backend N/A для mobile API)
-- [ ] **Transparency report** — если целевой рынок EU (DSA)
-
-### Качество и DX
-
-- [ ] **Unit/integration tests** — хотя бы smoke для auth, events, agreements
-- [ ] **Swagger v3** — сейчас SerializeAsV2
-- [ ] **README** — заменить GitLab template на документацию проекта
-- [ ] **Исправить route conflict** — `WalletsController.GetWalletAsync` с абсолютным `[HttpGet("/{walletId}")]`
-- [ ] **Миграции** — исправить порядок таблиц в InitialDatabase.sql для fresh install
+- [ ] Отзыв согласия (withdraw)
+- [ ] Retention / purge (tokens, anonymous age, logs)
+- [ ] Appeal workflow для sanctions
+- [ ] Audit log staff-доступа к PII
+- [ ] Cookie policy (web-клиент)
 
 ---
 
 ## Сводная матрица по волнам
 
-| Область | P0 (до prod) | P1 (после prod) | v1.1+ |
-|---------|-------------|-----------------|-------|
-| Регистрация + auth | ✅ + enforce consent | person update | — |
-| Бесплатные события | ✅ + fix deletes | premium params | — |
-| Участие/приглашения | ✅ + BW enforce | notifications | auto-invite |
-| Медиа | ✅ + ACL | album params | — |
-| Организации | ✅ (info only) | — | verified + tickets |
-| Модерация | ✅ | appeal flow | AI moderation |
-| Платежи | ❌ disable | — | full stack |
-| Юридика | ✅ docs + delete/export | retention, withdraw | ticketing agreement |
-| Infra security | ✅ all items | monitoring | multi-region |
+| Область | P0 остаток | P1 | v1.1+ |
+|---------|------------|----|-------|
+| Secrets / encryption keys | ❗ открыто | — | — |
+| Legal texts + DPO | ❗ открыто | — | ticketing agreement |
+| Age `>= 18` | ❗ открыто | age gate на signup | — |
+| Conversations event-chats | желательно | — | — |
+| Monitoring / backup / LICENSE | ❗ открыто | — | — |
+| Платежи | выкл. флагом | — | full stack |
+| Product UX (ниже) | — | discovery + reminders | tickets UX |
 
 ---
 
-## Критические находки в коде
+## Продуктовый бэклог: чего нет, но было бы полезно пользователю
 
-| # | Проблема | Файл / место | Приоритет |
-|---|----------|--------------|-----------|
-| 1 | Секреты в git (БД, SMTP, SMS, DaData, filestorage) | `EList.Api/appsettings.json` | 🔴 P0 |
-| 2 | Media ACL — ~10 TODO без проверки владельца/доступа | `EList.Services.Impl/MediaService.cs` | 🔴 P0 |
-| 3 | `ErrorCode.AgreementNotFound` не в enum | `AgreementService.cs` vs `ErrorCodes.cs` | 🔴 P0 |
-| 4 | CORS allow-all + credentials | `EList.Api/Program.cs` | 🔴 P0 |
-| 5 | Stack trace в HTTP-ответах | `EList.Api/Middleware/ErrorHandlingMiddleware.cs` | 🔴 P0 |
-| 6 | DELETE categories/types → NotImplementedException | `EventsMetadataDataProvider.cs` | 🟡 P0 |
-| 7 | Валидация телефона → NotImplementedException | `ContactDataValidator.cs` | 🟡 P0 |
-| 8 | Платежи — только schema, нет API | `DevelopMigration.sql`, `IOrdersDataProvider` | ⚪ v1.1 |
+Ниже — не блокеры релиза, а **ценность для пользователя** относительно текущего API. Сгруппировано по приоритету для роста продукта после soft launch.
 
----
+### 🔥 Высокая ценность (быстро закрывает «дыры» в опыте)
 
-## Рекомендуемый порядок работ
+| Фича | Зачем пользователю | База в коде |
+|------|--------------------|-------------|
+| **Лента / «мои события»** (upcoming / past / organizing / invited) | Сейчас есть search + participation, но нет удобного personal calendar feed | participations, invitations, events |
+| **Напоминания о событии** (T−24h / T−1h) | Снижает no-show; критично для офлайн-встреч | SystemNotifications + NotificationsService |
+| **Mobile push (FCM/APNs)** | In-app + WebSocket работают только при открытом клиенте | Notification hub; нет device tokens |
+| **Избранное / «хочу пойти»** (wishlist без commit) | Ниже порог, чем participate; помогает организатору видеть интерес | нет сущности |
+| **Шаринг / deep links** (`tvoy-spot.ru/e/{id}`) | Виральность; без этого рост только изнутри приложения | публичный get/search уже есть |
+| **Профиль организатора + история прошедших событий** | Доверие до участия (рейтинг уже есть) | Rating + Events + Organizations |
+| **Блокировка пользователя (user-level block)** | Сейчас только event BW-листы и модерация; нет «не видеть этого человека» | BW на уровне события |
+
+### 🗺️ Discovery и гео
+
+| Фича | Зачем | База |
+|------|-------|------|
+| **Карта событий / clusters** | Geo search (`Latitude/Longitude/LocationRange`) уже есть — нужен UX слой | EventsSearchRequest + PostGIS |
+| **«Рядом со мной» + фильтр «сегодня / выходные»** | Главный entrypoint для casual user | search + `updateLocation` |
+| **Рекомендации** (по подпискам, прошлым категориям, geo) | Retention после первой недели | subscriptions, participations, categories |
+| **Тренды / подборки редакции** | Холодный старт без графа друзей | system notifications / admin tools |
+
+### 👥 Социальный слой
+
+| Фича | Зачем | База |
+|------|-------|------|
+| **Друзья / адресная книга контактов платформы** | Приглашения сейчас по accountId — без discovery «кого позвать» | invitations, contacts |
+| **Совместные друзья на событии** («идут 3 ваших подписки») | Сильный конверсионный сигнал | subscriptions + participations |
+| **Публичный / приватный профиль** (гранулярнее Show-флагов) | Privacy + social proof | PersonAccessValidator |
+| **Реакции / RSVP статусы** (going / maybe / interested) | Гибче, чем binary participate | participations |
+| **Event-чат в списках бесед** | Уже TODO — без этого чат события «теряется» | ConversationsController |
+
+### 🗓️ Организатору
+
+| Фича | Зачем | База |
+|------|-------|------|
+| **Чек-ин участников (QR / код)** | Контроль входа на офлайн-ивент | tickets schema почти готова |
+| **Аналитика события** (views → invites → participates → no-show) | Понятно, что работает | частично notifications/participations |
+| **Повтор события из шаблона в 1 тап** | Templates уже есть — нужен UX «duplicate last» | EventTemplates |
+| **Co-hosts права** (уже assign organizators) + делегирование модерации чата | Масштаб команд | EventOrganizators |
+| **Рассылка участникам** (email/push) с лимитами | Сейчас broadcast только platform admin | NotificationsService |
+| **Лист ожидания** при лимите мест | Нет waitlist при MaxParticipants | participations |
+
+### 🎫 Монетизация (после v1.1)
+
+| Фича | Зачем |
+|------|-------|
+| Покупка билета + PDF/Wallet pass | Core paid UX |
+| Промокоды / early bird | Конверсия |
+| Донаты / «поддержка организатора» | Для бесплатных ивентов |
+| Подписка организатора (тарифы уже в wallets) | B2B revenue без ticketing |
+
+### ♿ Доверие и качество
+
+| Фича | Зачем |
+|------|-------|
+| Верифицированный организатор badge (уже есть org verification) — показать в UI | Trust |
+| Отзывы текстом к рейтингу (сейчас vote без review body?) | Качество сигналов |
+| Appeal для пользователя после бана | Fairness + support load |
+| Онбординг: интересы → первые 5 событий рядом | Activation |
+
+### Рекомендуемый product-порядок после soft launch
 
 ```
-Фаза 1 — Блокеры безопасности:
-  Secrets → CORS → stack trace → Media ACL → AgreementNotFound fix
+1. Мои события + напоминания + push        → retention
+2. Deep links + карта «рядом»              → acquisition
+3. Wishlist / RSVP maybe + social proof    → conversion
+4. Event-чаты в inbox + user block         → safety & UX polish
+5. Организаторская аналитика + waitlist    → supply-side
+6. Ticketing v1.1                          → monetization
+```
 
-Фаза 2 — Compliance:
-  Legal docs (юрист) → seed documents → enforce consent middleware
-  → Account deletion → Data export → Age logic fix
+---
 
-Фаза 3 — Функциональные дыры:
-  BW-lists enforce → DELETE categories fix → Phone validation
-  → Organizer permission checks → Role checks на admin endpoints
+## Критические находки (оставшиеся)
 
-Фаза 4 — Операционка:
-  Health check → CI/CD → Monitoring → Backup strategy
+| # | Проблема | Где | Приоритет |
+|---|----------|-----|-----------|
+| 1 | Секреты в git | `appsettings.json` | 🔴 P0 |
+| 2 | Шуточный encryption salt | `encryption.salt` | 🔴 P0 |
+| 3 | Нет загруженных Policy/Consent/Agreement | таблица `documents` | 🔴 P0 |
+| 4 | `Age > 18` вместо `>= 18` | `AccountDataHolder.cs:66` | 🟡 P0 |
+| 5 | Rate limiter in-memory | `EventCreateRateLimiter` | 🟡 P0 (multi-node) |
+| 6 | Нет monitoring/backup/LICENSE | ops | 🟡 P0 |
+| 7 | Delete аккаунта не чистит media/messages | `AccountsService.DeleteMyAccountAsync` | 🟡 P0/P1 |
+| 8 | Платежи — только schema | `IOrdersDataProvider` | ⚪ v1.1 |
 
-После soft launch:
-  P1 items → Payments v1.1 (отдельный epic)
+---
+
+## Рекомендуемый порядок до закрытия P0
+
+```
+1. Ротация всех секретов + вынос в secrets/env; новые encryption keys
+2. Юр. тексты → upload documents → smoke re-consent
+3. Fix Age >= 18; DPO contact в Policy
+4. Monitoring + backups + LICENSE
+5. (желательно) Event-чаты в Conversations + notify об исключении
+6. Soft launch на tvoy-spot.ru
 ```
 
 ---
