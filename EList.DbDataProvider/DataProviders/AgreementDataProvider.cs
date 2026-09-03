@@ -16,7 +16,17 @@ namespace EList.DbDataProvider.DataProviders
         #region anonymous agreements
         public async Task<AnonymousAgeAgreementDto> GetAnonymousAgeAgreementAsync(string jwt)
         {
-            var threshold = DateTimeOffset.UtcNow.AddHours(-1);
+            var hours = 1;
+            if (EList.Common.Configuration.ConfigurationManager.AppSettings.Contains("agreements:anonymousAgeTtlHours")
+                && int.TryParse(
+                    EList.Common.Configuration.ConfigurationManager.AppSettings["agreements:anonymousAgeTtlHours"],
+                    out var configuredHours)
+                && configuredHours > 0)
+            {
+                hours = configuredHours;
+            }
+
+            var threshold = DateTimeOffset.UtcNow.AddHours(-hours);
             var item = await _connection.AnonymousAgeAgreements.FirstOrDefaultAsync(i => i.Jwt == jwt && i.AgreementDate >= threshold);
             return item;
         }

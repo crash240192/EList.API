@@ -1,0 +1,40 @@
+name: Build
+
+on:
+  push:
+    branches: [develop, main, "cursor/**"]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout API
+        uses: actions/checkout@v4
+
+      # ProjectReference paths are ../../EList.Common/... from repo projects
+      # (sibling of the API repo root).
+      - name: Checkout Common
+        uses: actions/checkout@v4
+        with:
+          repository: crash240192/EList.Common
+          ref: develop
+          path: _common_checkout
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Link Common as sibling
+        run: |
+          ln -sfn "$GITHUB_WORKSPACE/_common_checkout" "$(dirname "$GITHUB_WORKSPACE")/EList.Common"
+          test -f "$(dirname "$GITHUB_WORKSPACE")/EList.Common/EList.Common/EList.Common.csproj"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "6.0.x"
+
+      - name: Restore
+        run: dotnet restore EList.sln
+
+      - name: Build
+        run: dotnet build EList.sln -c Release --no-restore
