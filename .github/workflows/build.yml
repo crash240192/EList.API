@@ -13,20 +13,21 @@ jobs:
       - name: Checkout API
         uses: actions/checkout@v4
 
-      # ProjectReference paths are ../../EList.Common/... from repo projects
-      # (sibling of the API repo root).
+      # ProjectReference paths are ../../EList.Common/... from API projects
+      # (sibling of the API repo root). Symlinks break MSBuild path resolution
+      # inside Common itself, so move the checkout to a real sibling directory.
       - name: Checkout Common
         uses: actions/checkout@v4
         with:
           repository: crash240192/EList.Common
           ref: develop
           path: _common_checkout
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Link Common as sibling
+      - name: Place Common as sibling
         run: |
-          ln -sfn "$GITHUB_WORKSPACE/_common_checkout" "$(dirname "$GITHUB_WORKSPACE")/EList.Common"
+          mv "$GITHUB_WORKSPACE/_common_checkout" "$(dirname "$GITHUB_WORKSPACE")/EList.Common"
           test -f "$(dirname "$GITHUB_WORKSPACE")/EList.Common/EList.Common/EList.Common.csproj"
+          test -f "$(dirname "$GITHUB_WORKSPACE")/EList.Common/EList.Sms/EList.Sms.csproj"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
