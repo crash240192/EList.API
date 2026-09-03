@@ -163,6 +163,36 @@ namespace EList.Api.Controllers.ContactData
             }
         }
 
+        /// <summary>
+        /// Soft-delete типа контакта (active = false)
+        /// </summary>
+        [HttpDelete("contactTypes/delete/{id}")]
+        public async Task<CommandResult> DeleteContactTypeAsync(Guid id)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DeleteContactTypeAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _contactDataService.DeleteContactTypeAsync(id);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
 
 
         /// <summary>

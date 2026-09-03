@@ -23,6 +23,9 @@ namespace EList.DbDataProvider.Models
         [Column("category_id")]
         public Guid EventCategoryId { get; set; }
 
+        [Column("active")]
+        public bool Active { get; set; } = true;
+
         [Association(ThisKey = nameof(EventCategoryId), OtherKey = nameof(EventCategoryDto.Id))]
         public EventCategoryDto EventCategory { get; set; }
 

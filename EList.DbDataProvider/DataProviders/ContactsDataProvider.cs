@@ -20,6 +20,7 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<Guid> CreateContactTypeAsync(ContactTypeDto item)
         {
+            item.Active = true;
             var result = (Guid)await _connection.InsertWithIdentityAsync(item);
             return result;
         }
@@ -37,7 +38,9 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task DeleteContactTypeAsync(Guid id)
         {
-            throw new NotImplementedException();
+            await _connection.ContactTypes.Where(i => i.Id == id)
+                .Set(i => i.Active, false)
+                .UpdateAsync();
         }
 
         public async Task<ContactTypeDto?> GetContactTypeAsync(Guid id)
@@ -48,7 +51,9 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<List<ContactTypeDto>> GetAllContactTypesAsync()
         {
-            var items = await _connection.ContactTypes.ToListAsync();
+            var items = await _connection.ContactTypes
+                .Where(i => i.Active)
+                .ToListAsync();
             return items;
         }
 

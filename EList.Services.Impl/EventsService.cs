@@ -231,6 +231,16 @@ namespace EList.Services.Impl
             if (!typesError.Success)
                 return typesError;
 
+            if (typeIds != null)
+            {
+                foreach (var typeId in typeIds)
+                {
+                    var type = await _eventsMetadataRepository.GetEventTypeAsync(typeId);
+                    if (type == null || !type.Active)
+                        return CommandResult.Fail(ErrorCode.EventTypeNotFound, $"Тип события '{typeId}' не найден или отключён");
+                }
+            }
+
             await _eventsMetadataRepository.BindEventTypesAsync(eventId, typeIds);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -436,6 +446,19 @@ namespace EList.Services.Impl
         {
             if (!ticketsEnabled)
                 return null;
+
+            var ticketSalesGloballyEnabled = true;
+            if (ConfigurationManager.AppSettings.Contains("features:ticketSalesEnabled")
+                && bool.TryParse(ConfigurationManager.AppSettings["features:ticketSalesEnabled"], out var flag))
+            {
+                ticketSalesGloballyEnabled = flag;
+            }
+
+            if (!ticketSalesGloballyEnabled)
+            {
+                return CommandResult.Fail(ErrorCode.InvalidValue,
+                    "Продажа билетов временно отключена. Можно указать стоимость в анонсе, но включить продажу билетов нельзя.");
+            }
 
             var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
             var organizationIds = organizators?

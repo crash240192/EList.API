@@ -34,5 +34,10 @@
         /// Цвет категории
         /// </summary>
         public string Color { get; set; }
+
+        /// <summary>
+        /// Активна ли категория (soft-delete)
+        /// </summary>
+        public bool Active { get; set; } = true;
     }
 }

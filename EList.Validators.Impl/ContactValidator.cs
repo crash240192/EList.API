@@ -45,6 +45,9 @@ namespace EList.Validators.Impl
             if (!IsValueValidForType(value, contactType))
                 return CommandResult.Fail(ErrorCode.InvalidValue, $"Значение контакта не соответствует типу \"{contactType.Name}\"");
 
+            if (!contactType.Active)
+                return CommandResult.Fail(ErrorCode.InvalidValue, $"Тип контакта \"{contactType.Name}\" отключён");
+
             var isAuthorizationContact = request.IsAuthorizationContact
                 || (existingContact?.IsAuthorizationContact ?? false);
 

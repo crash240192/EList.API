@@ -8,6 +8,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult<Guid?>> CreateContactTypeAsync(ContactTypeRequest request);
         Task<CommandResult<ContactType?>> GetContactTypeAsync(Guid id);
         Task<CommandResult> UpdateContactTypeAsync(Guid id, ContactTypeRequest request);
+        Task<CommandResult> DeleteContactTypeAsync(Guid id);
         Task<CommandResult<List<ContactType>>> GetAllContactTypesAsync();
 
         Task<CommandResult<Guid?>> CreateContactAsync(ContactRequest request);

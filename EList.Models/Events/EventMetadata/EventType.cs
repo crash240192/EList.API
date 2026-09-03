@@ -40,5 +40,9 @@
         /// </summary>
         public EventCategory EventCategory { get; set; }
 
+        /// <summary>
+        /// Активен ли тип (soft-delete)
+        /// </summary>
+        public bool Active { get; set; } = true;
     }
 }

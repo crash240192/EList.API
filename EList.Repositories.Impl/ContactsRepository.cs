@@ -61,6 +61,10 @@ namespace EList.Repositories.Impl
             await _contactDataProvider.UpdateContactTypeAsync(mappedRequest);
         }
 
+        public async Task DeleteContactTypeAsync(Guid id)
+        {
+            await _contactDataProvider.DeleteContactTypeAsync(id);
+        }
 
         public async Task<Guid> CreateContactAsync(ContactRequest request)
         {

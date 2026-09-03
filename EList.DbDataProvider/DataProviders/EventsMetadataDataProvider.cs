@@ -14,18 +14,22 @@ namespace EList.DbDataProvider.DataProviders
         #region eventType
         public async Task<Guid> CreateEventTypeAsync(EventTypeDto item)
         {
+            item.Active = true;
             var id = (Guid)await _connection.InsertWithIdentityAsync(item);
             return id;
         }
 
-        public Task DeleteEventTypeAsync(Guid id)
+        public async Task DeleteEventTypeAsync(Guid id)
         {
-            throw new NotImplementedException();
+            await _connection.EventTypes.Where(i => i.Id == id)
+                .Set(i => i.Active, false)
+                .UpdateAsync();
         }
 
         public async Task<List<EventTypeDto>?> GetAllEventTypesAsync()
         {
             var result = await _connection.EventTypes
+                .Where(i => i.Active)
                 .ToListAsync();
 
             return result;
@@ -56,7 +60,7 @@ namespace EList.DbDataProvider.DataProviders
         {
             var result = await _connection.EventTypes
                 .LoadWith(i => i.EventCategory)
-                .Where(i => i.EventCategoryId == categoryId)
+                .Where(i => i.EventCategoryId == categoryId && i.Active)
                 .ToListAsync();
 
             return result;
@@ -108,18 +112,28 @@ namespace EList.DbDataProvider.DataProviders
         #region eventCategory
         public async Task<Guid> CreateEventCategoryAsync(EventCategoryDto item)
         {
+            item.Active = true;
             var id = (Guid)await _connection.InsertWithIdentityAsync(item);
             return id;
         }
 
-        public Task DeleteEventCategoryAsync(Guid id)
+        public async Task DeleteEventCategoryAsync(Guid id)
         {
-            throw new NotImplementedException();
+            await _connection.EventCategories.Where(i => i.Id == id)
+                .Set(i => i.Active, false)
+                .UpdateAsync();
+
+            // Deactivate child types together with the category.
+            await _connection.EventTypes.Where(i => i.EventCategoryId == id)
+                .Set(i => i.Active, false)
+                .UpdateAsync();
         }
 
         public async Task<List<EventCategoryDto>> GetAllEventCategoriesAsync()
         {
-            var result = await _connection.EventCategories.ToListAsync();
+            var result = await _connection.EventCategories
+                .Where(i => i.Active)
+                .ToListAsync();
             return result;
         }
         
