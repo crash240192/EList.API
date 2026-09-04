@@ -57,6 +57,15 @@ namespace EList.Repositories.Impl
             return mappedResult;
         }
 
+        public async Task<EventsRatingItem?> GetAccountEventRatingAsync(Guid eventId, Guid accountId, EventRatingType ratingType)
+        {
+            var item = await _eventsRatingDataProvider.GetAccountEventRatingAsync(
+                eventId,
+                accountId,
+                _mapper.Map<DbDataProvider.Models.Enums.EventRatingType>(ratingType));
+            return _mapper.Map<EventsRatingItem?>(item);
+        }
+
         public async Task<double?> GetOrganizatorRatingAsync(Guid accountId)
         {
             var result = await _eventsRatingDataProvider.GetOrganizatorRatingAsync(accountId);

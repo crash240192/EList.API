@@ -112,5 +112,10 @@ namespace EList.Repositories.Impl
             var mappedRequest = _mapper.Map<MessageDto>(message);
             await _conversationsDataProvider.UpdateMessageAsync(mappedRequest);
         }
+
+        public async Task<List<Guid>> GetConversationAuthorAccountIdsAsync(Guid conversationId)
+        {
+            return await _conversationsDataProvider.GetConversationAuthorAccountIdsAsync(conversationId);
+        }
     }
 }
