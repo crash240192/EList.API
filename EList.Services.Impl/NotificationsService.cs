@@ -1503,6 +1503,44 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
+        public async Task<CommandResult> NotifyAgreementUpdateRequiredAsync(
+            DocumentType documentType,
+            string version,
+            List<Guid> accountIds)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyAgreementUpdateRequiredAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (accountIds == null || !accountIds.Any())
+                return CommandResult.OK;
+
+            var documentLabel = documentType switch
+            {
+                DocumentType.Policy => "Политика обработки ПДн",
+                DocumentType.Consent => "Согласие на обработку ПДн",
+                DocumentType.Agreement => "Пользовательское соглашение",
+                DocumentType.OrganizationAgreement => "Соглашение организации",
+                DocumentType.TicketingAgreement => "Соглашение о билетах",
+                _ => documentType.ToString()
+            };
+
+            var notifications = accountIds.Distinct().Select(accountId => BuildNotification(
+                accountId,
+                null,
+                _accountDataHolder.AccountId,
+                UserNotificationType.AgreementUpdateRequired,
+                "Обновлены юридические документы",
+                $"Появилась новая версия документа «{documentLabel}» (v{version}). Необходимо принять её, чтобы продолжить работу.",
+                new { DocumentType = documentType, Version = version })).ToList();
+
+            await PersistAndSendAsync(notifications);
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
         private async Task<CommandResult> NotifyOrganizationMemberChangeAsync(
             Guid organizationId,
             Guid accountId,
@@ -1957,54 +1995,5 @@ namespace EList.Services.Impl
                 CancellationToken.None);
         }
         #endregion private
-
-        /*
-        public async Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType)
-        {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(NotifyUserByContactAsync)}";
-
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-            var contacts = await _contactsRepository.GetAccountContactsAsync(tokenData.AccountId);
-
-            contacts = contacts?.Where(i => i.IsAuthorizationContact).ToList();
-
-            if (!contacts.NullSafeAny())
-                return CommandResult.Fail(ErrorCode.UserHasNoNecessaryContacts, "У пользователя отсутствует контакт для уведомления");
-
-            var tokens = new Dictionary<string, string>
-            {
-                { "#ACTIVATION_CODE#", tokenData.ActivationKey}
-            };
-
-            var contact = contacts.FirstOrDefault();
-
-            var notification = await _notificationsRepository.GetNotificationByTypeAsync(notificationType);
-
-            var isEmail = MailAddress.TryCreate(contact.Value, out var eMail);
-            if (isEmail)
-            {
-                var messageBody = _templateParser.Parse(notification.Message, tokens);
-                await _smtpClient.SendMessageAsync(correlationId, new Smtp.Models.Message
-                {
-                    IsBodyHtml = true,
-                    MessageBody = messageBody,
-                    MessageSubject = "EList",
-                    RecipientEmail = contact.Value
-                });
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return CommandResult.OK;
-            }
-
-            var isPhone = true; //Валидация на корректность введения телефона
-            {
-                var messageBody = _templateParser.Parse(notification.ShortMessage, tokens);
-                await _smsClient.SendSmsAsync(contact.Value, messageBody);
-            }
-
-            return CommandResult.Fail(ErrorCode.UnableToNotifyUser, "Не удалось уведомить пользователя");
-        }*/
     }
 }

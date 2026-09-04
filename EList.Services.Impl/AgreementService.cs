@@ -25,18 +25,28 @@ namespace EList.Services.Impl
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IEncryptionTool _encryptionTool;
+        private readonly INotificationsService _notificationsService;
+
+        private static readonly DocumentType[] UserReconsentDocumentTypes =
+        {
+            DocumentType.Policy,
+            DocumentType.Consent,
+            DocumentType.Agreement
+        };
 
         public AgreementService(ICorrelationIdProvider correlationIdProvider,
             IAgreementRepository agreementRepository,
             IOrganizationsRepository organizationsRepository,
             IAccountDataHolder accountDataHolder,
-            IEncryptionTool encryptionTool)
+            IEncryptionTool encryptionTool,
+            INotificationsService notificationsService)
         {
             _agreementRepository = agreementRepository;
             _organizationsRepository = organizationsRepository;
             _correlationIdProvider = correlationIdProvider;
             _accountDataHolder = accountDataHolder;
             _encryptionTool = encryptionTool;
+            _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
         }
 
         public async Task<CommandResult<AnonymousAgeAgreement>> GetAnonymousAgeAgreementAsync()
@@ -204,6 +214,15 @@ namespace EList.Services.Impl
                 Type = request.Type,
                 Version = versionesult.Result
             });
+
+            if (latestDocument != null && UserReconsentDocumentTypes.Contains(request.Type))
+            {
+                var accountIds = await _agreementRepository.GetAccountIdsAgreedToDocumentAsync(latestDocument.Id);
+                await _notificationsService.NotifyAgreementUpdateRequiredAsync(
+                    request.Type,
+                    versionesult.Result,
+                    accountIds);
+            }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

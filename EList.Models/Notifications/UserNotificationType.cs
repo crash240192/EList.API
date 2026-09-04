@@ -59,6 +59,9 @@
         /// <summary>Аккаунт снят с организаторов мероприятия.</summary>
         EventOrganizatorRemoved = 101,
 
+        /// <summary>Нужно принять новую версию юридического документа.</summary>
+        AgreementUpdateRequired = 110,
+
         /// <summary>На ваш профиль / контент поступила жалоба (без личности жалобщика).</summary>
         ContentReportFiledAgainstYou = 70,
         /// <summary>Новая жалоба в очереди организаторов события.</summary>

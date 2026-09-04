@@ -75,6 +75,8 @@ namespace EList.Services.Interfaces
 
         Task<CommandResult> NotifyEventOrganizatorAssignedAsync(Guid eventId, List<Guid> accountIds);
         Task<CommandResult> NotifyEventOrganizatorRemovedAsync(Guid eventId, Guid accountId);
+
+        Task<CommandResult> NotifyAgreementUpdateRequiredAsync(DocumentType documentType, string version, List<Guid> accountIds);
         //Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType);
     }
 }
