@@ -63,7 +63,7 @@ namespace EList.Services.Impl
             {
                 if (_adultConfirmed != null)
                     return _adultConfirmed.Value;
-                if (Age > 18)
+                if (Age >= 18)
                     return true;
                 return false;
             }
