@@ -77,6 +77,11 @@ namespace EList.Repositories.Impl
             var mappedDocument = _mapper.Map<DocumentDto>(document);
             await _agreementDataProvider.AddNewDocumentAsync(mappedDocument);
         }
+
+        public async Task<List<Guid>> GetAccountIdsAgreedToDocumentAsync(Guid documentId)
+        {
+            return await _agreementDataProvider.GetAccountIdsAgreedToDocumentAsync(documentId);
+        }
         #endregion
     }
 }

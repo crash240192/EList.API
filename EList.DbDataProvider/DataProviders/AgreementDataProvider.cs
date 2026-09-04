@@ -108,6 +108,15 @@ namespace EList.DbDataProvider.DataProviders
                 DocumentId = documentId,
             });
         }
+
+        public async Task<List<Guid>> GetAccountIdsAgreedToDocumentAsync(Guid documentId)
+        {
+            return await _connection.Agreements
+                .Where(i => i.DocumentId == documentId)
+                .Select(i => i.AccountId)
+                .Distinct()
+                .ToListAsync();
+        }
         #endregion
 
 
