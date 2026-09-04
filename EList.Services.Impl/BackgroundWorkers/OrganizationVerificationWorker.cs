@@ -34,6 +34,7 @@ namespace EList.Services.Impl.BackgroundWorkers
 
             var organizationsRepository = scopedServices.GetRequiredService<IOrganizationsRepository>();
             var registryClient = scopedServices.GetRequiredService<IOrganizationRegistryClient>();
+            var notificationsService = scopedServices.GetRequiredService<INotificationsService>();
 
             var pending = await organizationsRepository.GetPendingVerificationOrganizationsAsync();
             if (pending == null || pending.Count == 0)
@@ -50,7 +51,14 @@ namespace EList.Services.Impl.BackgroundWorkers
 
                 try
                 {
-                    await ProcessOrganizationAsync(organizationsRepository, registryClient, organization, correlationId, logger, stoppingToken);
+                    await ProcessOrganizationAsync(
+                        organizationsRepository,
+                        registryClient,
+                        notificationsService,
+                        organization,
+                        correlationId,
+                        logger,
+                        stoppingToken);
                 }
                 catch (Exception ex)
                 {
@@ -65,6 +73,7 @@ namespace EList.Services.Impl.BackgroundWorkers
         private static async Task ProcessOrganizationAsync(
             IOrganizationsRepository organizationsRepository,
             IOrganizationRegistryClient registryClient,
+            INotificationsService notificationsService,
             Models.Organizations.Organization organization,
             string correlationId,
             ILoggerWrapper logger,
@@ -79,6 +88,9 @@ namespace EList.Services.Impl.BackgroundWorkers
                     organization.Id,
                     OrganizationVerificationStatus.Rejected,
                     "Юридические реквизиты отсутствуют");
+                await notificationsService.NotifyOrganizationVerificationRejectedAsync(
+                    organization.Id,
+                    "Юридические реквизиты отсутствуют");
                 logger.Info(correlationId, null, methodName,
                     $"Organization '{organization.Id}' rejected: legal data missing", null);
                 return;
@@ -92,6 +104,7 @@ namespace EList.Services.Impl.BackgroundWorkers
                     await organizationsRepository.SetVerificationStatusAsync(
                         organization.Id,
                         OrganizationVerificationStatus.Verified);
+                    await notificationsService.NotifyOrganizationVerificationApprovedAsync(organization.Id);
                     logger.Info(correlationId, null, methodName,
                         $"Organization '{organization.Id}' verified" +
                         (string.IsNullOrWhiteSpace(checkResult.OfficialName) ? string.Empty : $": {checkResult.OfficialName}"),
@@ -102,6 +115,9 @@ namespace EList.Services.Impl.BackgroundWorkers
                     await organizationsRepository.SetVerificationStatusAsync(
                         organization.Id,
                         OrganizationVerificationStatus.Rejected,
+                        checkResult.Message);
+                    await notificationsService.NotifyOrganizationVerificationRejectedAsync(
+                        organization.Id,
                         checkResult.Message);
                     logger.Info(correlationId, null, methodName,
                         $"Organization '{organization.Id}' rejected: {checkResult.Message}", null);

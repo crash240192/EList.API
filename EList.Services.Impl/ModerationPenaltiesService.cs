@@ -157,6 +157,12 @@ namespace EList.Services.Impl
                     if (penalty.EventId != null && penalty.AccountId != null)
                     {
                         var accountIds = new List<Guid> { penalty.AccountId.Value };
+                        var participants = await _participationsRepository.GetEventParticipantIdsAsync(penalty.EventId.Value)
+                            ?? new List<Guid>();
+                        var wasParticipant = participants.Contains(penalty.AccountId.Value);
+                        var wasInvited = await _invitationsRepository.IsUserInvitatedAsync(
+                            penalty.AccountId.Value, penalty.EventId.Value);
+
                         await _blackListRepository.AddToBlackListAsync(new AddUsersToBWListRequest
                         {
                             EventId = penalty.EventId.Value,
@@ -164,7 +170,11 @@ namespace EList.Services.Impl
                         });
                         await _invitationsRepository.DeleteInvitationAsync(penalty.EventId.Value, accountIds);
                         await _participationsRepository.DropParticipationsAsync(penalty.EventId.Value, accountIds);
-                        await _notificationsService.NotifyAddedToBlackListAsync(penalty.EventId.Value, accountIds);
+
+                        if (wasParticipant || wasInvited)
+                            await _notificationsService.NotifyAddedToBlackListAsync(penalty.EventId.Value, accountIds);
+                        if (wasParticipant)
+                            await _notificationsService.NotifyRemovedFromEventAsync(penalty.EventId.Value, accountIds);
                     }
                     break;
             }

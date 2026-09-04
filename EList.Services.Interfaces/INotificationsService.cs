@@ -28,15 +28,22 @@ namespace EList.Services.Interfaces
         Task<CommandResult> NotifyEventCancelledAsync(Guid eventId);
 
         Task<CommandResult> NotifyUsersInvitedAsync(Guid eventId, List<Guid> subscribers);
+        Task<CommandResult> NotifyInvitationAcceptedAsync(Guid eventId, Guid invitedAccountId, Guid? inviterAccountId);
+        Task<CommandResult> NotifyInvitationDeclinedAsync(Guid eventId, Guid invitedAccountId, Guid? inviterAccountId);
+        Task<CommandResult> NotifyInvitationCancelledAsync(Guid eventId, Guid invitedAccountId);
 
         Task<CommandResult> NotifyParticipatedAsync(Guid eventId);
         Task<CommandResult> NotifyEventLeftAsync(Guid eventId);
+        Task<CommandResult> NotifyRemovedFromEventAsync(Guid eventId, List<Guid> accountIds);
 
 
         Task<CommandResult> NotifySubscribedAsync(Guid subscribedToId);
         Task<CommandResult> NotifyUnsubscribedAsync(Guid unsubscribedFromId);
 
         Task<CommandResult> NotifyAddedToBlackListAsync(Guid eventId, List<Guid> blackList);
+        Task<CommandResult> NotifyAddedToWhiteListAsync(Guid eventId, List<Guid> whiteList);
+        Task<CommandResult> NotifyRemovedFromBlackListAsync(Guid eventId, List<Guid> accountIds);
+        Task<CommandResult> NotifyRemovedFromWhiteListAsync(Guid eventId, List<Guid> accountIds);
         Task<CommandResult> NotifyNotInWhiteListAsync(Guid eventId, List<Guid> notInWhiteList);
 
 
@@ -55,6 +62,16 @@ namespace EList.Services.Interfaces
         Task<CommandResult> NotifyContentReportEscalatedAsync(ContentReport report);
         Task<CommandResult> NotifyContentReportPenaltyIssuedAsync(ModerationPenalty penalty);
         Task<CommandResult> NotifyEventRestoredAsync(Guid eventId);
+
+        Task<CommandResult> NotifyOrganizationMemberAddedAsync(Guid organizationId, Guid accountId);
+        Task<CommandResult> NotifyOrganizationMemberRemovedAsync(Guid organizationId, Guid accountId);
+        Task<CommandResult> NotifyOrganizationMemberDeactivatedAsync(Guid organizationId, Guid accountId);
+        Task<CommandResult> NotifyOrganizationOwnershipTransferredAsync(Guid organizationId, Guid newOwnerAccountId, Guid previousOwnerAccountId);
+        Task<CommandResult> NotifyOrganizationVerificationApprovedAsync(Guid organizationId);
+        Task<CommandResult> NotifyOrganizationVerificationRejectedAsync(Guid organizationId, string? reason);
+
+        Task<CommandResult> NotifyEventOrganizatorAssignedAsync(Guid eventId, List<Guid> accountIds);
+        Task<CommandResult> NotifyEventOrganizatorRemovedAsync(Guid eventId, Guid accountId);
         //Task<CommandResult> NotifyUserByContactAsync(SystemNotificationType notificationType);
     }
 }

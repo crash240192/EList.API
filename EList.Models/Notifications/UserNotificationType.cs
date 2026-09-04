@@ -16,6 +16,8 @@
 
         Participated = 20,
         EventLeft = 21,
+        /// <summary>Пользователя исключили из участников мероприятия (kick / BL / WL).</summary>
+        RemovedFromEvent = 22,
 
         MessageReplied = 31,
 
@@ -26,10 +28,34 @@
         NotInWhiteList = 45,
 
         NewInvitation = 51,
+        /// <summary>Приглашённый принял приглашение (для организаторов / пригласившего).</summary>
+        InvitationAccepted = 52,
+        /// <summary>Приглашённый отклонил приглашение.</summary>
+        InvitationDeclined = 53,
+        /// <summary>Организатор отменил приглашение (для приглашённого).</summary>
+        InvitationCancelled = 54,
 
         NewEventRating = 60,
         EventRatingChanged = 61,
         EventRatingDeleted = 62,
+
+        /// <summary>Пользователя добавили в организацию (менеджер).</summary>
+        OrganizationMemberAdded = 90,
+        /// <summary>Пользователя удалили из организации.</summary>
+        OrganizationMemberRemoved = 91,
+        /// <summary>Участие в организации деактивировано.</summary>
+        OrganizationMemberDeactivated = 92,
+        /// <summary>Владение организацией передано.</summary>
+        OrganizationOwnershipTransferred = 93,
+        /// <summary>Организация прошла верификацию.</summary>
+        OrganizationVerificationApproved = 94,
+        /// <summary>Верификация организации отклонена.</summary>
+        OrganizationVerificationRejected = 95,
+
+        /// <summary>Аккаунт назначен организатором мероприятия.</summary>
+        EventOrganizatorAssigned = 100,
+        /// <summary>Аккаунт снят с организаторов мероприятия.</summary>
+        EventOrganizatorRemoved = 101,
 
         /// <summary>На ваш профиль / контент поступила жалоба (без личности жалобщика).</summary>
         ContentReportFiledAgainstYou = 70,
