@@ -20,6 +20,8 @@
         RemovedFromEvent = 22,
 
         MessageReplied = 31,
+        /// <summary>Новое сообщение в диалоге (не ответ на конкретное сообщение).</summary>
+        NewMessage = 32,
 
         AddedToBlackList = 41,
         AddedToWhiteList = 42,

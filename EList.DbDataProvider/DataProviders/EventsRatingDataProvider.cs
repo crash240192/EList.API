@@ -63,6 +63,14 @@ namespace EList.DbDataProvider.DataProviders
             return item;
         }
 
+        public async Task<EventsRatingDto?> GetAccountEventRatingAsync(Guid eventId, Guid accountId, EventRatingType ratingType)
+        {
+            return await _connection.EventsRating.FirstOrDefaultAsync(i =>
+                i.EventId == eventId
+                && i.AccountId == accountId
+                && i.RatingType == ratingType);
+        }
+
         public async Task UpdateEventRatingAsync(Guid id, int value, string comment)
         {
             var localvalue = await _connection.EventsRating

@@ -52,7 +52,10 @@ namespace EList.Services.Interfaces
         Task<CommandResult> NotifyEventRatingDeletedAsync(Guid eventId, List<Guid> organizators = null);
 
 
+        Task<CommandResult> NotifyCommentRepliedAsync(Guid? eventId, Guid messageId, Guid replyId);
+        /// <summary>Устаревшее имя; используйте <see cref="NotifyCommentRepliedAsync"/>.</summary>
         Task<CommandResult> NotifyCommentRepliedsync(Guid? eventId, Guid messageId, Guid replyId);
+        Task<CommandResult> NotifyNewMessageAsync(Guid conversationId, Guid messageId, Guid? eventId = null);
 
         Task<CommandResult> NotifyContentReportCreatedAsync(ContentReport report);
         Task<CommandResult> NotifyContentReportResolvedAsync(
