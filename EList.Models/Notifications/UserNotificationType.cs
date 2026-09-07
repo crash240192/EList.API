@@ -13,11 +13,17 @@
         Unsubscribed = 11,
         RelatedPersonSubscribed = 12,
         RelatedPersonUnsubscribed = 13,
+        /// <summary>Digest RelatedPerson* за окно.</summary>
+        RelatedPersonActivityDigest = 14,
 
         Participated = 20,
         EventLeft = 21,
         /// <summary>Пользователя исключили из участников мероприятия (kick / BL / WL).</summary>
         RemovedFromEvent = 22,
+
+        /// <summary>Агрегат join/leave для организаторов.</summary>
+        ParticipatedDigest = 23,
+        EventLeftDigest = 24,
 
         MessageReplied = 31,
         /// <summary>Новое сообщение в диалоге (не ответ на конкретное сообщение).</summary>
@@ -40,6 +46,8 @@
         NewEventRating = 60,
         EventRatingChanged = 61,
         EventRatingDeleted = 62,
+        /// <summary>Ещё N оценок за период (агрегат outbox).</summary>
+        EventRatingDigest = 63,
 
         /// <summary>Пользователя добавили в организацию (менеджер).</summary>
         OrganizationMemberAdded = 90,

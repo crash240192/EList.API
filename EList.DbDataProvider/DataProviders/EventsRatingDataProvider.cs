@@ -71,6 +71,11 @@ namespace EList.DbDataProvider.DataProviders
                 && i.RatingType == ratingType);
         }
 
+        public async Task<int> CountRatingsForEventAsync(Guid eventId)
+        {
+            return await _connection.EventsRating.CountAsync(i => i.EventId == eventId);
+        }
+
         public async Task UpdateEventRatingAsync(Guid id, int value, string comment)
         {
             var localvalue = await _connection.EventsRating

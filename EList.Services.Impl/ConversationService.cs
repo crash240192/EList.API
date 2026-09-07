@@ -86,8 +86,6 @@ namespace EList.Services.Impl
             if (message.ReplyTo != null)
                 await _notificationsService.NotifyCommentRepliedAsync(conversation.EventId, message.ReplyTo.Value, result);
 
-            await _notificationsService.NotifyNewMessageAsync(conversation.Id, result, conversation.EventId);
-
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid>(result);
         }
