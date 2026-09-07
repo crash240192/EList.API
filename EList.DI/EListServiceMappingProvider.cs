@@ -10,6 +10,7 @@ using EList.Repositories.Impl;
 using EList.Repositories.Interfaces;
 using EList.Services.Impl;
 using EList.Services.Impl.AbuseProtection;
+using EList.Services.Impl.Notifications;
 using EList.Services.Impl.OrganizationRegistry;
 using EList.Services.Interfaces;
 using EList.Sms;
@@ -78,6 +79,7 @@ namespace EList.DI
             mapper.AddScoped<IModerationPenaltiesService, ModerationPenaltiesService>();
 
             mapper.AddSingleton<WebSocketConnectionManager>();
+            mapper.AddSingleton<NotificationFloodGate>();
 
             //Repositories
             mapper.AddScoped<IAgreementRepository, AgreementRepository>();

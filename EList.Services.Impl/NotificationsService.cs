@@ -13,6 +13,7 @@ using EList.Models.Notifications;
 using EList.Models.Organizations;
 using EList.Models.Subscriptions;
 using EList.Repositories.Interfaces;
+using EList.Services.Impl.Notifications;
 using EList.Services.Interfaces;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -43,6 +44,8 @@ namespace EList.Services.Impl
         private readonly IConversationRepository _conversationRepository;
         private readonly IOrganizationsRepository _organizationsRepository;
         private readonly IAccountPlatformRolesRepository _accountPlatformRolesRepository;
+        private readonly NotificationFloodGate _floodGate;
+
         public NotificationsService(
             WebSocketConnectionManager connectionManager,
             ICorrelationIdProvider correlationIdProvider,
@@ -58,7 +61,8 @@ namespace EList.Services.Impl
             IEventsRatingRepository eventsRatingRepository,
             IConversationRepository conversationRepository,
             IOrganizationsRepository organizationsRepository,
-            IAccountPlatformRolesRepository accountPlatformRolesRepository)
+            IAccountPlatformRolesRepository accountPlatformRolesRepository,
+            NotificationFloodGate floodGate)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _notificationsRepository = notificationsRepository ?? throw new ArgumentNullException(nameof(notificationsRepository));
@@ -73,6 +77,7 @@ namespace EList.Services.Impl
             _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
             _accountPlatformRolesRepository = accountPlatformRolesRepository ?? throw new ArgumentNullException(nameof(accountPlatformRolesRepository));
+            _floodGate = floodGate ?? throw new ArgumentNullException(nameof(floodGate));
             _connectionManager = connectionManager;
             _accountDataHolder = accountDataHolder;
         }
@@ -523,17 +528,29 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventData = await _eventsRepository.GetEventAsync(eventId);
-            var recipients = await GetParticipationActivityRecipientsAsync(eventId);
             var actorName = _accountDataHolder.AccountNameFullString ?? "Пользователь";
+            var (subscriberIds, organizatorIds) = await GetParticipationAudienceSplitAsync(eventId);
 
-            var notifications = recipients.Select(accountId => BuildNotification(
-                accountId,
+            var notifications = new List<Notification>();
+            foreach (var accountId in subscriberIds)
+            {
+                notifications.Add(BuildNotification(
+                    accountId,
+                    eventId,
+                    _accountDataHolder.AccountId,
+                    UserNotificationType.Participated,
+                    null,
+                    $"{actorName} принял участие в \"{eventData.Name}\"",
+                    new EventShort(eventData)));
+            }
+
+            await AppendParticipationOrgNotificationsAsync(
+                notifications,
+                organizatorIds,
                 eventId,
-                _accountDataHolder.AccountId,
-                UserNotificationType.Participated,
-                null,
-                $"{actorName} принял участие в \"{eventData.Name}\"",
-                new EventShort(eventData))).ToList();
+                eventData,
+                actorName,
+                isJoin: true);
 
             await PersistAndSendAsync(notifications);
 
@@ -549,17 +566,29 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventData = await _eventsRepository.GetEventAsync(eventId);
-            var recipients = await GetParticipationActivityRecipientsAsync(eventId);
             var actorName = _accountDataHolder.AccountNameFullString ?? "Пользователь";
+            var (subscriberIds, organizatorIds) = await GetParticipationAudienceSplitAsync(eventId);
 
-            var notifications = recipients.Select(accountId => BuildNotification(
-                accountId,
+            var notifications = new List<Notification>();
+            foreach (var accountId in subscriberIds)
+            {
+                notifications.Add(BuildNotification(
+                    accountId,
+                    eventId,
+                    _accountDataHolder.AccountId,
+                    UserNotificationType.EventLeft,
+                    null,
+                    $"{actorName} покинул событие \"{eventData.Name}\"",
+                    new EventShort(eventData)));
+            }
+
+            await AppendParticipationOrgNotificationsAsync(
+                notifications,
+                organizatorIds,
                 eventId,
-                _accountDataHolder.AccountId,
-                UserNotificationType.EventLeft,
-                null,
-                $"{actorName} покинул событие \"{eventData.Name}\"",
-                new EventShort(eventData))).ToList();
+                eventData,
+                actorName,
+                isJoin: false);
 
             await PersistAndSendAsync(notifications);
 
@@ -619,23 +648,43 @@ namespace EList.Services.Impl
 
             if (subscribers?.Any() ?? false)
             {
-                var notifications = subscribers.Select(subscriberId => new Notification
+                var flood = _floodGate.GetSettings().RelatedSocial;
+                var relatedNotifications = new List<Notification>();
+                foreach (var subscriberId in subscribers)
                 {
-                    Id = Guid.NewGuid(),
-                    AccountId = subscriberId,
-                    EventId = null,
-                    CreatedAt = DateTime.UtcNow,
-                    Message = $"{_accountDataHolder.AccountNameFullString} подписался на {subscribedToAccountFullString}",
-                    Title = null,
-                    RelatedAccountId = subscribedToId,
-                    Type = UserNotificationType.RelatedPersonSubscribed,
-                    Data = subscribedTo
-                }).ToList();
+                    var decision = _floodGate.EvaluateMode(
+                        $"related-sub:{subscriberId}",
+                        flood.Mode,
+                        flood.DigestWindowMinutes,
+                        out var pendingCount);
 
-                await _notificationsRepository.CreateNotificationsAsync(notifications);
+                    if (decision == FloodDecision.Suppress)
+                        continue;
 
-                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
-                await Task.WhenAll(wsTasks);
+                    if (decision == FloodDecision.SendDigest)
+                    {
+                        relatedNotifications.Add(BuildNotification(
+                            subscriberId,
+                            null,
+                            _accountDataHolder.AccountId,
+                            UserNotificationType.RelatedPersonActivityDigest,
+                            "Активность подписок",
+                            $"{pendingCount} новых действий подписок у ваших контактов",
+                            new { Count = pendingCount, Kind = "subscribed" }));
+                        continue;
+                    }
+
+                    relatedNotifications.Add(BuildNotification(
+                        subscriberId,
+                        null,
+                        subscribedToId,
+                        UserNotificationType.RelatedPersonSubscribed,
+                        null,
+                        $"{_accountDataHolder.AccountNameFullString} подписался на {subscribedToAccountFullString}",
+                        subscribedTo));
+                }
+
+                await PersistAndSendAsync(relatedNotifications);
             }
             #endregion
 
@@ -684,23 +733,43 @@ namespace EList.Services.Impl
 
             if (subscribers?.Any() ?? false)
             {
-                var notifications = subscribers.Select(subscriberId => new Notification
+                var flood = _floodGate.GetSettings().RelatedSocial;
+                var relatedNotifications = new List<Notification>();
+                foreach (var subscriberId in subscribers)
                 {
-                    Id = Guid.NewGuid(),
-                    AccountId = subscriberId,
-                    EventId = null,
-                    CreatedAt = DateTime.UtcNow,
-                    Message = $"{_accountDataHolder.AccountNameFullString} отписался от {unsubscribedFromAccountFullString}",
-                    Title = null,
-                    RelatedAccountId = unsubscribedFromId,
-                    Type = UserNotificationType.RelatedPersonUnsubscribed,
-                    Data = unsubscribedFrom
-                }).ToList();
+                    var decision = _floodGate.EvaluateMode(
+                        $"related-unsub:{subscriberId}",
+                        flood.Mode,
+                        flood.DigestWindowMinutes,
+                        out var pendingCount);
 
-                await _notificationsRepository.CreateNotificationsAsync(notifications);
+                    if (decision == FloodDecision.Suppress)
+                        continue;
 
-                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
-                await Task.WhenAll(wsTasks);
+                    if (decision == FloodDecision.SendDigest)
+                    {
+                        relatedNotifications.Add(BuildNotification(
+                            subscriberId,
+                            null,
+                            _accountDataHolder.AccountId,
+                            UserNotificationType.RelatedPersonActivityDigest,
+                            "Активность подписок",
+                            $"{pendingCount} новых действий подписок у ваших контактов",
+                            new { Count = pendingCount, Kind = "unsubscribed" }));
+                        continue;
+                    }
+
+                    relatedNotifications.Add(BuildNotification(
+                        subscriberId,
+                        null,
+                        unsubscribedFromId,
+                        UserNotificationType.RelatedPersonUnsubscribed,
+                        null,
+                        $"{_accountDataHolder.AccountNameFullString} отписался от {unsubscribedFromAccountFullString}",
+                        unsubscribedFrom));
+                }
+
+                await PersistAndSendAsync(relatedNotifications);
             }
             #endregion
 
@@ -864,71 +933,103 @@ namespace EList.Services.Impl
         #region event rating
         public async Task<CommandResult> NotifyNewEventRatingAsync(Guid eventId, Guid ratingItem, List<Guid> organizators = null)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(NotifyNewEventRatingAsync)}";
-            var execTime = Stopwatch.StartNew();
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-            var eventData = await _eventsRepository.GetEventAsync(eventId);
-            organizators ??= (await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(eventId))?.ToList();
-            var rating = await _eventsRatingRepository.GetRatingItemAsync(ratingItem);
-
-            if (organizators?.Any() ?? false)
-            {
-                var notifications = organizators.Where(i => i != _accountDataHolder.AccountId).Select(organizatorId => new Notification
-                {
-                    Id = Guid.NewGuid(),
-                    AccountId = organizatorId,
-                    EventId = eventId,
-                    CreatedAt = DateTime.UtcNow,
-                    Message = $"{_accountDataHolder.AccountNameFullString} оценил мероприятие \"{eventData.Name}\"",
-                    Title = "Новая оценка у мероприятия",
-                    RelatedAccountId = _accountDataHolder.AccountId,
-                    Type = UserNotificationType.NewEventRating,
-                    Data = rating
-                }).ToList();
-
-                await _notificationsRepository.CreateNotificationsAsync(notifications);
-
-                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
-                await Task.WhenAll(wsTasks);
-            }
-
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return CommandResult.OK;
+            return await NotifyEventRatingCoreAsync(
+                eventId,
+                ratingItem,
+                organizators,
+                isChange: false);
         }
 
         public async Task<CommandResult> NotifyEventRatingChangedAsync(Guid eventId, Guid ratingItem, List<Guid> organizators = null)
         {
+            return await NotifyEventRatingCoreAsync(
+                eventId,
+                ratingItem,
+                organizators,
+                isChange: true);
+        }
+
+        private async Task<CommandResult> NotifyEventRatingCoreAsync(
+            Guid eventId,
+            Guid ratingItem,
+            List<Guid>? organizators,
+            bool isChange)
+        {
             var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventRatingChangedAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyEventRatingCoreAsync)}";
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventData = await _eventsRepository.GetEventAsync(eventId);
             organizators ??= (await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(eventId))?.ToList();
+            organizators = organizators?.Where(i => i != _accountDataHolder.AccountId)?.ToList();
             var rating = await _eventsRatingRepository.GetRatingItemAsync(ratingItem);
 
-            if (organizators?.Any() ?? false)
+            if (organizators == null || !organizators.Any())
             {
-                var notifications = organizators.Where(i => i != _accountDataHolder.AccountId).Select(organizatorId => new Notification
-                {
-                    Id = Guid.NewGuid(),
-                    AccountId = organizatorId,
-                    EventId = eventId,
-                    CreatedAt = DateTime.UtcNow,
-                    Message = $"{_accountDataHolder.AccountNameFullString} изменил свою оценку мероприятия \"{eventData.Name}\"",
-                    Title = "Оценка мероприятия изменилась",
-                    RelatedAccountId = _accountDataHolder.AccountId,
-                    Type = UserNotificationType.EventRatingChanged,
-                    Data = rating
-                }).ToList();
-
-                await _notificationsRepository.CreateNotificationsAsync(notifications);
-
-                var wsTasks = notifications.Select(n => SendToUserAsync(n.AccountId, n));
-                await Task.WhenAll(wsTasks);
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return CommandResult.OK;
             }
+
+            var flood = _floodGate.GetSettings().Ratings;
+            var totalRatings = await _eventsRatingRepository.CountRatingsForEventAsync(eventId);
+            var forceRealtime = flood.LowScoreRealtimeMax > 0
+                && rating != null
+                && rating.Value <= flood.LowScoreRealtimeMax;
+
+            FloodDecision decision;
+            var pendingCount = 0;
+            if (forceRealtime)
+            {
+                decision = FloodDecision.SendRealtime;
+            }
+            else
+            {
+                decision = _floodGate.EvaluateFirstKThenDigest(
+                    $"rating:{eventId}",
+                    totalRatings,
+                    flood.FirstRealtimeCount,
+                    flood.DigestWindowMinutes,
+                    out pendingCount);
+            }
+
+            if (decision == FloodDecision.Suppress)
+            {
+                logger.Debug(correlationId, null, methodName, $"Method finished (suppressed)", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
+            List<Notification> notifications;
+            if (decision == FloodDecision.SendDigest)
+            {
+                notifications = organizators.Select(organizatorId => BuildNotification(
+                    organizatorId,
+                    eventId,
+                    _accountDataHolder.AccountId,
+                    UserNotificationType.EventRatingDigest,
+                    "Новые оценки мероприятия",
+                    $"Ещё {pendingCount} оценок у \"{eventData.Name}\"",
+                    new { Count = pendingCount, EventId = eventId })).ToList();
+            }
+            else
+            {
+                var type = isChange ? UserNotificationType.EventRatingChanged : UserNotificationType.NewEventRating;
+                var title = isChange ? "Оценка мероприятия изменилась" : "Новая оценка у мероприятия";
+                var message = isChange
+                    ? $"{_accountDataHolder.AccountNameFullString} изменил свою оценку мероприятия \"{eventData.Name}\""
+                    : $"{_accountDataHolder.AccountNameFullString} оценил мероприятие \"{eventData.Name}\"";
+
+                notifications = organizators.Select(organizatorId => BuildNotification(
+                    organizatorId,
+                    eventId,
+                    _accountDataHolder.AccountId,
+                    type,
+                    title,
+                    message,
+                    rating)).ToList();
+            }
+
+            await PersistAndSendAsync(notifications);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -1008,43 +1109,8 @@ namespace EList.Services.Impl
 
         public async Task<CommandResult> NotifyNewMessageAsync(Guid conversationId, Guid messageId, Guid? eventId = null)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(NotifyNewMessageAsync)}";
-            var execTime = Stopwatch.StartNew();
-            logger.Debug(correlationId, null, methodName, "Method started", null);
-
-            var message = await _conversationRepository.GetMessageAsync(messageId);
-            if (message == null)
-                return CommandResult.OK;
-
-            var recipients = await GetNewMessageRecipientsAsync(conversationId, eventId, excludeAccountId: _accountDataHolder.AccountId);
-            if (message.ReplyTo != null)
-            {
-                var parent = await _conversationRepository.GetMessageAsync(message.ReplyTo.Value);
-                if (parent?.AccountId != null)
-                    recipients.Remove(parent.AccountId.Value);
-            }
-
-            if (recipients.Count == 0)
-            {
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
-                return CommandResult.OK;
-            }
-
-            var preview = BuildMessagePreview(message.MessageText);
-            var actorName = _accountDataHolder.AccountNameFullString ?? "Пользователь";
-            var notifications = recipients.Select(accountId => BuildNotification(
-                accountId,
-                eventId,
-                _accountDataHolder.AccountId,
-                UserNotificationType.NewMessage,
-                $"{actorName} написал(а) сообщение",
-                preview,
-                message)).ToList();
-
-            await PersistAndSendAsync(notifications);
-
-            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            // Адресация сообщений ещё не реализована: broadcast NewMessage отключён.
+            // Остаётся только MessageReplied (явный reply).
             return CommandResult.OK;
         }
         #endregion
@@ -1639,35 +1705,114 @@ namespace EList.Services.Impl
             return ids.ToList();
         }
 
-        private async Task<List<Guid>> GetParticipationActivityRecipientsAsync(Guid eventId)
+        private async Task<(List<Guid> Subscribers, List<Guid> Organizators)> GetParticipationAudienceSplitAsync(Guid eventId)
         {
-            var ids = new HashSet<Guid>();
-
+            var subscribers = new HashSet<Guid>();
             if (_accountDataHolder.AccountId != null)
             {
-                var subscribers = await _subscriptionsRepository.GetSubscribersIdsAsync(new SubscriptionsSearchRequest
+                var ids = await _subscriptionsRepository.GetSubscribersIdsAsync(new SubscriptionsSearchRequest
                 {
                     AccountId = _accountDataHolder.AccountId.Value,
                     NotifyParticipated = true
                 });
-                if (subscribers != null)
+                if (ids != null)
                 {
-                    foreach (var id in subscribers)
-                        ids.Add(id);
+                    foreach (var id in ids)
+                        subscribers.Add(id);
                 }
             }
 
-            var organizators = await _eventOrganizatorsRepository.GetAllOrganizerAccountIdsAsync(eventId);
-            if (organizators != null)
+            var organizators = new HashSet<Guid>();
+            var orgIds = await _eventOrganizatorsRepository.GetAllOrganizerAccountIdsAsync(eventId);
+            if (orgIds != null)
             {
-                foreach (var id in organizators)
-                    ids.Add(id);
+                foreach (var id in orgIds)
+                    organizators.Add(id);
             }
 
             if (_accountDataHolder.AccountId != null)
-                ids.Remove(_accountDataHolder.AccountId.Value);
+            {
+                subscribers.Remove(_accountDataHolder.AccountId.Value);
+                organizators.Remove(_accountDataHolder.AccountId.Value);
+            }
 
-            return ids.ToList();
+            // Организатор, который уже в подписчиках актора, получает только subscriber-путь (без org digest дубля).
+            organizators.ExceptWith(subscribers);
+
+            return (subscribers.ToList(), organizators.ToList());
+        }
+
+        private async Task AppendParticipationOrgNotificationsAsync(
+            List<Notification> notifications,
+            List<Guid> organizatorIds,
+            Guid eventId,
+            Event eventData,
+            string actorName,
+            bool isJoin)
+        {
+            if (organizatorIds == null || organizatorIds.Count == 0)
+                return;
+
+            var flood = _floodGate.GetSettings().Participation;
+            var participantsCount = await _participationsRepository.GetParticipantsCountAsync(eventId);
+            // Для leave count уже без ушедшего; для join — уже с новым. first-K смотрит на текущий размер.
+            var decision = _floodGate.EvaluateFirstKThenDigest(
+                isJoin ? $"join:{eventId}" : $"leave:{eventId}",
+                participantsCount,
+                flood.FirstRealtimeCount,
+                flood.DigestWindowMinutes,
+                out var pendingCount);
+
+            if (decision == FloodDecision.Suppress)
+                return;
+
+            if (decision == FloodDecision.SendDigest)
+            {
+                var digestType = isJoin
+                    ? UserNotificationType.ParticipatedDigest
+                    : UserNotificationType.EventLeftDigest;
+                var title = isJoin ? "Новые участники" : "Участники покинули событие";
+                var message = isJoin
+                    ? $"Ещё {pendingCount} участников присоединились к \"{eventData.Name}\""
+                    : $"Ещё {pendingCount} участников покинули \"{eventData.Name}\"";
+
+                foreach (var organizatorId in organizatorIds)
+                {
+                    notifications.Add(BuildNotification(
+                        organizatorId,
+                        eventId,
+                        _accountDataHolder.AccountId,
+                        digestType,
+                        title,
+                        message,
+                        new { Count = pendingCount, EventId = eventId }));
+                }
+
+                return;
+            }
+
+            var type = isJoin ? UserNotificationType.Participated : UserNotificationType.EventLeft;
+            var realtimeMessage = isJoin
+                ? $"{actorName} принял участие в \"{eventData.Name}\""
+                : $"{actorName} покинул событие \"{eventData.Name}\"";
+
+            foreach (var organizatorId in organizatorIds)
+            {
+                notifications.Add(BuildNotification(
+                    organizatorId,
+                    eventId,
+                    _accountDataHolder.AccountId,
+                    type,
+                    null,
+                    realtimeMessage,
+                    new EventShort(eventData)));
+            }
+        }
+
+        private async Task<List<Guid>> GetParticipationActivityRecipientsAsync(Guid eventId)
+        {
+            var (subscribers, organizators) = await GetParticipationAudienceSplitAsync(eventId);
+            return subscribers.Concat(organizators).Distinct().ToList();
         }
 
         private async Task<HashSet<Guid>> GetNewMessageRecipientsAsync(
