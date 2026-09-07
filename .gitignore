@@ -37,3 +37,4 @@ bin/
 .idea/
 logs/
 EList.Api/internal-nlog.txt
+EList.Common/

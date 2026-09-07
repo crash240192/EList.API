@@ -11,6 +11,7 @@ namespace EList.Repositories.Interfaces
         Task<EventRating> GetEventRatingAcync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize); //получение оценки определенного ивента
         Task<EventsRatingItem?> GetRatingItemAsync(Guid itemId);
         Task<EventsRatingItem?> GetAccountEventRatingAsync(Guid eventId, Guid accountId, EventRatingType ratingType);
+        Task<int> CountRatingsForEventAsync(Guid eventId);
         Task<double?> GetOrganizatorRatingAsync(Guid accountId);
     }
 }

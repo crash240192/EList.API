@@ -66,6 +66,11 @@ namespace EList.Repositories.Impl
             return _mapper.Map<EventsRatingItem?>(item);
         }
 
+        public async Task<int> CountRatingsForEventAsync(Guid eventId)
+        {
+            return await _eventsRatingDataProvider.CountRatingsForEventAsync(eventId);
+        }
+
         public async Task<double?> GetOrganizatorRatingAsync(Guid accountId)
         {
             var result = await _eventsRatingDataProvider.GetOrganizatorRatingAsync(accountId);

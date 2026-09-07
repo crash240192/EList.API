@@ -718,10 +718,35 @@ namespace EList.Services.Impl
 
             await _eventsRepository.UpdateEventAsync(eventId, request);
 
-            await _notificationsService.NotifyEventUpdatedAsync(eventId);
+            if (ShouldNotifyEventUpdated(eventItem, request))
+                await _notificationsService.NotifyEventUpdatedAsync(eventId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(eventId);
+        }
+
+        private static bool ShouldNotifyEventUpdated(Event existing, EventRequest request)
+        {
+            var significantOnly = true;
+            if (ConfigurationManager.AppSettings.Contains("notificationFlood:eventUpdate:significantFieldsOnly")
+                && bool.TryParse(
+                    ConfigurationManager.AppSettings["notificationFlood:eventUpdate:significantFieldsOnly"],
+                    out var configured))
+            {
+                significantOnly = configured;
+            }
+
+            if (!significantOnly)
+                return true;
+
+            const double coordEpsilon = 0.00001;
+            return existing.StartTime != request.StartTime
+                || existing.EndTime != request.EndTime
+                || !string.Equals(existing.Name, request.Name, StringComparison.Ordinal)
+                || !string.Equals(existing.Address ?? string.Empty, request.Address ?? string.Empty, StringComparison.Ordinal)
+                || existing.Active != request.Active
+                || Math.Abs(existing.Latitude - request.Latitude) > coordEpsilon
+                || Math.Abs(existing.Longitude - request.Longitude) > coordEpsilon;
         }
 
         public async Task<CommandResult> SetEventCoverImageAsync(Guid eventId, Guid? imageId)
