@@ -152,5 +152,14 @@ namespace EList.DbDataProvider.DataProviders
                 }                
             }
         }
+
+        public async Task<List<Guid>> GetConversationAuthorAccountIdsAsync(Guid conversationId)
+        {
+            return await _connection.Messages
+                .Where(i => i.ConversationId == conversationId && i.AccountId != null)
+                .Select(i => i.AccountId!.Value)
+                .Distinct()
+                .ToListAsync();
+        }
     }
 }

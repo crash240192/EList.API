@@ -119,6 +119,10 @@ namespace EList.Services.Impl
                 request.RatingType = EventRatingType.Summary;
 
             request.AccountId = _accountDataHolder.AccountId.Value;
+            var existingRating = await _eventsRatingRepository.GetAccountEventRatingAsync(
+                request.EventId,
+                request.AccountId,
+                request.RatingType);
             var eventRating = await _eventsRatingRepository.CreateEventRatingAsync(request);
 
             var organizators = (await _eventOrganizatorsRepository.GetOrganizatorIdsByEventIdAsync(request.EventId))
@@ -126,7 +130,10 @@ namespace EList.Services.Impl
             organizators = organizators?.Where(i => i != _accountDataHolder.AccountId)
                 ?.ToList();
 
-            await _notificationsService.NotifyNewEventRatingAsync(request.EventId, eventRating);
+            if (existingRating != null)
+                await _notificationsService.NotifyEventRatingChangedAsync(request.EventId, eventRating, organizators);
+            else
+                await _notificationsService.NotifyNewEventRatingAsync(request.EventId, eventRating, organizators);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid>(eventRating);

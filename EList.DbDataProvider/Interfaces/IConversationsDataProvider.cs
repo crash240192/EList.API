@@ -19,5 +19,6 @@ namespace EList.DbDataProvider.Interfaces
         Task<Guid> CreateMessageAsync(MessageDto message);
         Task UpdateMessageAsync(MessageDto message);
         Task DeleteMessageAsync(Guid messageId);
+        Task<List<Guid>> GetConversationAuthorAccountIdsAsync(Guid conversationId);
     }
 }

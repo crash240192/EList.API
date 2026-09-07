@@ -82,8 +82,15 @@ namespace EList.Services.Impl
             };
 
             var notification = await _notificationsRepository.GetNotificationByTypeAsync(notificationType);
+            if (notification == null)
+                return CommandResult<string>.Fail(ErrorCode.UnableToNotifyUser, $"Шаблон системного уведомления «{notificationType}» не найден");
 
-            var isEmail = MailAddress.TryCreate(contact.Value, out var eMail);
+            var successMessage = notificationType is SystemNotificationType.Activation
+                or SystemNotificationType.ResetPasswordRequest
+                ? $"Код был выслан на {contact.Value}"
+                : $"Уведомление отправлено на {contact.Value}";
+
+            var isEmail = MailAddress.TryCreate(contact.Value, out _);
             if (isEmail)
             {
                 var messageBody = _templateParser.Parse(notification.Message, tokens);
@@ -91,20 +98,20 @@ namespace EList.Services.Impl
                 {
                     IsBodyHtml = true,
                     MessageBody = messageBody,
-                    MessageSubject = "EList",
+                    MessageSubject = notification.Header ?? "EList",
                     RecipientEmail = contact.Value
                 });
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return new CommandResult<string>($"Код активации был выслан на {contact.Value}");
+                return new CommandResult<string>(successMessage);
             }
 
-            var isPhone = true; //TODO: Валидация на корректность введения телефона
+            // SMS channel (phone authorization contact)
             {
                 var messageBody = _templateParser.Parse(notification.ShortMessage, tokens);
                 await _smsClient.SendSmsAsync(contact.Value, messageBody);
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return new CommandResult<string>(successMessage);
             }
-
-            return CommandResult<string>.Fail(ErrorCode.UnableToNotifyUser, "Не удалось уведомить пользователя");
         }
 
         public async Task<CommandResult<List<SystemNotification>>> GetAllAsync()

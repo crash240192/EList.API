@@ -17,5 +17,6 @@ namespace EList.Repositories.Interfaces
         Task AddNewDocumentAsync(Document document);
         Task<List<Document>> GetLatestDocumentsAsync();
         Task<Document> GetLatestDocumentAsync(DocumentType type);
+        Task<List<Guid>> GetAccountIdsAgreedToDocumentAsync(Guid documentId);
     }
 }

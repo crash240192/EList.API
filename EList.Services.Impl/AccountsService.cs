@@ -151,6 +151,15 @@ namespace EList.Services.Impl
 
             await _walletsService.CreateAccountWalletAsync(accountId);
 
+            var welcomeNotify = await _notificationsService.NotifyUserByContactAsync(
+                SystemNotificationType.AccountCreated,
+                accountId);
+            if (!welcomeNotify.Success)
+            {
+                logger.Debug(correlationId, null, methodName,
+                    $"AccountCreated notify skipped: {welcomeNotify.Message}", null);
+            }
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(accountId);
         }

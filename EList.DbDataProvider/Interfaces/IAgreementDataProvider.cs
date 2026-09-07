@@ -18,5 +18,6 @@ namespace EList.DbDataProvider.Interfaces
         Task AddNewDocumentAsync(DocumentDto document);
         Task<List<DocumentDto>> GetLatestDocumentsAsync();
         Task<DocumentDto> GetLatestDocumentAsync(DocumentType type);
+        Task<List<Guid>> GetAccountIdsAgreedToDocumentAsync(Guid documentId);
     }
 }

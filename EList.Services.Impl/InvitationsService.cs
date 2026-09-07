@@ -185,6 +185,12 @@ namespace EList.Services.Impl
 
             await _invitationsRepository.DeleteInvitationAsync(invitationId);
 
+            await _notificationsService.NotifyInvitationAcceptedAsync(
+                invitation.EventId,
+                invitation.InvitedAccountId,
+                invitation.InviterAccountId);
+            await _notificationsService.NotifyParticipatedAsync(invitation.EventId);
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
@@ -208,6 +214,11 @@ namespace EList.Services.Impl
 
             await _invitationsRepository.DeleteInvitationAsync(invitationId);
 
+            await _notificationsService.NotifyInvitationDeclinedAsync(
+                invitation.EventId,
+                invitation.InvitedAccountId,
+                invitation.InviterAccountId);
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
@@ -230,6 +241,10 @@ namespace EList.Services.Impl
                 return accessError;
 
             await _invitationsRepository.DeleteInvitationAsync(invitationId);
+
+            await _notificationsService.NotifyInvitationCancelledAsync(
+                invitation.EventId,
+                invitation.InvitedAccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

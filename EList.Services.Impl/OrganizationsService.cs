@@ -27,6 +27,7 @@ namespace EList.Services.Impl
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IMapper _mapper;
+        private readonly INotificationsService _notificationsService;
 
         public OrganizationsService(IOrganizationsRepository organizationsRepository,
             IAccountsRepository accountsRepository,
@@ -34,7 +35,8 @@ namespace EList.Services.Impl
             IOrganizationRegistryClient organizationRegistryClient,
             IAccountDataHolder accountDataHolder,
             ICorrelationIdProvider correlationIdProvider,
-            IMapper mapper)
+            IMapper mapper,
+            INotificationsService notificationsService)
         {
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
@@ -43,6 +45,7 @@ namespace EList.Services.Impl
             _accountDataHolder = accountDataHolder;
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+            _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
         }
 
         public async Task<CommandResult<Guid?>> CreateOrganizationAsync(OrganizationRequest request)
@@ -257,6 +260,8 @@ namespace EList.Services.Impl
                 if (existingMember.Role != OrganizationMemberRole.Owner)
                     await _organizationsRepository.UpdateMemberRoleAsync(organizationId, request.AccountId, OrganizationMemberRole.Manager);
 
+                await _notificationsService.NotifyOrganizationMemberAddedAsync(organizationId, request.AccountId);
+
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return new CommandResult<Guid?>(existingMember.Id);
             }
@@ -269,6 +274,8 @@ namespace EList.Services.Impl
                 Active = true,
                 InvitedBy = _accountDataHolder.AccountId
             });
+
+            await _notificationsService.NotifyOrganizationMemberAddedAsync(organizationId, request.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(memberId);
@@ -293,6 +300,7 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AccessError, "Нельзя удалить владельца организации. Сначала передайте владение");
 
             await _organizationsRepository.RemoveMemberAsync(organizationId, accountId);
+            await _notificationsService.NotifyOrganizationMemberRemovedAsync(organizationId, accountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -317,6 +325,11 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AccessError, "Нельзя деактивировать владельца организации");
 
             await _organizationsRepository.SetMemberActiveAsync(organizationId, accountId, active);
+
+            if (active)
+                await _notificationsService.NotifyOrganizationMemberAddedAsync(organizationId, accountId);
+            else
+                await _notificationsService.NotifyOrganizationMemberDeactivatedAsync(organizationId, accountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -343,10 +356,16 @@ namespace EList.Services.Impl
             if (account == null)
                 return CommandResult.Fail(ErrorCode.AccountNotFound, $"Аккаунт с id='{request.NewOwnerAccountId}' не найден");
 
+            var previousOwnerAccountId = _accountDataHolder.AccountId!.Value;
             await _organizationsRepository.TransferOwnershipAsync(
                 organizationId,
-                _accountDataHolder.AccountId!.Value,
+                previousOwnerAccountId,
                 request.NewOwnerAccountId);
+
+            await _notificationsService.NotifyOrganizationOwnershipTransferredAsync(
+                organizationId,
+                request.NewOwnerAccountId,
+                previousOwnerAccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

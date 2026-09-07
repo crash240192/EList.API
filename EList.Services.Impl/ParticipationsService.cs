@@ -283,15 +283,22 @@ namespace EList.Services.Impl
                 return accessError;
 
             await _participantsBWListRepository.AddToBlackListAsync(request);
-            var existingParticipants = await _participationRepository.GetEventParticipantIdsAsync(request.EventId);
-            var bannedUsers = request.AccountIds?.Intersect(existingParticipants)?.ToList();
+            var existingParticipants = await _participationRepository.GetEventParticipantIdsAsync(request.EventId)
+                ?? new List<Guid>();
+            var invitedUsers = await _invitationsRepository.GetInvitedUsersAsync(request.EventId)
+                ?? new List<Guid>();
+            var relatedAccounts = existingParticipants
+                .Concat(invitedUsers)
+                .ToHashSet();
+
+            var notifyBw = request.AccountIds.Where(relatedAccounts.Contains).Distinct().ToList();
+            var kickedParticipants = request.AccountIds.Intersect(existingParticipants).Distinct().ToList();
 
             await _invitationsRepository.DeleteInvitationAsync(request.EventId, request.AccountIds);
             await _participationRepository.DropParticipationsAsync(request.EventId, request.AccountIds);
 
-            await _notificationsService.NotifyAddedToBlackListAsync(request.EventId, bannedUsers);
-
-            //TODO: Сформировать удаление о том что пользователя исключили, если он участвовал в мероприятии или у него было приглашение
+            await _notificationsService.NotifyAddedToBlackListAsync(request.EventId, notifyBw);
+            await _notificationsService.NotifyRemovedFromEventAsync(request.EventId, kickedParticipants);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -312,18 +319,29 @@ namespace EList.Services.Impl
             if (!accessError.Success)
                 return accessError;
 
-            await _participantsBWListRepository.AddToWhiteListAsync(request);
-            var whiteList = await _participantsBWListRepository.GetEventWhiteListShortAsync(request.EventId);
+            var existingParticipants = await _participationRepository.GetEventParticipantIdsAsync(request.EventId)
+                ?? new List<Guid>();
+            var invitedUsers = await _invitationsRepository.GetInvitedUsersAsync(request.EventId)
+                ?? new List<Guid>();
+            var relatedBefore = existingParticipants.Concat(invitedUsers).ToHashSet();
+            var notifyAdded = request.AccountIds.Where(relatedBefore.Contains).Distinct().ToList();
 
-            var existingParticipants = await _participationRepository.GetEventParticipantIdsAsync(request.EventId);
-            var bannedUsers = existingParticipants.Where(i => !whiteList.Contains(i)).ToList();
+            await _participantsBWListRepository.AddToWhiteListAsync(request);
+            var whiteList = await _participantsBWListRepository.GetEventWhiteListShortAsync(request.EventId)
+                ?? new List<Guid>();
+
+            var droppedParticipants = existingParticipants.Where(i => !whiteList.Contains(i)).ToList();
+            var cancelledInvitees = invitedUsers
+                .Where(i => !whiteList.Contains(i))
+                .Except(droppedParticipants)
+                .ToList();
 
             await _invitationsRepository.CancelAllInvitationsExceptThisUsersAsync(request.EventId, whiteList);
             await _participationRepository.DropAllParticipationsExceptThisUsersAsync(request.EventId, whiteList);
 
-            await _notificationsService.NotifyNotInWhiteListAsync(request.EventId, bannedUsers);
-
-            //TODO: Сформировать удаление о том что пользователя исключили, если он участвовал в мероприятии или у него было приглашение
+            await _notificationsService.NotifyAddedToWhiteListAsync(request.EventId, notifyAdded);
+            await _notificationsService.NotifyRemovedFromEventAsync(request.EventId, droppedParticipants);
+            await _notificationsService.NotifyNotInWhiteListAsync(request.EventId, cancelledInvitees);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -342,7 +360,12 @@ namespace EList.Services.Impl
             if (!accessError.Success)
                 return accessError;
 
+            var shouldNotify = await ShouldNotifyBwListTargetAsync(eventId, accountId);
+
             await _participantsBWListRepository.DeleteFromBlackListAsync(eventId, accountId);
+
+            if (shouldNotify)
+                await _notificationsService.NotifyRemovedFromBlackListAsync(eventId, new List<Guid> { accountId });
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -360,10 +383,25 @@ namespace EList.Services.Impl
             if (!accessError.Success)
                 return accessError;
 
+            var shouldNotify = await ShouldNotifyBwListTargetAsync(eventId, accountId);
+
             await _participantsBWListRepository.DeleteFromWhiteListAsync(eventId, accountId);
+
+            if (shouldNotify)
+                await _notificationsService.NotifyRemovedFromWhiteListAsync(eventId, new List<Guid> { accountId });
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
+        }
+
+        private async Task<bool> ShouldNotifyBwListTargetAsync(Guid eventId, Guid accountId)
+        {
+            var participants = await _participationRepository.GetEventParticipantIdsAsync(eventId)
+                ?? new List<Guid>();
+            if (participants.Contains(accountId))
+                return true;
+
+            return await _invitationsRepository.IsUserInvitatedAsync(accountId, eventId);
         }
     }
 }

@@ -20,5 +20,6 @@ namespace EList.Repositories.Interfaces
         Task<Guid> CreateMessageAsync(MessageRequest message);
         Task UpdateMessageAsync(MessageRequest message);
         Task DeleteMessageAsync(Guid messageId);
+        Task<List<Guid>> GetConversationAuthorAccountIdsAsync(Guid conversationId);
     }
 }
