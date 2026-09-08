@@ -14,8 +14,8 @@ namespace EList.Api.Infrastructure
         /// </summary>
         public void Apply(OpenApiOperation operation, OperationFilterContext context)
         {
-            if (!context.MethodInfo.GetCustomAttributes(true).Any(x => x is AllowAnonymousAttribute) &&
-                !context.MethodInfo.DeclaringType.GetCustomAttributes(true).Any(x => x is AllowAnonymousAttribute))
+            if ((!context?.MethodInfo?.GetCustomAttributes(true).Any(x => x is AllowAnonymousAttribute) ?? false) &&
+                (!context?.MethodInfo?.DeclaringType?.GetCustomAttributes(true).Any(x => x is AllowAnonymousAttribute) ?? false))
             {
                 operation.Security = new List<OpenApiSecurityRequirement>
                 {
