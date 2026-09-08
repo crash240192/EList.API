@@ -151,6 +151,13 @@ namespace EList.Services.Impl
             if (curEvent.Active == false)
                 return CommandResult.Fail(ErrorCode.EventCancelled, $"Мероприятие было отменено");
 
+            // TicketsEnabled: приглашение не даёт бесплатный вход — нужен билет.
+            if (curEvent.Parameters?.TicketsEnabled == true)
+            {
+                return CommandResult.Fail(ErrorCode.OrganizationPaymentRequired,
+                    "Для участия в этом мероприятии нужно купить билет");
+            }
+
             var participateBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
                 _accountDataHolder.AccountId.Value, EList.Models.Enums.ModerationPenaltyType.BanEventParticipate);
             if (!participateBan.Success)

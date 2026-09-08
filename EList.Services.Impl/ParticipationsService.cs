@@ -70,6 +70,13 @@ namespace EList.Services.Impl
             if (curEvent.Active == false)
                 return CommandResult<Guid?>.Fail(ErrorCode.EventCancelled, "Мероприятие было отменено");
 
+            // TicketsEnabled: участие только через покупку билета (OrdersService).
+            if (curEvent.Parameters?.TicketsEnabled == true)
+            {
+                return CommandResult<Guid?>.Fail(ErrorCode.OrganizationPaymentRequired,
+                    "Для участия в этом мероприятии нужно купить билет");
+            }
+
             var participateBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
                 _accountDataHolder.AccountId.Value, ModerationPenaltyType.BanEventParticipate);
             if (!participateBan.Success)
