@@ -25,9 +25,12 @@ namespace EList.Services.Impl
         private const string LOGGER_NAME = "EList.Services.Impl.AccountsService.";
         #endregion
 
+        /// <summary>
+        /// Документы, которые пользователь обязан принять при регистрации.
+        /// Policy — только для ознакомления, в подписание не входит.
+        /// </summary>
         private static readonly DocumentType[] RequiredRegistrationDocuments =
         {
-            DocumentType.Policy,
             DocumentType.Consent,
             DocumentType.Agreement
         };
@@ -89,10 +92,10 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            if (!request.AcceptPolicy || !request.AcceptConsent || !request.AcceptAgreement)
+            if (!request.AcceptConsent || !request.AcceptAgreement)
             {
                 return CommandResult<Guid?>.Fail(ErrorCode.InvalidValue,
-                    "Для регистрации необходимо принять Политику ПДн, Согласие на обработку ПДн и Пользовательское соглашение");
+                    "Для регистрации необходимо принять Согласие на обработку ПДн и Пользовательское соглашение");
             }
 
             foreach (var documentType in RequiredRegistrationDocuments)

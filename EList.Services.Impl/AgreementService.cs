@@ -27,9 +27,12 @@ namespace EList.Services.Impl
         private readonly IEncryptionTool _encryptionTool;
         private readonly INotificationsService _notificationsService;
 
+        /// <summary>
+        /// При новой версии этих документов шлём AgreementUpdateRequired и ждём повторной подписи.
+        /// Policy информационна — пуш/re-consent не требуется.
+        /// </summary>
         private static readonly DocumentType[] UserReconsentDocumentTypes =
         {
-            DocumentType.Policy,
             DocumentType.Consent,
             DocumentType.Agreement
         };

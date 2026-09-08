@@ -9,13 +9,13 @@ namespace EList.Api.Middleware
 {
     /// <summary>
     /// Блокирует API для авторизованных пользователей, пока они не приняли
-    /// актуальные версии Policy / Consent / Agreement.
+    /// актуальные версии Consent / Agreement.
+    /// Policy (политика обработки ПДн) — информационный документ, подпись не требуется.
     /// </summary>
     public class ReConsentMiddleware
     {
         private static readonly DocumentType[] RequiredUserDocuments =
         {
-            DocumentType.Policy,
             DocumentType.Consent,
             DocumentType.Agreement
         };

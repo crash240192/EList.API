@@ -86,7 +86,7 @@
 
 ### ⚖️ Юридика
 
-- [x] **Enforce consent при регистрации** — `AcceptPolicy/Consent/Agreement`
+- [x] **Enforce consent при регистрации** — `AcceptConsent` / `AcceptAgreement` (Policy информационна, без обязательной галочки)
 - [x] **Re-consent middleware** — `features.reConsentEnforcementEnabled`
 - [x] **Data export API** — `GET /api/accounts/me/export`
 - [x] **Account deletion API** — `DELETE /api/accounts/me` (анонимизация + deactivate)

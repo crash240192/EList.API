@@ -12,9 +12,9 @@
 
 | Было | Стало |
 |------|--------|
-| Согласия опциональны | При регистрации обязательны `AcceptPolicy` / `AcceptConsent` / `AcceptAgreement` |
-| Обновление документов не мешало API | `ReConsentMiddleware`: без актуальных Policy/Consent/Agreement → **403**, `errorCode=AgreementNotFound`, поле `missingDocuments[]` |
-| — | Push `AgreementUpdateRequired` **отдельно на каждый** тип документа (не схлопывать) |
+| Согласия опциональны | При регистрации обязательны `AcceptConsent` / `AcceptAgreement`. **Policy** (политика ПДн) — только для ознакомления, галочка не нужна (`AcceptPolicy` игнорируется) |
+| Обновление документов не мешало API | `ReConsentMiddleware`: без актуальных **Consent/Agreement** → **403**, `errorCode=AgreementNotFound`, поле `missingDocuments[]`. Policy в проверку не входит |
+| — | Push `AgreementUpdateRequired` **отдельно** на Consent и Agreement (не на Policy; не схлопывать типы) |
 | — | `DELETE /api/accounts/me`, `GET /api/accounts/me/export` |
 
 Whitelist при re-consent (запросы не блокируются): `/api/agreements`, `/api/authorization`, `/api/accounts/create`, `/api/accounts/me`, health/swagger (с учётом path base `/eList`).
@@ -72,13 +72,14 @@ Whitelist при re-consent (запросы не блокируются): `/api/
 
 ### B1. Регистрация и re-consent (P0)
 
-1. Чекбоксы трёх документов + ссылки на `GET /api/agreements/documents/last/{type}`.
-2. Без галочек — не отправлять create.
-3. Глобальный обработчик **403** + `errorCode=AgreementNotFound` + `missingDocuments`:
+1. На регистрации: ссылка на Policy (без чекбокса) + обязательные чекбоксы Consent и Agreement; тексты через `GET /api/agreements/documents/last/{type}`.
+2. Без галочек Consent/Agreement — не отправлять create.
+3. Глобальный обработчик **403** + `errorCode=AgreementNotFound` + `missingDocuments` (только Consent/Agreement):
    - экран «Обновите соглашения»;
-   - для каждого типа — текст документа + `GET /api/agreements/agree/{documentType}`;
+   - для каждого типа из `missingDocuments` — текст + `GET /api/agreements/agree/{documentType}`;
    - после принятия — повторить исходный запрос / вернуться в приложение.
-4. По пушу `AgreementUpdateRequired` в ленте — тот же флоу (**по одному документу**, не «все сразу одной кнопкой»).
+4. По пушу `AgreementUpdateRequired` — тот же флоу (**по одному документу** Consent или Agreement; Policy не приходит).
+5. Обновление Policy на бэке не блокирует API и не шлёт re-consent push — UI может показать баннер «обновлена политика» по желанию, без обязательного действия.
 
 ### B2. Возраст
 
@@ -222,7 +223,7 @@ GET    /eList/api/orders/tickets/byCode/{code}
 
 ## Приоритет внедрения на UI
 
-1. Re-consent + регистрация согласий + age `>= 18`
+1. Re-consent + регистрация (Consent/Agreement; Policy без галочки) + age `>= 18`
 2. Лента: новые типы + digests + reply-only чат
 3. Карточка события: Cost «на месте» vs будущие билеты
 4. Delete / export аккаунта
