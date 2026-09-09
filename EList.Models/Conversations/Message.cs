@@ -1,4 +1,5 @@
 ﻿using EList.Models.Accounts;
+using EList.Models.Enums;
 using EList.Models.Person;
 
 namespace EList.Models.Conversations
@@ -61,5 +62,20 @@ namespace EList.Models.Conversations
 
         public AccountPublicData Account { get; set; }  
         public PersonInfo PersonInfo { get; set; }
+
+        /// <summary>
+        /// Количество лайков комментария.
+        /// </summary>
+        public int LikesCount { get; set; }
+
+        /// <summary>
+        /// Количество дизлайков комментария.
+        /// </summary>
+        public int DislikesCount { get; set; }
+
+        /// <summary>
+        /// Голос текущего пользователя, если он уже голосовал.
+        /// </summary>
+        public MessageVoteValue? CurrentUserVote { get; set; }
     }
 }

@@ -19,5 +19,9 @@ namespace EList.Services.Interfaces
         Task<CommandResult<Guid>> CreateMessageAsync(MessageRequest message);
         Task<CommandResult> UpdateMessageAsync(MessageRequest message);
         Task<CommandResult> DeleteMessageAsync(Guid messageId);
+
+        Task<CommandResult<MessageVoteResult>> LikeMessageAsync(Guid messageId);
+        Task<CommandResult<MessageVoteResult>> DislikeMessageAsync(Guid messageId);
+        Task<CommandResult<MessageVoteResult>> RemoveMessageVoteAsync(Guid messageId);
     }
 }

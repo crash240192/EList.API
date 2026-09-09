@@ -4,6 +4,7 @@ using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
 using EList.Models.Conversations;
+using EList.Models.Enums;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
@@ -205,6 +206,7 @@ namespace EList.Services.Impl
                 return CommandResult<PagedList<Message>>.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия");
 
             var result = await _conversationsRepository.GetConversationMessagesAsync(conversationId, pageIndex, pageSize);
+            await _conversationsRepository.ApplyMessageVoteStatsAsync(result.Result, _accountDataHolder.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<Message>>(result);
@@ -247,6 +249,7 @@ namespace EList.Services.Impl
                 return CommandResult<PagedList<Message>>.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия");
 
             var result = await _conversationsRepository.GetMessageRepliesAsync(messageId, pageIndex, pageSize);
+            await _conversationsRepository.ApplyMessageVoteStatsAsync(result.Result, _accountDataHolder.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<Message>>(result);
@@ -311,6 +314,88 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
+        }
+
+        public async Task<CommandResult<MessageVoteResult>> LikeMessageAsync(Guid messageId)
+        {
+            return await SetMessageVoteAsync(messageId, MessageVoteValue.Like);
+        }
+
+        public async Task<CommandResult<MessageVoteResult>> DislikeMessageAsync(Guid messageId)
+        {
+            return await SetMessageVoteAsync(messageId, MessageVoteValue.Dislike);
+        }
+
+        public async Task<CommandResult<MessageVoteResult>> RemoveMessageVoteAsync(Guid messageId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(RemoveMessageVoteAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var access = await EnsureCanVoteAsync(messageId);
+            if (access.Error != null)
+                return CommandResult<MessageVoteResult>.Fail(access.Error.ErrorCode, access.Error.Message);
+
+            var result = await _conversationsRepository.RemoveMessageVoteAsync(messageId, _accountDataHolder.AccountId.Value);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<MessageVoteResult>(result);
+        }
+
+        private async Task<CommandResult<MessageVoteResult>> SetMessageVoteAsync(Guid messageId, MessageVoteValue value)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}SetMessageVoteAsync";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var access = await EnsureCanVoteAsync(messageId);
+            if (access.Error != null)
+                return CommandResult<MessageVoteResult>.Fail(access.Error.ErrorCode, access.Error.Message);
+
+            var previousVote = access.Message.CurrentUserVote;
+            var result = await _conversationsRepository.SetMessageVoteAsync(messageId, _accountDataHolder.AccountId.Value, value);
+
+            if (value == MessageVoteValue.Like
+                && result.CurrentUserVote == MessageVoteValue.Like
+                && previousVote != MessageVoteValue.Like)
+            {
+                await _notificationsService.NotifyCommentLikedAsync(access.Conversation.EventId, messageId);
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<MessageVoteResult>(result);
+        }
+
+        private async Task<(CommandResult? Error, Message? Message, Conversation? Conversation)> EnsureCanVoteAsync(Guid messageId)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return (CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться"), null, null);
+
+            var message = await _conversationsRepository.GetMessageAsync(messageId);
+            if (message == null)
+                return (CommandResult.Fail(ErrorCode.MessageNotFound, "Сообщение не найдено"), null, null);
+
+            if (message.Hidden)
+                return (CommandResult.Fail(ErrorCode.AccessError, "Нельзя оценивать скрытое сообщение"), null, null);
+
+            var conversation = await _conversationsRepository.GetConversationAsync(message.ConversationId);
+            if (conversation == null)
+                return (CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Диалог не найден"), null, null);
+
+            if (conversation.EventId == null)
+                return (CommandResult.Fail(ErrorCode.AccessError, "Лайки и дизлайки доступны только для комментариев на страницах мероприятий"), null, null);
+
+            if (!await CanViewConversationAsync(conversation))
+                return (CommandResult.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия"), null, null);
+
+            var statsMessages = new List<Message> { message };
+            await _conversationsRepository.ApplyMessageVoteStatsAsync(statsMessages, _accountDataHolder.AccountId);
+
+            return (null, message, conversation);
         }
 
         private async Task<bool> IsEventAdminAsync(Guid eventId)

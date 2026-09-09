@@ -1,4 +1,5 @@
 ﻿using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Models.Enums;
 
 namespace EList.DbDataProvider.Interfaces
 {
@@ -20,5 +21,9 @@ namespace EList.DbDataProvider.Interfaces
         Task UpdateMessageAsync(MessageDto message);
         Task DeleteMessageAsync(Guid messageId);
         Task<List<Guid>> GetConversationAuthorAccountIdsAsync(Guid conversationId);
+
+        Task<MessageVoteStatsDto> SetMessageVoteAsync(Guid messageId, Guid accountId, MessageVoteValue value);
+        Task<MessageVoteStatsDto> RemoveMessageVoteAsync(Guid messageId, Guid accountId);
+        Task<Dictionary<Guid, MessageVoteStatsDto>> GetMessageVoteStatsAsync(IReadOnlyCollection<Guid> messageIds, Guid? currentAccountId);
     }
 }
