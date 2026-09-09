@@ -481,6 +481,109 @@ namespace EList.Services.Impl
             return new CommandResult<TicketResponse>(_mapper.Map<TicketResponse>(ticket));
         }
 
+        public async Task<CommandResult<TicketResponse>> ValidateTicketForEventAsync(TicketCheckInRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(ValidateTicketForEventAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            var access = await AssertOrganizerCanManageTicketsAsync(request);
+            if (!access.Success)
+                return CommandResult<TicketResponse>.Fail(access.ErrorCode, access.Message);
+
+            var ticketResult = await LoadTicketForEventCheckInAsync(request);
+            if (!ticketResult.Success)
+                return ticketResult;
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return ticketResult;
+        }
+
+        public async Task<CommandResult<TicketResponse>> CheckInTicketAsync(TicketCheckInRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(CheckInTicketAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            var access = await AssertOrganizerCanManageTicketsAsync(request);
+            if (!access.Success)
+                return CommandResult<TicketResponse>.Fail(access.ErrorCode, access.Message);
+
+            var ticketResult = await LoadTicketForEventCheckInAsync(request);
+            if (!ticketResult.Success)
+                return ticketResult;
+
+            var ticket = await _ordersRepository.GetTicketByCodeAsync(request.Code.Trim());
+            if (ticket == null)
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue, "Билет не найден");
+
+            if (ticket.Status == TicketStatus.Used)
+            {
+                var when = ticket.CheckedInAt?.ToString("u") ?? "ранее";
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
+                    $"Билет уже отмечен как использованный ({when})");
+            }
+
+            if (ticket.Status != TicketStatus.Issued)
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
+                    $"Билет в статусе {ticket.Status} нельзя отметить на входе");
+            }
+
+            var checkedInAt = DateTimeOffset.UtcNow;
+            await _ordersRepository.CheckInTicketAsync(
+                ticket.Id,
+                _accountDataHolder.AccountId!.Value,
+                checkedInAt);
+
+            var updated = await _ordersRepository.GetTicketByCodeAsync(ticket.Code) ?? ticket;
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<TicketResponse>(_mapper.Map<TicketResponse>(updated));
+        }
+
+        private async Task<CommandResult> AssertOrganizerCanManageTicketsAsync(TicketCheckInRequest? request)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+
+            if (request == null || request.EventId == Guid.Empty)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Не указано мероприятие");
+
+            if (string.IsNullOrWhiteSpace(request.Code))
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Не указан код билета");
+
+            var eventItem = await _eventsRepository.GetEventAsync(request.EventId);
+            if (eventItem == null)
+                return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{request.EventId}' не найдено");
+
+            var isOrg = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(
+                request.EventId, _accountDataHolder.AccountId.Value);
+            if (!isOrg && !_accountDataHolder.IsPlatformModeratorOrAbove)
+            {
+                return CommandResult.Fail(ErrorCode.AccessError,
+                    "Отмечать билеты могут только организаторы мероприятия");
+            }
+
+            return CommandResult.OK;
+        }
+
+        private async Task<CommandResult<TicketResponse>> LoadTicketForEventCheckInAsync(TicketCheckInRequest request)
+        {
+            var ticket = await _ordersRepository.GetTicketByCodeAsync(request.Code.Trim());
+            if (ticket == null)
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue, "Билет не найден");
+
+            if (ticket.EventId != request.EventId)
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
+                    "Билет относится к другому мероприятию");
+            }
+
+            return new CommandResult<TicketResponse>(_mapper.Map<TicketResponse>(ticket));
+        }
+
         private async Task FulfillPaidOrderAsync(Guid orderId, Guid buyerAccountId, Guid eventId, int quantity)
         {
             var existing = await _ordersRepository.GetOrderAsync(orderId);

@@ -41,5 +41,15 @@ namespace EList.Models.Orders
         /// Дата выдачи
         /// </summary>
         public DateTimeOffset IssuedAt { get; set; }
+
+        /// <summary>
+        /// Когда отмечено присутствие
+        /// </summary>
+        public DateTimeOffset? CheckedInAt { get; set; }
+
+        /// <summary>
+        /// Кто отметил присутствие
+        /// </summary>
+        public Guid? CheckedInByAccountId { get; set; }
     }
 }

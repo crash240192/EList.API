@@ -155,6 +155,11 @@ namespace EList.Repositories.Impl
             var mappedStatus = _mapper.Map<DbDataProvider.Models.Enums.TicketStatus>(status);
             await _ordersDataProvider.UpdateTicketsStatusByOrderAsync(orderId, mappedStatus);
         }
+
+        public async Task CheckInTicketAsync(Guid ticketId, Guid checkedInByAccountId, DateTimeOffset checkedInAt)
+        {
+            await _ordersDataProvider.CheckInTicketAsync(ticketId, checkedInByAccountId, checkedInAt);
+        }
         #endregion
 
         #region refunds

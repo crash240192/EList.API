@@ -834,11 +834,14 @@ CREATE TABLE IF NOT EXISTS public.tickets (
 	status public.ticket_status NOT NULL DEFAULT 'issued',
 	code varchar NOT NULL,
 	issued_at timestamptz NOT NULL DEFAULT now(),
+	checked_in_at timestamptz NULL,
+	checked_in_by_account_id uuid NULL,
 	CONSTRAINT tickets_pk PRIMARY KEY (id),
 	CONSTRAINT tickets_code_unique UNIQUE (code),
 	CONSTRAINT tickets_order_fk FOREIGN KEY (order_id) REFERENCES public.orders(id),
 	CONSTRAINT tickets_event_fk FOREIGN KEY (event_id) REFERENCES public.events(id),
-	CONSTRAINT tickets_holder_account_fk FOREIGN KEY (holder_account_id) REFERENCES public.accounts(id)
+	CONSTRAINT tickets_holder_account_fk FOREIGN KEY (holder_account_id) REFERENCES public.accounts(id),
+	CONSTRAINT tickets_checked_in_by_account_fk FOREIGN KEY (checked_in_by_account_id) REFERENCES public.accounts(id)
 );
 
 CREATE TABLE IF NOT EXISTS public.refunds (

@@ -28,6 +28,12 @@ namespace EList.DbDataProvider.Models
         [Column("issued_at")]
         public DateTimeOffset IssuedAt { get; set; }
 
+        [Column("checked_in_at")]
+        public DateTimeOffset? CheckedInAt { get; set; }
+
+        [Column("checked_in_by_account_id")]
+        public Guid? CheckedInByAccountId { get; set; }
+
 
         [Association(ThisKey = nameof(OrderId), OtherKey = nameof(OrderDto.Id))]
         public OrderDto Order { get; set; }
@@ -37,5 +43,8 @@ namespace EList.DbDataProvider.Models
 
         [Association(ThisKey = nameof(HolderAccountId), OtherKey = nameof(AccountDto.Id))]
         public AccountDto HolderAccount { get; set; }
+
+        [Association(ThisKey = nameof(CheckedInByAccountId), OtherKey = nameof(AccountDto.Id))]
+        public AccountDto? CheckedInByAccount { get; set; }
     }
 }

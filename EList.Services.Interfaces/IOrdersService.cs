@@ -24,5 +24,11 @@ namespace EList.Services.Interfaces
         Task<CommandResult<List<TicketResponse>>> GetMyTicketsAsync(Guid? eventId = null);
 
         Task<CommandResult<TicketResponse>> GetTicketByCodeAsync(string code);
+
+        /// <summary>Организатор: проверить билет без изменения статуса.</summary>
+        Task<CommandResult<TicketResponse>> ValidateTicketForEventAsync(TicketCheckInRequest request);
+
+        /// <summary>Организатор: отметить присутствие (issued → used).</summary>
+        Task<CommandResult<TicketResponse>> CheckInTicketAsync(TicketCheckInRequest request);
     }
 }
