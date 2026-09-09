@@ -262,21 +262,132 @@ namespace EList.Services.Impl
                     "У заказа нет идентификатора платежа");
             }
 
-            if (_paymentProvider.SupportsManualComplete)
-                await _paymentProvider.CompleteManuallyAsync(providerPaymentId);
-
-            var status = await _paymentProvider.GetStatusAsync(providerPaymentId);
-            if (status.Status != PaymentProviderStatus.Succeeded)
+            if (!_paymentProvider.SupportsManualComplete)
             {
-                return CommandResult<OrderResponse>.Fail(ErrorCode.OrganizationPaymentRequired,
-                    "Платёж ещё не подтверждён провайдером");
+                return CommandResult<OrderResponse>.Fail(ErrorCode.InvalidValue,
+                    "Ручное подтверждение недоступно для текущего платёжного провайдера; дождитесь webhook");
             }
 
-            await FulfillPaidOrderAsync(order.Id, order.BuyerAccountId, order.EventId, order.Quantity);
+            await _paymentProvider.CompleteManuallyAsync(providerPaymentId);
+
+            var payload = YooKassaWebhookPayloadFactory.BuildPaymentSucceeded(
+                providerPaymentId,
+                order.Id,
+                order.AmountTotal,
+                order.Currency);
+
+            var webhookResult = await ProcessYooKassaWebhookAsync(payload);
+            if (!webhookResult.Success)
+                return CommandResult<OrderResponse>.Fail(webhookResult.ErrorCode, webhookResult.Message);
 
             var paid = await _ordersRepository.GetOrderFullAsync(order.Id) ?? order;
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return new CommandResult<OrderResponse>(_mapper.Map<OrderResponse>(paid));
+        }
+
+        public async Task<CommandResult> ProcessYooKassaWebhookAsync(string rawPayload)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(ProcessYooKassaWebhookAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (string.IsNullOrWhiteSpace(rawPayload))
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Пустое тело webhook");
+
+            YooKassaWebhookNotification? notification;
+            try
+            {
+                notification = Newtonsoft.Json.JsonConvert.DeserializeObject<YooKassaWebhookNotification>(rawPayload);
+            }
+            catch (Exception ex)
+            {
+                logger.Debug(correlationId, null, methodName, $"Invalid JSON: {ex.Message}", null);
+                return CommandResult.Fail(ErrorCode.FormatError, "Некорректный JSON webhook ЮKassa");
+            }
+
+            if (notification?.Object == null || string.IsNullOrWhiteSpace(notification.Object.Id))
+                return CommandResult.Fail(ErrorCode.InvalidValue, "В webhook нет object.id платежа");
+
+            var eventName = string.IsNullOrWhiteSpace(notification.Event)
+                ? "payment.unknown"
+                : notification.Event.Trim();
+            var providerPaymentId = notification.Object.Id.Trim();
+            var providerEventId = $"{eventName}:{providerPaymentId}";
+
+            var existingWebhook = await _ordersRepository.GetWebhookEventAsync(
+                PaymentProvider.Yookassa, providerEventId);
+            if (existingWebhook?.ProcessedAt != null)
+            {
+                logger.Debug(correlationId, null, methodName, "Method finished (idempotent)", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
+            Guid webhookId;
+            if (existingWebhook != null)
+            {
+                webhookId = existingWebhook.Id;
+            }
+            else
+            {
+                webhookId = await _ordersRepository.CreateWebhookEventAsync(new PaymentWebhookEvent
+                {
+                    Provider = PaymentProvider.Yookassa,
+                    ProviderEventId = providerEventId,
+                    Payload = rawPayload,
+                    ReceivedAt = DateTimeOffset.UtcNow
+                });
+            }
+
+            Order? order = await _ordersRepository.GetOrderByProviderPaymentAsync(
+                PaymentProvider.Yookassa, providerPaymentId);
+
+            if (order == null
+                && notification.Object.Metadata != null
+                && notification.Object.Metadata.TryGetValue("orderId", out var orderIdRaw)
+                && Guid.TryParse(orderIdRaw, out var orderIdFromMeta))
+            {
+                order = await _ordersRepository.GetOrderAsync(orderIdFromMeta);
+            }
+
+            if (order == null)
+            {
+                await _ordersRepository.MarkWebhookProcessedAsync(webhookId, null);
+                logger.Debug(correlationId, null, methodName,
+                    $"Webhook stored but order not found for payment '{providerPaymentId}'", null, execTime.Elapsed);
+                // OK: событие зафиксировано, ретраи ЮKassa не нужны.
+                return CommandResult.OK;
+            }
+
+            if (string.Equals(eventName, "payment.succeeded", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(notification.Object.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+            {
+                if (_paymentProvider.SupportsManualComplete)
+                    await _paymentProvider.CompleteManuallyAsync(providerPaymentId);
+
+                if (string.IsNullOrWhiteSpace(order.ProviderPaymentId))
+                {
+                    await _ordersRepository.SetProviderPaymentAsync(
+                        order.Id, PaymentProvider.Yookassa, providerPaymentId);
+                }
+
+                await FulfillPaidOrderAsync(order.Id, order.BuyerAccountId, order.EventId, order.Quantity);
+            }
+            else if (string.Equals(eventName, "payment.canceled", StringComparison.OrdinalIgnoreCase)
+                     || string.Equals(notification.Object.Status, "canceled", StringComparison.OrdinalIgnoreCase))
+            {
+                if (order.Status == OrderStatus.Pending || order.Status == OrderStatus.Authorized)
+                    await _ordersRepository.UpdateOrderStatusAsync(order.Id, OrderStatus.Canceled);
+            }
+            else if (string.Equals(eventName, "payment.waiting_for_capture", StringComparison.OrdinalIgnoreCase))
+            {
+                if (order.Status == OrderStatus.Pending)
+                    await _ordersRepository.UpdateOrderStatusAsync(order.Id, OrderStatus.Authorized);
+            }
+
+            await _ordersRepository.MarkWebhookProcessedAsync(webhookId, order.Id);
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
         }
 
         public async Task<CommandResult<OrderResponse>> GetOrderAsync(Guid orderId)
@@ -415,7 +526,7 @@ namespace EList.Services.Impl
                         await _invitationsRepository.DeleteInvitationAsync(eventId, buyerAccountId);
                 }
 
-                await _notificationsService.NotifyParticipatedAsync(eventId);
+                await _notificationsService.NotifyParticipatedAsync(eventId, buyerAccountId);
             }
         }
 

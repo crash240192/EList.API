@@ -33,6 +33,8 @@ namespace EList.Services.Interfaces
         Task<CommandResult> NotifyInvitationCancelledAsync(Guid eventId, Guid invitedAccountId);
 
         Task<CommandResult> NotifyParticipatedAsync(Guid eventId);
+        /// <summary>Участие от имени конкретного аккаунта (например после оплаты по webhook без user-сессии).</summary>
+        Task<CommandResult> NotifyParticipatedAsync(Guid eventId, Guid actorAccountId);
         Task<CommandResult> NotifyEventLeftAsync(Guid eventId);
         Task<CommandResult> NotifyRemovedFromEventAsync(Guid eventId, List<Guid> accountIds);
 

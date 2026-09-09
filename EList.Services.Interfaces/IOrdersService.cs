@@ -7,8 +7,15 @@ namespace EList.Services.Interfaces
     {
         Task<CommandResult<CreateOrderResponse>> CreateOrderAsync(CreateOrderRequest request);
 
-        /// <summary>Подтверждение оплаты (stub / будущий webhook-handler).</summary>
+        /// <summary>
+        /// Stub/debug: имитация успешной оплаты через тот же путь, что webhook ЮKassa.
+        /// </summary>
         Task<CommandResult<OrderResponse>> CompletePaymentAsync(CompletePaymentRequest request);
+
+        /// <summary>
+        /// Обработка notification ЮKassa (и stub-симуляции). Идемпотентно по provider_event_id.
+        /// </summary>
+        Task<CommandResult> ProcessYooKassaWebhookAsync(string rawPayload);
 
         Task<CommandResult<OrderResponse>> GetOrderAsync(Guid orderId);
 

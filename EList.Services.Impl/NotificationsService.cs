@@ -520,7 +520,15 @@ namespace EList.Services.Impl
 
 
         #region participation
-        public async Task<CommandResult> NotifyParticipatedAsync(Guid eventId)
+        public Task<CommandResult> NotifyParticipatedAsync(Guid eventId)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return Task.FromResult(CommandResult.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован"));
+
+            return NotifyParticipatedAsync(eventId, _accountDataHolder.AccountId.Value);
+        }
+
+        public async Task<CommandResult> NotifyParticipatedAsync(Guid eventId, Guid actorAccountId)
         {
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(NotifyParticipatedAsync)}";
@@ -528,8 +536,8 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventData = await _eventsRepository.GetEventAsync(eventId);
-            var actorName = _accountDataHolder.AccountNameFullString ?? "Пользователь";
-            var (subscriberIds, organizatorIds) = await GetParticipationAudienceSplitAsync(eventId);
+            var actorName = await ResolveActorDisplayNameAsync(actorAccountId);
+            var (subscriberIds, organizatorIds) = await GetParticipationAudienceSplitAsync(eventId, actorAccountId);
 
             var notifications = new List<Notification>();
             foreach (var accountId in subscriberIds)
@@ -537,7 +545,7 @@ namespace EList.Services.Impl
                 notifications.Add(BuildNotification(
                     accountId,
                     eventId,
-                    _accountDataHolder.AccountId,
+                    actorAccountId,
                     UserNotificationType.Participated,
                     null,
                     $"{actorName} принял участие в \"{eventData.Name}\"",
@@ -550,6 +558,7 @@ namespace EList.Services.Impl
                 eventId,
                 eventData,
                 actorName,
+                actorAccountId,
                 isJoin: true);
 
             await PersistAndSendAsync(notifications);
@@ -566,8 +575,9 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var eventData = await _eventsRepository.GetEventAsync(eventId);
+            var actorAccountId = _accountDataHolder.AccountId;
             var actorName = _accountDataHolder.AccountNameFullString ?? "Пользователь";
-            var (subscriberIds, organizatorIds) = await GetParticipationAudienceSplitAsync(eventId);
+            var (subscriberIds, organizatorIds) = await GetParticipationAudienceSplitAsync(eventId, actorAccountId);
 
             var notifications = new List<Notification>();
             foreach (var accountId in subscriberIds)
@@ -575,7 +585,7 @@ namespace EList.Services.Impl
                 notifications.Add(BuildNotification(
                     accountId,
                     eventId,
-                    _accountDataHolder.AccountId,
+                    actorAccountId,
                     UserNotificationType.EventLeft,
                     null,
                     $"{actorName} покинул событие \"{eventData.Name}\"",
@@ -588,6 +598,7 @@ namespace EList.Services.Impl
                 eventId,
                 eventData,
                 actorName,
+                actorAccountId,
                 isJoin: false);
 
             await PersistAndSendAsync(notifications);
@@ -1705,14 +1716,16 @@ namespace EList.Services.Impl
             return ids.ToList();
         }
 
-        private async Task<(List<Guid> Subscribers, List<Guid> Organizators)> GetParticipationAudienceSplitAsync(Guid eventId)
+        private async Task<(List<Guid> Subscribers, List<Guid> Organizators)> GetParticipationAudienceSplitAsync(
+            Guid eventId,
+            Guid? actorAccountId)
         {
             var subscribers = new HashSet<Guid>();
-            if (_accountDataHolder.AccountId != null)
+            if (actorAccountId != null)
             {
                 var ids = await _subscriptionsRepository.GetSubscribersIdsAsync(new SubscriptionsSearchRequest
                 {
-                    AccountId = _accountDataHolder.AccountId.Value,
+                    AccountId = actorAccountId.Value,
                     NotifyParticipated = true
                 });
                 if (ids != null)
@@ -1730,10 +1743,10 @@ namespace EList.Services.Impl
                     organizators.Add(id);
             }
 
-            if (_accountDataHolder.AccountId != null)
+            if (actorAccountId != null)
             {
-                subscribers.Remove(_accountDataHolder.AccountId.Value);
-                organizators.Remove(_accountDataHolder.AccountId.Value);
+                subscribers.Remove(actorAccountId.Value);
+                organizators.Remove(actorAccountId.Value);
             }
 
             // Организатор, который уже в подписчиках актора, получает только subscriber-путь (без org digest дубля).
@@ -1748,6 +1761,7 @@ namespace EList.Services.Impl
             Guid eventId,
             Event eventData,
             string actorName,
+            Guid? actorAccountId,
             bool isJoin)
         {
             if (organizatorIds == null || organizatorIds.Count == 0)
@@ -1781,7 +1795,7 @@ namespace EList.Services.Impl
                     notifications.Add(BuildNotification(
                         organizatorId,
                         eventId,
-                        _accountDataHolder.AccountId,
+                        actorAccountId,
                         digestType,
                         title,
                         message,
@@ -1801,7 +1815,7 @@ namespace EList.Services.Impl
                 notifications.Add(BuildNotification(
                     organizatorId,
                     eventId,
-                    _accountDataHolder.AccountId,
+                    actorAccountId,
                     type,
                     null,
                     realtimeMessage,
@@ -1811,8 +1825,25 @@ namespace EList.Services.Impl
 
         private async Task<List<Guid>> GetParticipationActivityRecipientsAsync(Guid eventId)
         {
-            var (subscribers, organizators) = await GetParticipationAudienceSplitAsync(eventId);
+            var (subscribers, organizators) = await GetParticipationAudienceSplitAsync(
+                eventId, _accountDataHolder.AccountId);
             return subscribers.Concat(organizators).Distinct().ToList();
+        }
+
+        private async Task<string> ResolveActorDisplayNameAsync(Guid actorAccountId)
+        {
+            if (_accountDataHolder.AccountId == actorAccountId
+                && !string.IsNullOrWhiteSpace(_accountDataHolder.AccountNameFullString))
+            {
+                return _accountDataHolder.AccountNameFullString;
+            }
+
+            var person = await _personsRepository.GetPersonInfoAsync(actorAccountId);
+            if (!string.IsNullOrWhiteSpace(person?.FIO))
+                return person.FIO;
+
+            var account = await _accountsRepository.GetAccountAsync(actorAccountId);
+            return !string.IsNullOrWhiteSpace(account?.Login) ? account.Login : "Пользователь";
         }
 
         private async Task<HashSet<Guid>> GetNewMessageRecipientsAsync(

@@ -70,7 +70,9 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
-        /// Подтвердить оплату (для YooKassaStub — имитация webhook; для реальной ЮKassa будет отдельный webhook).
+        /// Stub/debug: подтвердить оплату (внутри шлёт synthetic webhook payment.succeeded).
+        /// Предпочтительно для отладки также: POST /api/payments/yookassa/stub/simulate-succeeded
+        /// или POST /api/payments/yookassa/webhook с телом notification.
         /// </summary>
         [HttpPost("payments/complete")]
         public async Task<CommandResult<OrderResponse>> CompletePaymentAsync([FromBody] CompletePaymentRequest request)
