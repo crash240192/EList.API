@@ -30,6 +30,7 @@ namespace EList.DbDataProvider.Interfaces
         Task UpdateTicketStatusAsync(Guid ticketId, TicketStatus status);
         Task UpdateTicketsStatusByOrderAsync(Guid orderId, TicketStatus status);
         Task CheckInTicketAsync(Guid ticketId, Guid checkedInByAccountId, DateTimeOffset checkedInAt);
+        Task ReassignTicketHolderAsync(Guid ticketId, Guid newHolderAccountId);
         #endregion
 
         #region refunds

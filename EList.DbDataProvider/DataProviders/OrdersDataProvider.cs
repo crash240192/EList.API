@@ -191,6 +191,13 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.CheckedInByAccountId, checkedInByAccountId)
                 .UpdateAsync();
         }
+
+        public async Task ReassignTicketHolderAsync(Guid ticketId, Guid newHolderAccountId)
+        {
+            await _connection.Tickets.Where(i => i.Id == ticketId)
+                .Set(i => i.HolderAccountId, newHolderAccountId)
+                .UpdateAsync();
+        }
         #endregion
 
         #region refunds

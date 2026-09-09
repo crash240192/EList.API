@@ -35,6 +35,7 @@ namespace EList.Services.Impl
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
         private readonly INotificationsService _notificationsService;
         private readonly IPaymentProvider _paymentProvider;
+        private readonly IAccountsRepository _accountsRepository;
         private readonly IMapper _mapper;
 
         public OrdersService(
@@ -50,6 +51,7 @@ namespace EList.Services.Impl
             IModerationPenaltiesService moderationPenaltiesService,
             INotificationsService notificationsService,
             IPaymentProvider paymentProvider,
+            IAccountsRepository accountsRepository,
             IMapper mapper)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
@@ -64,6 +66,7 @@ namespace EList.Services.Impl
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _paymentProvider = paymentProvider ?? throw new ArgumentNullException(nameof(paymentProvider));
+            _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
 
@@ -541,6 +544,163 @@ namespace EList.Services.Impl
             var updated = await _ordersRepository.GetTicketByCodeAsync(ticket.Code) ?? ticket;
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return new CommandResult<TicketResponse>(_mapper.Map<TicketResponse>(updated));
+        }
+
+        public async Task<CommandResult<TicketResponse>> TransferTicketAsync(TransferTicketRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(TransferTicketAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<TicketResponse>.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+
+            if (request == null || request.NewHolderAccountId == Guid.Empty)
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
+                    "Укажите нового владельца билета");
+            }
+
+            if (request.TicketId == null && string.IsNullOrWhiteSpace(request.Code))
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
+                    "Укажите ticketId или code");
+            }
+
+            Ticket? ticket = null;
+            if (request.TicketId != null)
+                ticket = await _ordersRepository.GetTicketAsync(request.TicketId.Value);
+            if (ticket == null && !string.IsNullOrWhiteSpace(request.Code))
+                ticket = await _ordersRepository.GetTicketByCodeAsync(request.Code.Trim());
+
+            if (ticket == null)
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue, "Билет не найден");
+
+            var actorId = _accountDataHolder.AccountId.Value;
+            if (ticket.HolderAccountId != actorId)
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.AccessError,
+                    "Передать можно только свой билет");
+            }
+
+            if (ticket.Status != TicketStatus.Issued)
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
+                    $"Билет в статусе {ticket.Status} нельзя передать");
+            }
+
+            if (request.NewHolderAccountId == ticket.HolderAccountId)
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
+                    "Новый владелец совпадает с текущим");
+            }
+
+            var newHolder = await _accountsRepository.GetAccountAsync(request.NewHolderAccountId);
+            if (newHolder == null || !newHolder.Active)
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.AccountNotFound,
+                    "Аккаунт нового владельца не найден или неактивен");
+            }
+
+            var eventItem = await _eventsRepository.GetEventAsync(ticket.EventId);
+            if (eventItem == null)
+                return CommandResult<TicketResponse>.Fail(ErrorCode.EventNotFound, "Мероприятие не найдено");
+
+            if (eventItem.Active == false)
+                return CommandResult<TicketResponse>.Fail(ErrorCode.EventCancelled, "Мероприятие было отменено");
+
+            var recipientAccess = await AssertAccountCanHoldTicketAsync(eventItem, request.NewHolderAccountId);
+            if (recipientAccess != null)
+                return CommandResult<TicketResponse>.Fail(recipientAccess.ErrorCode, recipientAccess.Message);
+
+            var previousHolderId = ticket.HolderAccountId;
+            await _ordersRepository.ReassignTicketHolderAsync(ticket.Id, request.NewHolderAccountId);
+
+            // Участие: отдельные сущности. Перенос «идёт на событие» вместе с билетом.
+            var previousStillHasTicket = await HolderHasActiveTicketForEventAsync(
+                previousHolderId, ticket.EventId, excludeTicketId: ticket.Id);
+            if (!previousStillHasTicket
+                && await _participationsRepository.IsUserParticipatedAsync(previousHolderId, ticket.EventId))
+            {
+                await _participationsRepository.LeaveEventAsync(previousHolderId, ticket.EventId);
+            }
+
+            if (!await _participationsRepository.IsUserParticipatedAsync(request.NewHolderAccountId, ticket.EventId))
+            {
+                if (eventItem.Parameters?.MaxPersonsCount > 0)
+                {
+                    var participantsCount = await _participationsRepository.GetParticipantsCountAsync(ticket.EventId);
+                    if (participantsCount >= eventItem.Parameters.MaxPersonsCount)
+                    {
+                        await _ordersRepository.ReassignTicketHolderAsync(ticket.Id, previousHolderId);
+                        if (!previousStillHasTicket)
+                            await _participationsRepository.ParticipateAsync(previousHolderId, ticket.EventId);
+
+                        return CommandResult<TicketResponse>.Fail(ErrorCode.EventIsFull,
+                            "Недостаточно мест, чтобы передать билет новому участнику");
+                    }
+                }
+
+                await _participationsRepository.ParticipateAsync(request.NewHolderAccountId, ticket.EventId);
+                await _notificationsService.NotifyParticipatedAsync(ticket.EventId, request.NewHolderAccountId);
+            }
+
+            var updated = await _ordersRepository.GetTicketAsync(ticket.Id) ?? ticket;
+            updated.HolderAccountId = request.NewHolderAccountId;
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<TicketResponse>(_mapper.Map<TicketResponse>(updated));
+        }
+
+        private async Task<bool> HolderHasActiveTicketForEventAsync(
+            Guid holderAccountId,
+            Guid eventId,
+            Guid? excludeTicketId)
+        {
+            var tickets = await _ordersRepository.GetTicketsByHolderAsync(holderAccountId) ?? new List<Ticket>();
+            return tickets.Any(t =>
+                t.EventId == eventId
+                && (excludeTicketId == null || t.Id != excludeTicketId.Value)
+                && (t.Status == TicketStatus.Issued || t.Status == TicketStatus.Used));
+        }
+
+        private async Task<CommandResult?> AssertAccountCanHoldTicketAsync(Event eventItem, Guid accountId)
+        {
+            var participateBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                accountId, ModerationPenaltyType.BanEventParticipate);
+            if (!participateBan.Success)
+                return participateBan;
+
+            var eventBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                accountId, ModerationPenaltyType.BanFromEvent, eventItem.Id);
+            if (!eventBan.Success)
+                return eventBan;
+
+            if (eventItem.Parameters?.Private ?? false)
+            {
+                var whiteListCount = await _participantsBWListRepository.WhiteListPersonsCountAsync(eventItem.Id);
+                if (whiteListCount == 0)
+                {
+                    var isUserInvited = await _invitationsRepository.IsUserInvitatedAsync(accountId, eventItem.Id);
+                    if (!isUserInvited)
+                    {
+                        return CommandResult.Fail(ErrorCode.AccessError,
+                            "Получатель не может принять билет на закрытое мероприятие без приглашения");
+                    }
+                }
+                else if (!await _participantsBWListRepository.IsUserInWhiteListAsync(eventItem.Id, accountId))
+                {
+                    return CommandResult.Fail(ErrorCode.AccessError,
+                        "Получатель не в белом списке закрытого мероприятия");
+                }
+            }
+            else if (await _participantsBWListRepository.IsUserInBlackListAsync(eventItem.Id, accountId))
+            {
+                return CommandResult.Fail(ErrorCode.AccessError,
+                    "Получатель в чёрном списке мероприятия");
+            }
+
+            return null;
         }
 
         private async Task<CommandResult> AssertOrganizerCanManageTicketsAsync(TicketCheckInRequest? request)

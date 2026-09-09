@@ -1103,6 +1103,7 @@ CREATE INDEX IF NOT EXISTS orders_status_idx ON public.orders (status);
 CREATE INDEX IF NOT EXISTS tickets_order_id_idx ON public.tickets (order_id);
 CREATE INDEX IF NOT EXISTS tickets_holder_account_id_idx ON public.tickets (holder_account_id);
 CREATE INDEX IF NOT EXISTS tickets_event_id_idx ON public.tickets (event_id);
+CREATE INDEX IF NOT EXISTS tickets_event_status_idx ON public.tickets (event_id, status);
 CREATE UNIQUE INDEX IF NOT EXISTS refunds_provider_refund_uidx ON public.refunds (provider_refund_id) WHERE provider_refund_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS refunds_order_id_idx ON public.refunds (order_id);
 CREATE INDEX IF NOT EXISTS payment_webhook_events_order_id_idx ON public.payment_webhook_events (order_id);

@@ -160,6 +160,11 @@ namespace EList.Repositories.Impl
         {
             await _ordersDataProvider.CheckInTicketAsync(ticketId, checkedInByAccountId, checkedInAt);
         }
+
+        public async Task ReassignTicketHolderAsync(Guid ticketId, Guid newHolderAccountId)
+        {
+            await _ordersDataProvider.ReassignTicketHolderAsync(ticketId, newHolderAccountId);
+        }
         #endregion
 
         #region refunds

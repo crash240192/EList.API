@@ -272,5 +272,35 @@ namespace EList.Api.Controllers
                 throw;
             }
         }
+
+        /// <summary>
+        /// Подарок / передача билета: меняется только holder, buyer заказа прежний.
+        /// </summary>
+        [HttpPost("tickets/transfer")]
+        public async Task<CommandResult<TicketResponse>> TransferTicketAsync([FromBody] TransferTicketRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(TransferTicketAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _ordersService.TransferTicketAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
     }
 }
