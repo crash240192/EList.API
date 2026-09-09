@@ -56,6 +56,7 @@ namespace EList.Services.Interfaces
         /// <summary>Устаревшее имя; используйте <see cref="NotifyCommentRepliedAsync"/>.</summary>
         Task<CommandResult> NotifyCommentRepliedsync(Guid? eventId, Guid messageId, Guid replyId);
         Task<CommandResult> NotifyNewMessageAsync(Guid conversationId, Guid messageId, Guid? eventId = null);
+        Task<CommandResult> NotifyCommentLikedAsync(Guid? eventId, Guid messageId);
 
         Task<CommandResult> NotifyContentReportCreatedAsync(ContentReport report);
         Task<CommandResult> NotifyContentReportResolvedAsync(

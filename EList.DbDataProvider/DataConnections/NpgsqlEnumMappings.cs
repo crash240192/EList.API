@@ -57,6 +57,9 @@ namespace EList.DbDataProvider.DataConnections
                 NpgsqlConnection.GlobalTypeMapper.MapEnum<ModerationPenaltyType>(
                     "public.moderation_penalty_type",
                     translator);
+                NpgsqlConnection.GlobalTypeMapper.MapEnum<MessageVoteValue>(
+                    "public.message_vote_value",
+                    translator);
 #pragma warning restore CS0618
 
                 _registered = true;

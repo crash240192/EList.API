@@ -1107,6 +1107,35 @@ namespace EList.Services.Impl
         public Task<CommandResult> NotifyCommentRepliedsync(Guid? eventId, Guid messageId, Guid replyId)
             => NotifyCommentRepliedAsync(eventId, messageId, replyId);
 
+        public async Task<CommandResult> NotifyCommentLikedAsync(Guid? eventId, Guid messageId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(NotifyCommentLikedAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var message = await _conversationRepository.GetMessageAsync(messageId);
+            if (message?.AccountId == null || message.AccountId == _accountDataHolder.AccountId)
+            {
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
+            var notification = BuildNotification(
+                message.AccountId.Value,
+                eventId,
+                _accountDataHolder.AccountId,
+                UserNotificationType.CommentLiked,
+                $"{_accountDataHolder.AccountNameFullString} оценил ваш комментарий",
+                BuildMessagePreview(message.MessageText),
+                message);
+
+            await PersistAndSendAsync(new List<Notification> { notification });
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
         public async Task<CommandResult> NotifyNewMessageAsync(Guid conversationId, Guid messageId, Guid? eventId = null)
         {
             // Адресация сообщений ещё не реализована: broadcast NewMessage отключён.

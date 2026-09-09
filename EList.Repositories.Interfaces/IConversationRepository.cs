@@ -1,5 +1,6 @@
 ﻿using EList.Common.Models;
 using EList.Models.Conversations;
+using EList.Models.Enums;
 
 namespace EList.Repositories.Interfaces
 {
@@ -21,5 +22,9 @@ namespace EList.Repositories.Interfaces
         Task UpdateMessageAsync(MessageRequest message);
         Task DeleteMessageAsync(Guid messageId);
         Task<List<Guid>> GetConversationAuthorAccountIdsAsync(Guid conversationId);
+
+        Task<MessageVoteResult> SetMessageVoteAsync(Guid messageId, Guid accountId, MessageVoteValue value);
+        Task<MessageVoteResult> RemoveMessageVoteAsync(Guid messageId, Guid accountId);
+        Task ApplyMessageVoteStatsAsync(IEnumerable<Message> messages, Guid? currentAccountId);
     }
 }

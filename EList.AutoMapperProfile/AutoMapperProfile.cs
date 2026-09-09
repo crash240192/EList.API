@@ -225,6 +225,7 @@ namespace EList.AutoMapperProfile
             CreateMap<Models.Enums.ReportResolutionAction, DbDataProvider.Models.Enums.ReportResolutionAction>().ReverseMap();
             CreateMap<Models.Enums.ReportActorContext, DbDataProvider.Models.Enums.ReportActorContext>().ReverseMap();
             CreateMap<Models.Enums.ModerationPenaltyType, DbDataProvider.Models.Enums.ModerationPenaltyType>().ReverseMap();
+            CreateMap<Models.Enums.MessageVoteValue, DbDataProvider.Models.Enums.MessageVoteValue>().ReverseMap();
             CreateMap<ModerationPenaltyDto, ModerationPenalty>().ReverseMap();
         }
 

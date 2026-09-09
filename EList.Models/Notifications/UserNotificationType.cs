@@ -28,6 +28,8 @@
         MessageReplied = 31,
         /// <summary>Новое сообщение в диалоге (не ответ на конкретное сообщение).</summary>
         NewMessage = 32,
+        /// <summary>Лайк комментария на странице мероприятия.</summary>
+        CommentLiked = 33,
 
         AddedToBlackList = 41,
         AddedToWhiteList = 42,

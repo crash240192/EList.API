@@ -4,6 +4,7 @@ using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
 using EList.Models.Accounts;
 using EList.Models.Conversations;
+using EList.Models.Enums;
 using EList.Models.Person;
 using EList.Repositories.Interfaces;
 
@@ -116,6 +117,55 @@ namespace EList.Repositories.Impl
         public async Task<List<Guid>> GetConversationAuthorAccountIdsAsync(Guid conversationId)
         {
             return await _conversationsDataProvider.GetConversationAuthorAccountIdsAsync(conversationId);
+        }
+
+        public async Task<MessageVoteResult> SetMessageVoteAsync(Guid messageId, Guid accountId, MessageVoteValue value)
+        {
+            var dbValue = _mapper.Map<DbDataProvider.Models.Enums.MessageVoteValue>(value);
+            var stats = await _conversationsDataProvider.SetMessageVoteAsync(messageId, accountId, dbValue);
+            return MapVoteResult(stats);
+        }
+
+        public async Task<MessageVoteResult> RemoveMessageVoteAsync(Guid messageId, Guid accountId)
+        {
+            var stats = await _conversationsDataProvider.RemoveMessageVoteAsync(messageId, accountId);
+            return MapVoteResult(stats);
+        }
+
+        public async Task ApplyMessageVoteStatsAsync(IEnumerable<Message> messages, Guid? currentAccountId)
+        {
+            var list = messages?.ToList();
+            if (list == null || list.Count == 0)
+                return;
+
+            var stats = await _conversationsDataProvider.GetMessageVoteStatsAsync(
+                list.Select(m => m.Id).ToList(),
+                currentAccountId);
+
+            foreach (var message in list)
+            {
+                if (!stats.TryGetValue(message.Id, out var item))
+                    continue;
+
+                message.LikesCount = item.LikesCount;
+                message.DislikesCount = item.DislikesCount;
+                message.CurrentUserVote = item.CurrentUserVote == null
+                    ? null
+                    : _mapper.Map<MessageVoteValue>(item.CurrentUserVote.Value);
+            }
+        }
+
+        private MessageVoteResult MapVoteResult(MessageVoteStatsDto stats)
+        {
+            return new MessageVoteResult
+            {
+                MessageId = stats.MessageId,
+                LikesCount = stats.LikesCount,
+                DislikesCount = stats.DislikesCount,
+                CurrentUserVote = stats.CurrentUserVote == null
+                    ? null
+                    : _mapper.Map<MessageVoteValue>(stats.CurrentUserVote.Value)
+            };
         }
     }
 }
