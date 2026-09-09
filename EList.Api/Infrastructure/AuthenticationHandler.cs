@@ -71,7 +71,9 @@ namespace EList.Api.Infrastructure
             "/api/subscriptions/getsubscribers*",
 
             "/api/agreements/age/anonymous/agree",
-            "/api/agreements/age/anonymous/get"
+            "/api/agreements/age/anonymous/get",
+
+            "/api/payments/yookassa/webhook"
         };
 
         private readonly Logger _currentLogger = LogManager.GetCurrentClassLogger();

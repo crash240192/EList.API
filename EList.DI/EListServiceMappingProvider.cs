@@ -12,6 +12,7 @@ using EList.Services.Impl;
 using EList.Services.Impl.AbuseProtection;
 using EList.Services.Impl.Notifications;
 using EList.Services.Impl.OrganizationRegistry;
+using EList.Services.Impl.Payments;
 using EList.Services.Interfaces;
 using EList.Sms;
 using EList.Smtp;
@@ -77,9 +78,12 @@ namespace EList.DI
             mapper.AddScoped<IAccountPlatformRolesService, AccountPlatformRolesService>();
             mapper.AddScoped<IContentReportsService, ContentReportsService>();
             mapper.AddScoped<IModerationPenaltiesService, ModerationPenaltiesService>();
+            mapper.AddScoped<IOrdersService, OrdersService>();
 
             mapper.AddSingleton<WebSocketConnectionManager>();
             mapper.AddSingleton<NotificationFloodGate>();
+            // Платежи: сейчас stub; реальная ЮKassa — заменить реализацию IPaymentProvider.
+            mapper.AddSingleton<IPaymentProvider, YooKassaStubPaymentProvider>();
 
             //Repositories
             mapper.AddScoped<IAgreementRepository, AgreementRepository>();
