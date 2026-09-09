@@ -45,6 +45,16 @@ namespace EList.Models.Orders
         public DateTimeOffset IssuedAt { get; set; }
 
         /// <summary>
+        /// Когда организатор отметил присутствие (check-in).
+        /// </summary>
+        public DateTimeOffset? CheckedInAt { get; set; }
+
+        /// <summary>
+        /// Кто отметил присутствие (организатор / staff).
+        /// </summary>
+        public Guid? CheckedInByAccountId { get; set; }
+
+        /// <summary>
         /// Заказ
         /// </summary>
         public Order? Order { get; set; }
@@ -58,5 +68,10 @@ namespace EList.Models.Orders
         /// Владелец билета
         /// </summary>
         public AccountPublicData? HolderAccount { get; set; }
+
+        /// <summary>
+        /// Кто сделал check-in
+        /// </summary>
+        public AccountPublicData? CheckedInByAccount { get; set; }
     }
 }

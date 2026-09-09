@@ -224,16 +224,20 @@ CREATE TABLE IF NOT EXISTS public.tickets (
 	status public.ticket_status NOT NULL DEFAULT 'issued',
 	code varchar NOT NULL,
 	issued_at timestamptz NOT NULL DEFAULT now(),
+	checked_in_at timestamptz NULL,
+	checked_in_by_account_id uuid NULL,
 	CONSTRAINT tickets_pk PRIMARY KEY (id),
 	CONSTRAINT tickets_code_unique UNIQUE (code),
 	CONSTRAINT tickets_order_fk FOREIGN KEY (order_id) REFERENCES public.orders(id),
 	CONSTRAINT tickets_event_fk FOREIGN KEY (event_id) REFERENCES public.events(id),
-	CONSTRAINT tickets_holder_account_fk FOREIGN KEY (holder_account_id) REFERENCES public.accounts(id)
+	CONSTRAINT tickets_holder_account_fk FOREIGN KEY (holder_account_id) REFERENCES public.accounts(id),
+	CONSTRAINT tickets_checked_in_by_account_fk FOREIGN KEY (checked_in_by_account_id) REFERENCES public.accounts(id)
 );
 
 CREATE INDEX IF NOT EXISTS tickets_order_id_idx ON public.tickets (order_id);
 CREATE INDEX IF NOT EXISTS tickets_holder_account_id_idx ON public.tickets (holder_account_id);
 CREATE INDEX IF NOT EXISTS tickets_event_id_idx ON public.tickets (event_id);
+CREATE INDEX IF NOT EXISTS tickets_event_status_idx ON public.tickets (event_id, status);
 
 
 -- возвраты
@@ -245,6 +249,7 @@ CREATE TABLE IF NOT EXISTS public.refunds (
 	provider_refund_id varchar NULL,
 	status public.refund_status NOT NULL DEFAULT 'pending',
 	create_date timestamptz NOT NULL DEFAULT now(),
+	ticket_ids jsonb NULL,
 	CONSTRAINT refunds_pk PRIMARY KEY (id),
 	CONSTRAINT refunds_order_fk FOREIGN KEY (order_id) REFERENCES public.orders(id),
 	CONSTRAINT refunds_amount_chk CHECK (amount > 0)
@@ -1085,3 +1090,29 @@ CREATE TABLE IF NOT EXISTS public.account_album_parameters(
 	constraint account_album_parameters_pk primary key (album_id),
 	constraint account_album_parameters_album_fk foreign key (album_id) references public.media_albums (id)
 );
+-- Ticket check-in columns (existing DBs that already had tickets table)
+ALTER TABLE public.tickets
+	ADD COLUMN IF NOT EXISTS checked_in_at timestamptz NULL;
+
+ALTER TABLE public.tickets
+	ADD COLUMN IF NOT EXISTS checked_in_by_account_id uuid NULL;
+
+DO $$
+BEGIN
+	IF NOT EXISTS (
+		SELECT 1 FROM pg_constraint WHERE conname = 'tickets_checked_in_by_account_fk'
+	) THEN
+		ALTER TABLE public.tickets
+			ADD CONSTRAINT tickets_checked_in_by_account_fk
+			FOREIGN KEY (checked_in_by_account_id) REFERENCES public.accounts(id);
+	END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS tickets_event_status_idx ON public.tickets (event_id, status);
+CREATE INDEX IF NOT EXISTS tickets_checked_in_by_account_id_idx
+	ON public.tickets (checked_in_by_account_id)
+	WHERE checked_in_by_account_id IS NOT NULL;
+
+-- Refunds: ticket ids covered by refund
+ALTER TABLE public.refunds
+	ADD COLUMN IF NOT EXISTS ticket_ids jsonb NULL;

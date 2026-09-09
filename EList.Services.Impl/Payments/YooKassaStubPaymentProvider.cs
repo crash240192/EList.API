@@ -12,6 +12,7 @@ namespace EList.Services.Impl.Payments
     public class YooKassaStubPaymentProvider : IPaymentProvider
     {
         private readonly ConcurrentDictionary<string, StubPayment> _payments = new();
+        private readonly ConcurrentDictionary<string, StubRefund> _refunds = new();
 
         public PaymentProvider Kind => PaymentProvider.Yookassa;
 
@@ -40,7 +41,6 @@ namespace EList.Services.Impl.Payments
             };
             _payments[providerPaymentId] = payment;
 
-            // Бесплатные заказы не должны сюда попадать; на всякий случай сразу Succeeded.
             if (request.Amount == 0)
             {
                 payment.Status = PaymentProviderStatus.Succeeded;
@@ -81,7 +81,6 @@ namespace EList.Services.Impl.Payments
             if (string.IsNullOrWhiteSpace(providerPaymentId))
                 throw new ArgumentException("providerPaymentId is required", nameof(providerPaymentId));
 
-            // После рестарта процесса in-memory запись может пропасть — создаём Succeeded на лету.
             _payments.AddOrUpdate(
                 providerPaymentId,
                 _ => new StubPayment
@@ -96,6 +95,58 @@ namespace EList.Services.Impl.Payments
                 {
                     existing.Status = PaymentProviderStatus.Succeeded;
                     existing.PaidAt = DateTimeOffset.UtcNow;
+                    return existing;
+                });
+
+            return Task.CompletedTask;
+        }
+
+        public Task<RefundCreationResult> CreateRefundAsync(RefundCreationRequest request)
+        {
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+            if (request.Amount < 0)
+                throw new ArgumentOutOfRangeException(nameof(request.Amount));
+
+            var providerRefundId = $"stub_rfnd_{Guid.NewGuid():N}";
+            _refunds[providerRefundId] = new StubRefund
+            {
+                ProviderRefundId = providerRefundId,
+                ProviderPaymentId = request.ProviderPaymentId,
+                RefundId = request.RefundId,
+                OrderId = request.OrderId,
+                Amount = request.Amount,
+                Currency = string.IsNullOrWhiteSpace(request.Currency) ? "RUB" : request.Currency,
+                Status = request.Amount == 0
+                    ? PaymentProviderStatus.Succeeded
+                    : PaymentProviderStatus.Pending,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+
+            return Task.FromResult(new RefundCreationResult
+            {
+                ProviderRefundId = providerRefundId,
+                Status = _refunds[providerRefundId].Status
+            });
+        }
+
+        public Task CompleteRefundManuallyAsync(string providerRefundId)
+        {
+            if (string.IsNullOrWhiteSpace(providerRefundId))
+                throw new ArgumentException("providerRefundId is required", nameof(providerRefundId));
+
+            _refunds.AddOrUpdate(
+                providerRefundId,
+                _ => new StubRefund
+                {
+                    ProviderRefundId = providerRefundId,
+                    Status = PaymentProviderStatus.Succeeded,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    Currency = "RUB"
+                },
+                (_, existing) =>
+                {
+                    existing.Status = PaymentProviderStatus.Succeeded;
                     return existing;
                 });
 
@@ -125,6 +176,18 @@ namespace EList.Services.Impl.Payments
             public PaymentProviderStatus Status { get; set; }
             public DateTimeOffset CreatedAt { get; set; }
             public DateTimeOffset? PaidAt { get; set; }
+        }
+
+        private sealed class StubRefund
+        {
+            public string ProviderRefundId { get; set; }
+            public string ProviderPaymentId { get; set; }
+            public Guid RefundId { get; set; }
+            public Guid OrderId { get; set; }
+            public decimal Amount { get; set; }
+            public string Currency { get; set; }
+            public PaymentProviderStatus Status { get; set; }
+            public DateTimeOffset CreatedAt { get; set; }
         }
     }
 }

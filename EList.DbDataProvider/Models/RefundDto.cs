@@ -28,6 +28,10 @@ namespace EList.DbDataProvider.Models
         [Column("create_date")]
         public DateTimeOffset CreateDate { get; set; }
 
+        /// <summary>JSON-массив UUID билетов.</summary>
+        [Column("ticket_ids"), DataType("jsonb")]
+        public string? TicketIdsJson { get; set; }
+
 
         [Association(ThisKey = nameof(OrderId), OtherKey = nameof(OrderDto.Id))]
         public OrderDto Order { get; set; }

@@ -7,8 +7,15 @@ namespace EList.Services.Interfaces
     {
         Task<CommandResult<CreateOrderResponse>> CreateOrderAsync(CreateOrderRequest request);
 
-        /// <summary>Подтверждение оплаты (stub / будущий webhook-handler).</summary>
+        /// <summary>
+        /// Stub/debug: имитация успешной оплаты через тот же путь, что webhook ЮKassa.
+        /// </summary>
         Task<CommandResult<OrderResponse>> CompletePaymentAsync(CompletePaymentRequest request);
+
+        /// <summary>
+        /// Обработка notification ЮKassa (и stub-симуляции). Идемпотентно по provider_event_id.
+        /// </summary>
+        Task<CommandResult> ProcessYooKassaWebhookAsync(string rawPayload);
 
         Task<CommandResult<OrderResponse>> GetOrderAsync(Guid orderId);
 
@@ -17,5 +24,22 @@ namespace EList.Services.Interfaces
         Task<CommandResult<List<TicketResponse>>> GetMyTicketsAsync(Guid? eventId = null);
 
         Task<CommandResult<TicketResponse>> GetTicketByCodeAsync(string code);
+
+        /// <summary>Организатор: проверить билет без изменения статуса.</summary>
+        Task<CommandResult<TicketResponse>> ValidateTicketForEventAsync(TicketCheckInRequest request);
+
+        /// <summary>Организатор: отметить присутствие (issued → used).</summary>
+        Task<CommandResult<TicketResponse>> CheckInTicketAsync(TicketCheckInRequest request);
+
+        /// <summary>Подарок/передача: сменить holder, покупатель заказа не меняется.</summary>
+        Task<CommandResult<TicketResponse>> TransferTicketAsync(TransferTicketRequest request);
+
+        /// <summary>Buyer: создать возврат по билетам заказа (issued only).</summary>
+        Task<CommandResult<RefundResponse>> CreateRefundAsync(CreateRefundRequest request);
+
+        /// <summary>Stub/debug: имитация refund.succeeded через webhook-путь.</summary>
+        Task<CommandResult<RefundResponse>> CompleteRefundAsync(CompleteRefundRequest request);
+
+        Task<CommandResult<List<RefundResponse>>> GetRefundsByOrderAsync(Guid orderId);
     }
 }

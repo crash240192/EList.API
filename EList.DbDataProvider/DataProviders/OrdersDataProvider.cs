@@ -136,6 +136,7 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.Order)
                 .LoadWith(i => i.Event)
                 .LoadWith(i => i.HolderAccount)
+                .LoadWith(i => i.CheckedInByAccount)
                 .FirstOrDefaultAsync(i => i.Code == code);
             return result;
         }
@@ -179,6 +180,22 @@ namespace EList.DbDataProvider.DataProviders
         {
             await _connection.Tickets.Where(i => i.OrderId == orderId)
                 .Set(i => i.Status, status)
+                .UpdateAsync();
+        }
+
+        public async Task CheckInTicketAsync(Guid ticketId, Guid checkedInByAccountId, DateTimeOffset checkedInAt)
+        {
+            await _connection.Tickets.Where(i => i.Id == ticketId)
+                .Set(i => i.Status, TicketStatus.Used)
+                .Set(i => i.CheckedInAt, checkedInAt)
+                .Set(i => i.CheckedInByAccountId, checkedInByAccountId)
+                .UpdateAsync();
+        }
+
+        public async Task ReassignTicketHolderAsync(Guid ticketId, Guid newHolderAccountId)
+        {
+            await _connection.Tickets.Where(i => i.Id == ticketId)
+                .Set(i => i.HolderAccountId, newHolderAccountId)
                 .UpdateAsync();
         }
         #endregion

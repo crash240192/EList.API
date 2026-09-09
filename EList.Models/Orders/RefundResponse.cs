@@ -36,5 +36,15 @@ namespace EList.Models.Orders
         /// Дата создания
         /// </summary>
         public DateTimeOffset CreateDate { get; set; }
+
+        /// <summary>
+        /// Идентификатор возврата у провайдера
+        /// </summary>
+        public string? ProviderRefundId { get; set; }
+
+        /// <summary>
+        /// Билеты, покрытые этим возвратом
+        /// </summary>
+        public List<Guid>? TicketIds { get; set; }
     }
 }

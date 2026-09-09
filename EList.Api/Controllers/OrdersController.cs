@@ -70,7 +70,9 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
-        /// Подтвердить оплату (для YooKassaStub — имитация webhook; для реальной ЮKassa будет отдельный webhook).
+        /// Stub/debug: подтвердить оплату (внутри шлёт synthetic webhook payment.succeeded).
+        /// Предпочтительно для отладки также: POST /api/payments/yookassa/stub/simulate-succeeded
+        /// или POST /api/payments/yookassa/webhook с телом notification.
         /// </summary>
         [HttpPost("payments/complete")]
         public async Task<CommandResult<OrderResponse>> CompletePaymentAsync([FromBody] CompletePaymentRequest request)
@@ -197,6 +199,152 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _ordersService.GetTicketByCodeAsync(code);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Организатор: проверить билет по коду без изменения статуса.
+        /// </summary>
+        [HttpPost("tickets/validate")]
+        public async Task<CommandResult<TicketResponse>> ValidateTicketAsync([FromBody] TicketCheckInRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(ValidateTicketAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _ordersService.ValidateTicketForEventAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Организатор: check-in — отметить присутствие (issued → used), фиксирует кто и когда.
+        /// </summary>
+        [HttpPost("tickets/check-in")]
+        public async Task<CommandResult<TicketResponse>> CheckInTicketAsync([FromBody] TicketCheckInRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CheckInTicketAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _ordersService.CheckInTicketAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Подарок / передача билета: меняется только holder, buyer заказа прежний.
+        /// </summary>
+        [HttpPost("tickets/transfer")]
+        public async Task<CommandResult<TicketResponse>> TransferTicketAsync([FromBody] TransferTicketRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(TransferTicketAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _ordersService.TransferTicketAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>Создать возврат по билетам заказа (buyer).</summary>
+        [HttpPost("refunds")]
+        public async Task<CommandResult<RefundResponse>> CreateRefundAsync([FromBody] CreateRefundRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CreateRefundAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _ordersService.CreateRefundAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>Список возвратов по заказу.</summary>
+        [HttpGet("{orderId}/refunds")]
+        public async Task<CommandResult<List<RefundResponse>>> GetRefundsByOrderAsync(Guid orderId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetRefundsByOrderAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _ordersService.GetRefundsByOrderAsync(orderId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
