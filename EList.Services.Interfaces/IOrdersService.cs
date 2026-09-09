@@ -33,5 +33,13 @@ namespace EList.Services.Interfaces
 
         /// <summary>Подарок/передача: сменить holder, покупатель заказа не меняется.</summary>
         Task<CommandResult<TicketResponse>> TransferTicketAsync(TransferTicketRequest request);
+
+        /// <summary>Buyer: создать возврат по билетам заказа (issued only).</summary>
+        Task<CommandResult<RefundResponse>> CreateRefundAsync(CreateRefundRequest request);
+
+        /// <summary>Stub/debug: имитация refund.succeeded через webhook-путь.</summary>
+        Task<CommandResult<RefundResponse>> CompleteRefundAsync(CompleteRefundRequest request);
+
+        Task<CommandResult<List<RefundResponse>>> GetRefundsByOrderAsync(Guid orderId);
     }
 }

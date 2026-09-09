@@ -18,6 +18,11 @@ namespace EList.Services.Interfaces
 
         /// <summary>Только для stub: имитация успешной оплаты.</summary>
         Task CompleteManuallyAsync(string providerPaymentId);
+
+        Task<RefundCreationResult> CreateRefundAsync(RefundCreationRequest request);
+
+        /// <summary>Только для stub: имитация успешного возврата.</summary>
+        Task CompleteRefundManuallyAsync(string providerRefundId);
     }
 
     public class PaymentCreationRequest
@@ -45,6 +50,22 @@ namespace EList.Services.Interfaces
         public PaymentProviderStatus Status { get; set; }
         public decimal? Amount { get; set; }
         public string? Currency { get; set; }
+    }
+
+    public class RefundCreationRequest
+    {
+        public Guid RefundId { get; set; }
+        public Guid OrderId { get; set; }
+        public string ProviderPaymentId { get; set; }
+        public decimal Amount { get; set; }
+        public string Currency { get; set; } = "RUB";
+        public string? Reason { get; set; }
+    }
+
+    public class RefundCreationResult
+    {
+        public string ProviderRefundId { get; set; }
+        public PaymentProviderStatus Status { get; set; }
     }
 
     public enum PaymentProviderStatus

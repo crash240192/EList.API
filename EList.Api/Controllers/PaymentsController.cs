@@ -109,5 +109,37 @@ namespace EList.Api.Controllers
                 throw;
             }
         }
+
+        /// <summary>
+        /// Отладка stub: имитировать refund.succeeded webhook.
+        /// </summary>
+        [Authorize]
+        [HttpPost("/api/payments/yookassa/stub/simulate-refund-succeeded")]
+        public async Task<CommandResult<RefundResponse>> SimulateRefundSucceededAsync(
+            [FromBody] CompleteRefundRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SimulateRefundSucceededAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _ordersService.CompleteRefundAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
     }
 }

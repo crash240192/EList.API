@@ -23,6 +23,10 @@ namespace EList.Models.Orders
         [JsonProperty("id")]
         public string Id { get; set; }
 
+        /// <summary>Для refund.* — id исходного платежа.</summary>
+        [JsonProperty("payment_id")]
+        public string? PaymentId { get; set; }
+
         [JsonProperty("status")]
         public string Status { get; set; }
 

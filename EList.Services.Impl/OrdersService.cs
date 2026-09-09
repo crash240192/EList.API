@@ -310,13 +310,13 @@ namespace EList.Services.Impl
             }
 
             if (notification?.Object == null || string.IsNullOrWhiteSpace(notification.Object.Id))
-                return CommandResult.Fail(ErrorCode.InvalidValue, "В webhook нет object.id платежа");
+                return CommandResult.Fail(ErrorCode.InvalidValue, "В webhook нет object.id");
 
             var eventName = string.IsNullOrWhiteSpace(notification.Event)
-                ? "payment.unknown"
+                ? "unknown"
                 : notification.Event.Trim();
-            var providerPaymentId = notification.Object.Id.Trim();
-            var providerEventId = $"{eventName}:{providerPaymentId}";
+            var objectId = notification.Object.Id.Trim();
+            var providerEventId = $"{eventName}:{objectId}";
 
             var existingWebhook = await _ordersRepository.GetWebhookEventAsync(
                 PaymentProvider.Yookassa, providerEventId);
@@ -342,6 +342,13 @@ namespace EList.Services.Impl
                 });
             }
 
+            if (eventName.StartsWith("refund.", StringComparison.OrdinalIgnoreCase))
+            {
+                return await ProcessRefundWebhookAsync(
+                    notification, eventName, objectId, webhookId, correlationId, methodName, execTime);
+            }
+
+            var providerPaymentId = objectId;
             Order? order = await _ordersRepository.GetOrderByProviderPaymentAsync(
                 PaymentProvider.Yookassa, providerPaymentId);
 
@@ -358,12 +365,12 @@ namespace EList.Services.Impl
                 await _ordersRepository.MarkWebhookProcessedAsync(webhookId, null);
                 logger.Debug(correlationId, null, methodName,
                     $"Webhook stored but order not found for payment '{providerPaymentId}'", null, execTime.Elapsed);
-                // OK: событие зафиксировано, ретраи ЮKassa не нужны.
                 return CommandResult.OK;
             }
 
             if (string.Equals(eventName, "payment.succeeded", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(notification.Object.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+                || (eventName.StartsWith("payment.", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(notification.Object.Status, "succeeded", StringComparison.OrdinalIgnoreCase)))
             {
                 if (_paymentProvider.SupportsManualComplete)
                     await _paymentProvider.CompleteManuallyAsync(providerPaymentId);
@@ -391,6 +398,366 @@ namespace EList.Services.Impl
             await _ordersRepository.MarkWebhookProcessedAsync(webhookId, order.Id);
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
+        }
+
+        private async Task<CommandResult> ProcessRefundWebhookAsync(
+            YooKassaWebhookNotification notification,
+            string eventName,
+            string providerRefundId,
+            Guid webhookId,
+            string correlationId,
+            string methodName,
+            Stopwatch execTime)
+        {
+            Refund? refund = await _ordersRepository.GetRefundByProviderRefundIdAsync(providerRefundId);
+
+            if (refund == null
+                && notification.Object.Metadata != null
+                && notification.Object.Metadata.TryGetValue("refundId", out var refundIdRaw)
+                && Guid.TryParse(refundIdRaw, out var refundIdFromMeta))
+            {
+                refund = await _ordersRepository.GetRefundAsync(refundIdFromMeta);
+            }
+
+            if (refund == null)
+            {
+                await _ordersRepository.MarkWebhookProcessedAsync(webhookId, null);
+                logger.Debug(correlationId, null, methodName,
+                    $"Webhook stored but refund not found '{providerRefundId}'", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
+            if (string.Equals(eventName, "refund.succeeded", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(notification.Object.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+            {
+                await FulfillRefundAsync(refund);
+            }
+            else if (string.Equals(eventName, "refund.canceled", StringComparison.OrdinalIgnoreCase)
+                     || string.Equals(notification.Object.Status, "canceled", StringComparison.OrdinalIgnoreCase))
+            {
+                if (refund.Status == RefundStatus.Pending)
+                    await _ordersRepository.UpdateRefundStatusAsync(refund.Id, RefundStatus.Failed, providerRefundId);
+            }
+
+            await _ordersRepository.MarkWebhookProcessedAsync(webhookId, refund.OrderId);
+            logger.Debug(correlationId, null, methodName, "Method finished (refund)", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult<RefundResponse>> CreateRefundAsync(CreateRefundRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(CreateRefundAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<RefundResponse>.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+
+            if (request == null || request.OrderId == Guid.Empty)
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue, "Не указан заказ");
+
+            var order = await _ordersRepository.GetOrderAsync(request.OrderId);
+            if (order == null)
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue, "Заказ не найден");
+
+            var isBuyer = order.BuyerAccountId == _accountDataHolder.AccountId.Value;
+            var isStaff = _accountDataHolder.IsPlatformModeratorOrAbove;
+            if (!isBuyer && !isStaff)
+                return CommandResult<RefundResponse>.Fail(ErrorCode.AccessError, "Возврат доступен покупателю заказа");
+
+            if (order.Status != OrderStatus.Paid && order.Status != OrderStatus.PartiallyRefunded)
+            {
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue,
+                    $"Заказ в статусе {order.Status} нельзя вернуть");
+            }
+
+            var tickets = await _ordersRepository.GetTicketsByOrderAsync(order.Id) ?? new List<Ticket>();
+            List<Ticket> selected;
+            if (request.TicketIds == null || request.TicketIds.Count == 0)
+            {
+                selected = tickets.Where(t => t.Status == TicketStatus.Issued).ToList();
+            }
+            else
+            {
+                var idSet = request.TicketIds.Distinct().ToHashSet();
+                selected = tickets.Where(t => idSet.Contains(t.Id)).ToList();
+                if (selected.Count != idSet.Count)
+                {
+                    return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue,
+                        "Часть указанных билетов не принадлежит заказу");
+                }
+            }
+
+            if (selected.Count == 0)
+            {
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue,
+                    "Нет билетов со статусом issued для возврата");
+            }
+
+            if (selected.Any(t => t.Status == TicketStatus.Used))
+            {
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue,
+                    "Билет после check-in вернуть нельзя");
+            }
+
+            if (selected.Any(t => t.Status != TicketStatus.Issued))
+            {
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue,
+                    "Вернуть можно только билеты в статусе issued");
+            }
+
+            var existingRefunds = await _ordersRepository.GetRefundsByOrderAsync(order.Id) ?? new List<Refund>();
+            var lockedTicketIds = existingRefunds
+                .Where(r => r.Status == RefundStatus.Pending || r.Status == RefundStatus.Succeeded)
+                .SelectMany(r => r.TicketIds ?? new List<Guid>())
+                .ToHashSet();
+            if (selected.Any(t => lockedTicketIds.Contains(t.Id)))
+            {
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue,
+                    "По одному из билетов уже есть возврат или заявка на возврат");
+            }
+
+            var amount = CalculateRefundAmount(order, selected.Count);
+            if (amount < 0)
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue, "Некорректная сумма возврата");
+
+            // amount=0 допустим для бесплатных билетов (void без денег) — но CHECK amount > 0 в БД!
+            // Для free: минимальная сумма обхода — используем fulfill без Refund row? 
+            // Schema: refunds_amount_chk CHECK (amount > 0). So for free tickets use 0.01? Or void without refund record.
+            // Better: for AmountTotal==0, mark tickets refunded directly without Refund entity / with special path.
+            if (order.AmountTotal == 0 || amount == 0)
+            {
+                foreach (var ticket in selected)
+                    await _ordersRepository.UpdateTicketStatusAsync(ticket.Id, TicketStatus.Refunded);
+
+                await RefreshOrderRefundStatusAsync(order.Id);
+                await CleanupParticipationForTicketsAsync(selected);
+
+                // Синтетический ответ без строки refund при amount=0
+                var freeRefund = new RefundResponse
+                {
+                    Id = Guid.Empty,
+                    OrderId = order.Id,
+                    Amount = 0,
+                    Reason = request.Reason ?? "free_ticket_void",
+                    Status = RefundStatus.Succeeded,
+                    CreateDate = DateTimeOffset.UtcNow,
+                    TicketIds = selected.Select(t => t.Id).ToList()
+                };
+                logger.Debug(correlationId, null, methodName, "Method finished (free void)", null, execTime.Elapsed);
+                return new CommandResult<RefundResponse>(freeRefund);
+            }
+
+            var refund = new Refund
+            {
+                OrderId = order.Id,
+                Amount = amount,
+                Reason = request.Reason,
+                Status = RefundStatus.Pending,
+                CreateDate = DateTimeOffset.UtcNow,
+                TicketIds = selected.Select(t => t.Id).ToList()
+            };
+            refund.Id = await _ordersRepository.CreateRefundAsync(refund);
+
+            if (string.IsNullOrWhiteSpace(order.ProviderPaymentId))
+            {
+                // Оплачен без провайдера (не должно для amount>0) — fulfill локально
+                await FulfillRefundAsync(refund);
+                var done = await _ordersRepository.GetRefundAsync(refund.Id) ?? refund;
+                logger.Debug(correlationId, null, methodName, "Method finished (local)", null, execTime.Elapsed);
+                return new CommandResult<RefundResponse>(_mapper.Map<RefundResponse>(done));
+            }
+
+            var providerRefund = await _paymentProvider.CreateRefundAsync(new RefundCreationRequest
+            {
+                RefundId = refund.Id,
+                OrderId = order.Id,
+                ProviderPaymentId = order.ProviderPaymentId,
+                Amount = amount,
+                Currency = order.Currency,
+                Reason = request.Reason
+            });
+
+            await _ordersRepository.UpdateRefundStatusAsync(
+                refund.Id, RefundStatus.Pending, providerRefund.ProviderRefundId);
+
+            if (providerRefund.Status == PaymentProviderStatus.Succeeded)
+                await FulfillRefundAsync(refund);
+
+            var created = await _ordersRepository.GetRefundAsync(refund.Id) ?? refund;
+            created.ProviderRefundId = providerRefund.ProviderRefundId;
+            created.TicketIds = refund.TicketIds;
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<RefundResponse>(_mapper.Map<RefundResponse>(created));
+        }
+
+        public async Task<CommandResult<RefundResponse>> CompleteRefundAsync(CompleteRefundRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(CompleteRefundAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<RefundResponse>.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+
+            if (request == null
+                || (request.RefundId == null
+                    && request.OrderId == null
+                    && string.IsNullOrWhiteSpace(request.ProviderRefundId)))
+            {
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue,
+                    "Укажите refundId, orderId или providerRefundId");
+            }
+
+            Refund? refund = null;
+            if (request.RefundId != null)
+                refund = await _ordersRepository.GetRefundAsync(request.RefundId.Value);
+            if (refund == null && !string.IsNullOrWhiteSpace(request.ProviderRefundId))
+                refund = await _ordersRepository.GetRefundByProviderRefundIdAsync(request.ProviderRefundId.Trim());
+            if (refund == null && request.OrderId != null)
+            {
+                var list = await _ordersRepository.GetRefundsByOrderAsync(request.OrderId.Value);
+                refund = list?.Where(r => r.Status == RefundStatus.Pending)
+                    .OrderByDescending(r => r.CreateDate)
+                    .FirstOrDefault();
+            }
+
+            if (refund == null)
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue, "Возврат не найден");
+
+            var order = await _ordersRepository.GetOrderAsync(refund.OrderId);
+            if (order == null)
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue, "Заказ не найден");
+
+            if (order.BuyerAccountId != _accountDataHolder.AccountId.Value
+                && !_accountDataHolder.IsPlatformModeratorOrAbove)
+            {
+                return CommandResult<RefundResponse>.Fail(ErrorCode.AccessError, "Нет доступа к возврату");
+            }
+
+            if (refund.Status == RefundStatus.Succeeded)
+            {
+                logger.Debug(correlationId, null, methodName, "Method finished (already)", null, execTime.Elapsed);
+                return new CommandResult<RefundResponse>(_mapper.Map<RefundResponse>(refund));
+            }
+
+            if (!_paymentProvider.SupportsManualComplete)
+            {
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue,
+                    "Ручное подтверждение возврата недоступно; дождитесь webhook");
+            }
+
+            if (string.IsNullOrWhiteSpace(refund.ProviderRefundId))
+            {
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue,
+                    "У возврата нет provider_refund_id");
+            }
+
+            await _paymentProvider.CompleteRefundManuallyAsync(refund.ProviderRefundId);
+
+            var payload = YooKassaWebhookPayloadFactory.BuildRefundSucceeded(
+                refund.ProviderRefundId,
+                order.ProviderPaymentId ?? string.Empty,
+                order.Id,
+                refund.Id,
+                refund.Amount,
+                order.Currency);
+
+            var webhookResult = await ProcessYooKassaWebhookAsync(payload);
+            if (!webhookResult.Success)
+                return CommandResult<RefundResponse>.Fail(webhookResult.ErrorCode, webhookResult.Message);
+
+            var done = await _ordersRepository.GetRefundAsync(refund.Id) ?? refund;
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<RefundResponse>(_mapper.Map<RefundResponse>(done));
+        }
+
+        public async Task<CommandResult<List<RefundResponse>>> GetRefundsByOrderAsync(Guid orderId)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<List<RefundResponse>>.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+
+            var order = await _ordersRepository.GetOrderAsync(orderId);
+            if (order == null)
+                return CommandResult<List<RefundResponse>>.Fail(ErrorCode.InvalidValue, "Заказ не найден");
+
+            var isBuyer = order.BuyerAccountId == _accountDataHolder.AccountId.Value;
+            var isOrg = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(
+                order.EventId, _accountDataHolder.AccountId.Value);
+            if (!isBuyer && !isOrg && !_accountDataHolder.IsPlatformModeratorOrAbove)
+                return CommandResult<List<RefundResponse>>.Fail(ErrorCode.AccessError, "Нет доступа");
+
+            var refunds = await _ordersRepository.GetRefundsByOrderAsync(orderId) ?? new List<Refund>();
+            return new CommandResult<List<RefundResponse>>(
+                refunds.Select(r => _mapper.Map<RefundResponse>(r)).ToList());
+        }
+
+        private async Task FulfillRefundAsync(Refund refund)
+        {
+            if (refund.Status == RefundStatus.Succeeded)
+                return;
+
+            await _ordersRepository.UpdateRefundStatusAsync(
+                refund.Id, RefundStatus.Succeeded, refund.ProviderRefundId);
+
+            var tickets = await _ordersRepository.GetTicketsByOrderAsync(refund.OrderId) ?? new List<Ticket>();
+            var ids = (refund.TicketIds ?? new List<Guid>()).ToHashSet();
+            var affected = ids.Count == 0
+                ? tickets.Where(t => t.Status == TicketStatus.Issued).ToList()
+                : tickets.Where(t => ids.Contains(t.Id)).ToList();
+
+            foreach (var ticket in affected.Where(t => t.Status == TicketStatus.Issued))
+                await _ordersRepository.UpdateTicketStatusAsync(ticket.Id, TicketStatus.Refunded);
+
+            await RefreshOrderRefundStatusAsync(refund.OrderId);
+            await CleanupParticipationForTicketsAsync(affected);
+        }
+
+        private async Task RefreshOrderRefundStatusAsync(Guid orderId)
+        {
+            var tickets = await _ordersRepository.GetTicketsByOrderAsync(orderId) ?? new List<Ticket>();
+            if (tickets.Count == 0)
+            {
+                await _ordersRepository.UpdateOrderStatusAsync(orderId, OrderStatus.Refunded);
+                return;
+            }
+
+            var anyActive = tickets.Any(t => t.Status == TicketStatus.Issued || t.Status == TicketStatus.Used);
+            var anyRefunded = tickets.Any(t => t.Status == TicketStatus.Refunded || t.Status == TicketStatus.Void);
+            if (!anyActive && anyRefunded)
+                await _ordersRepository.UpdateOrderStatusAsync(orderId, OrderStatus.Refunded);
+            else if (anyRefunded)
+                await _ordersRepository.UpdateOrderStatusAsync(orderId, OrderStatus.PartiallyRefunded);
+        }
+
+        private async Task CleanupParticipationForTicketsAsync(List<Ticket> affectedTickets)
+        {
+            foreach (var group in affectedTickets.GroupBy(t => new { t.HolderAccountId, t.EventId }))
+            {
+                var stillHas = await HolderHasActiveTicketForEventAsync(
+                    group.Key.HolderAccountId, group.Key.EventId, excludeTicketId: null);
+                // affected already refunded in DB — HolderHasActiveTicket checks issued/used only
+                if (!stillHas
+                    && await _participationsRepository.IsUserParticipatedAsync(
+                        group.Key.HolderAccountId, group.Key.EventId))
+                {
+                    await _participationsRepository.LeaveEventAsync(
+                        group.Key.HolderAccountId, group.Key.EventId);
+                }
+            }
+        }
+
+        private static decimal CalculateRefundAmount(Order order, int ticketCount)
+        {
+            if (order.Quantity <= 0 || ticketCount <= 0)
+                return 0m;
+            if (ticketCount >= order.Quantity)
+                return order.AmountTotal;
+
+            var unit = order.AmountTotal / order.Quantity;
+            return Math.Round(unit * ticketCount, 2, MidpointRounding.AwayFromZero);
         }
 
         public async Task<CommandResult<OrderResponse>> GetOrderAsync(Guid orderId)

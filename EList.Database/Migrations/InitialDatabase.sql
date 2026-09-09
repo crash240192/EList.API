@@ -852,6 +852,7 @@ CREATE TABLE IF NOT EXISTS public.refunds (
 	provider_refund_id varchar NULL,
 	status public.refund_status NOT NULL DEFAULT 'pending',
 	create_date timestamptz NOT NULL DEFAULT now(),
+	ticket_ids jsonb NULL,
 	CONSTRAINT refunds_pk PRIMARY KEY (id),
 	CONSTRAINT refunds_order_fk FOREIGN KEY (order_id) REFERENCES public.orders(id),
 	CONSTRAINT refunds_amount_chk CHECK (amount > 0)

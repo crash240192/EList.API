@@ -143,7 +143,10 @@ namespace EList.AutoMapperProfile
 
             CreateMap<OrderDto, Order>().ReverseMap();
             CreateMap<TicketDto, Ticket>().ReverseMap();
-            CreateMap<RefundDto, Refund>().ReverseMap();
+            CreateMap<RefundDto, Refund>()
+                .ForMember(dest => dest.TicketIds, opt => opt.MapFrom(src => DeserializeGuidList(src.TicketIdsJson)));
+            CreateMap<Refund, RefundDto>()
+                .ForMember(dest => dest.TicketIdsJson, opt => opt.MapFrom(src => SerializeGuidList(src.TicketIds)));
             CreateMap<PaymentWebhookEventDto, PaymentWebhookEvent>().ReverseMap();
             CreateMap<Order, OrderResponse>();
             CreateMap<Ticket, TicketResponse>();
@@ -226,6 +229,27 @@ namespace EList.AutoMapperProfile
             CreateMap<Models.Enums.ReportActorContext, DbDataProvider.Models.Enums.ReportActorContext>().ReverseMap();
             CreateMap<Models.Enums.ModerationPenaltyType, DbDataProvider.Models.Enums.ModerationPenaltyType>().ReverseMap();
             CreateMap<ModerationPenaltyDto, ModerationPenalty>().ReverseMap();
+        }
+
+        private static List<Guid>? DeserializeGuidList(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return null;
+            try
+            {
+                return JsonConvert.DeserializeObject<List<Guid>>(json);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string? SerializeGuidList(List<Guid>? ids)
+        {
+            if (ids == null || ids.Count == 0)
+                return null;
+            return JsonConvert.SerializeObject(ids);
         }
 
         private static UserNotificationType? MapNotificationTypeFromDb(string? type)

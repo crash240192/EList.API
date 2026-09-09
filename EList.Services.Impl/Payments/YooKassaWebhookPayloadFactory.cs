@@ -68,5 +68,39 @@ namespace EList.Services.Impl.Payments
 
             return JsonConvert.SerializeObject(notification);
         }
+
+        public static string BuildRefundSucceeded(
+            string providerRefundId,
+            string providerPaymentId,
+            Guid orderId,
+            Guid refundId,
+            decimal amount,
+            string currency = "RUB")
+        {
+            var notification = new YooKassaWebhookNotification
+            {
+                Type = "notification",
+                Event = "refund.succeeded",
+                Object = new YooKassaPaymentObject
+                {
+                    Id = providerRefundId,
+                    PaymentId = providerPaymentId,
+                    Status = "succeeded",
+                    Paid = null,
+                    Amount = new YooKassaAmount
+                    {
+                        Value = amount.ToString("0.00", CultureInfo.InvariantCulture),
+                        Currency = string.IsNullOrWhiteSpace(currency) ? "RUB" : currency
+                    },
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["orderId"] = orderId.ToString("D"),
+                        ["refundId"] = refundId.ToString("D")
+                    }
+                }
+            };
+
+            return JsonConvert.SerializeObject(notification);
+        }
     }
 }

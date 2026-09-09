@@ -249,6 +249,7 @@ CREATE TABLE IF NOT EXISTS public.refunds (
 	provider_refund_id varchar NULL,
 	status public.refund_status NOT NULL DEFAULT 'pending',
 	create_date timestamptz NOT NULL DEFAULT now(),
+	ticket_ids jsonb NULL,
 	CONSTRAINT refunds_pk PRIMARY KEY (id),
 	CONSTRAINT refunds_order_fk FOREIGN KEY (order_id) REFERENCES public.orders(id),
 	CONSTRAINT refunds_amount_chk CHECK (amount > 0)
@@ -1111,3 +1112,7 @@ CREATE INDEX IF NOT EXISTS tickets_event_status_idx ON public.tickets (event_id,
 CREATE INDEX IF NOT EXISTS tickets_checked_in_by_account_id_idx
 	ON public.tickets (checked_in_by_account_id)
 	WHERE checked_in_by_account_id IS NOT NULL;
+
+-- Refunds: ticket ids covered by refund
+ALTER TABLE public.refunds
+	ADD COLUMN IF NOT EXISTS ticket_ids jsonb NULL;
