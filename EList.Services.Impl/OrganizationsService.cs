@@ -5,6 +5,7 @@ using EList.Common.Models;
 using EList.Common.Support;
 using EList.Models.Enums;
 using EList.Models.Organizations;
+using EList.Models.Subscriptions;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
@@ -20,9 +21,12 @@ namespace EList.Services.Impl
         private const string LOGGER_NAME = "EList.Services.Impl.OrganizationsService.";
         #endregion
 
+        private const int MaxManagersPerBatch = 100;
+
         private readonly IOrganizationsRepository _organizationsRepository;
         private readonly IAccountsRepository _accountsRepository;
         private readonly IWalletsRepository _walletsRepository;
+        private readonly ISubscriptionsRepository _subscriptionsRepository;
         private readonly IOrganizationRegistryClient _organizationRegistryClient;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly ICorrelationIdProvider _correlationIdProvider;
@@ -32,6 +36,7 @@ namespace EList.Services.Impl
         public OrganizationsService(IOrganizationsRepository organizationsRepository,
             IAccountsRepository accountsRepository,
             IWalletsRepository walletsRepository,
+            ISubscriptionsRepository subscriptionsRepository,
             IOrganizationRegistryClient organizationRegistryClient,
             IAccountDataHolder accountDataHolder,
             ICorrelationIdProvider correlationIdProvider,
@@ -41,6 +46,7 @@ namespace EList.Services.Impl
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _walletsRepository = walletsRepository ?? throw new ArgumentNullException(nameof(walletsRepository));
+            _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
             _organizationRegistryClient = organizationRegistryClient ?? throw new ArgumentNullException(nameof(organizationRegistryClient));
             _accountDataHolder = accountDataHolder;
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
@@ -246,39 +252,95 @@ namespace EList.Services.Impl
             if (request.AccountId == Guid.Empty)
                 return CommandResult<Guid?>.Fail(ErrorCode.IsNullOrEmpty, "Не указан аккаунт менеджера");
 
-            var account = await _accountsRepository.GetAccountAsync(request.AccountId);
-            if (account == null)
+            var addResult = await AddOrReactivateManagerAsync(organizationId, request.AccountId);
+            if (addResult.Status == AddManagerStatus.NotFound)
                 return CommandResult<Guid?>.Fail(ErrorCode.AccountNotFound, $"Аккаунт с id='{request.AccountId}' не найден");
 
-            var existingMember = await _organizationsRepository.GetMemberAsync(organizationId, request.AccountId);
-            if (existingMember != null)
-            {
-                if (existingMember.Active)
-                    return CommandResult<Guid?>.Fail(ErrorCode.OrganizationMemberAlreadyExists, "Пользователь уже является участником организации");
-
-                await _organizationsRepository.SetMemberActiveAsync(organizationId, request.AccountId, true);
-                if (existingMember.Role != OrganizationMemberRole.Owner)
-                    await _organizationsRepository.UpdateMemberRoleAsync(organizationId, request.AccountId, OrganizationMemberRole.Manager);
-
-                await _notificationsService.NotifyOrganizationMemberAddedAsync(organizationId, request.AccountId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return new CommandResult<Guid?>(existingMember.Id);
-            }
-
-            var memberId = await _organizationsRepository.AddMemberAsync(new OrganizationMember
-            {
-                OrganizationId = organizationId,
-                AccountId = request.AccountId,
-                Role = OrganizationMemberRole.Manager,
-                Active = true,
-                InvitedBy = _accountDataHolder.AccountId
-            });
-
-            await _notificationsService.NotifyOrganizationMemberAddedAsync(organizationId, request.AccountId);
+            if (addResult.Status == AddManagerStatus.AlreadyMember)
+                return CommandResult<Guid?>.Fail(ErrorCode.OrganizationMemberAlreadyExists, "Пользователь уже является участником организации");
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-            return new CommandResult<Guid?>(memberId);
+            return new CommandResult<Guid?>(addResult.MemberId);
+        }
+
+        public async Task<CommandResult<List<OrganizationManagerCandidate>?>> GetManagerCandidatesFromSubscriptionsAsync(
+            Guid organizationId, string? name)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetManagerCandidatesFromSubscriptionsAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var accessError = await EnsureOwnerAsync(organizationId);
+            if (accessError != null)
+                return CommandResult<List<OrganizationManagerCandidate>?>.Fail(accessError.ErrorCode, accessError.Message);
+
+            var currentAccountId = _accountDataHolder.AccountId!.Value;
+            var search = new SubscriptionsSearchRequest
+            {
+                AccountId = currentAccountId,
+                Name = name
+            };
+
+            var subscriptions = await _subscriptionsRepository.GetSubscriptionsAsync(search);
+            var subscribers = await _subscriptionsRepository.GetSubscribersAsync(search);
+            var members = await _organizationsRepository.GetMembersByOrganizationIdAsync(organizationId, onlyActive: true);
+
+            var exclude = new HashSet<Guid> { currentAccountId };
+            foreach (var member in members ?? Enumerable.Empty<OrganizationMember>())
+                exclude.Add(member.AccountId);
+
+            var candidates = OrganizationManagerCandidateList.MergeUnique(
+                subscriptions?.Result, subscribers?.Result, exclude);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<OrganizationManagerCandidate>?>(candidates);
+        }
+
+        public async Task<CommandResult<AddOrganizationMembersResponse?>> AddManagersAsync(
+            Guid organizationId, AddOrganizationMembersRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AddManagersAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var accessError = await EnsureOwnerAsync(organizationId);
+            if (accessError != null)
+                return CommandResult<AddOrganizationMembersResponse?>.Fail(accessError.ErrorCode, accessError.Message);
+
+            var accountIds = (request?.AccountIds ?? new List<Guid>())
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            if (accountIds.Count == 0)
+                return CommandResult<AddOrganizationMembersResponse?>.Fail(ErrorCode.IsNullOrEmpty, "Не указаны аккаунты менеджеров");
+
+            if (accountIds.Count > MaxManagersPerBatch)
+                return CommandResult<AddOrganizationMembersResponse?>.Fail(
+                    ErrorCode.InvalidValue, $"За один раз можно добавить не больше {MaxManagersPerBatch} менеджеров");
+
+            var response = new AddOrganizationMembersResponse();
+            foreach (var accountId in accountIds)
+            {
+                var addResult = await AddOrReactivateManagerAsync(organizationId, accountId);
+                switch (addResult.Status)
+                {
+                    case AddManagerStatus.Added:
+                        response.AddedAccountIds.Add(accountId);
+                        break;
+                    case AddManagerStatus.AlreadyMember:
+                        response.AlreadyMembers.Add(accountId);
+                        break;
+                    case AddManagerStatus.NotFound:
+                        response.NotFound.Add(accountId);
+                        break;
+                }
+            }
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<AddOrganizationMembersResponse?>(response);
         }
 
         public async Task<CommandResult> RemoveMemberAsync(Guid organizationId, Guid accountId)
@@ -560,6 +622,46 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<OrganizationRegistryParty?>(party);
+        }
+
+        private enum AddManagerStatus
+        {
+            Added,
+            AlreadyMember,
+            NotFound
+        }
+
+        private async Task<(AddManagerStatus Status, Guid? MemberId)> AddOrReactivateManagerAsync(Guid organizationId, Guid accountId)
+        {
+            var account = await _accountsRepository.GetAccountAsync(accountId);
+            if (account == null)
+                return (AddManagerStatus.NotFound, null);
+
+            var existingMember = await _organizationsRepository.GetMemberAsync(organizationId, accountId);
+            if (existingMember != null)
+            {
+                if (existingMember.Active)
+                    return (AddManagerStatus.AlreadyMember, existingMember.Id);
+
+                await _organizationsRepository.SetMemberActiveAsync(organizationId, accountId, true);
+                if (existingMember.Role != OrganizationMemberRole.Owner)
+                    await _organizationsRepository.UpdateMemberRoleAsync(organizationId, accountId, OrganizationMemberRole.Manager);
+
+                await _notificationsService.NotifyOrganizationMemberAddedAsync(organizationId, accountId);
+                return (AddManagerStatus.Added, existingMember.Id);
+            }
+
+            var memberId = await _organizationsRepository.AddMemberAsync(new OrganizationMember
+            {
+                OrganizationId = organizationId,
+                AccountId = accountId,
+                Role = OrganizationMemberRole.Manager,
+                Active = true,
+                InvitedBy = _accountDataHolder.AccountId
+            });
+
+            await _notificationsService.NotifyOrganizationMemberAddedAsync(organizationId, accountId);
+            return (AddManagerStatus.Added, memberId);
         }
 
         private async Task<CommandResult?> EnsureOwnerAsync(Guid organizationId)

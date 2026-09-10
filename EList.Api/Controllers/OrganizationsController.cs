@@ -233,7 +233,9 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
-        /// Добавить менеджера в организацию
+        /// Добавить менеджера в организацию по uuid аккаунта.
+        /// Пока поле uuid пустое, клиент показывает кнопку «Добавить из подписок»
+        /// и открывает пикер из <c>GET managers/fromSubscriptions/{organizationId}</c>.
         /// </summary>
         [HttpPost("managers/add/{organizationId}")]
         public async Task<CommandResult<Guid?>> AddManagerAsync(Guid organizationId, [FromBody] AddOrganizationMemberRequest request)
@@ -248,6 +250,67 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _organizationsService.AddManagerAsync(organizationId, request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Кандидаты в менеджеры: подписки текущего пользователя ∪ его подписчики, без дублей.
+        /// Уже активные участники организации и сам владелец не входят в список.
+        /// Клиент показывает окно с поиском, прокруткой, максимум 5 видимыми строками и множественным выбором.
+        /// </summary>
+        [HttpGet("managers/fromSubscriptions/{organizationId}")]
+        public async Task<CommandResult<List<OrganizationManagerCandidate>?>> GetManagerCandidatesFromSubscriptionsAsync(
+            Guid organizationId, [FromQuery] string? name)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetManagerCandidatesFromSubscriptionsAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _organizationsService.GetManagerCandidatesFromSubscriptionsAsync(organizationId, name);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Добавить выбранных пользователей менеджерами организации (кнопка «Выбрать» в пикере).
+        /// Уже состоящие в команде пропускаются, остальные добавляются.
+        /// </summary>
+        [HttpPost("managers/addMany/{organizationId}")]
+        public async Task<CommandResult<AddOrganizationMembersResponse?>> AddManagersAsync(
+            Guid organizationId, [FromBody] AddOrganizationMembersRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AddManagersAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _organizationsService.AddManagersAsync(organizationId, request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
