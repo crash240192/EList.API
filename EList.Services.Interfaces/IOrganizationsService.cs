@@ -14,6 +14,8 @@ namespace EList.Services.Interfaces
 
         Task<CommandResult<List<OrganizationMemberResponse>?>> GetMembersAsync(Guid organizationId);
         Task<CommandResult<Guid?>> AddManagerAsync(Guid organizationId, AddOrganizationMemberRequest request);
+        Task<CommandResult<List<OrganizationManagerCandidate>?>> GetManagerCandidatesFromSubscriptionsAsync(Guid organizationId, string? name);
+        Task<CommandResult<AddOrganizationMembersResponse?>> AddManagersAsync(Guid organizationId, AddOrganizationMembersRequest request);
         Task<CommandResult> RemoveMemberAsync(Guid organizationId, Guid accountId);
         Task<CommandResult> SetMemberActiveAsync(Guid organizationId, Guid accountId, bool active);
         Task<CommandResult> TransferOwnershipAsync(Guid organizationId, TransferOwnershipRequest request);
