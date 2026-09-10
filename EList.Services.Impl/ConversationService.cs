@@ -87,7 +87,8 @@ namespace EList.Services.Impl
                 if (tapped == null || tapped.ConversationId != message.ConversationId)
                     return CommandResult<Guid>.Fail(ErrorCode.MessageNotFound, "Сообщение не найдено");
 
-                message.ReplyTo = await GetThreadRootIdAsync(tapped);
+                if (conversation.EventId != null)
+                    message.ReplyTo = await GetThreadRootIdAsync(tapped);
             }
 
             message.AccountId ??= _accountDataHolder.AccountId;
@@ -256,7 +257,9 @@ namespace EList.Services.Impl
             if (conversation != null && !await CanViewConversationAsync(conversation))
                 return CommandResult<PagedList<Message>>.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия");
 
-            var threadRootId = await GetThreadRootIdAsync(message);
+            var threadRootId = conversation?.EventId != null
+                ? await GetThreadRootIdAsync(message)
+                : message.Id;
             var result = await _conversationsRepository.GetMessageRepliesAsync(threadRootId, pageIndex, pageSize);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -324,7 +327,8 @@ namespace EList.Services.Impl
                 if (tapped == null || tapped.ConversationId != existingMessage.ConversationId)
                     return CommandResult.Fail(ErrorCode.MessageNotFound, "Сообщение не найдено");
 
-                message.ReplyTo = await GetThreadRootIdAsync(tapped);
+                if (conversation?.EventId != null)
+                    message.ReplyTo = await GetThreadRootIdAsync(tapped);
             }
 
             await _conversationsRepository.UpdateMessageAsync(message);

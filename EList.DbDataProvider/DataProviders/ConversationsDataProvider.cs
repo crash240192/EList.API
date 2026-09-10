@@ -63,9 +63,14 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<ListResponse<MessageDto>> GetConversationMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize)
         {
+            var conversation = await _connection.Conversations.FirstOrDefaultAsync(i => i.Id == conversationId);
             var query = MessagesWithAuthors()
-                .Where(i => i.ConversationId == conversationId && i.ReplyTo == null)
-                .OrderBy(i => i.CreateDate);
+                .Where(i => i.ConversationId == conversationId);
+
+            if (conversation?.EventId != null)
+                query = query.Where(i => i.ReplyTo == null);
+
+            query = query.OrderBy(i => i.CreateDate);
             var count = await query.CountAsync();
             
             var result = await query.ToPagedQuery(pageIndex, pageSize).ToListAsync();
