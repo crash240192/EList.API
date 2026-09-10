@@ -63,13 +63,14 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<ListResponse<MessageDto>> GetConversationMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize)
         {
-            var query = _connection.Messages
-                .LoadWith(i => i.Account)
-                .ThenLoad(i => i.PersonInfo)
-                .LoadWith(i => i.Account)
-                .ThenLoad(i => i.Avatars)
-                .Where(i => i.ConversationId == conversationId)
-                .OrderBy(i => i.CreateDate);
+            var conversation = await _connection.Conversations.FirstOrDefaultAsync(i => i.Id == conversationId);
+            var query = MessagesWithAuthors()
+                .Where(i => i.ConversationId == conversationId);
+
+            if (conversation?.EventId != null)
+                query = query.Where(i => i.ReplyTo == null);
+
+            query = query.OrderBy(i => i.CreateDate);
             var count = await query.CountAsync();
             
             var result = await query.ToPagedQuery(pageIndex, pageSize).ToListAsync();
@@ -84,11 +85,7 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<ListResponse<MessageDto>> GetMessageRepliesAsync(Guid messageId, int? pageIndex, int? pageSize)
         {
-            var query = _connection.Messages
-                .LoadWith(i => i.Account)
-                .ThenLoad(i => i.PersonInfo)
-                .LoadWith(i => i.Account)
-                .ThenLoad(i => i.Avatars)
+            var query = MessagesWithAuthors()
                 .Where(i => i.ReplyTo == messageId)
                 .OrderBy(i => i.CreateDate);
             var count = await query.CountAsync();
@@ -160,6 +157,16 @@ namespace EList.DbDataProvider.DataProviders
                 .Select(i => i.AccountId!.Value)
                 .Distinct()
                 .ToListAsync();
+        }
+
+        private IQueryable<MessageDto> MessagesWithAuthors()
+        {
+            return _connection.Messages
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.Avatars)
+                .LoadWith(i => i.Organization);
         }
     }
 }

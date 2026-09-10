@@ -1079,7 +1079,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var message = await _conversationRepository.GetMessageAsync(messageId);
-            if (message?.AccountId == null || message.AccountId == _accountDataHolder.AccountId)
+            if (message == null)
             {
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return CommandResult.OK;
@@ -1087,17 +1087,38 @@ namespace EList.Services.Impl
 
             var reply = await _conversationRepository.GetMessageAsync(replyId);
             var preview = BuildMessagePreview(reply?.MessageText);
+            var relatedAccountId = _accountDataHolder.AccountId;
+            var title = $"{_accountDataHolder.AccountNameFullString} ответил на ваше сообщение";
 
-            var notification = BuildNotification(
-                message.AccountId.Value,
+            var recipientIds = new List<Guid>();
+            if (message.AccountId.HasValue)
+            {
+                if (message.AccountId != relatedAccountId)
+                    recipientIds.Add(message.AccountId.Value);
+            }
+            else if (message.OrganizationId.HasValue)
+            {
+                var memberIds = await GetOrganizationMemberIdsAsync(message.OrganizationId.Value);
+                recipientIds.AddRange(memberIds.Where(id => id != relatedAccountId));
+            }
+
+            recipientIds = recipientIds.Distinct().ToList();
+            if (recipientIds.Count == 0)
+            {
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
+            var notifications = recipientIds.Select(accountId => BuildNotification(
+                accountId,
                 eventId,
-                _accountDataHolder.AccountId,
+                relatedAccountId,
                 UserNotificationType.MessageReplied,
-                $"{_accountDataHolder.AccountNameFullString} ответил на ваше сообщение",
+                title,
                 preview,
-                reply);
+                reply)).ToList();
 
-            await PersistAndSendAsync(new List<Notification> { notification });
+            await PersistAndSendAsync(notifications);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

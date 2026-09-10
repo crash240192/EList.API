@@ -236,7 +236,8 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
-        /// Список сообщений в рамках события
+        /// Корневые комментарии диалога. Вложенные ответы не входят в список — их нужно запрашивать
+        /// через <c>GET messages/replies/{messageId}</c>.
         /// </summary>
         /// <param name="conversationId"></param>
         /// <param name="pageIndex"></param>
@@ -266,7 +267,8 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
-        /// Список ответов на сообщение
+        /// Плоский список ответов первого уровня к корневому комментарию (как у YouTube/Instagram).
+        /// Если передан id уже вложенного ответа, возвращаются ответы всего треда.
         /// </summary>
         /// <param name="messageId"></param>
         /// <param name="pageIndex"></param>
@@ -296,7 +298,11 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
-        /// Создать сообщение
+        /// Создать сообщение. <c>replyTo</c> — комментарий, на который нажали «Ответить»;
+        /// сервер сохраняет связь с корневым комментарием (один уровень вложенности).
+        /// Текст сохраняется как есть: при ответе на ответ клиент может вставить
+        /// <c>suggestedReplyPrefix</c> адресата в начало <c>messageText</c> (это обычный текст, не ссылка).
+        /// Уведомление уходит только автору того сообщения, на которое ответили.
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>

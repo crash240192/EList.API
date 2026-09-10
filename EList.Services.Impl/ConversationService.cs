@@ -80,11 +80,22 @@ namespace EList.Services.Impl
             if (writeAccess != null)
                 return CommandResult<Guid>.Fail(writeAccess.ErrorCode, writeAccess.Message);
 
+            var addressedMessageId = message.ReplyTo;
+            if (message.ReplyTo.HasValue)
+            {
+                var tapped = await _conversationsRepository.GetMessageAsync(message.ReplyTo.Value);
+                if (tapped == null || tapped.ConversationId != message.ConversationId)
+                    return CommandResult<Guid>.Fail(ErrorCode.MessageNotFound, "Сообщение не найдено");
+
+                if (conversation.EventId != null)
+                    message.ReplyTo = await GetThreadRootIdAsync(tapped);
+            }
+
             message.AccountId ??= _accountDataHolder.AccountId;
             var result = await _conversationsRepository.CreateMessageAsync(message);
 
-            if (message.ReplyTo != null)
-                await _notificationsService.NotifyCommentRepliedAsync(conversation.EventId, message.ReplyTo.Value, result);
+            if (addressedMessageId != null)
+                await _notificationsService.NotifyCommentRepliedAsync(conversation.EventId, addressedMessageId.Value, result);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid>(result);
@@ -246,7 +257,10 @@ namespace EList.Services.Impl
             if (conversation != null && !await CanViewConversationAsync(conversation))
                 return CommandResult<PagedList<Message>>.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия");
 
-            var result = await _conversationsRepository.GetMessageRepliesAsync(messageId, pageIndex, pageSize);
+            var threadRootId = conversation?.EventId != null
+                ? await GetThreadRootIdAsync(message)
+                : message.Id;
+            var result = await _conversationsRepository.GetMessageRepliesAsync(threadRootId, pageIndex, pageSize);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<Message>>(result);
@@ -306,6 +320,16 @@ namespace EList.Services.Impl
 
             if (existingMessage.AccountId != _accountDataHolder.AccountId)
                 return CommandResult.Fail(ErrorCode.AccessError, $"Нельзя редактировать сообщения другого пользователя");
+
+            if (message.ReplyTo.HasValue)
+            {
+                var tapped = await _conversationsRepository.GetMessageAsync(message.ReplyTo.Value);
+                if (tapped == null || tapped.ConversationId != existingMessage.ConversationId)
+                    return CommandResult.Fail(ErrorCode.MessageNotFound, "Сообщение не найдено");
+
+                if (conversation?.EventId != null)
+                    message.ReplyTo = await GetThreadRootIdAsync(tapped);
+            }
 
             await _conversationsRepository.UpdateMessageAsync(message);
 
@@ -368,6 +392,32 @@ namespace EList.Services.Impl
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Корневой комментарий треда: у корневого <c>reply_to</c> пустой, ответы хранятся с ссылкой на него.
+        /// </summary>
+        private async Task<Guid> GetThreadRootIdAsync(Message message)
+        {
+            var current = message;
+            var seen = new HashSet<Guid> { current.Id };
+
+            for (var depth = 0; depth < 50; depth++)
+            {
+                if (!current.ReplyTo.HasValue)
+                    return current.Id;
+
+                var parent = await _conversationsRepository.GetMessageAsync(current.ReplyTo.Value);
+                if (parent == null)
+                    return current.ReplyTo.Value;
+
+                if (!seen.Add(parent.Id))
+                    return current.Id;
+
+                current = parent;
+            }
+
+            return current.Id;
         }
     }
 }
