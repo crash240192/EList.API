@@ -63,12 +63,8 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<ListResponse<MessageDto>> GetConversationMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize)
         {
-            var query = _connection.Messages
-                .LoadWith(i => i.Account)
-                .ThenLoad(i => i.PersonInfo)
-                .LoadWith(i => i.Account)
-                .ThenLoad(i => i.Avatars)
-                .Where(i => i.ConversationId == conversationId)
+            var query = MessagesWithAuthors()
+                .Where(i => i.ConversationId == conversationId && i.ReplyTo == null)
                 .OrderBy(i => i.CreateDate);
             var count = await query.CountAsync();
             
@@ -84,11 +80,7 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<ListResponse<MessageDto>> GetMessageRepliesAsync(Guid messageId, int? pageIndex, int? pageSize)
         {
-            var query = _connection.Messages
-                .LoadWith(i => i.Account)
-                .ThenLoad(i => i.PersonInfo)
-                .LoadWith(i => i.Account)
-                .ThenLoad(i => i.Avatars)
+            var query = MessagesWithAuthors()
                 .Where(i => i.ReplyTo == messageId)
                 .OrderBy(i => i.CreateDate);
             var count = await query.CountAsync();
@@ -160,6 +152,16 @@ namespace EList.DbDataProvider.DataProviders
                 .Select(i => i.AccountId!.Value)
                 .Distinct()
                 .ToListAsync();
+        }
+
+        private IQueryable<MessageDto> MessagesWithAuthors()
+        {
+            return _connection.Messages
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.Avatars)
+                .LoadWith(i => i.Organization);
         }
     }
 }

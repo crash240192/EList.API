@@ -84,26 +84,14 @@ namespace EList.Repositories.Impl
         public async Task<PagedList<Message>> GetConversationMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize)
         {
             var dbResult = await _conversationsDataProvider.GetConversationMessagesAsync(conversationId, pageIndex, pageSize);
-            var mappedResult = dbResult.Items?.Select(i =>
-            {
-                var message = _mapper.Map<Message>(i);
-                message.Account = _mapper.Map<AccountPublicData>(i.Account);
-                message.PersonInfo = _mapper.Map<PersonInfo>(i.Account.PersonInfo);
-                return message;
-            })?.ToList();
+            var mappedResult = dbResult.Items?.Select(MapMessage)?.ToList();
             return new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex ?? 0, pageSize ?? dbResult.TotalCount);
         }
 
         public async Task<PagedList<Message>> GetMessageRepliesAsync(Guid messageId, int? pageIndex, int? pageSize)
         {
             var dbResult = await _conversationsDataProvider.GetMessageRepliesAsync(messageId, pageIndex, pageSize);
-            var mappedResult = dbResult.Items?.Select(i =>
-            {
-                var message = _mapper.Map<Message>(i);
-                message.Account = _mapper.Map<AccountPublicData>(i.Account);
-                message.PersonInfo = _mapper.Map<PersonInfo>(i.Account.PersonInfo);
-                return message;
-            })?.ToList();
+            var mappedResult = dbResult.Items?.Select(MapMessage)?.ToList();
             return new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex ?? 0, pageSize ?? dbResult.TotalCount);
         }
 
@@ -116,6 +104,27 @@ namespace EList.Repositories.Impl
         public async Task<List<Guid>> GetConversationAuthorAccountIdsAsync(Guid conversationId)
         {
             return await _conversationsDataProvider.GetConversationAuthorAccountIdsAsync(conversationId);
+        }
+
+        private Message MapMessage(MessageDto dto)
+        {
+            var message = _mapper.Map<Message>(dto);
+            if (dto.Account != null)
+            {
+                message.Account = _mapper.Map<AccountPublicData>(dto.Account);
+                if (dto.Account.PersonInfo != null)
+                    message.PersonInfo = _mapper.Map<PersonInfo>(dto.Account.PersonInfo);
+            }
+
+            message.OrganizationName = dto.Organization?.Name;
+            message.SuggestedReplyPrefix = MessageReplyAddress.BuildPrefix(
+                dto.Account?.PersonInfo?.FirstName,
+                dto.Account?.PersonInfo?.LastName,
+                dto.AccountId,
+                dto.Organization?.Name,
+                dto.OrganizationId,
+                dto.Id);
+            return message;
         }
     }
 }
