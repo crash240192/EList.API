@@ -1,0 +1,56 @@
+UI → API, шаг за шагом (Cost > 0)
+Карточка события
+  CTA: «Купить билет»  (не Participate)
+       │
+       ▼
+[опц.] Экран подтверждения: цена = Cost, qty (пока обычно 1)
+       │
+       ▼
+POST /eList/api/orders
+  { eventId, quantity: 1, idempotencyKey? }
+
+Что делает API на create
+Проверки флага / TicketsEnabled / доступа / мест / продавца.
+Считает: amountTotal = Cost × qty, комиссия из payments.commissionPercent, остальное продавцу.
+Пишет заказ Pending.
+Т.к. сумма > 0 → YooKassaStub.CreatePayment → providerPaymentId + confirmationUrl.
+Ответ:
+paidImmediately: false
+order (Pending)
+confirmationUrl, providerPaymentId
+UI сохраняет orderId / providerPaymentId
+       │
+       ▼
+Открывает confirmationUrl  (сейчас stub-страница/URL возврата;
+                            позже — виджет ЮKassa)
+       │
+       ▼
+Пользователь «оплатил» / вернулся в приложение
+       │
+       ▼
+POST /eList/api/orders/payments/complete
+  { orderId }  или  { providerPaymentId }
+
+Что делает API на complete (stub)
+Находит заказ покупателя, статус Pending.
+Stub помечает платёж Succeeded.
+Fulfill: заказ → Paid, выпускает quantity билетов (issued + уникальный Code), делает Participate, чистит invite, шлёт notify об участии.
+Ответ: заказ Paid + билеты в order.tickets (если подтянулись).
+UI: экран успеха
+  — «Вы идёте»
+  — показать билет / QR из Code
+  — опц. GET /eList/api/orders/tickets/my?eventId=…
+Если Cost = 0 при TicketsEnabled
+Тот же POST /orders, но без оплаты: сразу paidImmediately: true, Paid + билет + Participate. complete не нужен.
+
+Чего UI не должен делать
+GET .../participations/participate/{id} - При TicketsEnabled → ошибка «нужно купить билет»
+Accept приглашения как вход - То же
+Ждать webhook ЮKassa - Пока stub: подтверждение только через payments/complete
+
+Краткая схема денег (сейчас)
+Cost (event_parameters)  →  цена одной позиции заказа
+quantity                 →  число одинаковых билетов
+комиссия %               →  amountCommission / amountSeller в заказе
+кошелёк/тариф платформы  →  другой контур, к покупке билета не относится
+Ценовые категории билетов ещё не в модели: одна цена на событие. Когда появятся типы — в create уйдёт ticketTypeId (или аналог), а не голый Cost.
