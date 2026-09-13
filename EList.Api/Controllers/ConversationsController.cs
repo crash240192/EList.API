@@ -393,5 +393,100 @@ namespace EList.Api.Controllers
                 throw;
             }
         }
+
+        /// <summary>
+        /// Поставить лайк комментарию на странице мероприятия.
+        /// Повторный вызов снимает лайк. Если стоял дизлайк — он заменяется на лайк.
+        /// </summary>
+        [HttpPost("messages/{messageId}/like")]
+        public async Task<CommandResult<MessageVoteResult>> LikeMessageAsync(Guid messageId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(LikeMessageAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                await _connectionProvider.StartNewTransactionAsync();
+
+                var result = await _conversationsService.LikeMessageAsync(messageId);
+
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Поставить дизлайк комментарию на странице мероприятия.
+        /// Повторный вызов снимает дизлайк. Если стоял лайк — он заменяется на дизлайк.
+        /// </summary>
+        [HttpPost("messages/{messageId}/dislike")]
+        public async Task<CommandResult<MessageVoteResult>> DislikeMessageAsync(Guid messageId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DislikeMessageAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                await _connectionProvider.StartNewTransactionAsync();
+
+                var result = await _conversationsService.DislikeMessageAsync(messageId);
+
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Снять свою оценку (лайк или дизлайк) с комментария.
+        /// </summary>
+        [HttpDelete("messages/{messageId}/vote")]
+        public async Task<CommandResult<MessageVoteResult>> RemoveMessageVoteAsync(Guid messageId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(RemoveMessageVoteAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                await _connectionProvider.StartNewTransactionAsync();
+
+                var result = await _conversationsService.RemoveMessageVoteAsync(messageId);
+
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
     }
 }

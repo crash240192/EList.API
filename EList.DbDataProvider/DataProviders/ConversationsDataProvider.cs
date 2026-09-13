@@ -1,6 +1,7 @@
 ﻿using EList.DbDataProvider.Extensions;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Models.Enums;
 using LinqToDB;
 using LinqToDB.Async;
 using Microsoft.VisualBasic;
@@ -160,6 +161,80 @@ namespace EList.DbDataProvider.DataProviders
                 .Select(i => i.AccountId!.Value)
                 .Distinct()
                 .ToListAsync();
+        }
+
+        public async Task<MessageVoteStatsDto> SetMessageVoteAsync(Guid messageId, Guid accountId, MessageVoteValue value)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var existing = await _connection.MessageVotes
+                .FirstOrDefaultAsync(i => i.MessageId == messageId && i.AccountId == accountId);
+
+            if (existing == null)
+            {
+                await _connection.InsertAsync(new MessageVoteDto
+                {
+                    MessageId = messageId,
+                    AccountId = accountId,
+                    Value = value,
+                    CreateDate = now,
+                    UpdateDate = now
+                });
+            }
+            else if (existing.Value == value)
+            {
+                await _connection.MessageVotes.DeleteAsync(i => i.Id == existing.Id);
+            }
+            else
+            {
+                await _connection.MessageVotes
+                    .Where(i => i.Id == existing.Id)
+                    .Set(i => i.Value, value)
+                    .Set(i => i.UpdateDate, now)
+                    .UpdateAsync();
+            }
+
+            var stats = await GetMessageVoteStatsAsync(new[] { messageId }, accountId);
+            return stats[messageId];
+        }
+
+        public async Task<MessageVoteStatsDto> RemoveMessageVoteAsync(Guid messageId, Guid accountId)
+        {
+            await _connection.MessageVotes.DeleteAsync(i => i.MessageId == messageId && i.AccountId == accountId);
+            var stats = await GetMessageVoteStatsAsync(new[] { messageId }, accountId);
+            return stats[messageId];
+        }
+
+        public async Task<Dictionary<Guid, MessageVoteStatsDto>> GetMessageVoteStatsAsync(
+            IReadOnlyCollection<Guid> messageIds,
+            Guid? currentAccountId)
+        {
+            var result = messageIds
+                .Distinct()
+                .ToDictionary(id => id, id => new MessageVoteStatsDto { MessageId = id });
+
+            if (result.Count == 0)
+                return result;
+
+            var votes = await _connection.MessageVotes
+                .Where(v => messageIds.Contains(v.MessageId))
+                .Select(v => new { v.MessageId, v.AccountId, v.Value })
+                .ToListAsync();
+
+            foreach (var vote in votes)
+            {
+                if (!result.TryGetValue(vote.MessageId, out var stats))
+                    continue;
+
+                if (vote.Value == MessageVoteValue.Like)
+                    stats.LikesCount++;
+                else
+                    stats.DislikesCount++;
+
+                if (currentAccountId != null && vote.AccountId == currentAccountId)
+                    stats.CurrentUserVote = vote.Value;
+            }
+
+            return result;
         }
     }
 }
