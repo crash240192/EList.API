@@ -130,8 +130,10 @@ namespace EList.Services.Impl
 
             if (eventItem.Parameters.MaxPersonsCount > 0)
             {
-                var participantsCount = await _participationsRepository.GetParticipantsCountAsync(eventItem.Id);
-                if (participantsCount + quantity > eventItem.Parameters.MaxPersonsCount)
+                // Учитываем и участников, и активные заказы (pending/authorized/paid),
+                // чтобы concurrent create не продавал больше лимита.
+                var reservedSeats = await CountReservedTicketSeatsAsync(eventItem.Id);
+                if (reservedSeats + quantity > eventItem.Parameters.MaxPersonsCount)
                 {
                     return CommandResult<CreateOrderResponse>.Fail(ErrorCode.EventIsFull,
                         "Недостаточно мест для указанного количества билетов");
@@ -1199,6 +1201,22 @@ namespace EList.Services.Impl
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Места под билеты: max(участники, сумма quantity у pending/authorized/paid заказов).
+        /// Pending учитывается, чтобы concurrent create не перепродавал лимит до fulfill.
+        /// </summary>
+        private async Task<int> CountReservedTicketSeatsAsync(Guid eventId)
+        {
+            var participantsCount = await _participationsRepository.GetParticipantsCountAsync(eventId);
+            var orders = await _ordersRepository.GetOrdersByEventAsync(eventId) ?? new List<Order>();
+            var orderSeats = orders
+                .Where(o => o.Status == OrderStatus.Pending
+                    || o.Status == OrderStatus.Authorized
+                    || o.Status == OrderStatus.Paid)
+                .Sum(o => o.Quantity);
+            return Math.Max(participantsCount, orderSeats);
         }
 
         private async Task<Guid?> ResolveSellerOrganizationIdAsync(Guid eventId)

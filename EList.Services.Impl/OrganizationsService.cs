@@ -23,6 +23,7 @@ namespace EList.Services.Impl
         private readonly IOrganizationsRepository _organizationsRepository;
         private readonly IAccountsRepository _accountsRepository;
         private readonly IWalletsRepository _walletsRepository;
+        private readonly IAgreementRepository _agreementRepository;
         private readonly IOrganizationRegistryClient _organizationRegistryClient;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly ICorrelationIdProvider _correlationIdProvider;
@@ -32,6 +33,7 @@ namespace EList.Services.Impl
         public OrganizationsService(IOrganizationsRepository organizationsRepository,
             IAccountsRepository accountsRepository,
             IWalletsRepository walletsRepository,
+            IAgreementRepository agreementRepository,
             IOrganizationRegistryClient organizationRegistryClient,
             IAccountDataHolder accountDataHolder,
             ICorrelationIdProvider correlationIdProvider,
@@ -41,6 +43,7 @@ namespace EList.Services.Impl
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _walletsRepository = walletsRepository ?? throw new ArgumentNullException(nameof(walletsRepository));
+            _agreementRepository = agreementRepository ?? throw new ArgumentNullException(nameof(agreementRepository));
             _organizationRegistryClient = organizationRegistryClient ?? throw new ArgumentNullException(nameof(organizationRegistryClient));
             _accountDataHolder = accountDataHolder;
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
@@ -524,6 +527,24 @@ namespace EList.Services.Impl
 
             if (canSellTickets && organization.VerificationStatus != OrganizationVerificationStatus.Verified)
                 return CommandResult.Fail(ErrorCode.OrganizationNotVerified, "Продажа билетов доступна только верифицированным организациям");
+
+            if (canSellTickets)
+            {
+                var latestTicketing = await _agreementRepository.GetLatestDocumentAsync(DocumentType.TicketingAgreement);
+                if (latestTicketing == null)
+                {
+                    return CommandResult.Fail(ErrorCode.AgreementDocumentNotFound,
+                        "Агентский договор на продажу билетов ещё не загружен администратором");
+                }
+
+                var agreed = await _agreementRepository.DoesOrganizationAgreedWithLatestDocumentVersion(
+                    organizationId, DocumentType.TicketingAgreement);
+                if (!agreed)
+                {
+                    return CommandResult.Fail(ErrorCode.AgreementNotFound,
+                        "Перед включением продажи билетов необходимо принять Агентский договор (TicketingAgreement)");
+                }
+            }
 
             await _organizationsRepository.SetCanSellTicketsAsync(organizationId, canSellTickets);
 

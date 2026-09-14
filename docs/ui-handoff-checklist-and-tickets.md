@@ -131,7 +131,7 @@ Whitelist при re-consent (запросы не блокируются): `/api/
 
 - Одна квота `MaxPersonsCount`; билет = auto-Participate.
 - Типов билетов пока нет (только `quantity`).
-- Чек-ин / refund / PDF / Wallet pass — вне этого этапа.
+- Чек-ин / refund / transfer — API + UI (P1); PDF / Wallet pass — вне этапа.
 - Кошельки/тарифы платформы — **другой** денежный контур, не смешивать с билетами.
 
 ### Экраны и флоу
@@ -156,7 +156,8 @@ Whitelist при re-consent (запросы не блокируются): `/api/
 - `GET /api/orders/my`, `GET /api/orders/{id}`
 - `GET /api/orders/tickets/my?eventId=`
 - Карточка билета: код (`Code`), статус `issued | used | refunded | void`, событие, дата выдачи.
-- QR из `Code` (чек-ин API позже — пока «показать на входе»).
+- Действия: подарить (`POST /tickets/transfer`), вернуть (`POST /refunds`).
+- Организатор на событии: validate / check-in по коду.
 
 #### C4. Организатор: параметры события
 

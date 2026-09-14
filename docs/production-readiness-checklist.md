@@ -153,13 +153,13 @@
 
 ### Платежи (v1.1)
 
-- [ ] OrdersService + PaymentsController
+- [x] OrdersService + PaymentsController (stub + complete; split/webhook — дальше)
 - [ ] Webhook controller (YooKassa/TBank) + idempotency
-- [ ] Tickets API (issue / validate / used)
-- [ ] Refunds
-- [ ] TicketingAgreement
-- [ ] 54-ФЗ / онлайн-касса
-- [ ] Organization payment-provider onboarding
+- [x] Tickets API (issue / validate / used / transfer) — runtime stub
+- [x] Refunds API (stub provider)
+- [x] TicketingAgreement gate на `CanSellTickets` + capacity с учётом pending заказов
+- [ ] 54-ФЗ / онлайн-касса (разделённая фискализация зафиксирована в черновике агентского договора)
+- [ ] Organization payment-provider onboarding / реальный YooKassa split
 
 ### Compliance (P1)
 
