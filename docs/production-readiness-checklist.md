@@ -1,141 +1,124 @@
 # EList 3.0.1 — Чеклист готовности к продакшн-релизу
 
 > Первичный аудит: 31 августа 2026  
-> Актуализация: 3 сентября 2026 (`origin/develop` @ `0f57cf8`)  
-> Уточнения от владельца: 3 сентября 2026 (секреты через `.env` на проде; юр. документы в БД, не в git; rate limiter → P1)  
-> Рекомендуемый scope MVP v1: **бесплатная социальная платформа событий** (продажа билетов через API выключена)
+> Предыдущая актуализация: 3 сентября 2026  
+> **Пересборка: 14 сентября 2026** (`develop` + tickets API + исходники `Agreements/`)  
+> Продуктовое описание: [SERVICE.md](./SERVICE.md)  
+> Юр. ревью билетов: [legal-ticketing-review.md](./legal-ticketing-review.md)
+
+### Scope soft launch (рекомендуемый)
+
+**Социальная платформа событий** с выключенной продажей билетов (`features.ticketSalesEnabled=false`).  
+Билетный контур можно включать на стенде; в prod — только после закрытия юр. развилок и реального ЮKassa split.
 
 ---
 
-## Что изменилось с 31 августа
+## 1. Обзор готовности (14.09.2026)
 
-С момента первого чеклиста закрыт большой блок P0 по hardening, ACL и compliance. Ключевые коммиты:
-
-| Коммит | Суть |
-|--------|------|
-| `581a9dc` … `219a012` | Person/contact/album/event/invitation validators + ACL |
-| `f3a45ed` | CORS whitelist, safe errors, admin roles, payout crypto, `/health` |
-| `80a4bc4` | Soft-delete каталогов, consent при регистрации, delete/export аккаунта, `ticketSalesEnabled` |
-| `6102148` | `ReConsentMiddleware` |
-| `566d96d` | Configurable age TTL, PII redaction в логах, GitHub Actions CI |
-| `902616b` / `0f57cf8` | Host configuration + CI sibling layout для EList.Common |
-
----
-
-## Обзор готовности (актуально)
-
-| Категория | Было (31.08) | Сейчас (03.09) | Комментарий |
-|-----------|--------------|----------------|-------------|
-| Ядро (аккаунты, auth, события, подписки) | 🟢 ~75% | 🟢 ~85% | Consent, delete/export, validators |
-| Социальное (участие, приглашения, чаты) | 🟡 ~60% | 🟢 ~80% | BW/access validators; чаты event — TODO |
-| Организации + модерация | 🟢 ~80% | 🟢 ~85% | Payout encryption |
-| Медиа | 🟡 ~50% | 🟢 ~85% | AlbumAccessValidator |
-| Платежи/билеты | 🔴 ~5% | 🔴 ~5% | Schema only; `ticketSalesEnabled=false` |
-| Юридика / compliance | 🟡 ~30% | 🟢 ~80% | Enforce + re-consent + export; документы в prod БД (не в git) |
-| Production hardening | 🔴 ~20% | 🟢 ~75% | CORS/errors/CI/health; prod secrets из `.env` |
+| Категория | 03.09 | 14.09 | Комментарий |
+|-----------|-------|-------|-------------|
+| Ядро (аккаунты, auth, события, подписки) | 🟢 ~85% | 🟢 ~85% | **Баг:** UI create без `AcceptConsent`/`AcceptAgreement` |
+| Социальное (участие, приглашения, чаты) | 🟢 ~80% | 🟢 ~80% | Event-чаты в Conversations — TODO |
+| Организации + модерация | 🟢 ~85% | 🟢 ~85% | Payout encryption; verified → `CanSellTickets` |
+| Медиа | 🟢 ~85% | 🟢 ~85% | Album ACL |
+| Платежи / билеты | 🔴 ~5% | 🟡 ~55% | Stub API есть; split/прод-ЮKassa нет; флаг выкл. |
+| Юридика / compliance | 🟢 ~80% | 🟢 ~85% | Исходники в `Agreements/`; runtime = БД; Policy без галочки |
+| Production hardening | 🟢 ~75% | 🟢 ~75% | CORS/errors/CI/health; secrets из `.env` |
+| Автотесты | 🔴 0% | 🔴 0% | Нет test projects |
 
 ---
 
-## Карта модулей (актуально)
+## 2. Карта модулей
 
-### ✅ Готово к MVP
+### Готово к soft launch (без билетов)
 
 | Модуль | Статус | Примечание |
-|--------|--------|------------|
-| **Accounts** | ✅ | + `DELETE /me`, `GET /me/export`, consent flags на create |
-| **Authorization** | ✅ | |
-| **Events** | ✅ | Soft-delete categories/types; geo search |
-| **EventTemplates** | ✅ | |
-| **Subscriptions** | ✅ | Access validators |
-| **Rating** | ✅ | |
-| **Organizations** | ✅ | Payout encrypted; verification via DaData |
-| **ContentReports / BugReports / PlatformRoles** | ✅ | |
-| **Notifications** | ✅ | Admin-only send/broadcast |
-| **SystemNotifications** | ✅ | |
-| **Agreements** | ✅ | Enforcement есть; тексты загружены в prod БД (в git не хранятся — ок) |
-| **Media** | ✅ | ACL через AlbumAccessValidator |
-| **Participations / Invitations** | ✅ | BW + visibility; нет notify об исключении |
-| **Wallets/Tariffs** | ⚠️ | CRUD есть; Deposite API нет; DebtCollector выкл. |
+|--------|--------|-----------|
+| Accounts | ✅ | Consent flags на create; delete/export |
+| Authorization | ✅ | |
+| Events / Templates | ✅ | Soft-delete справочников; geo |
+| Subscriptions / Rating | ✅ | |
+| Organizations | ✅ | Verification + payout crypto |
+| ContentReports / BugReports / PlatformRoles | ✅ | |
+| Notifications (+ antiflood) | ✅ | |
+| Agreements | ✅ | Policy информационна; Consent+Agreement enforced |
+| Media | ✅ | |
+| Participations / Invitations | ✅ | BW + visibility |
+| Wallets / Tariffs | ⚠️ | **Рудимент тарифа**, не билетные деньги; deposit UX слабый |
 
-### 🔴 Вне MVP v1
+### Билеты (в коде, вне prod soft launch)
 
 | Модуль | Статус |
 |--------|--------|
-| Payments / Orders / Tickets / Refunds / Webhooks | Schema + `IOrdersDataProvider`, нет API |
-| Auto-invitations | Только таблицы |
-| Automated tests | Нет test projects |
+| Orders / Tickets / Refunds / Webhooks (stub) | ✅ API + UI stub |
+| Check-in / Transfer | ✅ API; UI слабо |
+| Real YooKassa + split на реквизиты организатора | ❌ |
+| Gate `TicketingAgreement` на `CanSellTickets` | ❌ только Verified |
+| Типы/тарифы билетов | ❌ одна цена `Cost` |
+| 54-ФЗ / чеки | ❌ модель не закрыта в договоре |
 
 ---
 
-## P0 — Блокеры prod (первый порядок)
+## 3. Зафиксированные продуктовые правила (новые / уточнённые)
 
-### 🔒 Инфраструктура и безопасность
-
-- [x] **CORS whitelist** — `AllowedOrigins` → `tvoy-spot.ru` (`Program.cs`)
-- [x] **Stack trace в ответах** — только Development (`ErrorHandlingMiddleware`)
-- [x] **Media ACL** — `AlbumAccessValidator` + event visibility
-- [x] **Role checks** — notifications send/broadcast; `documents/add`
-- [x] **ErrorCode.AgreementNotFound** — добавлен в EList.Common
-- [x] **PII redaction в API-логах** — `LoggerHandlerWebApiFilter.RedactJson`
-- [x] **ConfigurationManager из host config** — env vars / `appsettings.{env}.json`
-- [x] **Health check** — `GET /health`, `GET /version`
-- [x] **CI build** — `.github/workflows/build.yml`
-- [x] **Prod secrets из `.env` / host config** — на проде секретное убрано из appsettings; подтягивается при деплое
-- [ ] **(опционально) Почистить секреты в git-истории / dev appsettings** — в репозитории всё ещё лежат plaintext значения; для prod не блокер, но риск утечки через историю/форки. Ротация ключей, если они когда-либо светились публично.
-- [ ] **HTTPS / reverse proxy / HSTS** — операционный деплой (если ещё не закрыто инфраструктурой)
-
-### ⚖️ Юридика
-
-- [x] **Enforce consent при регистрации** — `AcceptConsent` / `AcceptAgreement` (Policy информационна, без обязательной галочки)
-- [x] **Re-consent middleware** — `features.reConsentEnforcementEnabled`
-- [x] **Data export API** — `GET /api/accounts/me/export`
-- [x] **Account deletion API** — `DELETE /api/accounts/me` (анонимизация + deactivate)
-- [x] **`documents/add` admin-only**
-- [x] **Баги AgreementsController** — agree не anonymous, возвращает результат сервиса
-- [x] **Юридические тексты Policy / Consent / Agreement** — загружены в prod БД; в git не дублируем (source of truth = `documents`)
-- [ ] **Договоры поручения с процессорами** — DaData, GreenSMS, Yandex SMTP, filestorage (бумажная/договорная работа, не код)
-- [ ] **Контакт оператора / DPO** в Policy (если ещё не указан в загруженном тексте)
-- [ ] **Углубить delete** — cascade/anonymize messages, media, agreements (сейчас soft anonymize person/contacts) → можно P1
-
-### 🛡️ Возраст
-
-- [x] **TTL anonymous age configurable** — `agreements.anonymousAgeTtlHours` (default 24)
-- [ ] **Исправить `Age > 18` → `>= 18`** в `AccountDataHolder.AdultConfirmed` — в работе
-- [ ] **Age gate при регистрации** — сейчас только self-declaration для 18+/платных событий (P1, если Policy это покрывает)
-- [ ] **Зафиксировать в Policy**, что age = self-declaration (если ещё не зафиксировано)
-
-### 🔧 Функциональные блокеры
-
-- [x] **Soft-delete eventCategories / eventTypes / contactTypes**
-- [x] **Валидация телефона/email** — `ContactValidator`
-- [x] **BW-листы + visibility** в invitations/participations
-- [x] **Шифрование organization_payout**
-- [x] **Privacy ACL persons** — BirthDate/Gender/Patronymic скрыты; ФИО всё ещё видны всем
-- [x] **`ticketSalesEnabled: false`** — продажа билетов через API заблокирована
-- [ ] **Уведомления об исключении** из участников / BW (TODO в `ParticipationsService`) → P1
-- [ ] **Список организаторов события** — TODO доступа в `EventOrganizatorsService.GetByEventIdAsync` → P1
-- [ ] **Event-чаты в Conversations** — TODO byAccount/byEvent → P1
-
-### 📋 Операционка
-
-См. подробную расшифровку в разделе [Monitoring / backup / LICENSE](#ops-monitoring-backup-license) ниже.
-
-- [x] Health endpoint
-- [x] CI restore/build
-- [ ] **Мониторинг / алерты** — см. детали ниже
-- [ ] **Backup & restore** — см. детали ниже
-- [ ] **LICENSE** — см. детали ниже
-- [ ] **README** вместо GitLab template (желательно, не блокер)
+- [x] **Policy без обязательной галочки** — информационный документ; `AcceptPolicy` игнорируется; re-consent не включает Policy
+- [x] **Обязательны Consent + Agreement** при регистрации и при обновлении версий
+- [x] **Кошелёк ≠ билеты** — только баланс/списание тарифа платформы; не P2P, не оплата билетов
+- [x] **Продавец билета = организатор**; сервис = площадка; целевой расчёт = ЮKassa split
+- [ ] Закрыть развилки в Агентском договоре (§2.1 режим агента, §6.2 фискализация) — см. legal-review
+- [ ] Enforced accept `TicketingAgreement` перед `CanSellTickets=true`
+- [ ] Реальный provider + split до включения флага в prod
 
 ---
 
-## P1 — Второй порядок
+## 4. P0 — блокеры / срочный дебаг
 
-### Инфра (перенесено из P0)
+### Регистрация и согласия (сломанный флоу)
 
-- [ ] **Rate limiter multi-instance** — `EventCreateRateLimiter` in-memory; на старте при одном инстансе достаточно; при scale-out → Redis/DB shared store
+- [ ] **UI: передавать `AcceptConsent` / `AcceptAgreement` в `POST /accounts/create`**
+- [ ] Убрать или сделать fallback дублирующие `agree` после логина (бэк уже пишет согласия в TX create)
+- [ ] Не глотать ошибки `POST /persons/set`; дожать person после activate
+- [ ] Глобальный UI-обработчик 403 + `AgreementNotFound` + `missingDocuments` (Consent/Agreement only)
+- [ ] Коды в UI `errorCodes`: `AgreementNotFound=18001`, `OrganizationPaymentRequired=11006`, …
+
+### Билеты на стенде (не prod)
+
+- [ ] Стендовый `ticketSalesEnabled=true` + smoke stub checkout
+- [ ] CTA: `TicketsEnabled` → «Купить/получить билет»; иначе Participate; `Cost` без билетов → «Платно на месте»
+- [ ] Не смешивать wallet top-up с оплатой билета
+- [ ] Скрывать ticketing UX при выключенном флаге
+
+### Ops soft launch
+
+- [x] Health / version, CI build, CORS, safe errors, PII redaction
+- [x] Prod secrets из host/`.env`
+- [x] Backup на сервере (`pg_dump` / restore известен)
+- [x] HTTPS на инфраструктуре
+- [ ] HSTS (HTTP Strict Transport Security) — заголовок/`max-age` на reverse proxy; опционально при уже работающем HTTPS
+- [ ] Uptime-check + алерт
+- [ ] (опц.) чистка plaintext секретов из git history / ротация
+
+---
+
+## 5. P1 — второй порядок
+
+### Билеты → prod-ready
+
+- [ ] Закрыть текст Агентского договора (режим + фискализация) и залить в БД
+- [ ] Gate `TicketingAgreement` + verified + payout реквизиты
+- [ ] Реальный `IPaymentProvider` ЮKassa со split / marketplace transfers
+- [ ] Return URL / `confirmationUrl` в UI вместо (или вместе с) локальной заглушкой
+- [ ] Org check-in UI; transfer/gift UI; refund UI на существующие API
+- [ ] Capacity reservation / гонка мест
+- [ ] Adult gate на покупке при необходимости Policy
+
+### Прочее
+
 - [ ] Углубить account delete (media/messages/agreements)
-- [ ] Notify об исключении / event-чаты в Conversations / GetByEventId ACL
+- [ ] Notify об исключении из участников / BW
+- [ ] Event-чаты в Conversations; ACL списка организаторов события
+- [ ] Age gate ≥14 на регистрации (если требует Policy)
+- [ ] Shared rate limiter при multi-instance — **отложено**: in-memory на инстанс ок при 2–3 репликах (лимит мягко масштабируется)
 
 ### Функциональность (остатки кода)
 
@@ -143,7 +126,7 @@
 - [ ] Media album `setParameters`
 - [ ] Invitations: заполнить `result.Event`
 - [ ] Premium-параметры событий по тарифу
-- [ ] Wallets Deposite API / DebtCollector
+- [ ] Wallets Deposite API / DebtCollector (тарифный контур, не билеты)
 - [ ] Auto-invitations
 - [ ] Локализация (`localization.enabled: false`)
 - [ ] Swagger v3
@@ -171,199 +154,80 @@
 
 ---
 
-## Сводная матрица по волнам
+## 6. P2 / бэклог
 
-| Область | P0 остаток | P1 | v1.1+ |
-|---------|------------|----|-------|
-| Secrets (prod `.env`) | ✅ закрыто | опционально: чистка git history | — |
-| Legal texts в БД | ✅ закрыто | DPO/процессоры если не в тексте | ticketing agreement |
-| Age `>= 18` | ❗ в работе | age gate на signup | — |
-| Monitoring / backup / LICENSE | желательно до soft launch | — | — |
-| Rate limiter shared | — | ❗ при multi-instance | — |
-| Conversations event-chats | — | желательно | — |
-| Платежи | выкл. флагом | — | full stack |
-| Product UX (ниже) | — | discovery + reminders | tickets UX |
+- Типы билетов, 54-ФЗ, Wallet pass / PDF
+- Auto-invitations
+- Локализация, Swagger polish
+- Автотесты (unit + e2e: register, re-consent, free join, ticket stub, org enable tickets)
+- Product UX: «мои события», reminders, push, deep links, карта «рядом» — см. исторический бэклог ниже при необходимости
 
 ---
 
-<a id="ops-monitoring-backup-license"></a>
+## 7. P0/P1 из аудита 03.09 — статус
 
-## Monitoring / backup / LICENSE — что имеется в виду
+### Закрыто ранее
 
-Это не одна задача в коде, а **три операционных пакета**. Для MVP достаточно минимального набора; полный — по мере роста трафика.
+- [x] CORS, safe errors, media ACL, role checks, health, CI
+- [x] Consent enforce + ReConsentMiddleware
+- [x] Account delete/export
+- [x] Soft-delete справочников; contact validation; BW/visibility
+- [x] Org payout encryption; `ticketSalesEnabled` kill-switch
+- [x] AdultConfirmed `>= 18`; anonymous age TTL
+- [x] Notifications P0–P2 + antiflood
+- [x] Tickets stub API (orders/complete/webhook/check-in/transfer/refund) — **после 03.09**
 
-### 1. Monitoring (наблюдаемость + алерты)
+### Остаётся открытым
 
-**Цель:** узнать о проблеме раньше пользователей.
+- [ ] Processor DPAs (DaData, SMS, SMTP, filestorage) — вне кода
+- [ ] Контакт оператора ПДн / DPO в Policy (юр. лицо, email/адрес для запросов субъектов) — проверить загруженный текст
+- [ ] HSTS на reverse proxy (HTTPS уже есть)
+- [ ] Uptime monitoring / алерты
 
-| Слой | Минимум для soft launch | Дальше (P1) |
-|------|-------------------------|-------------|
-| **Liveness** | Уже есть `GET /health` — дергать из LB / Docker / k8s probe каждые 10–30с | Readiness: проверка соединения с PostgreSQL (+ опционально filestorage) отдельным `/ready` |
-| **Метрики** | Счётчик 5xx / latency на reverse proxy (nginx/Caddy/Traefik access log) или простой uptime-check (UptimeRobot / Better Stack / Grafana Cloud free) на `/health` и на `https://tvoy-spot.ru` | Prometheus + `/metrics` (request duration, DB pool, WS connections) |
-| **Логи** | Централизованный сбор NLog (файл → stdout уже есть) в одно место: Docker logs / Loki / CloudWatch / journald | Алерт по паттернам: `Failed to call`, SMTP/SMS errors, spike `InternalError` |
-| **Алерты «болит»** | 1–2 канала (Telegram/email): API down > 2 мин; error rate > N%/5 мин | Отдельно: SMS-провайдер 4xx/5xx, DaData timeout, disk > 80%, PG connections |
-| **Бизнес-сигналы (опционально)** | — | Регистрации/день, create event fail, activation code fail rate |
+---
 
-**Конкретные работы (чеклист):**
-- [ ] Uptime-check на `/eList/health` (или `/health` с учётом pathBase) + уведомление в Telegram/почту
-- [ ] Reverse proxy логирует status/latency; раз в день глазами или простой dashboard
-- [ ] Понимание, куда пишутся `logs/yyyy-MM-dd.log` на проде и сколько места занимают
-- [ ] (желательно) алерт на рост 5xx
+## 8. Матрица воркфлоу (integrity)
 
-**Не требуется для MVP:** полный APM (AppInsights/Jaeger), distributed tracing, SLO dashboard.
+| Воркфлоу | Backend | UI | Целостность |
+|----------|---------|----|-------------|
+| Регистрация + Consent/Agreement + person | ✅ | ⚠️ | **Сломан** — флаги create |
+| Login / activate / password | ✅ | ✅ | OK |
+| Re-consent | ✅ middleware | ⚠️ Gate | Частично |
+| Каталог / карта / событие | ✅ | ✅ | OK |
+| Free participate | ✅ | ✅ | OK |
+| Cost без TicketsEnabled | ✅ | ⚠️ badge | Проверить copy |
+| Ticket purchase | ✅ stub | ✅ stub | E2E stub; не prod |
+| My tickets / gift / refund | ✅ API | ⚠️ | UI «скоро» |
+| Org verify + CanSellTickets | ✅ | ✅ | Нет gate TicketingAgreement |
+| Wallet / tariff | ⚠️ | ⚠️ | Рудимент тарифа |
+| Notifications WS | ✅ | ✅ | OK |
+| Media | ✅ | ✅ | OK |
+| Delete / export | ✅ | ⚠️ | Сверить UI |
 
-### 2. Backup (резервное копирование и восстановление)
+---
 
-**Цель:** не потерять ПДн и контент при падении диска / ошибке миграции / ransomware.
-
-| Что бэкапить | Минимум | Проверка |
-|--------------|---------|----------|
-| **PostgreSQL** | Ежедневный logical dump (`pg_dump`) или snapshot тома; хранение ≥ 7 дней off-host (S3/другой сервер) | Раз в месяц: restore на staging и `SELECT count(*)` по `accounts`/`events` |
-| **Filestorage** | Копия object storage / volume с медиа (аватары, альбомы) с той же периодичностью | Выборочно открыть 2–3 файла после restore |
-| **Секреты / `.env`** | Отдельный сейф (1Password/Bitwarden/sealed secret), не только на сервере | Доступ у ≥ 2 человек |
-| **Точка отката миграций** | Перед каждой schema-migration — ручной dump | Документированный rollback |
-
-**Конкретные работы (чеклист):**
-- [ ] Cron/скрипт ночного `pg_dump` (custom или plain) → удалённое хранилище
-- [ ] Retention policy: например 7 daily + 4 weekly
-- [ ] Бэкап filestorage (rsync/S3 sync)
-- [ ] Письменный runbook: «как восстановить за ≤ 1–2 часа»
-- [ ] Один успешный drill restore до публичного анонса (или сразу после soft launch)
-
-**152-ФЗ / здравый смысл:** ПДн в бэкапах тоже ПДн — шифрование at-rest бэкапов и ограничение доступа.
-
-### 3. LICENSE (правовой статус кода репозитория)
-
-**Цель:** явно зафиксировать, **кому принадлежит код** и можно ли его копировать/форкать.
-
-| Вариант | Когда выбирать |
-|---------|----------------|
-| **Нет публичного LICENSE + private repo** | Коммерческий продукт: код не open source. Тогда LICENSE в git **не обязателен**; важнее NDA/договоры с подрядчиками и © в Policy |
-| **Proprietary LICENSE / «All rights reserved»** | Если репо когда-либо станет видимым: короткий файл «© … Все права защищены. Использование без согласия запрещено» |
-| **Open source (MIT/Apache-2.0)** | Только если сознательно открываете код |
-
-**Конкретные работы:**
-- [ ] Решить: репо остаётся private commercial → достаточно © в пользовательском соглашении / Policy; файл `LICENSE` опционален
-- [ ] Если репо public или есть внешние контрибьюторы → добавить явный `LICENSE` + CLA/условия вклада
-- [ ] Проверить, что сторонние NuGet-пакеты совместимы с выбранной моделью (обычно ок для proprietary backend)
-
-**Итог по LICENSE для EList:** скорее всего достаточно private repo + формулировки в Agreement/Policy; отдельный MIT/Apache не нужен, если не планируете open source.
-
-### Приоритет ops для soft launch
+## 9. Рекомендуемый порядок работ
 
 ```
-Must:   uptime-check /health + алерт «сервис лежит»
-Must:   ежедневный pg_dump off-host + понимание, как restore
-Should: бэкап filestorage + retention
-Nice:   LICENSE/© формулировка; README; deploy pipeline в CI
-Later:  Prometheus, ready-probe с DB, drill restore по расписанию
+1. Fix registration AcceptConsent/AcceptAgreement + person sync
+2. 403 re-consent handler + error codes на UI
+3. Закрыть текст Агентского договора (§2.1 / §6.2) + заливка в БД
+4. Ticket CTA/badge + stub E2E на стенде (флаг только на stage)
+5. TicketingAgreement gate + реальный ЮKassa split
+6. Soft launch без ticketSalesEnabled в prod
+7. Включение билетов в prod после п.3–5
 ```
 
 ---
 
-## Продуктовый бэклог: чего нет, но было бы полезно пользователю
+## 10. Связанные артефакты
 
-Ниже — не блокеры релиза, а **ценность для пользователя** относительно текущего API. Сгруппировано по приоритету для роста продукта после soft launch.
-
-### 🔥 Высокая ценность (быстро закрывает «дыры» в опыте)
-
-| Фича | Зачем пользователю | База в коде |
-|------|--------------------|-------------|
-| **Лента / «мои события»** (upcoming / past / organizing / invited) | Сейчас есть search + participation, но нет удобного personal calendar feed | participations, invitations, events |
-| **Напоминания о событии** (T−24h / T−1h) | Снижает no-show; критично для офлайн-встреч | SystemNotifications + NotificationsService |
-| **Mobile push (FCM/APNs)** | In-app + WebSocket работают только при открытом клиенте | Notification hub; нет device tokens |
-| **Избранное / «хочу пойти»** (wishlist без commit) | Ниже порог, чем participate; помогает организатору видеть интерес | нет сущности |
-| **Шаринг / deep links** (`tvoy-spot.ru/e/{id}`) | Виральность; без этого рост только изнутри приложения | публичный get/search уже есть |
-| **Профиль организатора + история прошедших событий** | Доверие до участия (рейтинг уже есть) | Rating + Events + Organizations |
-| **Блокировка пользователя (user-level block)** | Сейчас только event BW-листы и модерация; нет «не видеть этого человека» | BW на уровне события |
-
-### 🗺️ Discovery и гео
-
-| Фича | Зачем | База |
-|------|-------|------|
-| **Карта событий / clusters** | Geo search (`Latitude/Longitude/LocationRange`) уже есть — нужен UX слой | EventsSearchRequest + PostGIS |
-| **«Рядом со мной» + фильтр «сегодня / выходные»** | Главный entrypoint для casual user | search + `updateLocation` |
-| **Рекомендации** (по подпискам, прошлым категориям, geo) | Retention после первой недели | subscriptions, participations, categories |
-| **Тренды / подборки редакции** | Холодный старт без графа друзей | system notifications / admin tools |
-
-### 👥 Социальный слой
-
-| Фича | Зачем | База |
-|------|-------|------|
-| **Друзья / адресная книга контактов платформы** | Приглашения сейчас по accountId — без discovery «кого позвать» | invitations, contacts |
-| **Совместные друзья на событии** («идут 3 ваших подписки») | Сильный конверсионный сигнал | subscriptions + participations |
-| **Публичный / приватный профиль** (гранулярнее Show-флагов) | Privacy + social proof | PersonAccessValidator |
-| **Реакции / RSVP статусы** (going / maybe / interested) | Гибче, чем binary participate | participations |
-| **Event-чат в списках бесед** | Уже TODO — без этого чат события «теряется» | ConversationsController |
-
-### 🗓️ Организатору
-
-| Фича | Зачем | База |
-|------|-------|------|
-| **Чек-ин участников (QR / код)** | Контроль входа на офлайн-ивент | tickets schema почти готова |
-| **Аналитика события** (views → invites → participates → no-show) | Понятно, что работает | частично notifications/participations |
-| **Повтор события из шаблона в 1 тап** | Templates уже есть — нужен UX «duplicate last» | EventTemplates |
-| **Co-hosts права** (уже assign organizators) + делегирование модерации чата | Масштаб команд | EventOrganizators |
-| **Рассылка участникам** (email/push) с лимитами | Сейчас broadcast только platform admin | NotificationsService |
-| **Лист ожидания** при лимите мест | Нет waitlist при MaxParticipants | participations |
-
-### 🎫 Монетизация (после v1.1)
-
-| Фича | Зачем |
-|------|-------|
-| Покупка билета + PDF/Wallet pass | Core paid UX |
-| Промокоды / early bird | Конверсия |
-| Донаты / «поддержка организатора» | Для бесплатных ивентов |
-| Подписка организатора (тарифы уже в wallets) | B2B revenue без ticketing |
-
-### ♿ Доверие и качество
-
-| Фича | Зачем |
-|------|-------|
-| Верифицированный организатор badge (уже есть org verification) — показать в UI | Trust |
-| Отзывы текстом к рейтингу (сейчас vote без review body?) | Качество сигналов |
-| Appeal для пользователя после бана | Fairness + support load |
-| Онбординг: интересы → первые 5 событий рядом | Activation |
-
-### Рекомендуемый product-порядок после soft launch
-
-```
-1. Мои события + напоминания + push        → retention
-2. Deep links + карта «рядом»              → acquisition
-3. Wishlist / RSVP maybe + social proof    → conversion
-4. Event-чаты в inbox + user block         → safety & UX polish
-5. Организаторская аналитика + waitlist    → supply-side
-6. Ticketing v1.1                          → monetization
-```
-
----
-
-## Критические находки (оставшиеся)
-
-| # | Проблема | Где | Приоритет |
-|---|----------|-----|-----------|
-| 1 | `Age > 18` вместо `>= 18` | `AccountDataHolder.cs:66` | 🟡 P0 (в работе) |
-| 2 | Monitoring / backup (минимум) | ops | 🟡 желательно до soft launch |
-| 3 | Секреты plaintext в git-истории / dev appsettings | репозиторий | ⚪ не блокер prod (prod на `.env`) |
-| 4 | Rate limiter in-memory | `EventCreateRateLimiter` | ⚪ P1 (при multi-instance) |
-| 5 | Delete аккаунта не чистит media/messages | `AccountsService` | ⚪ P1 |
-| 6 | Платежи — только schema | `IOrdersDataProvider` | ⚪ v1.1 |
-
----
-
-## Рекомендуемый порядок до soft launch
-
-```
-1. Fix Age >= 18
-2. Минимум ops: uptime на /health + ежедневный pg_dump off-host
-3. (по желанию) бэкап filestorage, ©/LICENSE формулировка
-4. Soft launch на tvoy-spot.ru
-5. Итерация 2: shared rate limiter, event-чаты, notify об исключении, product UX
-```
-
----
-
-## Связанные документы
-
-- [content-reports-ui.md](./content-reports-ui.md) — спецификация UI/API модерации
-- [AGENTS.md](../AGENTS.md) — техническая документация для разработки
+| Артефакт | Путь |
+|----------|------|
+| Описание сервиса | [SERVICE.md](./SERVICE.md) |
+| Legal ticketing review | [legal-ticketing-review.md](./legal-ticketing-review.md) |
+| UI handoff | [ui-handoff-checklist-and-tickets.md](./ui-handoff-checklist-and-tickets.md) |
+| Tickets workflow | [tickets workflow.txt](./tickets%20workflow.txt) |
+| Content reports UI | [content-reports-ui.md](./content-reports-ui.md) |
+| Исходники документов | [`../Agreements/`](../Agreements/) |
+| Cloud/dev notes | [`../AGENTS.md`](../AGENTS.md) |

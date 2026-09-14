@@ -1,3 +1,9 @@
+# Ticket checkout (stub) — пошаговый UI↔API
+# Контекст продукта и юр. модели: SERVICE.md §7, legal-ticketing-review.md
+# Чеклист: production-readiness-checklist.md
+# Важно: features.ticketSalesEnabled по умолчанию false; реальный ЮKassa split ещё не реализован.
+# Кошелёк платформы к этому флоу не относится.
+
 UI → API, шаг за шагом (Cost > 0)
 Карточка события
   CTA: «Купить билет»  (не Participate)
