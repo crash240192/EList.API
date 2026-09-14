@@ -114,11 +114,11 @@
 
 ### Прочее
 
-- [ ] Углубить account delete (media/messages/agreements)
-- [ ] Notify об исключении из участников / BW
-- [ ] Event-чаты в Conversations; ACL списка организаторов события
+- [x] Углубить account delete (media/messages/subscriptions/geo/password)
+- [x] Notify об исключении из участников / BW *(уже на develop)*
+- [x] Event-чаты в Conversations (`personalOnly=false`); ACL списка организаторов события
 - [ ] Age gate ≥14 на регистрации (если требует Policy)
-- [ ] Shared rate limiter при multi-instance — **отложено**: in-memory на инстанс ок при 2–3 репликах (лимит мягко масштабируется)
+- [ ] Shared rate limiter при multi-instance — **отложено**: in-memory на инстанс ок при 2–3 репликах
 
 ### Функциональность (остатки кода)
 
@@ -146,11 +146,11 @@
 
 ### Compliance (P1)
 
-- [ ] Отзыв согласия (withdraw)
-- [ ] Retention / purge (tokens, anonymous age, logs)
+- [x] Отзыв согласия (withdraw) → `POST /api/agreements/withdraw` (= углублённый delete)
+- [x] Retention / purge (anonymous age + inactive tokens) — `RetentionPurgeWorker`
 - [ ] Appeal workflow для sanctions
 - [ ] Audit log staff-доступа к PII
-- [ ] Cookie policy (web-клиент)
+- [x] Cookie policy (web-клиент) — страница `/cookies`
 
 ---
 

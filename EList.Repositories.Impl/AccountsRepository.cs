@@ -65,6 +65,11 @@ namespace EList.Repositories.Impl
             await _accountsDataProvider.SetAccountActiveAsync(accountId, active);
         }
 
+        public async Task ClearSensitiveDataAsync(Guid accountId)
+        {
+            await _accountsDataProvider.ClearSensitiveDataAsync(accountId);
+        }
+
 
         #region locations
         public async Task UpdateLocationAsync(Guid accountId, double latitude, double longitude)

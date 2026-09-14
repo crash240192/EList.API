@@ -41,19 +41,79 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<List<ConversationDto>> GetAccountConversationsAsync(Guid accountId, bool personalOnly)
         {
-            var request = _connection.Messages
+            // Чаты, в которых пользователь уже писал сообщения.
+            var messagedQuery = _connection.Messages
                 .LoadWith(i => i.Conversation)
                 .Where(i => i.AccountId == accountId)
-                .Select(i => i.Conversation)
-                .DistinctBy(i => i.Id);
+                .Select(i => i.Conversation);
 
             if (personalOnly)
-                request = request.Where(i => i.EventId == null);
+                messagedQuery = messagedQuery.Where(i => i.EventId == null);
 
-            request = request.OrderBy(i => i.CreateDate);
+            var conversations = await messagedQuery.ToListAsync();
+            var byId = conversations
+                .Where(c => c != null)
+                .GroupBy(c => c.Id)
+                .ToDictionary(g => g.Key, g => g.First());
 
-            var conversations = await request.ToListAsync();
-            return conversations;
+            // При personalOnly=false добавляем event-чаты событий,
+            // где пользователь участник или организатор (даже без своих сообщений).
+            if (!personalOnly)
+            {
+                var participatedEventIds = await _connection.Participations
+                    .Where(p => p.AccountId == accountId)
+                    .Select(p => p.EventId)
+                    .ToListAsync();
+
+                var directOrgEventIds = await _connection.Organizators
+                    .Where(o => o.AccountId == accountId)
+                    .Select(o => o.EventId)
+                    .ToListAsync();
+
+                var memberOrgIds = await _connection.OrganizationMembers
+                    .Where(m => m.AccountId == accountId && m.Active)
+                    .Select(m => m.OrganizationId)
+                    .ToListAsync();
+
+                var orgMemberEventIds = memberOrgIds.Count == 0
+                    ? new List<Guid>()
+                    : await _connection.Organizators
+                        .Where(o => o.OrganizationId != null && memberOrgIds.Contains(o.OrganizationId.Value))
+                        .Select(o => o.EventId)
+                        .ToListAsync();
+
+                var eventIds = participatedEventIds
+                    .Concat(directOrgEventIds)
+                    .Concat(orgMemberEventIds)
+                    .Distinct()
+                    .ToList();
+
+                if (eventIds.Count > 0)
+                {
+                    var eventConversations = await _connection.Conversations
+                        .Where(c => c.EventId != null && eventIds.Contains(c.EventId.Value))
+                        .ToListAsync();
+
+                    foreach (var conversation in eventConversations)
+                    {
+                        if (!byId.ContainsKey(conversation.Id))
+                            byId[conversation.Id] = conversation;
+                    }
+                }
+            }
+
+            return byId.Values.OrderBy(c => c.CreateDate).ToList();
+        }
+
+        public async Task AnonymizeAccountMessagesAsync(Guid accountId)
+        {
+            await _connection.Messages
+                .Where(m => m.AccountId == accountId)
+                .Set(m => m.MessageText, "[сообщение удалено]")
+                .Set(m => m.Hidden, true)
+                .Set(m => m.HiddenAt, DateTimeOffset.UtcNow)
+                .Set(m => m.UpdateDate, DateTimeOffset.UtcNow)
+                .UpdateAsync();
         }
 
         public async Task<ConversationDto?> GetConversationAsync(Guid conversationId)

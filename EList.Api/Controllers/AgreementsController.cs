@@ -28,19 +28,21 @@ namespace EList.Api.Controllers
         #endregion
 
         private readonly IAgreementService _agreementService;
+        private readonly IAccountsService _accountsService;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
         private readonly IAccountDataHolder _accountDataHolder;
 
         public AgreementsController(IAgreementService agreementService,
+            IAccountsService accountsService,
             ICorrelationIdProvider correlationIdProvider,
             IDataConnectionProvider connectionProvider,
             IAccountDataHolder accountDataHolder)
         {
-            
+            _agreementService = agreementService;
+            _accountsService = accountsService;
             _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
-            _agreementService = agreementService;
             _accountDataHolder = accountDataHolder;
         }
 
@@ -287,6 +289,38 @@ namespace EList.Api.Controllers
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return result;
+        }
+
+        /// <summary>
+        /// Отзыв согласия на обработку ПДн: углублённое удаление/анонимизация аккаунта.
+        /// </summary>
+        [HttpPost("withdraw")]
+        public async Task<CommandResult> WithdrawConsentAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(WithdrawConsentAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _accountsService.DeleteMyAccountAsync();
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
         }
     }
 }

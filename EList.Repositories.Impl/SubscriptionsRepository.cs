@@ -108,6 +108,11 @@ namespace EList.Repositories.Impl
             await _subscriptionsDataProvider.DeleteSubscriptionAsync(subscriberId, subscribedToId);
         }
 
+        public async Task DeleteAllForAccountAsync(Guid accountId)
+        {
+            await _subscriptionsDataProvider.DeleteAllForAccountAsync(accountId);
+        }
+
 
         public async Task UpdateSubscriptionAsync(UpdateSubscriptionRequest request)
         {

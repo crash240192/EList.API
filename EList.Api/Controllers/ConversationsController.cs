@@ -193,7 +193,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                //TODO: Добавить в отображение список всех чатов из событий в которых пользователь состоит или которые организует
+                // personalOnly=false → личные + event-чаты событий, где пользователь участник/организатор
                 var result = await _conversationsService.GetAccountConversationsAsync(personalOnly);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -222,7 +222,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                //TODO: Добавить в отображение список всех чатов из событий в которых пользователь состоит или которые организует
+                // byEvent возвращает чаты конкретного события; ACL видимости — в ConversationService.
                 var result = await _conversationsService.GetEventConversations(eventId);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);

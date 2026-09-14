@@ -70,6 +70,9 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<DebtCollectorWorke
 builder.Services.AddSingleton<OrganizationVerificationWorker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<OrganizationVerificationWorker>());
 
+builder.Services.AddSingleton<RetentionPurgeWorker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<RetentionPurgeWorker>());
+
 var app = builder.Build();
 
 var pathBase = ConfigurationManager.AppSettings["pathBase"] ?? string.Empty;

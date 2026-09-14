@@ -7,6 +7,7 @@ namespace EList.DbDataProvider.Interfaces
     {
         Task<AnonymousAgeAgreementDto> GetAnonymousAgeAgreementAsync(string jwt);
         Task SaveAnonumousAgeAgreementAsync(string jwt, string clientInfo);
+        Task<int> PurgeExpiredAnonymousAgeAgreementsAsync();
 
 
         Task<bool> DoesUserAgreedWithLatestDocumentVersion(Guid accountId, DocumentType documentType);

@@ -7,6 +7,7 @@ namespace EList.Repositories.Interfaces
     {
         Task<AnonymousAgeAgreement> GetAnonymousAgeAgreementAsync(string jwt);
         Task SaveAnonymousAgeAgreement(string jwt, string clientInfo);
+        Task<int> PurgeExpiredAnonymousAgeAgreementsAsync();
 
         Task<bool> DoesUserAgreedWithLatestDocumentVersion(Guid accountId, DocumentType documentType);
         Task SaveUserAgreementAsync(Guid accountId, Guid documentId);

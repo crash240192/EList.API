@@ -42,6 +42,11 @@ namespace EList.Repositories.Impl
             await _authorizationDataProvider.DeactivateAccountTokensAsync(accountId);
         }
 
+        public async Task<int> PurgeInactiveTokensAsync(TimeSpan olderThan)
+        {
+            return await _authorizationDataProvider.PurgeInactiveTokensAsync(olderThan);
+        }
+
         public async Task<Authorization> GetAuthorizationDataAsync(Guid token)
         {
             var authorizationItem = await _authorizationDataProvider.GetAuthorizationDataAsync(token);

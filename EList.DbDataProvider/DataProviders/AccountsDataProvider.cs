@@ -74,5 +74,14 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.Active, active)
                 .UpdateAsync();
         }
+
+        public async Task ClearSensitiveDataAsync(Guid accountId)
+        {
+            await _connection.Accounts.Where(i => i.Id == accountId)
+                .Set(i => i.Latitude, (double?)null)
+                .Set(i => i.Longitude, (double?)null)
+                .Set(i => i.PasswordHash, $"deleted:{accountId:N}")
+                .UpdateAsync();
+        }
     }
 }
