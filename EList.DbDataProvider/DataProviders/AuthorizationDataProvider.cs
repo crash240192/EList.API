@@ -95,5 +95,13 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.Active, false)
                 .UpdateAsync();
         }
+
+        public async Task<int> PurgeInactiveTokensAsync(TimeSpan olderThan)
+        {
+            var threshold = DateTimeOffset.UtcNow - olderThan;
+            return await _connection.Authorization
+                .Where(i => !i.Active && i.CreationDate < threshold)
+                .DeleteAsync();
+        }
     }
 }

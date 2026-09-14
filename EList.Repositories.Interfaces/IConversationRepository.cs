@@ -21,6 +21,7 @@ namespace EList.Repositories.Interfaces
         Task<Guid> CreateMessageAsync(MessageRequest message);
         Task UpdateMessageAsync(MessageRequest message);
         Task DeleteMessageAsync(Guid messageId);
+        Task AnonymizeAccountMessagesAsync(Guid accountId);
         Task<List<Guid>> GetConversationAuthorAccountIdsAsync(Guid conversationId);
 
         Task<MessageVoteResult> SetMessageVoteAsync(Guid messageId, Guid accountId, MessageVoteValue value);

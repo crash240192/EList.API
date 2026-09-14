@@ -40,6 +40,24 @@ namespace EList.DbDataProvider.DataProviders
                 AgreementDate = DateTime.UtcNow
             });
         }
+
+        public async Task<int> PurgeExpiredAnonymousAgeAgreementsAsync()
+        {
+            var hours = 24;
+            if (EList.Common.Configuration.ConfigurationManager.AppSettings.Contains("agreements:anonymousAgeTtlHours")
+                && int.TryParse(
+                    EList.Common.Configuration.ConfigurationManager.AppSettings["agreements:anonymousAgeTtlHours"],
+                    out var configuredHours)
+                && configuredHours > 0)
+            {
+                hours = configuredHours;
+            }
+
+            var threshold = DateTimeOffset.UtcNow.AddHours(-hours);
+            return await _connection.AnonymousAgeAgreements
+                .Where(i => i.AgreementDate < threshold)
+                .DeleteAsync();
+        }
         #endregion
 
 

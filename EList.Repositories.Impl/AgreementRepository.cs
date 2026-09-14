@@ -28,6 +28,11 @@ namespace EList.Repositories.Impl
             await _agreementDataProvider.SaveAnonumousAgeAgreementAsync(jwt, clientInfo);
         }
 
+        public async Task<int> PurgeExpiredAnonymousAgeAgreementsAsync()
+        {
+            return await _agreementDataProvider.PurgeExpiredAnonymousAgeAgreementsAsync();
+        }
+
         #region agreements
 
         public async Task<bool> DoesUserAgreedWithLatestDocumentVersion(Guid accountId, Models.Enums.DocumentType documentType)

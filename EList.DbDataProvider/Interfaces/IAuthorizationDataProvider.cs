@@ -9,6 +9,7 @@ namespace EList.DbDataProvider.Interfaces
         Task ActivateTokenAsync(Guid token);
         Task DeactivateTokenAsync(Guid token);
         Task DeactivateAccountTokensAsync(Guid accountId);
+        Task<int> PurgeInactiveTokensAsync(TimeSpan olderThan);
         
         Task<AuthorizationDto?> GetAuthorizationDataAsync(Guid token);
         Task<AuthorizationDto?> GetAuthorizationDataAsync(Guid accountId, string clientHash);

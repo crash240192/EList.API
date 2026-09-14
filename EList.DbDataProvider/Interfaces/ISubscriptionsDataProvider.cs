@@ -13,6 +13,7 @@ namespace EList.DbDataProvider.Interfaces
         Task<Guid> SubscribeToAccountAsync(Guid subscriberId, Guid subscribeToId);
         Task UpdateSubscriptionAsync(SubscriptionDto request);
         Task DeleteSubscriptionAsync(Guid subscriberId, Guid subscribedToId);
+        Task DeleteAllForAccountAsync(Guid accountId);
         Task<bool> IsSubscriptionExistAsync(Guid subscriberId, Guid subscribeToId);
     }
 }

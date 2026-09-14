@@ -20,6 +20,7 @@ namespace EList.DbDataProvider.Interfaces
         Task<Guid> CreateMessageAsync(MessageDto message);
         Task UpdateMessageAsync(MessageDto message);
         Task DeleteMessageAsync(Guid messageId);
+        Task AnonymizeAccountMessagesAsync(Guid accountId);
         Task<List<Guid>> GetConversationAuthorAccountIdsAsync(Guid conversationId);
 
         Task<MessageVoteStatsDto> SetMessageVoteAsync(Guid messageId, Guid accountId, MessageVoteValue value);

@@ -13,6 +13,7 @@ namespace EList.Repositories.Interfaces
         Task<int> GetSubscribersCountAsync(Guid accountId);
         Task<bool> IsSubscriptionExistAsync(Guid subscriberId, Guid subscribedToId);        
         Task DeleteSubscriptionAsync(Guid subscriberId, Guid subscribedToId);
+        Task DeleteAllForAccountAsync(Guid accountId);
         Task UpdateSubscriptionAsync(UpdateSubscriptionRequest request);
     }
 }

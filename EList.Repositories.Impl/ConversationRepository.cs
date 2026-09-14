@@ -75,6 +75,11 @@ namespace EList.Repositories.Impl
             await _conversationsDataProvider.DeleteMessageAsync(messageId);
         }
 
+        public async Task AnonymizeAccountMessagesAsync(Guid accountId)
+        {
+            await _conversationsDataProvider.AnonymizeAccountMessagesAsync(accountId);
+        }
+
         public async Task<Message> GetMessageAsync(Guid messageId)
         {
             var dbResult = await _conversationsDataProvider.GetMessageAsync(messageId);

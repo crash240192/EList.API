@@ -190,8 +190,14 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task DeleteSubscriptionAsync(Guid subscriberId, Guid subscribedToId)
         {
-            var result = await _connection.Subscriptions
+            await _connection.Subscriptions
                 .DeleteAsync(i => i.SubscribedToId == subscribedToId && i.SubscriberId == subscriberId);
+        }
+
+        public async Task DeleteAllForAccountAsync(Guid accountId)
+        {
+            await _connection.Subscriptions
+                .DeleteAsync(i => i.SubscriberId == accountId || i.SubscribedToId == accountId);
         }
     }
 }

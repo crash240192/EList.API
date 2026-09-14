@@ -5,8 +5,8 @@ using EList.Common.Support;
 using EList.Models.EventOrganizators;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
+using EList.Validators.Interfaces;
 using NLog;
-using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
 
 namespace EList.Services.Impl
@@ -27,6 +27,7 @@ namespace EList.Services.Impl
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
         private readonly INotificationsService _notificationsService;
         private readonly IOrganizationsRepository _organizationsRepository;
+        private readonly IParticipationAccessValidator _participationAccessValidator;
 
         public EventOrganizatorsService(ICorrelationIdProvider correlationIdProvider,
             IEventsRepository eventsRepository,
@@ -35,7 +36,8 @@ namespace EList.Services.Impl
             ISubscriptionsRepository subscriptionsRepository,
             IModerationPenaltiesService moderationPenaltiesService,
             INotificationsService notificationsService,
-            IOrganizationsRepository organizationsRepository)
+            IOrganizationsRepository organizationsRepository,
+            IParticipationAccessValidator participationAccessValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
@@ -45,6 +47,8 @@ namespace EList.Services.Impl
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
+            _participationAccessValidator = participationAccessValidator
+                ?? throw new ArgumentNullException(nameof(participationAccessValidator));
         }
 
         public async Task<CommandResult<EventOrganizator?>> GetByIdAsync(Guid id)
@@ -77,7 +81,10 @@ namespace EList.Services.Impl
             if (curEvent == null)
                 return CommandResult<List<EventOrganizator>>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
 
-            //TODO: Реализовать проверку, доступен ли пользователю просмотр списка участников
+            var accessError = await _participationAccessValidator.AssertCanViewParticipantsAsync(
+                curEvent, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
+            if (!accessError.Success)
+                return CommandResult<List<EventOrganizator>>.Fail(accessError.ErrorCode, accessError.Message);
 
             var result = await _organizatorsRepository.GetByEventIdAsync(eventId);
 

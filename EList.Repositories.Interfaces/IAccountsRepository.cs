@@ -14,5 +14,6 @@ namespace EList.Repositories.Interfaces
 
         Task SetAccountWalletAsync(Guid accountId, Guid walletId);
         Task SetAccountActiveAsync(Guid accountId, bool active);
+        Task ClearSensitiveDataAsync(Guid accountId);
     }
 }

@@ -4,6 +4,7 @@ using EList.Common.Encryption;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
+using EList.FilestorageClient;
 using EList.Models.Accounts;
 using EList.Models.ContactData;
 using EList.Models.Enums;
@@ -50,6 +51,8 @@ namespace EList.Services.Impl
         private readonly IPersonsRepository _personsRepository;
         private readonly IEventsRepository _eventsRepository;
         private readonly ISubscriptionsRepository _subscriptionsRepository;
+        private readonly IConversationRepository _conversationRepository;
+        private readonly IFilestorageClient _filestorageClient;
 
         public AccountsService(ICorrelationIdProvider correlationIdProvider,
             IAccountsRepository accountsRepository,
@@ -65,7 +68,9 @@ namespace EList.Services.Impl
             IAgreementRepository agreementRepository,
             IPersonsRepository personsRepository,
             IEventsRepository eventsRepository,
-            ISubscriptionsRepository subscriptionsRepository)
+            ISubscriptionsRepository subscriptionsRepository,
+            IConversationRepository conversationRepository,
+            IFilestorageClient filestorageClient)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
@@ -81,6 +86,8 @@ namespace EList.Services.Impl
             _personsRepository = personsRepository ?? throw new ArgumentNullException(nameof(personsRepository));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
+            _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
+            _filestorageClient = filestorageClient ?? throw new ArgumentNullException(nameof(filestorageClient));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -268,6 +275,66 @@ namespace EList.Services.Impl
             }
 
             await _accountsRepository.UpdateLoginAsync(accountId, $"deleted_{accountId:N}");
+
+            // Углублённая очистка: media, сообщения, подписки, geo/password.
+            try
+            {
+                var albums = await _mediaRepository.GetAccountAlbumsAsync(accountId) ?? new List<EList.Models.Media.MediaAlbum>();
+                foreach (var album in albums)
+                {
+                    var files = await _mediaRepository.GetAlbumFilesAsync(album.Id, pageIndex: 0, pageSize: 500);
+                    var fileIds = files?.Result?.Select(f => f.Id).ToList() ?? new List<Guid>();
+                    if (fileIds.Count > 0
+                        && _accountDataHolder.Token != null
+                        && !string.IsNullOrEmpty(_accountDataHolder.Jwt))
+                    {
+                        foreach (var fileId in fileIds)
+                        {
+                            try
+                            {
+                                await _filestorageClient.DeleteFileAsync(
+                                    fileId, _accountDataHolder.Token.Value, _accountDataHolder.Jwt);
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.Warn(correlationId, null, methodName,
+                                    $"Не удалось удалить файл {fileId} из filestorage: {ex.Message}");
+                            }
+                        }
+                        await _mediaRepository.DeleteFilesAsync(fileIds);
+                    }
+                    await _mediaRepository.DeleteAlbumAsync(album.Id);
+                }
+
+                var avatarIds = await _mediaRepository.GetAccountAvatarsAsync(accountId) ?? new List<Guid>();
+                foreach (var avatarId in avatarIds)
+                {
+                    if (_accountDataHolder.Token != null && !string.IsNullOrEmpty(_accountDataHolder.Jwt))
+                    {
+                        try
+                        {
+                            await _filestorageClient.DeleteFileAsync(
+                                avatarId, _accountDataHolder.Token.Value, _accountDataHolder.Jwt);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.Warn(correlationId, null, methodName,
+                                $"Не удалось удалить аватар {avatarId} из filestorage: {ex.Message}");
+                        }
+                    }
+                    await _mediaRepository.DeleteAvatarAsync(avatarId);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(correlationId, null, methodName,
+                    $"Ошибка очистки media при удалении аккаунта: {ex.Message}");
+            }
+
+            await _conversationRepository.AnonymizeAccountMessagesAsync(accountId);
+            await _subscriptionsRepository.DeleteAllForAccountAsync(accountId);
+            await _accountsRepository.ClearSensitiveDataAsync(accountId);
+
             await _accountsRepository.SetAccountActiveAsync(accountId, false);
             await _authorizationRepository.DeactivateAccountTokensAsync(accountId);
 
