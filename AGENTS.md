@@ -4,7 +4,9 @@
 
 ### Project overview
 
-EList 3.0.1 is a **C# / ASP.NET Core 6.0** backend REST API for an event-management and social platform. It exposes a Swagger-documented API with endpoints for accounts, authorization, events, participations, subscriptions, media, and wallets.
+EList 3.0.1 is a **C# / ASP.NET Core 6.0** backend REST API for an event-management and social platform. It exposes a Swagger-documented API with endpoints for accounts, authorization, events, participations, subscriptions, media, wallets (tariff balance only), and ticket orders (feature-flagged stub).
+
+**Product / domain docs (manual, not auto-updated on commit):** see [`docs/SERVICE.md`](docs/SERVICE.md) and [`docs/production-readiness-checklist.md`](docs/production-readiness-checklist.md). Legal drafts live in [`Agreements/`](Agreements/); runtime texts are in the DB.
 
 ### Tech stack
 
