@@ -34,7 +34,9 @@ namespace EList.Repositories.Impl
                 Address = request.Address,
                 Description = request.Description,
                 EndTime = request.EndTime,
-                CoverImageId = request.CoverImageId
+                CoverImageId = request.CoverImageId,
+                CoverFocusX = request.CoverFocusX,
+                CoverFocusY = request.CoverFocusY
             };
             var result = await _eventsDataProvider.CreateEventAsync(mappedRequest);
             return result;
@@ -64,6 +66,8 @@ namespace EList.Repositories.Impl
                 Description = request.Description,
                 EndTime = request.EndTime,
                 CoverImageId = request.CoverImageId,
+                CoverFocusX = request.CoverFocusX,
+                CoverFocusY = request.CoverFocusY,
                 Id = id
             };
             await _eventsDataProvider.UpdateEventAsync(mappedRequest);

@@ -51,6 +51,12 @@ namespace EList.DbDataProvider.Models
         [Column("cover_image_id")]
         public Guid? CoverImageId { get; set; }
 
+        [Column("cover_focus_x")]
+        public double? CoverFocusX { get; set; }
+
+        [Column("cover_focus_y")]
+        public double? CoverFocusY { get; set; }
+
         [Column("create_date")]
         public DateTimeOffset CreateDate { get; set; }
 

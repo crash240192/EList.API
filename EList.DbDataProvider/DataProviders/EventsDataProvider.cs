@@ -44,6 +44,8 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.Name, item.Name)
                 .Set(i => i.StartTime, item.StartTime)
                 .Set(i => i.CoverImageId, item.CoverImageId)
+                .Set(i => i.CoverFocusX, item.CoverFocusX)
+                .Set(i => i.CoverFocusY, item.CoverFocusY)
                 .Set(i => i.UpdateDate, DateTimeOffset.Now.ToUniversalTime())
                 .UpdateAsync();
         }

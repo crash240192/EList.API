@@ -11,6 +11,7 @@
     <None Remove="Migrations\DevelopMigration.sql" />
     <None Remove="Migrations\SoftDeleteCatalogs.sql" />
     <None Remove="Migrations\MessageVotes.sql" />
+    <None Remove="Migrations\CoverFocus.sql" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,6 +19,7 @@
     <EmbeddedResource Include="Migrations\DevelopMigration.sql" />
     <EmbeddedResource Include="Migrations\SoftDeleteCatalogs.sql" />
     <EmbeddedResource Include="Migrations\MessageVotes.sql" />
+    <EmbeddedResource Include="Migrations\CoverFocus.sql" />
   </ItemGroup>
 
   <ItemGroup>
