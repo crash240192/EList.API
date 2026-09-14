@@ -49,5 +49,15 @@
         /// Идентификатор файла обложки
         /// </summary>
         public Guid? CoverImageId { get; set; }
+
+        /// <summary>
+        /// Горизонтальная точка фокуса обложки (0…100), для object-position
+        /// </summary>
+        public double? CoverFocusX { get; set; }
+
+        /// <summary>
+        /// Вертикальная точка фокуса обложки (0…100), для object-position
+        /// </summary>
+        public double? CoverFocusY { get; set; }
     }
 }
