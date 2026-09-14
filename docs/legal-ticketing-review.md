@@ -1,7 +1,7 @@
 # Юридическая модель продажи билетов — ревью исходников
 
 > Дата: 14 сентября 2026  
-> Источники: `Agreements/*.txt` (commit «Добавил исходники документов…»), код `OrdersService` / `YooKassaStubPaymentProvider` / org payout, продуктовая модель владельца.  
+> Источники: `Agreements/*.txt` (commit «Добавил исходники документов…»), код `OrdersService` / `YooKassaStubPaymentProvider` / `OrganizationPayout.ProviderSellerId`, продуктовая модель владельца.  
 > Связано: [SERVICE.md](./SERVICE.md) §7.
 
 ---
