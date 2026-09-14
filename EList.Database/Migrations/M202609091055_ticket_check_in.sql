@@ -1,3 +1,5 @@
+-- Historical snapshot; changes are already included in M202608250914_develop_incremental / InitialDatabase. Not registered as a FluentMigrator step.
+
 -- Ticket check-in: кто и когда отметил присутствие
 -- Safe to re-run (IF NOT EXISTS).
 
