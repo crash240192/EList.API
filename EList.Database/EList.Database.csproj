@@ -8,18 +8,18 @@
 
   <ItemGroup>
     <None Remove="Migrations\InitialDatabase.sql" />
-    <None Remove="Migrations\DevelopMigration.sql" />
-    <None Remove="Migrations\SoftDeleteCatalogs.sql" />
-    <None Remove="Migrations\MessageVotes.sql" />
-    <None Remove="Migrations\CoverFocus.sql" />
+    <None Remove="Migrations\M202608250914_develop_incremental.sql" />
+    <None Remove="Migrations\M202609031136_soft_delete_catalogs.sql" />
+    <None Remove="Migrations\M202609091542_message_votes.sql" />
+    <None Remove="Migrations\M202609142252_cover_focus.sql" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Migrations\InitialDatabase.sql" />
-    <EmbeddedResource Include="Migrations\DevelopMigration.sql" />
-    <EmbeddedResource Include="Migrations\SoftDeleteCatalogs.sql" />
-    <EmbeddedResource Include="Migrations\MessageVotes.sql" />
-    <EmbeddedResource Include="Migrations\CoverFocus.sql" />
+    <EmbeddedResource Include="Migrations\M202608250914_develop_incremental.sql" />
+    <EmbeddedResource Include="Migrations\M202609031136_soft_delete_catalogs.sql" />
+    <EmbeddedResource Include="Migrations\M202609091542_message_votes.sql" />
+    <EmbeddedResource Include="Migrations\M202609142252_cover_focus.sql" />
   </ItemGroup>
 
   <ItemGroup>
