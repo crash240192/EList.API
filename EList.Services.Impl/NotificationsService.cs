@@ -1118,7 +1118,7 @@ namespace EList.Services.Impl
         public Task<CommandResult> NotifyCommentRepliedsync(Guid? eventId, Guid messageId, Guid replyId)
             => NotifyCommentRepliedAsync(eventId, messageId, replyId);
 
-        public async Task<CommandResult> NotifyCommentLikedAsync(Guid? eventId, Guid messageId)
+        public async Task<CommandResult> NotifyCommentLikedAsync(Guid? eventId, Guid messageId, int likesCountAfter)
         {
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(NotifyCommentLikedAsync)}";
@@ -1132,14 +1132,50 @@ namespace EList.Services.Impl
                 return CommandResult.OK;
             }
 
-            var notification = BuildNotification(
-                message.AccountId.Value,
-                eventId,
-                _accountDataHolder.AccountId,
-                UserNotificationType.CommentLiked,
-                $"{_accountDataHolder.AccountNameFullString} оценил ваш комментарий",
-                BuildMessagePreview(message.MessageText),
-                message);
+            var flood = _floodGate.GetSettings().CommentLikes;
+            var decision = _floodGate.EvaluateFirstKThenDigest(
+                $"commentLike:{messageId}",
+                likesCountAfter,
+                flood.FirstRealtimeCount,
+                flood.DigestWindowMinutes,
+                out var pendingCount);
+
+            if (decision == FloodDecision.Suppress)
+            {
+                logger.Debug(correlationId, null, methodName, $"Method finished (suppressed)", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
+            Notification notification;
+            if (decision == FloodDecision.SendDigest)
+            {
+                notification = BuildNotification(
+                    message.AccountId.Value,
+                    eventId,
+                    _accountDataHolder.AccountId,
+                    UserNotificationType.CommentLikedDigest,
+                    "Новые оценки комментария",
+                    $"Ещё {pendingCount} оценок вашего комментария",
+                    new
+                    {
+                        Count = pendingCount,
+                        MessageId = messageId,
+                        ConversationId = message.ConversationId,
+                        EventId = eventId,
+                        Preview = BuildMessagePreview(message.MessageText),
+                    });
+            }
+            else
+            {
+                notification = BuildNotification(
+                    message.AccountId.Value,
+                    eventId,
+                    _accountDataHolder.AccountId,
+                    UserNotificationType.CommentLiked,
+                    $"{_accountDataHolder.AccountNameFullString} оценил ваш комментарий",
+                    BuildMessagePreview(message.MessageText),
+                    message);
+            }
 
             await PersistAndSendAsync(new List<Notification> { notification });
 

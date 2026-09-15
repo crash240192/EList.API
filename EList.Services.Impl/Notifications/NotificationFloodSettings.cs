@@ -9,6 +9,7 @@ namespace EList.Services.Impl.Notifications
         public ParticipationFloodSettings Participation { get; set; } = new();
         public RelatedSocialFloodSettings RelatedSocial { get; set; } = new();
         public EventUpdateFloodSettings EventUpdate { get; set; } = new();
+        public CommentLikesFloodSettings CommentLikes { get; set; } = new();
     }
 
     public class RatingFloodSettings
@@ -43,6 +44,15 @@ namespace EList.Services.Impl.Notifications
     {
         /// <summary>Пушить update только при значимых полях (время/место/имя/active).</summary>
         public bool SignificantFieldsOnly { get; set; } = true;
+    }
+
+    public class CommentLikesFloodSettings
+    {
+        /// <summary>Первые N лайков конкретного комментария — realtime автору; дальше digest.</summary>
+        public int FirstRealtimeCount { get; set; } = 5;
+
+        /// <summary>Окно агрегации digest после first-K, минуты.</summary>
+        public int DigestWindowMinutes { get; set; } = 60;
     }
 
     public enum FloodDecision

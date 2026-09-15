@@ -54,14 +54,16 @@ Whitelist при re-consent (запросы не блокируются): `/api/
 | `EventOrganizatorAssigned` / `Removed` | назначение |
 | Org member / ownership / verification | организация |
 | `EventRatingChanged` vs `NewEventRating`, `EventRatingDeleted` | рейтинг |
-| Digests: `EventRatingDigest`, `ParticipatedDigest`, `EventLeftDigest`, `RelatedPersonActivityDigest` | antiflood |
+| Digests: `EventRatingDigest`, `ParticipatedDigest`, `EventLeftDigest`, `RelatedPersonActivityDigest`, `CommentLikedDigest` | antiflood |
 | `AgreementUpdateRequired` | новый юр. документ (по одному типу) |
 | `MessageReplied` | **только reply** |
+| `CommentLiked` / `CommentLikedDigest` | лайк комментария (first-K + digest) |
 | `NewMessage` | **больше не шлётся** (broadcast отключён до адресации сообщений) |
 
 Правила antiflood (сервер, `appsettings.notificationFlood`):
 
 - рейтинги / join-leave для организаторов: first-K + digest;
+- лайки комментария (`commentLikes`): first-K по лайкам **конкретного** сообщения + digest автору;
 - RelatedPerson*: по умолчанию 1:1, можно `mode=digest`;
 - `EventUpdated`: пуш только при смене времени / места / названия / active / coords (не description/cover).
 
@@ -109,8 +111,9 @@ Whitelist при re-consent (запросы не блокируются): `/api/
 
 1. Добавить рендеры для типов из §A5 (invites, BL/WL, org, organizator, rating, digests, agreement).
 2. Digests: UI по `Type` + `Data.Count` («Ещё N оценок…»), не как одиночное действие человека.
-3. Чат события: **не ждать** push на каждое сообщение; опираться на polling/WS чата; push только на **ответ вам** (`MessageReplied`).
-4. `EventUpdated`: не ожидать пуш на смену описания/обложки.
+3. Чат события: **не ждать** push на каждое сообщение; опираться на polling/WS чата; push только на **ответ вам** (`MessageReplied`) и **лайки** (`CommentLiked` / digest).
+4. Лайки/дизлайки комментариев: `POST .../messages/{id}/like|dislike`, `DELETE .../vote`; в ленте — deep-link к сообщению как у `MessageReplied`.
+5. `EventUpdated`: не ожидать пуш на смену описания/обложки.
 
 ### B6. Организации (организаторский UI)
 

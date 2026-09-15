@@ -29,6 +29,9 @@ namespace EList.Services.Impl.Notifications
 
             TryBindInt("notificationFlood:relatedSocial:digestWindowMinutes", v => settings.RelatedSocial.DigestWindowMinutes = v);
 
+            TryBindInt("notificationFlood:commentLikes:firstRealtimeCount", v => settings.CommentLikes.FirstRealtimeCount = v);
+            TryBindInt("notificationFlood:commentLikes:digestWindowMinutes", v => settings.CommentLikes.DigestWindowMinutes = v);
+
             if (ConfigurationManager.AppSettings.Contains("notificationFlood:eventUpdate:significantFieldsOnly")
                 && bool.TryParse(ConfigurationManager.AppSettings["notificationFlood:eventUpdate:significantFieldsOnly"], out var significant))
             {

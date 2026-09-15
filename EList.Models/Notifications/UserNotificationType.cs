@@ -30,6 +30,8 @@
         NewMessage = 32,
         /// <summary>Лайк комментария на странице мероприятия.</summary>
         CommentLiked = 33,
+        /// <summary>Ещё N лайков комментария за период (агрегат antiflood).</summary>
+        CommentLikedDigest = 34,
 
         AddedToBlackList = 41,
         AddedToWhiteList = 42,

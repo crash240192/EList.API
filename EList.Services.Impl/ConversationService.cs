@@ -411,7 +411,10 @@ namespace EList.Services.Impl
                 && result.CurrentUserVote == MessageVoteValue.Like
                 && previousVote != MessageVoteValue.Like)
             {
-                await _notificationsService.NotifyCommentLikedAsync(access.Conversation.EventId, messageId);
+                await _notificationsService.NotifyCommentLikedAsync(
+                    access.Conversation.EventId,
+                    messageId,
+                    result.LikesCount);
             }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
