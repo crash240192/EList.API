@@ -60,9 +60,6 @@ namespace EList.Repositories.Impl
             await _conversationsDataProvider.DeleteConversationAsync(conversationId);
         }
 
-
-
-
         public async Task<Guid> CreateMessageAsync(MessageRequest message)
         {
             var mappedRequest = _mapper.Map<MessageDto>(message);
@@ -84,6 +81,8 @@ namespace EList.Repositories.Impl
         {
             var dbResult = await _conversationsDataProvider.GetMessageAsync(messageId);
             var mappedResult = _mapper.Map<Message>(dbResult);
+            if (mappedResult != null)
+                await ApplyMessageFilesAsync(new[] { mappedResult });
             return mappedResult;
         }
 
@@ -97,7 +96,9 @@ namespace EList.Repositories.Impl
                 message.PersonInfo = _mapper.Map<PersonInfo>(i.Account.PersonInfo);
                 return message;
             })?.ToList();
-            return new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex ?? 0, pageSize ?? dbResult.TotalCount);
+            var page = new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex ?? 0, pageSize ?? dbResult.TotalCount);
+            await ApplyMessageFilesAsync(page.Result);
+            return page;
         }
 
         public async Task<PagedList<Message>> GetConversationRootMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize)
@@ -110,7 +111,9 @@ namespace EList.Repositories.Impl
                 message.PersonInfo = _mapper.Map<PersonInfo>(i.Account.PersonInfo);
                 return message;
             })?.ToList();
-            return new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex ?? 0, pageSize ?? dbResult.TotalCount);
+            var page = new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex ?? 0, pageSize ?? dbResult.TotalCount);
+            await ApplyMessageFilesAsync(page.Result);
+            return page;
         }
 
         public async Task<PagedList<Message>> GetMessageRepliesAsync(Guid messageId, int? pageIndex, int? pageSize)
@@ -123,7 +126,9 @@ namespace EList.Repositories.Impl
                 message.PersonInfo = _mapper.Map<PersonInfo>(i.Account.PersonInfo);
                 return message;
             })?.ToList();
-            return new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex ?? 0, pageSize ?? dbResult.TotalCount);
+            var page = new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex ?? 0, pageSize ?? dbResult.TotalCount);
+            await ApplyMessageFilesAsync(page.Result);
+            return page;
         }
 
         public async Task<MessageLocation?> GetMessageLocationAsync(Guid messageId, int rootPageSize, int siblingPageSize)
@@ -225,6 +230,38 @@ namespace EList.Repositories.Impl
                     ? null
                     : _mapper.Map<MessageVoteValue>(item.CurrentUserVote.Value);
             }
+        }
+
+        public async Task SetMessageFilesAsync(Guid messageId, IReadOnlyList<Guid> fileIds)
+        {
+            await _conversationsDataProvider.SetMessageFilesAsync(messageId, fileIds ?? Array.Empty<Guid>());
+        }
+
+        public async Task<List<Guid>> GetMessageFileIdsAsync(Guid messageId)
+        {
+            return await _conversationsDataProvider.GetMessageFileIdsAsync(messageId);
+        }
+
+        public async Task ApplyMessageFilesAsync(IEnumerable<Message> messages)
+        {
+            var list = messages?.ToList();
+            if (list == null || list.Count == 0)
+                return;
+
+            var map = await _conversationsDataProvider.GetMessageFilesMapAsync(
+                list.Select(m => m.Id).ToList());
+
+            foreach (var message in list)
+            {
+                message.FileIds = map.TryGetValue(message.Id, out var files)
+                    ? files
+                    : new List<Guid>();
+            }
+        }
+
+        public async Task<List<Guid>> GetOrphanMessageFileIdsAsync(IReadOnlyList<Guid> fileIds, Guid? exceptMessageId)
+        {
+            return await _conversationsDataProvider.GetOrphanMessageFileIdsAsync(fileIds, exceptMessageId);
         }
 
         private MessageVoteResult MapVoteResult(MessageVoteStatsDto stats)

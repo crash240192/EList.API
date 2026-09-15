@@ -77,5 +77,10 @@ namespace EList.Models.Conversations
         /// Голос текущего пользователя, если он уже голосовал.
         /// </summary>
         public MessageVoteValue? CurrentUserVote { get; set; }
+
+        /// <summary>
+        /// Вложения сообщения (file id).
+        /// </summary>
+        public List<Guid> FileIds { get; set; } = new();
     }
 }

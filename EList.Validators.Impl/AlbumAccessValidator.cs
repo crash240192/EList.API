@@ -79,6 +79,18 @@ namespace EList.Validators.Impl
             if (viewerAccountId == null)
                 return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
 
+            var parameters = ResolveParameters(album);
+            if (parameters.IsSystemAlbum
+                && operation is AlbumAccessOperation.ModifyMetadata
+                    or AlbumAccessOperation.Delete
+                    or AlbumAccessOperation.AddFiles
+                    or AlbumAccessOperation.Assign)
+            {
+                return CommandResult.Fail(
+                    ErrorCode.AccessError,
+                    "Системный альбом нельзя изменять вручную");
+            }
+
             if (album.EventId != null)
                 return await AssertCanModifyEventAlbumAsync(album, viewerAccountId.Value, adultConfirmed, operation);
 

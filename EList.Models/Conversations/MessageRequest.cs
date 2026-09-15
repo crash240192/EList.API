@@ -31,5 +31,10 @@
         /// Ответ на указанное сообщение
         /// </summary>
         public Guid? ReplyTo { get; set; }
+
+        /// <summary>
+        /// Вложения (file id из filestorage). До 10 штук. Текст может быть пустым, если есть файлы.
+        /// </summary>
+        public List<Guid>? FileIds { get; set; }
     }
 }

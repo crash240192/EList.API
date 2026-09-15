@@ -64,6 +64,9 @@ namespace EList.Services.Impl
                 return CommandResult<Guid?>.Fail(albumError.ErrorCode, albumError.Message);
 
             request.AccountId = _accountDataHolder.AccountId;
+            if (request.Parameters != null)
+                request.Parameters.SystemKind = null;
+
             var result = await _mediaRepository.CreateAlbumAsync(request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -83,6 +86,9 @@ namespace EList.Services.Impl
             var albumError = _mediaAlbumValidator.ValidateAlbumRequest(request, requireName: false);
             if (!albumError.Success)
                 return albumError;
+
+            if (request.Parameters != null)
+                request.Parameters.SystemKind = null;
 
             var album = await _mediaRepository.GetAlbumAsync(request.Id.Value);
             if (album == null)
@@ -231,6 +237,7 @@ namespace EList.Services.Impl
             var result = await _mediaRepository.GetEventAlbumsAsync(eventId);
             result = await _albumAccessValidator.FilterViewableAlbumsAsync(
                 result, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
+            result = await FilterEmptySystemAlbumsAsync(result);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<MediaAlbum>>(result);
@@ -244,6 +251,15 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _mediaRepository.GetEventsAlbumsAsync(accountId, _accountDataHolder.AccountId, pageIndex, pageSize);
+            if (result?.Result != null)
+            {
+                foreach (var container in result.Result)
+                {
+                    if (container.Albums == null)
+                        continue;
+                    container.Albums = await FilterEmptySystemAlbumsAsync(container.Albums);
+                }
+            }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<EventAlbumsContainer>>(result);
@@ -564,6 +580,29 @@ namespace EList.Services.Impl
                     Task.WaitAll(tasks.ToArray());
                 }
             }
+        }
+
+        private async Task<List<MediaAlbum>> FilterEmptySystemAlbumsAsync(List<MediaAlbum> albums)
+        {
+            if (albums == null || albums.Count == 0)
+                return albums ?? new List<MediaAlbum>();
+
+            var result = new List<MediaAlbum>(albums.Count);
+            foreach (var album in albums)
+            {
+                var isSystem = album.Parameters?.SystemKind != null;
+                if (!isSystem)
+                {
+                    result.Add(album);
+                    continue;
+                }
+
+                var count = await _mediaRepository.CountAlbumFilesAsync(album.Id);
+                if (count > 0)
+                    result.Add(album);
+            }
+
+            return result;
         }
     }
 }

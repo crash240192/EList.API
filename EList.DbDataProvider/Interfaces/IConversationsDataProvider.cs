@@ -30,5 +30,10 @@ namespace EList.DbDataProvider.Interfaces
         Task<MessageVoteStatsDto> SetMessageVoteAsync(Guid messageId, Guid accountId, MessageVoteValue value);
         Task<MessageVoteStatsDto> RemoveMessageVoteAsync(Guid messageId, Guid accountId);
         Task<Dictionary<Guid, MessageVoteStatsDto>> GetMessageVoteStatsAsync(IReadOnlyCollection<Guid> messageIds, Guid? currentAccountId);
+
+        Task SetMessageFilesAsync(Guid messageId, IReadOnlyList<Guid> fileIds);
+        Task<List<Guid>> GetMessageFileIdsAsync(Guid messageId);
+        Task<Dictionary<Guid, List<Guid>>> GetMessageFilesMapAsync(IReadOnlyCollection<Guid> messageIds);
+        Task<List<Guid>> GetOrphanMessageFileIdsAsync(IReadOnlyList<Guid> fileIds, Guid? exceptMessageId);
     }
 }

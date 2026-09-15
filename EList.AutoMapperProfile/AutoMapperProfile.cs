@@ -116,7 +116,14 @@ namespace EList.AutoMapperProfile
 
             CreateMap<Invitation, InvitationDto>().ReverseMap().ForMember(dest => dest.Inviter, opt => opt.Ignore());
 
-            CreateMap<EventAlbumParameters, EventAlbumParametersDto>().ReverseMap();
+            CreateMap<EventAlbumParameters, EventAlbumParametersDto>()
+                .ForMember(dest => dest.SystemKind, opt => opt.MapFrom(src =>
+                    src.SystemKind == null ? (short?)null : (short)src.SystemKind.Value));
+            CreateMap<EventAlbumParametersDto, EventAlbumParameters>()
+                .ForMember(dest => dest.SystemKind, opt => opt.MapFrom(src =>
+                    src.SystemKind == null
+                        ? (Models.Enums.EventAlbumSystemKind?)null
+                        : (Models.Enums.EventAlbumSystemKind)src.SystemKind.Value));
             CreateMap<AccountAlbumParameters, AccountAlbumParametersDto>().ReverseMap();
             CreateMap<EventAlbumRequest, AlbumRequest>().ReverseMap();
             CreateMap<MediaAlbum, MediaAlbumDto>();
@@ -152,8 +159,10 @@ namespace EList.AutoMapperProfile
             CreateMap<Ticket, TicketResponse>();
             CreateMap<Refund, RefundResponse>();
 
-            CreateMap<MessageDto, Message>().ReverseMap();
-            CreateMap<MessageRequest, MessageDto>().ReverseMap();
+            CreateMap<MessageDto, Message>()
+                .ForMember(dest => dest.FileIds, opt => opt.Ignore());
+            CreateMap<Message, MessageDto>();
+            CreateMap<MessageRequest, MessageDto>();
             CreateMap<ConversationDto, Conversation>().ReverseMap();
             CreateMap<ConversationRequest, ConversationDto>().ReverseMap();
 

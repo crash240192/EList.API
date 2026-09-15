@@ -12,6 +12,7 @@
     <None Remove="Migrations\M202609031136_soft_delete_catalogs.sql" />
     <None Remove="Migrations\M202609091542_message_votes.sql" />
     <None Remove="Migrations\M202609142252_cover_focus.sql" />
+    <None Remove="Migrations\M202609152340_message_files_system_album.sql" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,6 +21,7 @@
     <EmbeddedResource Include="Migrations\M202609031136_soft_delete_catalogs.sql" />
     <EmbeddedResource Include="Migrations\M202609091542_message_votes.sql" />
     <EmbeddedResource Include="Migrations\M202609142252_cover_focus.sql" />
+    <EmbeddedResource Include="Migrations\M202609152340_message_files_system_album.sql" />
   </ItemGroup>
 
   <ItemGroup>

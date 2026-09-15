@@ -8,6 +8,9 @@ namespace EList.Models.Media
         public bool HeadAlbum { get; set; }
         public bool ParticipantsReadonly { get; set; }
         public bool Private { get; set; }
+        public Enums.EventAlbumSystemKind? SystemKind { get; set; }
+
+        public bool IsSystemAlbum => SystemKind != null;
 
         public static AlbumAccessParameters OwnerOnlyDefault() => new()
         {
@@ -21,7 +24,8 @@ namespace EList.Models.Media
             {
                 HeadAlbum = parameters.HeadAlbum,
                 ParticipantsReadonly = parameters.ParticipantsReadonly,
-                Private = parameters.Private
+                Private = parameters.Private,
+                SystemKind = parameters.SystemKind
             };
 
         public static AlbumAccessParameters FromAccount(AccountAlbumParameters? parameters) => parameters == null

@@ -4,6 +4,7 @@ using EList.DbDataProvider.Models;
 using EList.DbDataProvider.Models.Enums;
 using LinqToDB;
 using LinqToDB.Async;
+using LinqToDB.Data;
 using Microsoft.VisualBasic;
 
 namespace EList.DbDataProvider.DataProviders
@@ -36,7 +37,78 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task DeleteMessageAsync(Guid messageId)
         {
+            await _connection.MessageFiles.DeleteAsync(i => i.MessageId == messageId);
             await _connection.Messages.DeleteAsync(i => i.Id == messageId);
+        }
+
+        public async Task SetMessageFilesAsync(Guid messageId, IReadOnlyList<Guid> fileIds)
+        {
+            await _connection.MessageFiles.DeleteAsync(i => i.MessageId == messageId);
+
+            if (fileIds == null || fileIds.Count == 0)
+                return;
+
+            var rows = fileIds
+                .Distinct()
+                .Select((fileId, index) => new MessageFileDto
+                {
+                    Id = Guid.NewGuid(),
+                    MessageId = messageId,
+                    FileId = fileId,
+                    SortOrder = index
+                })
+                .ToList();
+
+            await _connection.BulkCopyAsync(rows);
+        }
+
+        public async Task<List<Guid>> GetMessageFileIdsAsync(Guid messageId)
+        {
+            return await _connection.MessageFiles
+                .Where(i => i.MessageId == messageId)
+                .OrderBy(i => i.SortOrder)
+                .Select(i => i.FileId)
+                .ToListAsync();
+        }
+
+        public async Task<Dictionary<Guid, List<Guid>>> GetMessageFilesMapAsync(IReadOnlyCollection<Guid> messageIds)
+        {
+            var result = messageIds
+                .Distinct()
+                .ToDictionary(id => id, _ => new List<Guid>());
+
+            if (result.Count == 0)
+                return result;
+
+            var rows = await _connection.MessageFiles
+                .Where(i => messageIds.Contains(i.MessageId))
+                .OrderBy(i => i.SortOrder)
+                .Select(i => new { i.MessageId, i.FileId })
+                .ToListAsync();
+
+            foreach (var row in rows)
+            {
+                if (result.TryGetValue(row.MessageId, out var list))
+                    list.Add(row.FileId);
+            }
+
+            return result;
+        }
+
+        public async Task<List<Guid>> GetOrphanMessageFileIdsAsync(IReadOnlyList<Guid> fileIds, Guid? exceptMessageId)
+        {
+            if (fileIds == null || fileIds.Count == 0)
+                return new List<Guid>();
+
+            var stillReferenced = await _connection.MessageFiles
+                .Where(i => fileIds.Contains(i.FileId)
+                    && (exceptMessageId == null || i.MessageId != exceptMessageId.Value))
+                .Select(i => i.FileId)
+                .Distinct()
+                .ToListAsync();
+
+            var referenced = new HashSet<Guid>(stillReferenced);
+            return fileIds.Where(id => !referenced.Contains(id)).Distinct().ToList();
         }
 
         public async Task<List<ConversationDto>> GetAccountConversationsAsync(Guid accountId, bool personalOnly)

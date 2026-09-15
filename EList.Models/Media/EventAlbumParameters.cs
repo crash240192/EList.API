@@ -21,5 +21,10 @@
         /// Флаг закрытости альбома (виден только участникам события)
         /// </summary>
         public bool Private { get; set; }
+
+        /// <summary>
+        /// Системный тип (DiscussionPhotos и т.п.). null — обычный альбом.
+        /// </summary>
+        public Enums.EventAlbumSystemKind? SystemKind { get; set; }
     }
 }

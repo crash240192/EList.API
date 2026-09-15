@@ -10,6 +10,10 @@ namespace EList.DbDataProvider.Interfaces
         Task AssignAlbumToAccountAsync(Guid accountId, Guid albumId);
         Task AssignAlbumToEventAsync(Guid eventId, Guid albumId);
         Task AddFilesToAlbumAsync(Guid albumId, List<Guid> fileIds);
+        Task RemoveFilesFromAlbumAsync(Guid albumId, List<Guid> fileIds);
+        Task<int> CountAlbumFilesAsync(Guid albumId);
+        Task<Guid?> FindEventSystemAlbumIdAsync(Guid eventId, short systemKind);
+        Task RegisterEventSystemAlbumAsync(Guid eventId, short systemKind, Guid albumId);
         Task<MediaAlbumDto> GetAlbumAsync(Guid id);
         Task<List<MediaAlbumDto>> GetAccountAlbumsAsync(Guid accountId);
         Task<List<MediaAlbumDto>> GetEventAlbumsAsync(Guid eventId);

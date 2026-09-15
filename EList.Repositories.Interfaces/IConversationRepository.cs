@@ -29,5 +29,10 @@ namespace EList.Repositories.Interfaces
         Task<MessageVoteResult> SetMessageVoteAsync(Guid messageId, Guid accountId, MessageVoteValue value);
         Task<MessageVoteResult> RemoveMessageVoteAsync(Guid messageId, Guid accountId);
         Task ApplyMessageVoteStatsAsync(IEnumerable<Message> messages, Guid? currentAccountId);
+
+        Task SetMessageFilesAsync(Guid messageId, IReadOnlyList<Guid> fileIds);
+        Task<List<Guid>> GetMessageFileIdsAsync(Guid messageId);
+        Task ApplyMessageFilesAsync(IEnumerable<Message> messages);
+        Task<List<Guid>> GetOrphanMessageFileIdsAsync(IReadOnlyList<Guid> fileIds, Guid? exceptMessageId);
     }
 }

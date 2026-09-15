@@ -1,8 +1,10 @@
 ﻿using System.Diagnostics;
 using EList.Common.CorrelationId;
+using EList.Common.Extensions;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
+using EList.FilestorageClient;
 using EList.Models.Conversations;
 using EList.Models.Enums;
 using EList.Repositories.Interfaces;
@@ -13,6 +15,9 @@ namespace EList.Services.Impl
 {
     public class ConversationService : IConversationService
     {
+        public const int MaxFilesPerMessage = 10;
+        public const string DiscussionPhotosAlbumName = "Фото из обсуждений";
+
         #region logger
         private static readonly ILogger log = LogManager.GetCurrentClassLogger();
         private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
@@ -26,6 +31,8 @@ namespace EList.Services.Impl
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly INotificationsService _notificationsService;
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
+        private readonly IMediaRepository _mediaRepository;
+        private readonly IFilestorageClient _filestorageClient;
 
         public ConversationService(ICorrelationIdProvider correlationIdProvider,
             IConversationRepository conversationsRepository,
@@ -33,7 +40,9 @@ namespace EList.Services.Impl
             IParticipationsRepository participationsRepository,
             IAccountDataHolder accountDataHolder,
             INotificationsService notificationsService,
-            IModerationPenaltiesService moderationPenaltiesService)
+            IModerationPenaltiesService moderationPenaltiesService,
+            IMediaRepository mediaRepository,
+            IFilestorageClient filestorageClient)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _conversationsRepository = conversationsRepository ?? throw new ArgumentNullException(nameof(conversationsRepository));
@@ -42,6 +51,8 @@ namespace EList.Services.Impl
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _accountDataHolder = accountDataHolder;
+            _mediaRepository = mediaRepository ?? throw new ArgumentNullException(nameof(mediaRepository));
+            _filestorageClient = filestorageClient ?? throw new ArgumentNullException(nameof(filestorageClient));
         }
 
         public async Task<CommandResult<Guid>> CreateConversationAsync(ConversationRequest conversation)
@@ -81,8 +92,30 @@ namespace EList.Services.Impl
             if (writeAccess != null)
                 return CommandResult<Guid>.Fail(writeAccess.ErrorCode, writeAccess.Message);
 
+            var contentError = ValidateMessageContent(message);
+            if (contentError != null)
+                return CommandResult<Guid>.Fail(contentError.ErrorCode, contentError.Message);
+
+            var fileIds = NormalizeFileIds(message.FileIds);
+            if (fileIds.Count > 0 && conversation.EventId == null)
+                return CommandResult<Guid>.Fail(ErrorCode.InvalidValue, "Вложения доступны только в обсуждениях мероприятий");
+
             message.AccountId ??= _accountDataHolder.AccountId;
+            message.MessageText ??= string.Empty;
+            message.FileIds = fileIds;
+
             var result = await _conversationsRepository.CreateMessageAsync(message);
+
+            if (fileIds.Count > 0)
+            {
+                var attachError = await AttachFilesToMessageAsync(
+                    conversation.EventId!.Value, result, fileIds, previousFileIds: null);
+                if (attachError != null)
+                {
+                    await _conversationsRepository.DeleteMessageAsync(result);
+                    return CommandResult<Guid>.Fail(attachError.ErrorCode, attachError.Message);
+                }
+            }
 
             if (message.ReplyTo != null)
                 await _notificationsService.NotifyCommentRepliedAsync(conversation.EventId, message.ReplyTo.Value, result);
@@ -142,7 +175,11 @@ namespace EList.Services.Impl
             if (existingMessage.Replied)
                 return CommandResult.Fail(ErrorCode.MessageReplied, "Нельзя удалить сообщение на которое уже ответили");
 
+            var fileIds = existingMessage.FileIds ?? new List<Guid>();
             await _conversationsRepository.DeleteMessageAsync(messageId);
+
+            if (fileIds.Count > 0 && conversation?.EventId != null)
+                await DetachFilesFromDiscussionAlbumAsync(conversation.EventId.Value, fileIds, exceptMessageId: null);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -358,7 +395,38 @@ namespace EList.Services.Impl
             if (existingMessage.AccountId != _accountDataHolder.AccountId)
                 return CommandResult.Fail(ErrorCode.AccessError, $"Нельзя редактировать сообщения другого пользователя");
 
+            // Если FileIds не переданы — оставляем прежние вложения.
+            if (message.FileIds == null)
+                message.FileIds = existingMessage.FileIds;
+
+            var contentError = ValidateMessageContent(message);
+            if (contentError != null)
+                return contentError;
+
+            var fileIds = NormalizeFileIds(message.FileIds);
+            if (fileIds.Count > 0 && conversation?.EventId == null)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Вложения доступны только в обсуждениях мероприятий");
+
+            message.MessageText ??= string.Empty;
+            message.FileIds = fileIds;
+            message.ConversationId = existingMessage.ConversationId;
+
             await _conversationsRepository.UpdateMessageAsync(message);
+
+            if (conversation?.EventId != null)
+            {
+                var attachError = await AttachFilesToMessageAsync(
+                    conversation.EventId.Value,
+                    message.Id.Value,
+                    fileIds,
+                    previousFileIds: existingMessage.FileIds);
+                if (attachError != null)
+                    return attachError;
+            }
+            else
+            {
+                await _conversationsRepository.SetMessageFilesAsync(message.Id.Value, fileIds);
+            }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -419,6 +487,124 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<MessageVoteResult>(result);
+        }
+
+        private static CommandResult? ValidateMessageContent(MessageRequest message)
+        {
+            var text = message.MessageText?.Trim() ?? string.Empty;
+            var fileCount = NormalizeFileIds(message.FileIds).Count;
+
+            if (string.IsNullOrEmpty(text) && fileCount == 0)
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Сообщение должно содержать текст или вложения");
+
+            if (fileCount > MaxFilesPerMessage)
+                return CommandResult.Fail(ErrorCode.InvalidValue, $"Не больше {MaxFilesPerMessage} файлов на сообщение");
+
+            message.MessageText = text;
+            return null;
+        }
+
+        private static List<Guid> NormalizeFileIds(IEnumerable<Guid>? fileIds)
+        {
+            if (fileIds == null)
+                return new List<Guid>();
+
+            return fileIds.Where(id => id != Guid.Empty).Distinct().ToList();
+        }
+
+        private async Task<CommandResult?> AttachFilesToMessageAsync(
+            Guid eventId,
+            Guid messageId,
+            List<Guid> fileIds,
+            List<Guid>? previousFileIds)
+        {
+            var previous = previousFileIds ?? new List<Guid>();
+            var previousSet = new HashSet<Guid>(previous);
+            var nextSet = new HashSet<Guid>(fileIds);
+
+            var toAdd = fileIds.Where(id => !previousSet.Contains(id)).ToList();
+            var toRemove = previous.Where(id => !nextSet.Contains(id)).ToList();
+
+            if (toAdd.Count > 0 || fileIds.Count > 0)
+            {
+                if (_accountDataHolder.AccountId == null)
+                    return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+                var albumId = await _mediaRepository.EnsureEventSystemAlbumAsync(
+                    eventId,
+                    (short)EventAlbumSystemKind.DiscussionPhotos,
+                    _accountDataHolder.AccountId.Value,
+                    DiscussionPhotosAlbumName);
+
+                if (toAdd.Count > 0)
+                    await _mediaRepository.AddFilesToAlbumAsync(albumId, toAdd);
+            }
+
+            await _conversationsRepository.SetMessageFilesAsync(messageId, fileIds);
+
+            if (toRemove.Count > 0)
+                await DetachFilesFromDiscussionAlbumAsync(eventId, toRemove, exceptMessageId: messageId);
+
+            return null;
+        }
+
+        private async Task DetachFilesFromDiscussionAlbumAsync(
+            Guid eventId,
+            IReadOnlyList<Guid> fileIds,
+            Guid? exceptMessageId)
+        {
+            if (!fileIds.NullSafeAny())
+                return;
+
+            var albumId = await _mediaRepository.FindEventSystemAlbumIdAsync(
+                eventId, (short)EventAlbumSystemKind.DiscussionPhotos);
+
+            var orphanMessageFiles = await _conversationsRepository.GetOrphanMessageFileIdsAsync(
+                fileIds, exceptMessageId);
+
+            if (albumId != null && orphanMessageFiles.Count > 0)
+                await _mediaRepository.RemoveFilesFromAlbumAsync(albumId.Value, orphanMessageFiles);
+
+            await DeleteAbandonedFilesFromStorageAsync(orphanMessageFiles, albumId);
+        }
+
+        private async Task DeleteAbandonedFilesFromStorageAsync(List<Guid> fileIds, Guid? exceptAlbumId)
+        {
+            if (!fileIds.NullSafeAny())
+                return;
+
+            if (_accountDataHolder.Token == null)
+                return;
+
+            List<Guid> candidates = fileIds;
+            if (exceptAlbumId != null)
+            {
+                candidates = await _mediaRepository.GetFilesNotExistsInAnotherAlbumsAsync(fileIds, exceptAlbumId.Value)
+                    ?? new List<Guid>();
+            }
+            else
+            {
+                var stillInAlbums = new List<Guid>();
+                foreach (var fileId in fileIds)
+                {
+                    if (await _mediaRepository.SomeAlbumContainsThisFileAsync(fileId))
+                        stillInAlbums.Add(fileId);
+                }
+                var stillSet = new HashSet<Guid>(stillInAlbums);
+                candidates = fileIds.Where(id => !stillSet.Contains(id)).ToList();
+            }
+
+            foreach (var fileId in candidates)
+            {
+                try
+                {
+                    await _filestorageClient.DeleteFileAsync(fileId, _accountDataHolder.Token.Value, _accountDataHolder.Jwt);
+                }
+                catch
+                {
+                    // Не блокируем удаление сообщения из‑за сбоя filestorage.
+                }
+            }
         }
 
         private async Task<(CommandResult? Error, Message? Message, Conversation? Conversation)> EnsureCanVoteAsync(Guid messageId)

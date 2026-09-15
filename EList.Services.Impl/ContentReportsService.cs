@@ -687,6 +687,21 @@ namespace EList.Services.Impl
                     {
                         await _contentReportsRepository.SetMessageHiddenAsync(
                             report.MessageId.Value, true, _accountDataHolder.AccountId);
+                        var message = await _conversationRepository.GetMessageAsync(report.MessageId.Value);
+                        if (message != null)
+                        {
+                            var conversation = await _conversationRepository.GetConversationAsync(message.ConversationId);
+                            if (conversation?.EventId != null && message.FileIds != null && message.FileIds.Count > 0)
+                            {
+                                var albumId = await _mediaRepository.FindEventSystemAlbumIdAsync(
+                                    conversation.EventId.Value,
+                                    (short)EventAlbumSystemKind.DiscussionPhotos);
+                                var orphans = await _conversationRepository.GetOrphanMessageFileIdsAsync(
+                                    message.FileIds, report.MessageId.Value);
+                                if (albumId != null && orphans.Count > 0)
+                                    await _mediaRepository.RemoveFilesFromAlbumAsync(albumId.Value, orphans);
+                            }
+                        }
                         await _conversationRepository.DeleteMessageAsync(report.MessageId.Value);
                         return CommandResult.OK;
                     }

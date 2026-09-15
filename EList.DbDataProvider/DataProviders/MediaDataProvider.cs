@@ -54,13 +54,67 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task AddFilesToAlbumAsync(Guid albumId, List<Guid> fileIds)
         {
-            var files = fileIds.Select(i => new FileAlbumRelationDto
-            {
-                AlbumId = albumId,
-                FileId = i
-            });
+            if (!fileIds.NullSafeAny())
+                return;
 
-            await _connection.BulkCopyAsync(files);
+            var existing = await _connection.AlbumFiles
+                .Where(i => i.AlbumId == albumId && fileIds.Contains(i.FileId))
+                .Select(i => i.FileId)
+                .ToListAsync();
+            var existingSet = new HashSet<Guid>(existing);
+
+            var files = fileIds
+                .Where(id => !existingSet.Contains(id))
+                .Distinct()
+                .Select(i => new FileAlbumRelationDto
+                {
+                    Id = Guid.NewGuid(),
+                    AlbumId = albumId,
+                    FileId = i
+                })
+                .ToList();
+
+            if (files.Count > 0)
+                await _connection.BulkCopyAsync(files);
+        }
+
+        public async Task RemoveFilesFromAlbumAsync(Guid albumId, List<Guid> fileIds)
+        {
+            if (!fileIds.NullSafeAny())
+                return;
+
+            await _connection.AlbumFiles
+                .Where(i => i.AlbumId == albumId && fileIds.Contains(i.FileId))
+                .DeleteAsync();
+        }
+
+        public async Task<int> CountAlbumFilesAsync(Guid albumId)
+        {
+            return await _connection.AlbumFiles
+                .Where(i => i.AlbumId == albumId && !i.Hidden)
+                .CountAsync();
+        }
+
+        public async Task<Guid?> FindEventSystemAlbumIdAsync(Guid eventId, short systemKind)
+        {
+            var row = await _connection.EventSystemAlbums
+                .FirstOrDefaultAsync(i => i.EventId == eventId && i.SystemKind == systemKind);
+            return row?.AlbumId;
+        }
+
+        public async Task RegisterEventSystemAlbumAsync(Guid eventId, short systemKind, Guid albumId)
+        {
+            var exists = await _connection.EventSystemAlbums
+                .AnyAsync(i => i.EventId == eventId && i.SystemKind == systemKind);
+            if (exists)
+                return;
+
+            await _connection.InsertAsync(new EventSystemAlbumDto
+            {
+                EventId = eventId,
+                SystemKind = systemKind,
+                AlbumId = albumId
+            });
         }
 
         public async Task UpdateAlbumAsync(AlbumRequest request)
@@ -416,6 +470,9 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task DeleteAlbumAsync(Guid albumId)
         {
+            await _connection.EventSystemAlbums.Where(i => i.AlbumId == albumId)
+                .DeleteAsync();
+
             await _connection.AccountAlbums.Where(i => i.AlbumId == albumId)
                 .DeleteAsync();
 

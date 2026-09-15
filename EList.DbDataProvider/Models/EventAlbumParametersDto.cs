@@ -1,4 +1,4 @@
-﻿using LinqToDB.Mapping;
+using LinqToDB.Mapping;
 
 namespace EList.DbDataProvider.Models
 {
@@ -17,17 +17,10 @@ namespace EList.DbDataProvider.Models
         [Column("private_album")]
         public bool Private { get; set; }
 
+        [Column("system_kind")]
+        public short? SystemKind { get; set; }
+
         [Association(ThisKey = nameof(AlbumId), OtherKey = nameof(MediaAlbumDto.Id))]
         public MediaAlbumDto Album { get; set; }
     }
-
-    //public class AlbumAllowedUsers
-    //{
-    //    [Column("id"), PrimaryKey, Identity]
-    //    public Guid Id { get; set; }
-
-    //    public Guid AccountId { get; set; }
-
-
-    //}
 }

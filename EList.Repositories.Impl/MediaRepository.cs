@@ -47,6 +47,73 @@ namespace EList.Repositories.Impl
             await _mediaDataProvider.AddFilesToAlbumAsync(albumId, fileIds);
         }
 
+        public async Task RemoveFilesFromAlbumAsync(Guid albumId, List<Guid> fileIds)
+        {
+            await _mediaDataProvider.RemoveFilesFromAlbumAsync(albumId, fileIds);
+        }
+
+        public async Task<int> CountAlbumFilesAsync(Guid albumId)
+        {
+            return await _mediaDataProvider.CountAlbumFilesAsync(albumId);
+        }
+
+        public async Task<Guid?> FindEventSystemAlbumIdAsync(Guid eventId, short systemKind)
+        {
+            return await _mediaDataProvider.FindEventSystemAlbumIdAsync(eventId, systemKind);
+        }
+
+        public async Task RegisterEventSystemAlbumAsync(Guid eventId, short systemKind, Guid albumId)
+        {
+            await _mediaDataProvider.RegisterEventSystemAlbumAsync(eventId, systemKind, albumId);
+        }
+
+        public async Task<Guid> EnsureEventSystemAlbumAsync(
+            Guid eventId,
+            short systemKind,
+            Guid ownerAccountId,
+            string albumName)
+        {
+            var existing = await _mediaDataProvider.FindEventSystemAlbumIdAsync(eventId, systemKind);
+            if (existing != null)
+                return existing.Value;
+
+            var albumId = await _mediaDataProvider.CreateAlbumAsync(new AlbumRequest
+            {
+                Name = albumName,
+                Description = string.Empty,
+                AccountId = ownerAccountId,
+                EventId = eventId,
+                Parameters = new EventAlbumParametersDto
+                {
+                    HeadAlbum = false,
+                    ParticipantsReadonly = true,
+                    Private = false,
+                    SystemKind = systemKind
+                }
+            });
+
+            if (albumId == null)
+                throw new InvalidOperationException("Не удалось создать системный альбом");
+
+            await _mediaDataProvider.AssignAlbumToEventAsync(eventId, albumId.Value);
+
+            try
+            {
+                await _mediaDataProvider.RegisterEventSystemAlbumAsync(eventId, systemKind, albumId.Value);
+            }
+            catch
+            {
+                var winner = await _mediaDataProvider.FindEventSystemAlbumIdAsync(eventId, systemKind);
+                if (winner != null && winner.Value != albumId.Value)
+                {
+                    await _mediaDataProvider.DeleteAlbumAsync(albumId.Value);
+                    return winner.Value;
+                }
+            }
+
+            return albumId.Value;
+        }
+
         public async Task<List<MediaAlbum>> GetAccountAlbumsAsync(Guid accountId)
         {
             var items = await _mediaDataProvider.GetAccountAlbumsAsync(accountId);
