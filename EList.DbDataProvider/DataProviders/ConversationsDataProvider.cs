@@ -174,6 +174,24 @@ namespace EList.DbDataProvider.DataProviders
             return new ListResponse<MessageDto>(count, result);
         }
 
+        public async Task<int> GetMessagePageIndexAsync(Guid conversationId, Guid? parentId, Guid messageId, int pageSize)
+        {
+            if (pageSize <= 0) pageSize = 10;
+
+            var target = await _connection.Messages.FirstOrDefaultAsync(i => i.Id == messageId);
+            if (target == null || target.ConversationId != conversationId)
+                return 0;
+
+            // Тот же порядок, что у списка: OrderBy(CreateDate)
+            var beforeCount = await _connection.Messages
+                .Where(i => i.ConversationId == conversationId
+                    && i.ReplyTo == parentId
+                    && i.CreateDate < target.CreateDate)
+                .CountAsync();
+
+            return beforeCount / pageSize;
+        }
+
         public async Task UpdateConversationAsync(ConversationDto conversation)
         {
             await _connection.Conversations.Where(i => i.Id == conversation.Id)

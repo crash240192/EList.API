@@ -126,6 +126,60 @@ namespace EList.Repositories.Impl
             return new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex ?? 0, pageSize ?? dbResult.TotalCount);
         }
 
+        public async Task<MessageLocation?> GetMessageLocationAsync(Guid messageId, int rootPageSize, int siblingPageSize)
+        {
+            if (rootPageSize <= 0) rootPageSize = 10;
+            if (siblingPageSize <= 0) siblingPageSize = 5;
+
+            var current = await GetMessageAsync(messageId);
+            if (current == null) return null;
+
+            var conversation = await GetConversationAsync(current.ConversationId);
+            var chain = new List<Message> { current };
+            var cursor = current;
+            var guard = 0;
+            while (cursor.ReplyTo != null && guard++ < 64)
+            {
+                var parent = await GetMessageAsync(cursor.ReplyTo.Value);
+                if (parent == null) break;
+                chain.Add(parent);
+                cursor = parent;
+            }
+
+            chain.Reverse(); // root → … → target
+            var root = chain[0];
+            var parentId = current.ReplyTo;
+            var ancestors = chain.Take(chain.Count - 1).Select(m => m.Id).ToList();
+
+            var path = new List<MessagePathNode>();
+            foreach (var node in chain)
+            {
+                var nodeParent = node.ReplyTo;
+                var pageSize = nodeParent == null ? rootPageSize : siblingPageSize;
+                var pageIndex = await _conversationsDataProvider.GetMessagePageIndexAsync(
+                    current.ConversationId, nodeParent, node.Id, pageSize);
+                path.Add(new MessagePathNode
+                {
+                    MessageId = node.Id,
+                    ParentId = nodeParent,
+                    PageIndex = pageIndex,
+                });
+            }
+
+            return new MessageLocation
+            {
+                MessageId = current.Id,
+                ConversationId = current.ConversationId,
+                EventId = conversation?.EventId,
+                RootId = root.Id,
+                ParentId = parentId,
+                Path = path,
+                AncestorIds = ancestors,
+                RootPageIndex = path[0].PageIndex,
+                SiblingPageIndex = parentId == null ? 0 : path[^1].PageIndex,
+            };
+        }
+
         public async Task UpdateMessageAsync(MessageRequest message)
         {
             var mappedRequest = _mapper.Map<MessageDto>(message);

@@ -17,6 +17,7 @@ namespace EList.Repositories.Interfaces
         Task<PagedList<Message>> GetConversationMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize);
         Task<PagedList<Message>> GetConversationRootMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize);
         Task<PagedList<Message>> GetMessageRepliesAsync(Guid messageId, int? pageIndex, int? pageSize);
+        Task<MessageLocation?> GetMessageLocationAsync(Guid messageId, int rootPageSize, int siblingPageSize);
 
         Task<Message> GetMessageAsync(Guid messageId);
         Task<Guid> CreateMessageAsync(MessageRequest message);

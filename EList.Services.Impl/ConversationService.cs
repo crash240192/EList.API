@@ -277,6 +277,32 @@ namespace EList.Services.Impl
             return new CommandResult<PagedList<Message>>(result);
         }
 
+        public async Task<CommandResult<MessageLocation>> GetMessageLocationAsync(
+            Guid messageId,
+            int? rootPageSize = null,
+            int? siblingPageSize = null)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetMessageLocationAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var location = await _conversationsRepository.GetMessageLocationAsync(
+                messageId,
+                rootPageSize ?? 10,
+                siblingPageSize ?? 5);
+            if (location == null)
+                return CommandResult<MessageLocation>.Fail(ErrorCode.MessageNotFound, "Сообщение не найдено");
+
+            var conversation = await _conversationsRepository.GetConversationAsync(location.ConversationId);
+            if (conversation != null && !await CanViewConversationAsync(conversation))
+                return CommandResult<MessageLocation>.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия");
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<MessageLocation>(location);
+        }
+
         public async Task<CommandResult> UpdateConversationAsync(ConversationRequest conversation)
         {
             var correlationId = _correlationIdProvider.Get();
