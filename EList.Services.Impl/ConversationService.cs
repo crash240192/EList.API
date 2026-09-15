@@ -212,6 +212,28 @@ namespace EList.Services.Impl
             return new CommandResult<PagedList<Message>>(result);
         }
 
+        public async Task<CommandResult<PagedList<Message>>> GetConversationRootMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetConversationRootMessagesAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var conversation = await _conversationsRepository.GetConversationAsync(conversationId);
+            if (conversation == null)
+                return CommandResult<PagedList<Message>>.Fail(ErrorCode.IsNullOrEmpty, "Диалог не найден");
+
+            if (!await CanViewConversationAsync(conversation))
+                return CommandResult<PagedList<Message>>.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия");
+
+            var result = await _conversationsRepository.GetConversationRootMessagesAsync(conversationId, pageIndex, pageSize);
+            await _conversationsRepository.ApplyMessageVoteStatsAsync(result.Result, _accountDataHolder.AccountId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<PagedList<Message>>(result);
+        }
+
         public async Task<CommandResult<List<Conversation>>> GetEventConversations(Guid eventId)
         {
             var correlationId = _correlationIdProvider.Get();

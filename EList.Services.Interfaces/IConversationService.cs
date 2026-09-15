@@ -14,6 +14,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult<List<Conversation>>> GetEventConversations(Guid eventId);
 
         Task<CommandResult<PagedList<Message>>> GetConversationMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize);
+        Task<CommandResult<PagedList<Message>>> GetConversationRootMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize);
         Task<CommandResult<PagedList<Message>>> GetMessageRepliesAsync(Guid messageId, int? pageIndex, int? pageSize);
 
         Task<CommandResult<Guid>> CreateMessageAsync(MessageRequest message);

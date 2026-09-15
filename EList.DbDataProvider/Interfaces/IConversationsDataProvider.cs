@@ -14,6 +14,8 @@ namespace EList.DbDataProvider.Interfaces
         Task<List<ConversationDto>> GetEventConversations(Guid eventId);
 
         Task<ListResponse<MessageDto>> GetConversationMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize);
+        /// <summary>Корневые сообщения диалога (без ReplyTo).</summary>
+        Task<ListResponse<MessageDto>> GetConversationRootMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize);
         Task<ListResponse<MessageDto>> GetMessageRepliesAsync(Guid messageId, int? pageIndex, int? pageSize);
 
         Task<MessageDto> GetMessageAsync(Guid messageId);

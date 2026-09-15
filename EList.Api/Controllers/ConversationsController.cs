@@ -266,6 +266,32 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Корневые комментарии диалога (ReplyTo IS NULL), с пагинацией
+        /// </summary>
+        [HttpGet("messages/roots/byConversationId/{conversationId}")]
+        public async Task<CommandResult<PagedList<Message>>> GetConversationRootMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetConversationRootMessagesAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _conversationsService.GetConversationRootMessagesAsync(conversationId, pageIndex, pageSize);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Список ответов на сообщение
         /// </summary>
         /// <param name="messageId"></param>

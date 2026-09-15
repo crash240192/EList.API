@@ -100,6 +100,19 @@ namespace EList.Repositories.Impl
             return new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex ?? 0, pageSize ?? dbResult.TotalCount);
         }
 
+        public async Task<PagedList<Message>> GetConversationRootMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize)
+        {
+            var dbResult = await _conversationsDataProvider.GetConversationRootMessagesAsync(conversationId, pageIndex, pageSize);
+            var mappedResult = dbResult.Items?.Select(i =>
+            {
+                var message = _mapper.Map<Message>(i);
+                message.Account = _mapper.Map<AccountPublicData>(i.Account);
+                message.PersonInfo = _mapper.Map<PersonInfo>(i.Account.PersonInfo);
+                return message;
+            })?.ToList();
+            return new PagedList<Message>(dbResult.TotalCount, mappedResult, pageIndex ?? 0, pageSize ?? dbResult.TotalCount);
+        }
+
         public async Task<PagedList<Message>> GetMessageRepliesAsync(Guid messageId, int? pageIndex, int? pageSize)
         {
             var dbResult = await _conversationsDataProvider.GetMessageRepliesAsync(messageId, pageIndex, pageSize);

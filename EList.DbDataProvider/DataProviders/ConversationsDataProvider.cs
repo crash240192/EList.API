@@ -137,6 +137,21 @@ namespace EList.DbDataProvider.DataProviders
             return new ListResponse<MessageDto>(count, result);
         }
 
+        public async Task<ListResponse<MessageDto>> GetConversationRootMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize)
+        {
+            var query = _connection.Messages
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Account)
+                .ThenLoad(i => i.Avatars)
+                .Where(i => i.ConversationId == conversationId && i.ReplyTo == null)
+                .OrderBy(i => i.CreateDate);
+            var count = await query.CountAsync();
+
+            var result = await query.ToPagedQuery(pageIndex, pageSize).ToListAsync();
+            return new ListResponse<MessageDto>(count, result);
+        }
+
         public async Task<List<ConversationDto>> GetEventConversations(Guid eventId)
         {
             var result = await _connection.Conversations.Where(i =>  eventId == i.EventId).ToListAsync();
