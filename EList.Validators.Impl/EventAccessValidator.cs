@@ -70,6 +70,46 @@ namespace EList.Validators.Impl
             return CommandResult.OK;
         }
 
+        public async Task<CommandResult> AssertCanJoinEventAsync(
+            Event eventItem,
+            Guid accountId,
+            bool hasProvenInvitation = false)
+        {
+            if (eventItem.Parameters?.Private == true)
+            {
+                if (await _participantsBWListRepository.IsUserInWhiteListAsync(eventItem.Id, accountId))
+                    return CommandResult.OK;
+
+                var whiteListIsEmpty = await _participantsBWListRepository.IsWhiteListEmptyAsync(eventItem.Id);
+                if (whiteListIsEmpty)
+                {
+                    if (hasProvenInvitation)
+                        return CommandResult.OK;
+
+                    var isUserInvited = await _invitationsRepository.IsUserInvitatedAsync(accountId, eventItem.Id);
+                    if (isUserInvited)
+                        return CommandResult.OK;
+
+                    return CommandResult.Fail(
+                        ErrorCode.AccessError,
+                        "Принять участие в закрытом мероприятии можно только по приглашению");
+                }
+
+                return CommandResult.Fail(
+                    ErrorCode.AccessError,
+                    "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
+            }
+
+            if (await _participantsBWListRepository.IsUserInBlackListAsync(eventItem.Id, accountId))
+            {
+                return CommandResult.Fail(
+                    ErrorCode.AccessError,
+                    "Организатор добавил вас в чёрный список мероприятия");
+            }
+
+            return CommandResult.OK;
+        }
+
         private async Task<CommandResult> AssertPrivacyAccessAsync(Event eventItem, Guid? viewerAccountId)
         {
             var eventId = eventItem.Id;
@@ -79,41 +119,48 @@ namespace EList.Validators.Impl
                 if (viewerAccountId == null)
                     return CommandResult.Fail(ErrorCode.EventAccessDenied, "Сначала Необходимо авторизоваться");
 
-                var isUserInWhiteList = await _participantsBWListRepository.IsUserInWhiteListAsync(
-                    eventId, viewerAccountId.Value);
-                if (!isUserInWhiteList)
+                // Закрытое + человек в WL → видит всегда.
+                if (await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, viewerAccountId.Value))
+                    return CommandResult.OK;
+
+                var whiteListIsEmpty = await _participantsBWListRepository.IsWhiteListEmptyAsync(eventId);
+                if (!whiteListIsEmpty)
                 {
-                    var whiteListIsEmpty = await _participantsBWListRepository.IsWhiteListEmptyAsync(eventId);
-                    if (whiteListIsEmpty)
-                    {
-                        var isUserParticipated = await _participationsRepository.IsUserParticipatedAsync(
-                            viewerAccountId.Value, eventId);
-                        if (!isUserParticipated)
-                        {
-                            var invitation = await _invitationsRepository.GetInvitationAsync(
-                                viewerAccountId.Value, eventId);
-                            if (invitation == null)
-                                return CommandResult.Fail(
-                                    ErrorCode.EventAccessDenied,
-                                    "Посещать закрытые мероприятия можно только приглашению");
-                        }
-                    }
-                    else
-                    {
-                        return CommandResult.Fail(
-                            ErrorCode.EventAccessDenied,
-                            "Посещать закрытые мероприятия можно только приглашению");
-                    }
+                    // WL не пуст и пользователя нет в нём — мероприятие скрыто
+                    // (приглашать таких нельзя, см. InvitationsService.CreateAsync).
+                    return CommandResult.Fail(
+                        ErrorCode.EventAccessDenied,
+                        "Это закрытое мероприятие доступно только участникам белого списка");
                 }
+
+                // WL пуст → только приглашённые / уже участвующие.
+                var isUserParticipated = await _participationsRepository.IsUserParticipatedAsync(
+                    viewerAccountId.Value, eventId);
+                if (isUserParticipated)
+                    return CommandResult.OK;
+
+                var invitation = await _invitationsRepository.GetInvitationAsync(
+                    viewerAccountId.Value, eventId);
+                if (invitation == null)
+                {
+                    return CommandResult.Fail(
+                        ErrorCode.EventAccessDenied,
+                        "Посещать закрытые мероприятия можно только по приглашению");
+                }
+
+                return CommandResult.OK;
             }
-            else if (viewerAccountId != null)
+
+            if (viewerAccountId != null)
             {
                 var isUserInBlackList = await _participantsBWListRepository.IsUserInBlackListAsync(
                     eventId, viewerAccountId.Value);
                 if (isUserInBlackList)
+                {
                     return CommandResult.Fail(
                         ErrorCode.EventAccessDenied,
                         "Организатор добавил вас в чёрный список мероприятия");
+                }
             }
 
             return CommandResult.OK;

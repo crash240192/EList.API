@@ -26,6 +26,17 @@ namespace EList.Validators.Interfaces
             bool adultConfirmed,
             bool? isOrganizator = null);
 
+        /// <summary>
+        /// Можно ли аккаунту вступить / принять приглашение / купить билет.
+        /// Открытое: не в чёрном списке.
+        /// Закрытое, WL пуст: нужно приглашение (или <paramref name="hasProvenInvitation"/>).
+        /// Закрытое, WL не пуст: только участники белого списка (вход и без приглашения).
+        /// </summary>
+        Task<CommandResult> AssertCanJoinEventAsync(
+            Event eventItem,
+            Guid accountId,
+            bool hasProvenInvitation = false);
+
         Task<bool> IsAccountEventOrganizatorAsync(Guid eventId, Guid accountId);
     }
 }

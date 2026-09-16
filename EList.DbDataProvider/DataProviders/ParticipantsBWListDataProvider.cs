@@ -151,7 +151,7 @@ namespace EList.DbDataProvider.DataProviders
         public async Task<int> BlackListPersonsCountAsync(Guid eventId)
         {
             var result = await _connection.BlackList
-                .Where(i => i.EventId != eventId)
+                .Where(i => i.EventId == eventId)
                 .CountAsync();
             return result;
         }
@@ -159,7 +159,7 @@ namespace EList.DbDataProvider.DataProviders
         public async Task<int> WhiteListPersonsCountAsync(Guid eventId)
         {
             var result = await _connection.WhiteList
-                .Where(i => i.EventId != eventId)
+                .Where(i => i.EventId == eventId)
                 .CountAsync();
             return result;
         }

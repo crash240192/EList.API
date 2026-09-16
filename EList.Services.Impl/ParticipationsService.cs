@@ -30,6 +30,7 @@ namespace EList.Services.Impl
         private readonly INotificationsService _notificationsService;
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
         private readonly IParticipationAccessValidator _participationAccessValidator;
+        private readonly IEventAccessValidator _eventAccessValidator;
         private readonly IPagingValidator _pagingValidator;
 
         public ParticipationsService(ICorrelationIdProvider correlationIdProvider,
@@ -41,6 +42,7 @@ namespace EList.Services.Impl
             INotificationsService notificationsService,
             IModerationPenaltiesService moderationPenaltiesService,
             IParticipationAccessValidator participationAccessValidator,
+            IEventAccessValidator eventAccessValidator,
             IPagingValidator pagingValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
@@ -51,6 +53,7 @@ namespace EList.Services.Impl
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _participationAccessValidator = participationAccessValidator ?? throw new ArgumentNullException(nameof(participationAccessValidator));
+            _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
             _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
             _accountDataHolder = accountDataHolder;
         }
@@ -87,26 +90,10 @@ namespace EList.Services.Impl
             if (!eventBan.Success)
                 return CommandResult<Guid?>.Fail(eventBan.ErrorCode, eventBan.Message);
 
-            if (curEvent.Parameters.Private ?? false)
-            {
-                var whiteListCount = await _participantsBWListRepository.WhiteListPersonsCountAsync(eventId);
-                if (whiteListCount == 0)
-                {// если белый список пуст, проверяем приглашения
-                    var isUserInvited = await _invitationsRepository.IsUserInvitatedAsync(_accountDataHolder.AccountId.Value, eventId);
-                    if (!isUserInvited)
-                        return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Принять участие в закрытом мероприятии можно только по приглашению");
-                }
-                else
-                {
-                    if (!await _participantsBWListRepository.IsUserInWhiteListAsync(eventId, _accountDataHolder.AccountId.Value))
-                        return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
-                }
-            }
-            else
-            {
-                if (await _participantsBWListRepository.IsUserInBlackListAsync(eventId, _accountDataHolder.AccountId.Value))
-                    return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
-            }
+            var joinAccess = await _eventAccessValidator.AssertCanJoinEventAsync(
+                curEvent, _accountDataHolder.AccountId.Value);
+            if (!joinAccess.Success)
+                return CommandResult<Guid?>.Fail(joinAccess.ErrorCode, joinAccess.Message);
 
             if (curEvent.Parameters?.MaxPersonsCount > 0)
             {

@@ -29,6 +29,7 @@ namespace EList.Services.Impl
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
         private readonly IInvitationAccessValidator _invitationAccessValidator;
         private readonly IInvitationDataValidator _invitationDataValidator;
+        private readonly IEventAccessValidator _eventAccessValidator;
         private readonly IPagingValidator _pagingValidator;
 
         public InvitationsService(ICorrelationIdProvider correlationIdProvider,
@@ -41,6 +42,7 @@ namespace EList.Services.Impl
             IModerationPenaltiesService moderationPenaltiesService,
             IInvitationAccessValidator invitationAccessValidator,
             IInvitationDataValidator invitationDataValidator,
+            IEventAccessValidator eventAccessValidator,
             IPagingValidator pagingValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
@@ -52,6 +54,7 @@ namespace EList.Services.Impl
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _invitationAccessValidator = invitationAccessValidator ?? throw new ArgumentNullException(nameof(invitationAccessValidator));
             _invitationDataValidator = invitationDataValidator ?? throw new ArgumentNullException(nameof(invitationDataValidator));
+            _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
             _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
             _accountDataHolder = accountDataHolder;
         }
@@ -168,18 +171,14 @@ namespace EList.Services.Impl
             if (!eventBan.Success)
                 return CommandResult.Fail(eventBan.ErrorCode, eventBan.Message);
 
-            // Согласовано с ParticipateAsync: при пустом WL достаточно самого приглашения.
-            if (curEvent.Parameters?.Private ?? false)
-            {
-                var whiteListCount = await _participantsBWListRepository.WhiteListPersonsCountAsync(curEvent.Id);
-                if (whiteListCount > 0
-                    && !await _participantsBWListRepository.IsUserInWhiteListAsync(curEvent.Id, _accountDataHolder.AccountId.Value))
-                    return CommandResult.Fail(ErrorCode.AccessError, "Участвовать в закрытом мероприятии могут только пользователи из белого списка");
-            }
-            else if (await _participantsBWListRepository.IsUserInBlackListAsync(curEvent.Id, _accountDataHolder.AccountId.Value))
-            {
-                return CommandResult.Fail(ErrorCode.AccessError, "Организатор добавил вас в чёрный список мероприятия");
-            }
+            // Согласовано с ParticipateAsync / AssertCanJoinEventAsync:
+            // пустой WL → достаточно приглашения; непустой WL → только из списка.
+            var joinAccess = await _eventAccessValidator.AssertCanJoinEventAsync(
+                curEvent,
+                _accountDataHolder.AccountId.Value,
+                hasProvenInvitation: true);
+            if (!joinAccess.Success)
+                return joinAccess;
 
             if (curEvent.Parameters?.MaxPersonsCount > 0)
             {

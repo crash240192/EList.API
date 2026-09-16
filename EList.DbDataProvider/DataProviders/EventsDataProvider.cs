@@ -121,8 +121,9 @@ namespace EList.DbDataProvider.DataProviders
             }
 
             // Отображение частных мероприятий
-            // для черных списков - показывать если пользователь не в черных списках или он организатор / член орг-организатора
-            // для белых списков - показывать, если пользователь в белом списке, или белый список пуст, или он организатор/член орг, или он уже участник
+            // Открытое: не в чёрном списке (или организатор).
+            // Закрытое, WL пуст: только приглашённые / участники.
+            // Закрытое, WL не пуст: только люди из белого списка (приглашение не требуется).
             if (curAccountId != null)
             {
                 eventsRequest = eventsRequest
@@ -134,9 +135,12 @@ namespace EList.DbDataProvider.DataProviders
                     eventsRequest = eventsRequest.Where(i =>
                         (i.Parameters.Private == true &&
                                 (
-                                    (i.WhiteList.Any(p => p.AccountId == curAccountId) || i.WhiteList.Count() == 0)
-                                    &&
-                                    (i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId) || i.Participants.Any(p => p.AccountId == curAccountId))
+                                    i.WhiteList.Any(p => p.AccountId == curAccountId)
+                                    || (
+                                        i.WhiteList.Count() == 0
+                                        && (i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
+                                            || i.Participants.Any(p => p.AccountId == curAccountId))
+                                    )
                                 )
                         )
                         || (i.Parameters.Private != true && (!i.BlackList.Any(p => p.AccountId == curAccountId)))
@@ -148,9 +152,12 @@ namespace EList.DbDataProvider.DataProviders
                     eventsRequest = eventsRequest.Where(i =>
                         (i.Parameters.Private == true &&
                                 (
-                                    (i.WhiteList.Any(p => p.AccountId == curAccountId) || i.WhiteList.Count() == 0)
-                                    &&
-                                    (i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId) || i.Participants.Any(p => p.AccountId == curAccountId))
+                                    i.WhiteList.Any(p => p.AccountId == curAccountId)
+                                    || (
+                                        i.WhiteList.Count() == 0
+                                        && (i.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
+                                            || i.Participants.Any(p => p.AccountId == curAccountId))
+                                    )
                                 )
                         )
                         || (i.Parameters.Private != true && (!i.BlackList.Any(p => p.AccountId == curAccountId)))

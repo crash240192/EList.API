@@ -11,6 +11,7 @@ using EList.Models.Orders;
 using EList.Repositories.Interfaces;
 using EList.Services.Impl.Payments;
 using EList.Services.Interfaces;
+using EList.Validators.Interfaces;
 using NLog;
 
 namespace EList.Services.Impl
@@ -34,6 +35,7 @@ namespace EList.Services.Impl
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
         private readonly INotificationsService _notificationsService;
+        private readonly IEventAccessValidator _eventAccessValidator;
         private readonly IPaymentProvider _paymentProvider;
         private readonly IAccountsRepository _accountsRepository;
         private readonly IMapper _mapper;
@@ -50,6 +52,7 @@ namespace EList.Services.Impl
             IParticipantsBWListRepository participantsBWListRepository,
             IModerationPenaltiesService moderationPenaltiesService,
             INotificationsService notificationsService,
+            IEventAccessValidator eventAccessValidator,
             IPaymentProvider paymentProvider,
             IAccountsRepository accountsRepository,
             IMapper mapper)
@@ -65,6 +68,7 @@ namespace EList.Services.Impl
             _participantsBWListRepository = participantsBWListRepository ?? throw new ArgumentNullException(nameof(participantsBWListRepository));
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
+            _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
             _paymentProvider = paymentProvider ?? throw new ArgumentNullException(nameof(paymentProvider));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
@@ -1045,29 +1049,9 @@ namespace EList.Services.Impl
             if (!eventBan.Success)
                 return eventBan;
 
-            if (eventItem.Parameters?.Private ?? false)
-            {
-                var whiteListCount = await _participantsBWListRepository.WhiteListPersonsCountAsync(eventItem.Id);
-                if (whiteListCount == 0)
-                {
-                    var isUserInvited = await _invitationsRepository.IsUserInvitatedAsync(accountId, eventItem.Id);
-                    if (!isUserInvited)
-                    {
-                        return CommandResult.Fail(ErrorCode.AccessError,
-                            "Получатель не может принять билет на закрытое мероприятие без приглашения");
-                    }
-                }
-                else if (!await _participantsBWListRepository.IsUserInWhiteListAsync(eventItem.Id, accountId))
-                {
-                    return CommandResult.Fail(ErrorCode.AccessError,
-                        "Получатель не в белом списке закрытого мероприятия");
-                }
-            }
-            else if (await _participantsBWListRepository.IsUserInBlackListAsync(eventItem.Id, accountId))
-            {
-                return CommandResult.Fail(ErrorCode.AccessError,
-                    "Получатель в чёрном списке мероприятия");
-            }
+            var joinAccess = await _eventAccessValidator.AssertCanJoinEventAsync(eventItem, accountId);
+            if (!joinAccess.Success)
+                return RemapJoinAccessForTicketHolder(joinAccess);
 
             return null;
         }
@@ -1176,31 +1160,53 @@ namespace EList.Services.Impl
             if (!eventBan.Success)
                 return eventBan;
 
-            if (eventItem.Parameters?.Private ?? false)
-            {
-                var whiteListCount = await _participantsBWListRepository.WhiteListPersonsCountAsync(eventItem.Id);
-                if (whiteListCount == 0)
-                {
-                    var isUserInvited = await _invitationsRepository.IsUserInvitatedAsync(accountId, eventItem.Id);
-                    if (!isUserInvited)
-                    {
-                        return CommandResult.Fail(ErrorCode.AccessError,
-                            "Купить билет на закрытое мероприятие можно только по приглашению");
-                    }
-                }
-                else if (!await _participantsBWListRepository.IsUserInWhiteListAsync(eventItem.Id, accountId))
-                {
-                    return CommandResult.Fail(ErrorCode.AccessError,
-                        "Купить билет на закрытое мероприятие могут только пользователи из белого списка");
-                }
-            }
-            else if (await _participantsBWListRepository.IsUserInBlackListAsync(eventItem.Id, accountId))
-            {
-                return CommandResult.Fail(ErrorCode.AccessError,
-                    "Организатор добавил вас в чёрный список мероприятия");
-            }
+            var joinAccess = await _eventAccessValidator.AssertCanJoinEventAsync(eventItem, accountId);
+            if (!joinAccess.Success)
+                return RemapJoinAccessForTicketBuyer(joinAccess);
 
             return null;
+        }
+
+        private static CommandResult RemapJoinAccessForTicketBuyer(CommandResult joinAccess)
+        {
+            var message = joinAccess.Message ?? string.Empty;
+            if (message.Contains("приглашению", StringComparison.Ordinal))
+            {
+                return CommandResult.Fail(ErrorCode.AccessError,
+                    "Купить билет на закрытое мероприятие можно только по приглашению");
+            }
+
+            if (message.Contains("белого списка", StringComparison.Ordinal))
+            {
+                return CommandResult.Fail(ErrorCode.AccessError,
+                    "Купить билет на закрытое мероприятие могут только пользователи из белого списка");
+            }
+
+            return joinAccess;
+        }
+
+        private static CommandResult RemapJoinAccessForTicketHolder(CommandResult joinAccess)
+        {
+            var message = joinAccess.Message ?? string.Empty;
+            if (message.Contains("приглашению", StringComparison.Ordinal))
+            {
+                return CommandResult.Fail(ErrorCode.AccessError,
+                    "Получатель не может принять билет на закрытое мероприятие без приглашения");
+            }
+
+            if (message.Contains("белого списка", StringComparison.Ordinal))
+            {
+                return CommandResult.Fail(ErrorCode.AccessError,
+                    "Получатель не в белом списке закрытого мероприятия");
+            }
+
+            if (message.Contains("чёрный список", StringComparison.Ordinal))
+            {
+                return CommandResult.Fail(ErrorCode.AccessError,
+                    "Получатель в чёрном списке мероприятия");
+            }
+
+            return joinAccess;
         }
 
         /// <summary>

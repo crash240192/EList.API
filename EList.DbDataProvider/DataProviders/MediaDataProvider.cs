@@ -283,10 +283,15 @@ namespace EList.DbDataProvider.DataProviders
                             && curAccountOrganizationIds.Contains(o.OrganizationId.Value)))
                     || (
                         e.Parameters.Private == true
-                        && (e.WhiteList.Any(w => w.AccountId == curAccountId) || !e.WhiteList.Any())
                         && (
-                            e.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
-                            || e.Participants.Any(p => p.AccountId == curAccountId)
+                            e.WhiteList.Any(w => w.AccountId == curAccountId)
+                            || (
+                                !e.WhiteList.Any()
+                                && (
+                                    e.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
+                                    || e.Participants.Any(p => p.AccountId == curAccountId)
+                                )
+                            )
                         )
                     )
                     || (
@@ -346,10 +351,15 @@ namespace EList.DbDataProvider.DataProviders
                             && curAccountOrganizationIds.Contains(o.OrganizationId.Value)))
                     || (
                         e.Parameters.Private == true
-                        && (e.WhiteList.Any(w => w.AccountId == curAccountId) || !e.WhiteList.Any())
                         && (
-                            e.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
-                            || e.Participants.Any(p => p.AccountId == curAccountId)
+                            e.WhiteList.Any(w => w.AccountId == curAccountId)
+                            || (
+                                !e.WhiteList.Any()
+                                && (
+                                    e.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
+                                    || e.Participants.Any(p => p.AccountId == curAccountId)
+                                )
+                            )
                         )
                     )
                     || (

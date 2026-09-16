@@ -15,12 +15,15 @@ namespace EList.DbDataProvider.Extensions
 
             if (eventItem.Parameters?.Private == true)
             {
-                var whiteListAllowed = eventItem.WhiteList.Any(w => w.AccountId == accountId)
-                    || !eventItem.WhiteList.Any();
-                var participantOrInvited = eventItem.Invitations.Any(inv => inv.InvitedAccountId == accountId)
-                    || eventItem.Participants.Any(p => p.AccountId == accountId);
+                // Согласовано с EventAccessValidator: в WL — доступен; пустой WL — только invite/participant.
+                if (eventItem.WhiteList.Any(w => w.AccountId == accountId))
+                    return true;
 
-                return whiteListAllowed && participantOrInvited;
+                if (eventItem.WhiteList.Any())
+                    return false;
+
+                return eventItem.Invitations.Any(inv => inv.InvitedAccountId == accountId)
+                    || eventItem.Participants.Any(p => p.AccountId == accountId);
             }
 
             if (eventItem.BlackList.Any(b => b.AccountId == accountId))
