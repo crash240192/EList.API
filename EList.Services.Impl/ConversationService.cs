@@ -143,7 +143,11 @@ namespace EList.Services.Impl
                     return CommandResult.Fail(ErrorCode.AccessError, "Удалять диалоги мероприятия может только организатор");
             }
 
+            var conversationFileIds = await _conversationsRepository.GetConversationMessageFileIdsAsync(conversationId);
             await _conversationsRepository.DeleteConversationAsync(conversationId);
+
+            if (conversation.EventId != null && conversationFileIds.Count > 0)
+                await DetachFilesFromDiscussionAlbumAsync(conversation.EventId.Value, conversationFileIds, exceptMessageId: null);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -458,6 +462,15 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<MessageVoteResult>(result);
+        }
+
+        public async Task CleanupMessageMediaAsync(Guid messageId, Guid? eventId)
+        {
+            var fileIds = await _conversationsRepository.GetMessageFileIdsAsync(messageId);
+            if (!fileIds.NullSafeAny() || eventId == null)
+                return;
+
+            await DetachFilesFromDiscussionAlbumAsync(eventId.Value, fileIds, exceptMessageId: messageId);
         }
 
         private async Task<CommandResult<MessageVoteResult>> SetMessageVoteAsync(Guid messageId, MessageVoteValue value)

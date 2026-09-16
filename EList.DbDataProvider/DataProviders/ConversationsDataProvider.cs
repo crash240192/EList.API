@@ -111,6 +111,16 @@ namespace EList.DbDataProvider.DataProviders
             return fileIds.Where(id => !referenced.Contains(id)).Distinct().ToList();
         }
 
+        public async Task<List<Guid>> GetConversationMessageFileIdsAsync(Guid conversationId)
+        {
+            return await (
+                from mf in _connection.MessageFiles
+                join m in _connection.Messages on mf.MessageId equals m.Id
+                where m.ConversationId == conversationId
+                select mf.FileId
+            ).Distinct().ToListAsync();
+        }
+
         public async Task<List<ConversationDto>> GetAccountConversationsAsync(Guid accountId, bool personalOnly)
         {
             // Чаты, в которых пользователь уже писал сообщения.

@@ -34,5 +34,6 @@ namespace EList.Repositories.Interfaces
         Task<List<Guid>> GetMessageFileIdsAsync(Guid messageId);
         Task ApplyMessageFilesAsync(IEnumerable<Message> messages);
         Task<List<Guid>> GetOrphanMessageFileIdsAsync(IReadOnlyList<Guid> fileIds, Guid? exceptMessageId);
+        Task<List<Guid>> GetConversationMessageFileIdsAsync(Guid conversationId);
     }
 }

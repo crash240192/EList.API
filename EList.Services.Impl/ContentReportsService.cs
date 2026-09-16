@@ -26,6 +26,7 @@ namespace EList.Services.Impl
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
         private readonly IEventsRepository _eventsRepository;
         private readonly IConversationRepository _conversationRepository;
+        private readonly IConversationService _conversationService;
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
         private readonly IAccountsRepository _accountsRepository;
         private readonly IOrganizationsRepository _organizationsRepository;
@@ -42,6 +43,7 @@ namespace EList.Services.Impl
             IEventOrganizatorsRepository eventOrganizatorsRepository,
             IEventsRepository eventsRepository,
             IConversationRepository conversationRepository,
+            IConversationService conversationService,
             IParticipantsBWListRepository participantsBWListRepository,
             IAccountsRepository accountsRepository,
             IOrganizationsRepository organizationsRepository,
@@ -57,6 +59,7 @@ namespace EList.Services.Impl
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
+            _conversationService = conversationService ?? throw new ArgumentNullException(nameof(conversationService));
             _participantsBWListRepository = participantsBWListRepository ?? throw new ArgumentNullException(nameof(participantsBWListRepository));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
@@ -691,16 +694,8 @@ namespace EList.Services.Impl
                         if (message != null)
                         {
                             var conversation = await _conversationRepository.GetConversationAsync(message.ConversationId);
-                            if (conversation?.EventId != null && message.FileIds != null && message.FileIds.Count > 0)
-                            {
-                                var albumId = await _mediaRepository.FindEventSystemAlbumIdAsync(
-                                    conversation.EventId.Value,
-                                    (short)EventAlbumSystemKind.DiscussionPhotos);
-                                var orphans = await _conversationRepository.GetOrphanMessageFileIdsAsync(
-                                    message.FileIds, report.MessageId.Value);
-                                if (albumId != null && orphans.Count > 0)
-                                    await _mediaRepository.RemoveFilesFromAlbumAsync(albumId.Value, orphans);
-                            }
+                            await _conversationService.CleanupMessageMediaAsync(
+                                report.MessageId.Value, conversation?.EventId);
                         }
                         await _conversationRepository.DeleteMessageAsync(report.MessageId.Value);
                         return CommandResult.OK;

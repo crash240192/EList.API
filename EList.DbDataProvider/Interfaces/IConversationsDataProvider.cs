@@ -35,5 +35,6 @@ namespace EList.DbDataProvider.Interfaces
         Task<List<Guid>> GetMessageFileIdsAsync(Guid messageId);
         Task<Dictionary<Guid, List<Guid>>> GetMessageFilesMapAsync(IReadOnlyCollection<Guid> messageIds);
         Task<List<Guid>> GetOrphanMessageFileIdsAsync(IReadOnlyList<Guid> fileIds, Guid? exceptMessageId);
+        Task<List<Guid>> GetConversationMessageFileIdsAsync(Guid conversationId);
     }
 }

@@ -264,6 +264,11 @@ namespace EList.Repositories.Impl
             return await _conversationsDataProvider.GetOrphanMessageFileIdsAsync(fileIds, exceptMessageId);
         }
 
+        public async Task<List<Guid>> GetConversationMessageFileIdsAsync(Guid conversationId)
+        {
+            return await _conversationsDataProvider.GetConversationMessageFileIdsAsync(conversationId);
+        }
+
         private MessageVoteResult MapVoteResult(MessageVoteStatsDto stats)
         {
             return new MessageVoteResult

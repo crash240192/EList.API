@@ -22,6 +22,11 @@ namespace EList.Services.Interfaces
         Task<CommandResult> UpdateMessageAsync(MessageRequest message);
         Task<CommandResult> DeleteMessageAsync(Guid messageId);
 
+        /// <summary>
+        /// Снять вложения с системного альбома и удалить orphan-файлы из storage (до удаления сообщения).
+        /// </summary>
+        Task CleanupMessageMediaAsync(Guid messageId, Guid? eventId);
+
         Task<CommandResult<MessageVoteResult>> LikeMessageAsync(Guid messageId);
         Task<CommandResult<MessageVoteResult>> DislikeMessageAsync(Guid messageId);
         Task<CommandResult<MessageVoteResult>> RemoveMessageVoteAsync(Guid messageId);
