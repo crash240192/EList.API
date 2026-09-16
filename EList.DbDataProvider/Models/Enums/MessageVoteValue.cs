@@ -5,9 +5,9 @@ namespace EList.DbDataProvider.Models.Enums
     public enum MessageVoteValue
     {
         [MapValue(Value = "like")]
-        Like,
+        Like = 1,
 
         [MapValue(Value = "dislike")]
-        Dislike
+        Dislike = 2
     }
 }
