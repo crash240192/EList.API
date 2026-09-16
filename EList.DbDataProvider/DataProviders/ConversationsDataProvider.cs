@@ -405,7 +405,7 @@ namespace EList.DbDataProvider.DataProviders
                 else
                     stats.DislikesCount++;
 
-                if (currentAccountId != null && vote.AccountId == currentAccountId)
+                if (currentAccountId != null && vote.AccountId == currentAccountId.Value)
                     stats.CurrentUserVote = vote.Value;
             }
 

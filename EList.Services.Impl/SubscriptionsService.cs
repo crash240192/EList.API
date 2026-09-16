@@ -191,6 +191,32 @@ namespace EList.Services.Impl
             return new CommandResult<int>(subscriptionsCount);
         }
 
+        public async Task<CommandResult<bool>> IsSubscribedAsync(Guid subscribedToId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(IsSubscribedAsync)}";
+
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<bool>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            if (_accountDataHolder.AccountId.Value == subscribedToId)
+                return new CommandResult<bool>(false);
+
+            var accessError = await _subscriptionAccessValidator.AssertCanViewSubscriptionsAsync(
+                subscribedToId, _accountDataHolder.AccountId);
+            if (!accessError.Success)
+                return CommandResult<bool>.Fail(accessError.ErrorCode, accessError.Message);
+
+            var exists = await _subscriptionsRepository.IsSubscriptionExistAsync(
+                _accountDataHolder.AccountId.Value, subscribedToId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<bool>(exists);
+        }
+
         public async Task<CommandResult> DeleteSubscriptionAsync(Guid subscribedToId)
         {
             var correlationId = _correlationIdProvider.Get();

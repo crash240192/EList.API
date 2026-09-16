@@ -25,6 +25,8 @@ using EList.Models.UserAgreements;
 using EList.Models.Wallets;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using StjJsonElement = System.Text.Json.JsonElement;
+using StjJsonDocument = System.Text.Json.JsonDocument;
 
 namespace EList.AutoMapperProfile
 {
@@ -89,10 +91,12 @@ namespace EList.AutoMapperProfile
             CreateMap<SystemNotificationDto, SystemNotification>().ReverseMap();
             CreateMap<NotificationDto, Notification>()
                 .ForMember(dest => dest.Type, opt => opt.MapFrom(src => MapNotificationTypeFromDb(src.Type)))
-                .ForMember(dest => dest.Data, opt => opt.MapFrom(src => !string.IsNullOrWhiteSpace(src.Data) ? JsonConvert.DeserializeObject(src.Data) : null));
+                // System.Text.Json cannot serialize Newtonsoft JObject/JValue (scalars become []).
+                // Keep Data as JsonElement so REST history preserves message ids for deep-links.
+                .ForMember(dest => dest.Data, opt => opt.MapFrom(src => ParseNotificationDataForApi(src.Data)));
             CreateMap<Notification, NotificationDto>()
                 .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.Type == null ? null : ((int)src.Type.Value).ToString()))
-                .ForMember(dest => dest.Data, opt => opt.MapFrom(src => src.Data != null ? JObject.FromObject(src.Data).ToString() : null));
+                .ForMember(dest => dest.Data, opt => opt.MapFrom(src => SerializeNotificationDataForDb(src.Data)));
 
             CreateMap<EventCategoryDto, EventCategory>().ReverseMap();
             CreateMap<EventTypeDto, EventType>().ReverseMap();
@@ -274,6 +278,46 @@ namespace EList.AutoMapperProfile
                 return namedType;
 
             return null;
+        }
+
+        /// <summary>
+        /// Deserialize notification payload for HTTP responses.
+        /// Must not return Newtonsoft <see cref="JToken"/> — STJ turns JValues into empty arrays.
+        /// </summary>
+        private static object? ParseNotificationDataForApi(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return null;
+
+            try
+            {
+                using var doc = StjJsonDocument.Parse(json);
+                return doc.RootElement.Clone();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string? SerializeNotificationDataForDb(object? data)
+        {
+            if (data == null)
+                return null;
+
+            if (data is string s)
+                return string.IsNullOrWhiteSpace(s) ? null : s;
+
+            if (data is StjJsonElement je)
+                return je.ValueKind == System.Text.Json.JsonValueKind.Undefined
+                    || je.ValueKind == System.Text.Json.JsonValueKind.Null
+                    ? null
+                    : je.GetRawText();
+
+            if (data is JToken token)
+                return token.ToString(Formatting.None);
+
+            return JObject.FromObject(data).ToString(Formatting.None);
         }
     }
 }
