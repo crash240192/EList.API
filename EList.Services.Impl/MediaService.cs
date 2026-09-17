@@ -297,7 +297,7 @@ namespace EList.Services.Impl
                 return accessError;
 
             var files = await _mediaRepository.GetAlbumFilesAsync(albumId);
-            var fileIds = files.Result?.Select(i => i.Id)?.ToList();
+            var fileIds = files.Result?.Select(i => i.FileId)?.Where(id => id != Guid.Empty).ToList();
             if (fileIds.NullSafeAny())
                 await DeleteAbondonedFilesFromFilestorageAsync(fileIds, albumId);
 
@@ -568,33 +568,41 @@ namespace EList.Services.Impl
 
         private async Task DeleteAbondonedFilesFromFilestorageAsync(List<Guid>? fileIds, Guid albumId)
         {
-            // проверяем что файлы в удаляемом альбоме не прикреплены к другим альбомам. Если не прикреплены, то удаляем их физически из файлохранилища
-            
-            if (fileIds.NullSafeAny())
+            // Files not linked to other albums → delete from filestorage.
+            if (!fileIds.NullSafeAny())
+                return;
+
+            if (_accountDataHolder.Token == null || string.IsNullOrEmpty(_accountDataHolder.Jwt))
+                return;
+
+            // TODO: also skip if file is still an avatar/cover elsewhere
+            var filesWithoutAlbums = await _mediaRepository.GetFilesNotExistsInAnotherAlbumsAsync(fileIds, albumId);
+            if (!filesWithoutAlbums.NullSafeAny())
+                return;
+
+            var queue = new ConcurrentQueue<Guid>(filesWithoutAlbums);
+            var workerCount = Math.Min(10, filesWithoutAlbums.Count);
+            var token = _accountDataHolder.Token.Value;
+            var jwt = _accountDataHolder.Jwt;
+            var correlationId = _correlationIdProvider.Get();
+
+            var tasks = Enumerable.Range(0, workerCount).Select(_ => Task.Run(async () =>
             {
-                //TODO: Добавить проверку что этот файл не является в том числе аватаркой 
-                var filesWithoutAlbums = await _mediaRepository.GetFilesNotExistsInAnotherAlbumsAsync(fileIds, albumId);
-
-                //Тут мы проверяем что этот файл больше не прикреплён ни к одному альбому
-                if (filesWithoutAlbums.NullSafeAny())
+                while (queue.TryDequeue(out var curFileId))
                 {
-                    var fileIdsConcurrentQueue = new ConcurrentQueue<Guid>(filesWithoutAlbums);
-
-                    var tasks = new List<Task>();
-                    for (int i = 0; i < 10; i++)
+                    try
                     {
-                        var task = Task.Run(async () =>
-                        {
-                            while (fileIdsConcurrentQueue.TryDequeue(out var curFileId))
-                            {
-                                await _filestorageClient.DeleteFileAsync(curFileId, _accountDataHolder.Token.Value, _accountDataHolder.Jwt);
-                            }
-                        });
+                        await _filestorageClient.DeleteFileAsync(curFileId, token, jwt);
                     }
-
-                    Task.WaitAll(tasks.ToArray());
+                    catch (Exception ex)
+                    {
+                        logger.Warn(correlationId, null, $"{LOGGER_NAME}DeleteAbondonedFilesFromFilestorageAsync",
+                            $"Не удалось удалить файл {curFileId} из filestorage: {ex.Message}");
+                    }
                 }
-            }
+            })).ToArray();
+
+            await Task.WhenAll(tasks);
         }
 
         private async Task<List<MediaAlbum>> FilterEmptySystemAlbumsAsync(List<MediaAlbum> albums)
