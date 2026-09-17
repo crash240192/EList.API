@@ -1,5 +1,6 @@
 ﻿using EList.Common.CorrelationId;
 using EList.Common.Logger;
+using Microsoft.Extensions.Primitives;
 using NLog;
 using ILogger = NLog.ILogger;
 
@@ -41,6 +42,18 @@ namespace EList.Api.Middleware
                 {
                     context.Request.Headers["Authorization"] = token.ToString();
                     context.Request.Headers["Authorization-jwt"] = jwt.ToString();
+
+                    // Browser WebSocket cannot set custom headers — pass ClientHash inputs via query
+                    if (context.Request.Query.TryGetValue("x-client-platform", out var platform)
+                        && !StringValues.IsNullOrEmpty(platform))
+                    {
+                        context.Request.Headers["X-Client-Platform"] = platform.ToString();
+                    }
+                    if (context.Request.Query.TryGetValue("x-app-version", out var appVersion)
+                        && !StringValues.IsNullOrEmpty(appVersion))
+                    {
+                        context.Request.Headers["X-App-Version"] = appVersion.ToString();
+                    }
                 }
                 
                 await next(context);
