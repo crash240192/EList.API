@@ -13,6 +13,7 @@ using EList.Validators.Interfaces;
 using NLog;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using FileVisibility = EList.FilestorageClient.FileVisibility;
 
 namespace EList.Services.Impl
 {
@@ -32,6 +33,7 @@ namespace EList.Services.Impl
         private readonly IAlbumAccessValidator _albumAccessValidator;
         private readonly IMediaAlbumValidator _mediaAlbumValidator;
         private readonly IFilestorageClient _filestorageClient;
+        private readonly IEventsRepository _eventsRepository;
 
         public MediaService(ICorrelationIdProvider correlationIdProvider,
             IMediaRepository mediaRepository,
@@ -40,7 +42,8 @@ namespace EList.Services.Impl
             IOrganizationsRepository organizationsRepository,
             IAlbumAccessValidator albumAccessValidator,
             IMediaAlbumValidator mediaAlbumValidator,
-            IFilestorageClient filestorageClient)
+            IFilestorageClient filestorageClient,
+            IEventsRepository eventsRepository)
         {
             _correlationIdProvider = correlationIdProvider;
             _mediaRepository = mediaRepository;
@@ -50,6 +53,7 @@ namespace EList.Services.Impl
             _albumAccessValidator = albumAccessValidator;
             _mediaAlbumValidator = mediaAlbumValidator;
             _filestorageClient = filestorageClient;
+            _eventsRepository = eventsRepository;
         }
 
         public async Task<CommandResult<Guid?>> CreateAlbumAsync(EventAlbumRequest request)
@@ -101,6 +105,10 @@ namespace EList.Services.Impl
 
             await _mediaRepository.UpdateAlbumAsync(request);
 
+            // Reload after update so parameters (Private) are current
+            var updatedAlbum = await _mediaRepository.GetAlbumAsync(request.Id.Value) ?? album;
+            await SyncAlbumFilesVisibilityAsync(updatedAlbum);
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
@@ -128,6 +136,10 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AccessError, "Привязать альбом к мероприятию может только организатор");
 
             await _mediaRepository.AssignAlbumToEventAsync(eventId, albumId);
+
+            var assigned = await _mediaRepository.GetAlbumAsync(albumId);
+            if (assigned != null)
+                await SyncAlbumFilesVisibilityAsync(assigned);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -183,6 +195,7 @@ namespace EList.Services.Impl
                 return accessError;
 
             await _mediaRepository.AddFilesToAlbumAsync(request.AlbumId, request.FileIds);
+            await SyncFileIdsVisibilityAsync(request.FileIds, await ResolveAlbumFilesPrivateAsync(album));
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -392,6 +405,7 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
 
             await _mediaRepository.SetNewAccountAvatarAsync(_accountDataHolder.AccountId.Value, fileId);
+            await SyncFileIdsVisibilityAsync(new List<Guid> { fileId }, isPrivate: false);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -510,6 +524,7 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AccessError, "Изменить аватар организации может только владелец или менеджер");
 
             await _mediaRepository.SetNewOrganizationAvatarAsync(organizationId, fileId);
+            await SyncFileIdsVisibilityAsync(new List<Guid> { fileId }, isPrivate: false);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -603,6 +618,88 @@ namespace EList.Services.Impl
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// When event privacy flips, re-sync visibility for all files in event albums
+        /// (closed event → Private attachments; covers stay Public via SetEventCoverImage).
+        /// </summary>
+        public async Task SyncEventAlbumsVisibilityAsync(Guid eventId)
+        {
+            var albums = await _mediaRepository.GetEventAlbumsAsync(eventId);
+            if (albums == null || albums.Count == 0)
+                return;
+
+            foreach (var album in albums)
+                await SyncAlbumFilesVisibilityAsync(album);
+        }
+
+        public async Task SyncAlbumVisibilityAsync(Guid albumId)
+        {
+            var album = await _mediaRepository.GetAlbumAsync(albumId);
+            if (album != null)
+                await SyncAlbumFilesVisibilityAsync(album);
+        }
+
+        private async Task SyncAlbumFilesVisibilityAsync(MediaAlbum album)
+        {
+            var isPrivate = await ResolveAlbumFilesPrivateAsync(album);
+            var fileIds = await CollectAlbumFileIdsAsync(album.Id);
+            await SyncFileIdsVisibilityAsync(fileIds, isPrivate);
+        }
+
+        private async Task<bool> ResolveAlbumFilesPrivateAsync(MediaAlbum album)
+        {
+            var parameters = _albumAccessValidator.ResolveParameters(album);
+            if (parameters.Private)
+                return true;
+
+            if (album.EventId != null)
+            {
+                var ev = await _eventsRepository.GetEventAsync(album.EventId.Value);
+                if (ev?.Parameters?.Private == true)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private async Task<List<Guid>> CollectAlbumFileIdsAsync(Guid albumId)
+        {
+            var ids = new List<Guid>();
+            var pageIndex = 0;
+            const int pageSize = 500;
+            while (true)
+            {
+                var page = await _mediaRepository.GetAlbumFilesAsync(albumId, pageIndex, pageSize);
+                var batch = page?.Result?.Select(f => f.FileId).Where(id => id != Guid.Empty).ToList()
+                    ?? new List<Guid>();
+                if (batch.Count == 0)
+                    break;
+                ids.AddRange(batch);
+                if (batch.Count < pageSize)
+                    break;
+                pageIndex++;
+            }
+            return ids;
+        }
+
+        private async Task SyncFileIdsVisibilityAsync(IReadOnlyList<Guid> fileIds, bool isPrivate)
+        {
+            if (fileIds == null || fileIds.Count == 0)
+                return;
+
+            var visibility = isPrivate ? FileVisibility.Private : FileVisibility.Public;
+            try
+            {
+                await _filestorageClient.SetFilesVisibilityAsync(fileIds, visibility);
+            }
+            catch (Exception ex)
+            {
+                var correlationId = _correlationIdProvider.Get();
+                logger.Warn(correlationId, null, $"{LOGGER_NAME}SyncFileIdsVisibilityAsync",
+                    $"Не удалось обновить visibility ({visibility}) для {fileIds.Count} файлов: {ex.Message}");
+            }
         }
     }
 }

@@ -6,6 +6,7 @@ using EList.Common.Extensions;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
+using EList.FilestorageClient;
 using EList.Localization;
 using EList.Models.Accounts;
 using EList.Models.Enums;
@@ -51,6 +52,8 @@ namespace EList.Services.Impl
         private readonly IEventAccessValidator _eventAccessValidator;
         private readonly IEventValidator _eventValidator;
         private readonly IPagingValidator _pagingValidator;
+        private readonly IMediaService _mediaService;
+        private readonly IFilestorageClient _filestorageClient;
 
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
@@ -71,28 +74,32 @@ namespace EList.Services.Impl
             AbuseProtectionOptions abuseProtection,
             IEventAccessValidator eventAccessValidator,
             IEventValidator eventValidator,
-            IPagingValidator pagingValidator)
+            IPagingValidator pagingValidator,
+            IMediaService mediaService,
+            IFilestorageClient filestorageClient)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
             _authorizationRepository = authorizationRepository ?? throw new Exception(nameof(authorizationRepository));
-            _invitationsRepository = invitationsRepository ?? throw new Exception(nameof(invitationsRepository));
-            _subscriptionsRepository = subscriptionsRepository ?? throw new Exception(nameof(subscriptionsRepository));
-            _participationsRepository = participationsRepository ?? throw new Exception(nameof(participationsRepository));
-            _participantsBWListRepository = participantsBWListRepository ?? throw new Exception(nameof(participantsBWListRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
-            _walletsRepository = walletsRepository ?? throw new Exception(nameof(walletsRepository));
-            _notificationsService = notificationsService ?? throw new Exception(nameof(notificationsService));
+            _invitationsRepository = invitationsRepository ?? throw new ArgumentNullException(nameof(invitationsRepository));
+            _participationsRepository = participationsRepository ?? throw new ArgumentNullException(nameof(participationsRepository));
+            _walletsRepository = walletsRepository ?? throw new ArgumentNullException(nameof(walletsRepository));
+            _accountDataHolder = accountDataHolder ?? throw new ArgumentNullException(nameof(accountDataHolder));
+            _participantsBWListRepository = participantsBWListRepository ?? throw new ArgumentNullException(nameof(participantsBWListRepository));
+            _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
+            _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _eventCreateRateLimiter = eventCreateRateLimiter ?? throw new ArgumentNullException(nameof(eventCreateRateLimiter));
             _abuseProtection = abuseProtection ?? throw new ArgumentNullException(nameof(abuseProtection));
-            _accountDataHolder = accountDataHolder;
             _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
             _eventValidator = eventValidator ?? throw new ArgumentNullException(nameof(eventValidator));
             _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
+            _mediaService = mediaService ?? throw new ArgumentNullException(nameof(mediaService));
+            _filestorageClient = filestorageClient ?? throw new ArgumentNullException(nameof(filestorageClient));
         }
 
 
@@ -437,6 +444,8 @@ namespace EList.Services.Impl
                 await _eventsMetadataRepository.UpdateEventParametersAsync(curEvent.EventParametersId.Value, parameters);
             }
 
+            await _mediaService.SyncEventAlbumsVisibilityAsync(eventId);
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
@@ -767,6 +776,20 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
 
             await _eventsRepository.SetEventCoverImageAsync(eventId, imageId);
+
+            if (imageId != null && imageId != Guid.Empty)
+            {
+                try
+                {
+                    await _filestorageClient.SetFilesVisibilityAsync(
+                        new List<Guid> { imageId.Value }, FileVisibility.Public);
+                }
+                catch (Exception ex)
+                {
+                    logger.Warn(correlationId, null, methodName,
+                        $"Не удалось выставить Public visibility для обложки {imageId}: {ex.Message}");
+                }
+            }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(eventId);

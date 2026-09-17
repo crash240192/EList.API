@@ -33,6 +33,7 @@ namespace EList.Services.Impl
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
         private readonly IMediaRepository _mediaRepository;
         private readonly IFilestorageClient _filestorageClient;
+        private readonly IMediaService _mediaService;
 
         public ConversationService(ICorrelationIdProvider correlationIdProvider,
             IConversationRepository conversationsRepository,
@@ -42,7 +43,8 @@ namespace EList.Services.Impl
             INotificationsService notificationsService,
             IModerationPenaltiesService moderationPenaltiesService,
             IMediaRepository mediaRepository,
-            IFilestorageClient filestorageClient)
+            IFilestorageClient filestorageClient,
+            IMediaService mediaService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _conversationsRepository = conversationsRepository ?? throw new ArgumentNullException(nameof(conversationsRepository));
@@ -53,6 +55,7 @@ namespace EList.Services.Impl
             _accountDataHolder = accountDataHolder;
             _mediaRepository = mediaRepository ?? throw new ArgumentNullException(nameof(mediaRepository));
             _filestorageClient = filestorageClient ?? throw new ArgumentNullException(nameof(filestorageClient));
+            _mediaService = mediaService ?? throw new ArgumentNullException(nameof(mediaService));
         }
 
         public async Task<CommandResult<Guid>> CreateConversationAsync(ConversationRequest conversation)
@@ -550,7 +553,10 @@ namespace EList.Services.Impl
                     DiscussionPhotosAlbumName);
 
                 if (toAdd.Count > 0)
+                {
                     await _mediaRepository.AddFilesToAlbumAsync(albumId, toAdd);
+                    await _mediaService.SyncAlbumVisibilityAsync(albumId);
+                }
             }
 
             await _conversationsRepository.SetMessageFilesAsync(messageId, fileIds);

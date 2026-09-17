@@ -32,5 +32,10 @@ namespace EList.Services.Interfaces
         Task<CommandResult<List<Guid>?>> GetOrganizationAvatarsAsync(Guid organizationId);
         Task<CommandResult<Guid?>> GetOrganizationAvatarAsync(Guid organizationId);
 
+        /// <summary>Re-sync filestorage visibility for all files in event albums (event privacy change).</summary>
+        Task SyncEventAlbumsVisibilityAsync(Guid eventId);
+
+        /// <summary>Re-sync filestorage visibility for files in one album.</summary>
+        Task SyncAlbumVisibilityAsync(Guid albumId);
     }
 }
