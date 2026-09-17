@@ -23,6 +23,11 @@ namespace EList.DbDataProvider.Interfaces
         Task<bool> CheckFileExistsAsync(List<Guid> fileIds);
         Task<List<Guid>> GetFilesNotExistsInAnotherAlbumsAsync(List<Guid> fileIds, Guid exceptAlbumId);
         Task<bool> SomeAlbumContainsThisFileAsync(Guid fileId);
+        /// <summary>
+        /// Returns file ids from the input that have no remaining refs
+        /// (albums, messages, avatars, covers, bug reports, content reports).
+        /// </summary>
+        Task<List<Guid>> FilterUnreferencedFileIdsAsync(IReadOnlyList<Guid> fileIds);
         Task DeleteFilesAsync(List<Guid> fileIds);
         Task DeleteAlbumAsync(Guid albumId);
 

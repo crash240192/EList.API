@@ -26,6 +26,7 @@ namespace EList.Repositories.Interfaces
         Task<bool> CheckFilesExistsAsync(List<Guid> fileIds);
         Task<List<Guid>> GetFilesNotExistsInAnotherAlbumsAsync(List<Guid> fileIds, Guid exceptAlbumId);
         Task<bool> SomeAlbumContainsThisFileAsync(Guid fileId);
+        Task<List<Guid>> FilterUnreferencedFileIdsAsync(IReadOnlyList<Guid> fileIds);
         Task DeleteFilesAsync(List<Guid> fileIds);
         Task DeleteAlbumAsync(Guid albumId);
 

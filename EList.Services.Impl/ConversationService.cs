@@ -613,6 +613,8 @@ namespace EList.Services.Impl
                 candidates = fileIds.Where(id => !stillSet.Contains(id)).ToList();
             }
 
+            candidates = await _mediaRepository.FilterUnreferencedFileIdsAsync(candidates);
+
             foreach (var fileId in candidates)
             {
                 try

@@ -73,6 +73,9 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<OrganizationVerifi
 builder.Services.AddSingleton<RetentionPurgeWorker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RetentionPurgeWorker>());
 
+builder.Services.AddSingleton<OrphanFileGcWorker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<OrphanFileGcWorker>());
+
 var app = builder.Build();
 
 var pathBase = ConfigurationManager.AppSettings["pathBase"] ?? string.Empty;

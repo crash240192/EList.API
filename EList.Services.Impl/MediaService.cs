@@ -568,20 +568,24 @@ namespace EList.Services.Impl
 
         private async Task DeleteAbondonedFilesFromFilestorageAsync(List<Guid>? fileIds, Guid albumId)
         {
-            // Files not linked to other albums → delete from filestorage.
+            // Files not linked anywhere else → delete from filestorage.
             if (!fileIds.NullSafeAny())
                 return;
 
             if (_accountDataHolder.Token == null || string.IsNullOrEmpty(_accountDataHolder.Jwt))
                 return;
 
-            // TODO: also skip if file is still an avatar/cover elsewhere
             var filesWithoutAlbums = await _mediaRepository.GetFilesNotExistsInAnotherAlbumsAsync(fileIds, albumId);
             if (!filesWithoutAlbums.NullSafeAny())
                 return;
 
-            var queue = new ConcurrentQueue<Guid>(filesWithoutAlbums);
-            var workerCount = Math.Min(10, filesWithoutAlbums.Count);
+            // Also skip avatars, covers, message attachments, bug/report refs.
+            var orphanIds = await _mediaRepository.FilterUnreferencedFileIdsAsync(filesWithoutAlbums);
+            if (!orphanIds.NullSafeAny())
+                return;
+
+            var queue = new ConcurrentQueue<Guid>(orphanIds);
+            var workerCount = Math.Min(10, orphanIds.Count);
             var token = _accountDataHolder.Token.Value;
             var jwt = _accountDataHolder.Jwt;
             var correlationId = _correlationIdProvider.Get();

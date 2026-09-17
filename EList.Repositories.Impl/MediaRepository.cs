@@ -188,6 +188,11 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task<List<Guid>> FilterUnreferencedFileIdsAsync(IReadOnlyList<Guid> fileIds)
+        {
+            return await _mediaDataProvider.FilterUnreferencedFileIdsAsync(fileIds);
+        }
+
         public async Task DeleteFilesAsync(List<Guid> fileIds)
         {
             await _mediaDataProvider.DeleteFilesAsync(fileIds);

@@ -472,6 +472,50 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<List<Guid>> FilterUnreferencedFileIdsAsync(IReadOnlyList<Guid> fileIds)
+        {
+            if (fileIds == null || fileIds.Count == 0)
+                return new List<Guid>();
+
+            var ids = fileIds.Where(id => id != Guid.Empty).Distinct().ToList();
+            if (ids.Count == 0)
+                return new List<Guid>();
+
+            var referenced = new HashSet<Guid>();
+
+            foreach (var id in await _connection.AlbumFiles
+                .Where(i => ids.Contains(i.FileId)).Select(i => i.FileId).Distinct().ToListAsync())
+                referenced.Add(id);
+
+            foreach (var id in await _connection.MessageFiles
+                .Where(i => ids.Contains(i.FileId)).Select(i => i.FileId).Distinct().ToListAsync())
+                referenced.Add(id);
+
+            foreach (var id in await _connection.AccountAvatars
+                .Where(i => ids.Contains(i.PhotoId)).Select(i => i.PhotoId).Distinct().ToListAsync())
+                referenced.Add(id);
+
+            foreach (var id in await _connection.OrganizationAvatars
+                .Where(i => ids.Contains(i.PhotoId)).Select(i => i.PhotoId).Distinct().ToListAsync())
+                referenced.Add(id);
+
+            foreach (var id in await _connection.Events
+                .Where(i => i.CoverImageId != null && ids.Contains(i.CoverImageId.Value))
+                .Select(i => i.CoverImageId!.Value).Distinct().ToListAsync())
+                referenced.Add(id);
+
+            foreach (var id in await _connection.BugReportFiles
+                .Where(i => ids.Contains(i.FileId)).Select(i => i.FileId).Distinct().ToListAsync())
+                referenced.Add(id);
+
+            foreach (var id in await _connection.ContentReports
+                .Where(i => i.FileId != null && ids.Contains(i.FileId.Value))
+                .Select(i => i.FileId!.Value).Distinct().ToListAsync())
+                referenced.Add(id);
+
+            return ids.Where(id => !referenced.Contains(id)).ToList();
+        }
+
         public async Task DeleteFilesAsync(List<Guid> fileIds)
         {
             await _connection.AlbumFiles.Where(i => fileIds.Contains(i.FileId))
