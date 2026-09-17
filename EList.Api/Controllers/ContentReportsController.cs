@@ -300,6 +300,55 @@ namespace EList.Api.Controllers
             return await ExecuteAsync(nameof(GetActionsAsync), () => _contentReportsService.GetActionsAsync(reportId));
         }
 
+        /// <summary>
+        /// Staff proxy: скачать файл жалобы (в т.ч. Blocked) через service-token filestorage.
+        /// </summary>
+        [HttpGet("get/{reportId}/file")]
+        public async Task<IActionResult> DownloadReportedFileAsync(
+            Guid reportId,
+            [FromHeader(Name = "FullSize")] bool? fullSize)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(DownloadReportedFileAsync)}";
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _contentReportsService.DownloadReportedFileAsync(reportId, fullSize);
+                if (!result.Success || result.Result == null)
+                {
+                    if (result.ErrorCode == (int)EList.Common.Support.ErrorCode.AccessError)
+                        return Unauthorized(result);
+                    if (result.ErrorCode == (int)EList.Common.Support.ErrorCode.ContentReportNotFound
+                        || result.ErrorCode == (int)EList.Common.Support.ErrorCode.AlbumItemNotFound)
+                        return NotFound(result);
+                    return BadRequest(result);
+                }
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return File(
+                    result.Result.Content,
+                    result.Result.ContentType ?? "application/octet-stream",
+                    result.Result.FileName);
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Восстановить Active accessStatus файла жалобы (модератор площадки).
+        /// </summary>
+        [HttpPost("restoreFileAccess/{reportId}")]
+        public async Task<CommandResult> RestoreReportedFileAccessAsync(Guid reportId)
+        {
+            return await ExecuteTransactionalAsync(
+                nameof(RestoreReportedFileAccessAsync),
+                () => _contentReportsService.RestoreReportedFileAccessAsync(reportId));
+        }
+
         private async Task<T> ExecuteAsync<T>(string methodShortName, Func<Task<T>> action)
         {
             var correlationId = _correlationIdProvider.Get();

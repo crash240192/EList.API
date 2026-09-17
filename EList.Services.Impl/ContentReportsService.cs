@@ -3,6 +3,7 @@ using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
+using EList.FilestorageClient;
 using EList.Models.ContentReports;
 using EList.Models.Enums;
 using EList.Repositories.Interfaces;
@@ -34,6 +35,7 @@ namespace EList.Services.Impl
         private readonly INotificationsService _notificationsService;
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
         private readonly IInvitationsRepository _invitationsRepository;
+        private readonly IFilestorageClient _filestorageClient;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IMapper _mapper;
@@ -51,6 +53,7 @@ namespace EList.Services.Impl
             INotificationsService notificationsService,
             IModerationPenaltiesService moderationPenaltiesService,
             IInvitationsRepository invitationsRepository,
+            IFilestorageClient filestorageClient,
             IAccountDataHolder accountDataHolder,
             ICorrelationIdProvider correlationIdProvider,
             IMapper mapper)
@@ -67,6 +70,7 @@ namespace EList.Services.Impl
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _invitationsRepository = invitationsRepository ?? throw new ArgumentNullException(nameof(invitationsRepository));
+            _filestorageClient = filestorageClient ?? throw new ArgumentNullException(nameof(filestorageClient));
             _accountDataHolder = accountDataHolder;
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
@@ -1188,6 +1192,9 @@ namespace EList.Services.Impl
             if (fileId == null)
                 return CommandResult.Fail(ErrorCode.AlbumItemNotFound, "Фото не найдено");
 
+            // Soft-block blob in filestorage (no physical delete — evidence for staff proxy).
+            await BlockFileAsync(fileId.Value);
+
             switch (kind)
             {
                 case "event_cover":
@@ -1222,6 +1229,8 @@ namespace EList.Services.Impl
             {
                 if (report.EventId == null)
                     return CommandResult.Fail(ErrorCode.EventNotFound, "Мероприятие не найдено");
+                if (fileId != null)
+                    await BlockFileAsync(fileId.Value);
                 await _eventsRepository.SetEventCoverImageAsync(report.EventId.Value, null);
                 return CommandResult.OK;
             }
@@ -1230,6 +1239,7 @@ namespace EList.Services.Impl
             {
                 if (fileId != null)
                 {
+                    await BlockFileAsync(fileId.Value);
                     await _mediaRepository.DeleteAvatarAsync(fileId.Value);
                     return CommandResult.OK;
                 }
@@ -1241,7 +1251,10 @@ namespace EList.Services.Impl
 
                 var last = await _mediaRepository.GetLastAccountAvatarAsync(accountId.Value);
                 if (last != null)
+                {
+                    await BlockFileAsync(last.Value);
                     await _mediaRepository.DeleteAvatarAsync(last.Value);
+                }
                 return CommandResult.OK;
             }
 
@@ -1249,6 +1262,7 @@ namespace EList.Services.Impl
             {
                 if (fileId != null)
                 {
+                    await BlockFileAsync(fileId.Value);
                     await _mediaRepository.DeleteOrganizationAvatarAsync(fileId.Value);
                     return CommandResult.OK;
                 }
@@ -1260,11 +1274,138 @@ namespace EList.Services.Impl
 
                 var last = await _mediaRepository.GetLastOrganizationAvatarAsync(organizationId.Value);
                 if (last != null)
+                {
+                    await BlockFileAsync(last.Value);
                     await _mediaRepository.DeleteOrganizationAvatarAsync(last.Value);
+                }
                 return CommandResult.OK;
             }
 
             return CommandResult.Fail(ErrorCode.InvalidValue, "Сброс аватарки не применим к этой жалобе");
+        }
+
+        /// <summary>
+        /// Mark file Blocked in filestorage (blob kept). Failures are logged, not fatal for local moderation.
+        /// </summary>
+        private async Task BlockFileAsync(Guid fileId)
+        {
+            if (fileId == Guid.Empty)
+                return;
+
+            try
+            {
+                var result = await _filestorageClient.SetFilesAccessStatusAsync(
+                    new[] { fileId }, FileAccessStatus.Blocked);
+                if (!result.Success)
+                {
+                    logger.Warn(_correlationIdProvider.Get(), null,
+                        $"{LOGGER_NAME}{nameof(BlockFileAsync)}",
+                        $"Не удалось выставить Blocked для {fileId}: {result.Message}", null);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(_correlationIdProvider.Get(), null,
+                    $"{LOGGER_NAME}{nameof(BlockFileAsync)}",
+                    $"Не удалось выставить Blocked для {fileId}: {ex.Message}", null);
+            }
+        }
+
+        /// <summary>
+        /// Restore Active access (e.g. after mistaken hide). Service-token via FilestorageClient.
+        /// </summary>
+        private async Task UnblockFileAsync(Guid fileId)
+        {
+            if (fileId == Guid.Empty)
+                return;
+
+            try
+            {
+                var result = await _filestorageClient.SetFilesAccessStatusAsync(
+                    new[] { fileId }, FileAccessStatus.Active);
+                if (!result.Success)
+                {
+                    logger.Warn(_correlationIdProvider.Get(), null,
+                        $"{LOGGER_NAME}{nameof(UnblockFileAsync)}",
+                        $"Не удалось выставить Active для {fileId}: {result.Message}", null);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(_correlationIdProvider.Get(), null,
+                    $"{LOGGER_NAME}{nameof(UnblockFileAsync)}",
+                    $"Не удалось выставить Active для {fileId}: {ex.Message}", null);
+            }
+        }
+
+        public async Task<CommandResult<ReportedFileContent>> DownloadReportedFileAsync(Guid reportId, bool? fullSize = null)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<ReportedFileContent>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var report = await _contentReportsRepository.GetReportByIdAsync(reportId);
+            if (report == null)
+                return CommandResult<ReportedFileContent>.Fail(ErrorCode.ContentReportNotFound, "Жалоба не найдена");
+
+            if (!await CanViewReportAsync(report))
+                return CommandResult<ReportedFileContent>.Fail(ErrorCode.AccessError, "Недостаточно прав для просмотра файла жалобы");
+
+            var fileId = report.FileId
+                ?? (report.TargetType == ReportTargetType.Photo ? report.TargetId : (Guid?)null);
+            if (fileId == null || fileId == Guid.Empty)
+                return CommandResult<ReportedFileContent>.Fail(ErrorCode.AlbumItemNotFound, "У жалобы нет файла");
+
+            var download = await _filestorageClient.DownloadFileAsync(fileId.Value, fullSize);
+            if (!download.Success || download.Result == null)
+                return CommandResult<ReportedFileContent>.Fail(
+                    download.ErrorCode != 0 ? download.ErrorCode : (int)ErrorCode.InvalidValue,
+                    download.Message ?? "Не удалось скачать файл");
+
+            return new CommandResult<ReportedFileContent>(new ReportedFileContent
+            {
+                Content = download.Result.Content,
+                ContentType = download.Result.ContentType,
+                FileName = download.Result.FileName
+            });
+        }
+
+        public async Task<CommandResult> RestoreReportedFileAccessAsync(Guid reportId)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            if (!_accountDataHolder.IsPlatformModeratorOrAbove)
+                return CommandResult.Fail(ErrorCode.AccessError, "Восстановить доступ к файлу может только модератор площадки");
+
+            var report = await _contentReportsRepository.GetReportByIdAsync(reportId);
+            if (report == null)
+                return CommandResult.Fail(ErrorCode.ContentReportNotFound, "Жалоба не найдена");
+
+            var fileId = report.FileId
+                ?? (report.TargetType == ReportTargetType.Photo ? report.TargetId : (Guid?)null);
+            if (fileId == null || fileId == Guid.Empty)
+                return CommandResult.Fail(ErrorCode.AlbumItemNotFound, "У жалобы нет файла");
+
+            await UnblockFileAsync(fileId.Value);
+
+            // Album hide is independent of AccessStatus — clear it when restoring.
+            var kind = TryGetStringFromSnapshot(report.TargetSnapshot, "kind");
+            if (kind == null || kind == "album")
+            {
+                await _contentReportsRepository.SetAlbumFileHiddenAsync(
+                    fileId.Value, report.AlbumId, false, null);
+            }
+
+            await _contentReportsRepository.AddActionAsync(new ContentReportAction
+            {
+                ReportId = reportId,
+                ActorAccountId = _accountDataHolder.AccountId,
+                ActorContext = ReportActorContext.PlatformModerator,
+                Action = "file_access_restored",
+                Details = JsonSerializer.Serialize(new { fileId })
+            });
+
+            return CommandResult.OK;
         }
 
         private static string? TryGetStringFromSnapshot(string? snapshot, string propertyName)

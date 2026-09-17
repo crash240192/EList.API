@@ -35,5 +35,16 @@ namespace EList.Services.Interfaces
         Task<CommandResult> ResolveAsync(Guid reportId, ResolveContentReportRequest request);
         Task<CommandResult> EscalateAsync(Guid reportId, EscalateContentReportRequest request);
         Task<CommandResult<List<ContentReportAction>>> GetActionsAsync(Guid reportId);
+
+        /// <summary>
+        /// Staff proxy: download reported file via filestorage service-token (works when Blocked).
+        /// </summary>
+        Task<CommandResult<ReportedFileContent>> DownloadReportedFileAsync(Guid reportId, bool? fullSize = null);
+
+        /// <summary>
+        /// Restore Active accessStatus for the report file (after mistaken Block).
+        /// Also un-hides album relation when present.
+        /// </summary>
+        Task<CommandResult> RestoreReportedFileAccessAsync(Guid reportId);
     }
 }
