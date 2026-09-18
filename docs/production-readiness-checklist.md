@@ -17,7 +17,7 @@
 
 | Категория | 03.09 | 14.09 | Комментарий |
 |-----------|-------|-------|-------------|
-| Ядро (аккаунты, auth, события, подписки) | 🟢 ~85% | 🟢 ~85% | **Баг:** UI create без `AcceptConsent`/`AcceptAgreement` |
+| Ядро (аккаунты, auth, события, подписки) | 🟢 ~85% | 🟢 ~90% | Регистрация: consent + person ≥14 в create |
 | Социальное (участие, приглашения, чаты) | 🟢 ~80% | 🟢 ~80% | Event-чаты в Conversations — TODO |
 | Организации + модерация | 🟢 ~85% | 🟢 ~85% | Payout encryption; verified → `CanSellTickets` |
 | Медиа | 🟢 ~85% | 🟢 ~85% | Album ACL |
@@ -73,13 +73,15 @@
 
 ## 4. P0 — блокеры / срочный дебаг
 
-### Регистрация и согласия (сломанный флоу)
+### Регистрация и согласия
 
-- [ ] **UI: передавать `AcceptConsent` / `AcceptAgreement` в `POST /accounts/create`**
-- [ ] Убрать или сделать fallback дублирующие `agree` после логина (бэк уже пишет согласия в TX create)
-- [ ] Не глотать ошибки `POST /persons/set`; дожать person после activate
-- [ ] Глобальный UI-обработчик 403 + `AgreementNotFound` + `missingDocuments` (Consent/Agreement only)
-- [ ] Коды в UI `errorCodes`: `AgreementNotFound=18001`, `OrganizationPaymentRequired=11006`, …
+- [x] **UI: передавать `AcceptConsent` / `AcceptAgreement` в `POST /accounts/create`**
+- [x] Профиль (ФИО + ДР ≥14) создаётся в той же TX `create` — нет аккаунта без возраста
+- [x] Серверный age gate (`PersonValidator` + `UserUnderMinimumAge=4003`) на create и `persons/set`
+- [x] UI: обязательные имя/фамилия/ДР; Policy — ссылка без галочки
+- [x] Fallback дублирующие `agree` после логина (мягкий; бэк пишет согласия в TX create)
+- [x] Глобальный UI-обработчик 403 + `AgreementNotFound` + `missingDocuments` (Consent/Agreement only)
+- [x] Коды в UI `errorCodes`: `AgreementNotFound=18001`, `UserUnderMinimumAge=4003`, …
 
 ### Билеты на стенде (не prod)
 
@@ -117,7 +119,7 @@
 - [x] Углубить account delete (media/messages/subscriptions/geo/password)
 - [x] Notify об исключении из участников / BW *(уже на develop)*
 - [x] Event-чаты в Conversations (`personalOnly=false`); ACL списка организаторов события
-- [ ] Age gate ≥14 на регистрации (если требует Policy)
+- [x] Age gate ≥14 на регистрации (UI + API create/`persons/set`)
 - [ ] Shared rate limiter при multi-instance — **отложено**: in-memory на инстанс ок при 2–3 репликах
 
 ### Функциональность (остатки кода)
@@ -209,8 +211,8 @@
 ## 9. Рекомендуемый порядок работ
 
 ```
-1. Fix registration AcceptConsent/AcceptAgreement + person sync
-2. 403 re-consent handler + error codes на UI
+1. ~~Fix registration AcceptConsent/AcceptAgreement + person sync~~ ✅
+2. ~~403 re-consent handler + error codes на UI~~ ✅
 3. Закрыть текст Агентского договора (§2.1 / §6.2) + заливка в БД
 4. Ticket CTA/badge + stub E2E на стенде (флаг только на stage)
 5. TicketingAgreement gate + реальный ЮKassa split
