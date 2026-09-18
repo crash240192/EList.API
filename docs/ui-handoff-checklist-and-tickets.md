@@ -16,7 +16,7 @@
 
 | Было | Стало |
 |------|--------|
-| Согласия опциональны | При регистрации обязательны `AcceptConsent` / `AcceptAgreement`. **Policy** (политика ПДн) — только для ознакомления, галочка не нужна (`AcceptPolicy` игнорируется) |
+| Согласия опциональны | При регистрации обязательны `AcceptConsent` / `AcceptAgreement` + профиль (ФИО, ДР ≥14) в `create`. **Policy** — только для ознакомления, галочка не нужна (`AcceptPolicy` игнорируется) |
 | Обновление документов не мешало API | `ReConsentMiddleware`: без актуальных **Consent/Agreement** → **403**, `errorCode=AgreementNotFound`, поле `missingDocuments[]`. Policy в проверку не входит |
 | — | Push `AgreementUpdateRequired` **отдельно** на Consent и Agreement (не на Policy; не схлопывать типы) |
 | — | `DELETE /api/accounts/me`, `GET /api/accounts/me/export` |
@@ -25,6 +25,7 @@ Whitelist при re-consent (запросы не блокируются): `/api/
 
 ### 2. Возраст
 
+- **Регистрация / профиль:** возраст ≥ **14** (UI + API `create` / `persons/set`). Код `UserUnderMinimumAge=4003`.
 - Анонимное «мне 18+»: TTL `agreements.anonymousAgeTtlHours` (default 24).
 - `AdultConfirmed`: возраст **`>= 18`** (раньше было `> 18`).
 - Платные анонсы (`Cost > 0`) по-прежнему требуют adult-подтверждения на бэке.

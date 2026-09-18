@@ -78,8 +78,9 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 ### Зафиксированные правила продукта
 
 1. **Policy ≠ согласие.** Политика публикуется для ознакомления (152-ФЗ). Отдельная галочка «согласен с Политикой» **не нужна** и **не блокирует** API. Поле `AcceptPolicy` на create сохранено для совместимости клиентов и **игнорируется** сервером.
-2. При регистрации обязательны только **Consent + Agreement** (`AcceptConsent`, `AcceptAgreement`). Они же проверяются в `ReConsentMiddleware`.
+2. При регистрации обязательны **Consent + Agreement** (`AcceptConsent`, `AcceptAgreement`) и профиль: **имя, фамилия, дата рождения** (возраст ≥ **14**, иначе `UserUnderMinimumAge=4003`). Профиль пишется в той же TX, что и аккаунт. Consent/Agreement же проверяются в `ReConsentMiddleware`.
 3. Обновление Policy **не** требует re-consent и **не** шлёт push о необходимости повторного согласия.
+4. Подтверждение **18+** (`AdultConfirmed`) — отдельная ось (контент 18+ / анонимное age-agreement); не путать с порогом регистрации 14+.
 
 ---
 
@@ -144,10 +145,10 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 
 | Воркфлоу | Статус | Комментарий |
 |----------|--------|-------------|
-| Регистрация (create + Consent/Agreement + wallet) | ⚠️ рассинхрон UI↔API | Бэк требует `AcceptConsent`/`AcceptAgreement` в create; UI галочки не отправляет |
-| Person info после регистрации | ⚠️ | Отдельный `POST /persons/set`; ошибки на UI глотаются |
+| Регистрация (create + Consent/Agreement + person ≥14 + wallet) | ✅ | `AcceptConsent`/`AcceptAgreement` + ФИО/ДР в `create`; профиль в той же TX; age gate `UserUnderMinimumAge` |
+| Person info после регистрации | ✅ | Создаётся в `create`; `POST /persons/set` — для правок профиля (ДР ≥14) |
 | Логин / активация / смена пароля | ✅ | |
-| Re-consent Consent/Agreement | ⚠️ | Middleware + UI Gate есть; глобальный обработчик 403/`AgreementNotFound` на UI — добить |
+| Re-consent Consent/Agreement | ✅ | Middleware + UI Gate + обработчик 403/`AgreementNotFound` |
 | Каталог / карта / карточка события | ✅ | |
 | Участие без билетов | ✅ | |
 | Покупка билета (stub) | ⚠️ | UI+API stub; реальной ЮKassa и split нет |

@@ -1,4 +1,6 @@
-﻿namespace EList.Models.Accounts
+﻿using EList.Models.Enums;
+
+namespace EList.Models.Accounts
 {
     /// <summary>
     /// Запрос на создание аккаунта
@@ -60,5 +62,30 @@
         /// Согласие с Пользовательским соглашением (обязательно)
         /// </summary>
         public bool AcceptAgreement { get; set; }
+
+        /// <summary>
+        /// Имя (обязательно; профиль создаётся в той же транзакции)
+        /// </summary>
+        public string FirstName { get; set; }
+
+        /// <summary>
+        /// Фамилия (обязательно)
+        /// </summary>
+        public string LastName { get; set; }
+
+        /// <summary>
+        /// Отчество
+        /// </summary>
+        public string Patronymic { get; set; }
+
+        /// <summary>
+        /// Пол
+        /// </summary>
+        public Gender? Gender { get; set; }
+
+        /// <summary>
+        /// Дата рождения (обязательно; возраст ≥ 14)
+        /// </summary>
+        public DateTime? BirthDate { get; set; }
     }
 }

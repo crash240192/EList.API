@@ -49,6 +49,7 @@ namespace EList.Services.Impl
         private readonly IMediaRepository _mediaRepository;
         private readonly IAgreementRepository _agreementRepository;
         private readonly IPersonsRepository _personsRepository;
+        private readonly IPersonValidator _personValidator;
         private readonly IEventsRepository _eventsRepository;
         private readonly ISubscriptionsRepository _subscriptionsRepository;
         private readonly IConversationRepository _conversationRepository;
@@ -67,6 +68,7 @@ namespace EList.Services.Impl
             IMediaRepository mediaRepository,
             IAgreementRepository agreementRepository,
             IPersonsRepository personsRepository,
+            IPersonValidator personValidator,
             IEventsRepository eventsRepository,
             ISubscriptionsRepository subscriptionsRepository,
             IConversationRepository conversationRepository,
@@ -84,6 +86,7 @@ namespace EList.Services.Impl
             _mediaRepository = mediaRepository ?? throw new ArgumentNullException(nameof(mediaRepository));
             _agreementRepository = agreementRepository ?? throw new ArgumentNullException(nameof(agreementRepository));
             _personsRepository = personsRepository ?? throw new ArgumentNullException(nameof(personsRepository));
+            _personValidator = personValidator ?? throw new ArgumentNullException(nameof(personValidator));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
             _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
@@ -104,6 +107,18 @@ namespace EList.Services.Impl
                 return CommandResult<Guid?>.Fail(ErrorCode.InvalidValue,
                     "Для регистрации необходимо принять Согласие на обработку ПДн и Пользовательское соглашение");
             }
+
+            var personRequest = new PersonRequest
+            {
+                FirstName = request.FirstName?.Trim(),
+                LastName = request.LastName?.Trim(),
+                Patronymic = string.IsNullOrWhiteSpace(request.Patronymic) ? null : request.Patronymic.Trim(),
+                Gender = request.Gender,
+                BirthDate = request.BirthDate
+            };
+            var personValidation = _personValidator.ValidateCreation(personRequest);
+            if (!personValidation.Success)
+                return CommandResult<Guid?>.Fail(personValidation.ErrorCode, personValidation.Message);
 
             foreach (var documentType in RequiredRegistrationDocuments)
             {
@@ -152,6 +167,9 @@ namespace EList.Services.Impl
             });
 
             await _contactsRepository.BindAccountAndContactAsync(accountId, contactId);
+
+            // Профиль (в т.ч. ДР ≥ 14) — в той же TX, чтобы не было аккаунта без возраста.
+            await _personsRepository.CreatePersonInfoAsync(accountId, personRequest);
 
             foreach (var documentType in RequiredRegistrationDocuments)
             {

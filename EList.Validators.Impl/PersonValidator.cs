@@ -11,6 +11,8 @@ namespace EList.Validators.Impl
     public class PersonValidator : IPersonValidator
     {
         private const int MaxNameLength = 100;
+        /// <summary>Минимальный возраст для регистрации и хранения профиля в сервисе.</summary>
+        public const int MinRegistrationAgeYears = 14;
         private static readonly DateTime MinBirthDate = DateTime.UtcNow.Date.AddYears(-120);
         private static readonly DateTime MaxBirthDate = DateTime.UtcNow.Date;
 
@@ -23,7 +25,7 @@ namespace EList.Validators.Impl
 
         public CommandResult ValidateCreation(PersonRequest request)
         {
-            return ValidateRequest(request);
+            return ValidateRequest(request, requireBirthDate: true);
         }
 
         public async Task<CommandResult> ValidateUpdation(Guid accountId, PersonRequest request)
@@ -32,7 +34,7 @@ namespace EList.Validators.Impl
             if (!accountExistsResult.Success)
                 return accountExistsResult;
 
-            return ValidateRequest(request);
+            return ValidateRequest(request, requireBirthDate: true);
         }
 
         public async Task<CommandResult> ValidateAccountExists(Guid accountId)
@@ -45,7 +47,7 @@ namespace EList.Validators.Impl
             return CommandResult.OK;
         }
 
-        private static CommandResult ValidateRequest(PersonRequest request)
+        private static CommandResult ValidateRequest(PersonRequest request, bool requireBirthDate)
         {
             if (request == null)
                 return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Персональные данные не указаны");
@@ -68,14 +70,35 @@ namespace EList.Validators.Impl
             if (request.Gender.HasValue && !Enum.IsDefined(typeof(Gender), request.Gender.Value))
                 return CommandResult.Fail(ErrorCode.InvalidValue, "Указан некорректный пол");
 
-            if (request.BirthDate.HasValue)
+            if (!request.BirthDate.HasValue)
             {
-                var birthDate = request.BirthDate.Value.Date;
-                if (birthDate < MinBirthDate || birthDate > MaxBirthDate)
-                    return CommandResult.Fail(ErrorCode.InvalidValue, "Указана некорректная дата рождения");
+                if (requireBirthDate)
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Укажите дату рождения");
+                return CommandResult.OK;
+            }
+
+            var birthDate = request.BirthDate.Value.Date;
+            if (birthDate < MinBirthDate || birthDate > MaxBirthDate)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Указана некорректная дата рождения");
+
+            var age = CalculateAge(birthDate);
+            if (age < MinRegistrationAgeYears)
+            {
+                return CommandResult.Fail(
+                    ErrorCode.UserUnderMinimumAge,
+                    "Регистрация и использование сервиса доступны только по достижению 14 лет");
             }
 
             return CommandResult.OK;
+        }
+
+        private static int CalculateAge(DateTime birthDate)
+        {
+            var today = DateTime.Today;
+            var age = today.Year - birthDate.Year;
+            if (birthDate.Date > today.AddYears(-age))
+                age--;
+            return age;
         }
     }
 }
