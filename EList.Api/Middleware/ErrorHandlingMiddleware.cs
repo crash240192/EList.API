@@ -6,11 +6,14 @@ using NLog;
 using System.Net;
 using System.Text;
 using ILogger = NLog.ILogger;
+using ConfigurationManager = EList.Common.Configuration.ConfigurationManager;
 
 namespace EList.Api.Middleware
 {
     public class ErrorHandlingMiddleware
     {
+        public const string CorrelationIdHeaderName = "X-Correlation-Id";
+
         #region NLog
         private static ILogger log = LogManager.GetCurrentClassLogger();
         private static ILoggerWrapper logger = new NLogLoggerWrapper(log);
@@ -61,30 +64,56 @@ namespace EList.Api.Middleware
         {
             var code = (int)HttpStatusCode.InternalServerError;
             var contentType = "application/json";
-            var isDevelopment = _environment.IsDevelopment();
+            var correlationId = _correlationIdProvider.Get();
+            var exposeDetails = ShouldExposeDetailedErrors(_environment);
 
-            // В prod клиенту — безопасное сообщение без stack / внутренних деталей.
-            // В Development — полная цепочка сообщений + stack для отладки.
-            object bodyPayload = isDevelopment
+            if (!string.IsNullOrWhiteSpace(correlationId)
+                && !context.Response.Headers.ContainsKey(CorrelationIdHeaderName))
+            {
+                context.Response.Headers[CorrelationIdHeaderName] = correlationId;
+            }
+
+            // Development / Staging / features:exposeDetailedErrors — детали клиенту.
+            // Production без флага — безопасное сообщение + correlationId для поиска в логах.
+            object bodyPayload = exposeDetails
                 ? new
                 {
                     errorCode = ErrorCode.InternalError,
                     success = false,
                     message = FormatExceptionChain(exception),
-                    stackTrace = exception.ToString()
+                    stackTrace = exception.ToString(),
+                    correlationId
                 }
                 : new
                 {
                     errorCode = ErrorCode.InternalError,
                     success = false,
                     message = "Внутренняя ошибка сервера. Обратитесь в поддержку и укажите correlation id.",
-                    correlationId = _correlationIdProvider.Get()
+                    correlationId
                 };
 
             string body = JsonConvert.SerializeObject(bodyPayload);
             context.Response.ContentType = contentType;
             context.Response.StatusCode = code;
             return context.Response.WriteAsync(body);
+        }
+
+        /// <summary>
+        /// Development и Staging — детали по умолчанию.
+        /// Production — только если features:exposeDetailedErrors=true (не включать в prod).
+        /// </summary>
+        internal static bool ShouldExposeDetailedErrors(IHostEnvironment environment)
+        {
+            if (environment.IsDevelopment() || environment.IsEnvironment("Staging"))
+                return true;
+
+            if (!ConfigurationManager.AppSettings.Contains("features:exposeDetailedErrors"))
+                return false;
+
+            return bool.TryParse(
+                       ConfigurationManager.AppSettings["features:exposeDetailedErrors"],
+                       out var enabled)
+                   && enabled;
         }
 
         /// <summary>

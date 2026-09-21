@@ -154,6 +154,7 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 | Покупка билета (stub) | ⚠️ | UI+API stub; реальной ЮKassa и split нет |
 | Организации, верификация, payout | ✅ / ⚠️ | Верификация нужна для `CanSellTickets`; payout ещё не связан с реальным split |
 | Кошелёк / тариф | ⚠️ | Рудимент; это не билетный контур |
+| Ошибки / Staging | ✅ | `ASPNETCORE_ENVIRONMENT` + `features:exposeDetailedErrors`; UI показывает `correlationId` — см. [docker-environment.md](./docker-environment.md) |
 | Уведомления (WS + antiflood) | ✅ | |
 | Медиа / альбомы | ✅ | |
 | Жалобы / модерация / admin | ✅ | |
