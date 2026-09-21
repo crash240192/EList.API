@@ -44,7 +44,7 @@
 | Agreements | ✅ | Policy информационна; Consent+Agreement enforced |
 | Media | ✅ | |
 | Participations / Invitations | ✅ | BW + visibility |
-| Wallets / Tariffs | ⚠️ | **Рудимент тарифа**, не билетные деньги; deposit UX слабый |
+| Wallets / Tariffs | ⚠️ | NextChargeAt + charge ledger; deposit stub; не билетные деньги |
 
 ### Билеты (в коде, вне prod soft launch)
 
@@ -128,7 +128,8 @@
 - [ ] Media album `setParameters`
 - [ ] Invitations: заполнить `result.Event`
 - [ ] Premium-параметры событий по тарифу
-- [ ] Wallets Deposite API / DebtCollector (тарифный контур, не билеты)
+- [x] Wallets Deposit API + stub payment (тарифный контур, не билеты) / DebtCollector
+- [x] Wallets NextChargeAt + `wallet_tariff_charges` ledger (списание только при достаточном балансе)
 - [ ] Auto-invitations
 - [ ] Локализация (`localization.enabled: false`)
 - [ ] Swagger v3

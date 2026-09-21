@@ -27,8 +27,17 @@ namespace EList.Services.Impl.Payments
 
             var providerPaymentId = $"stub_{Guid.NewGuid():N}";
             var returnUrl = ResolveReturnUrl(request.ReturnUrl);
-            var confirmationUrl =
-                $"{returnUrl}?orderId={request.OrderId:D}&paymentId={providerPaymentId}&stub=1";
+            string confirmationUrl;
+            if (request.WalletDepositId != null && request.WalletDepositId != Guid.Empty)
+            {
+                confirmationUrl =
+                    $"{returnUrl}?depositId={request.WalletDepositId:D}&paymentId={providerPaymentId}&stub=1&purpose=wallet";
+            }
+            else
+            {
+                confirmationUrl =
+                    $"{returnUrl}?orderId={request.OrderId:D}&paymentId={providerPaymentId}&stub=1";
+            }
 
             var payment = new StubPayment
             {

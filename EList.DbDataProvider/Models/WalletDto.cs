@@ -20,6 +20,9 @@ namespace EList.DbDataProvider.Models
         [Column("last_charge_date")]
         public DateTimeOffset? LastChargeDate { get; set; }
 
+        [Column("next_charge_at")]
+        public DateTimeOffset? NextChargeAt { get; set; }
+
         [Association(ThisKey = nameof(TariffId), OtherKey = nameof(TariffDto.Id))]
         public TariffDto Tariff { get; set; }
     }

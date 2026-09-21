@@ -1,4 +1,5 @@
 ﻿using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Models.Enums;
 
 namespace EList.DbDataProvider.Interfaces
 {
@@ -27,7 +28,28 @@ namespace EList.DbDataProvider.Interfaces
         Task<WalletDto?> GetOrganizationWalletAsync(Guid organizationId);
 
         Task<List<WalletDto>> GetOverdueWalletsAsync();
+        /// <summary>Только +balance. Период тарифа не сдвигается.</summary>
         Task DepositeAsync(Guid walletId, double value);
+        /// <summary>
+        /// Списать тариф если due и хватает баланса. Без минуса.
+        /// Период стартует с момента успешного списания.
+        /// </summary>
         Task<bool> ChargeByTariffAsync(Guid walletId);
+
+        Task<Guid> CreateWalletDepositAsync(WalletDepositDto item);
+        Task<WalletDepositDto?> GetWalletDepositAsync(Guid depositId);
+        Task<WalletDepositDto?> GetWalletDepositByProviderPaymentAsync(PaymentProvider provider, string providerPaymentId);
+        Task<WalletDepositDto?> GetWalletDepositByIdempotencyAsync(Guid walletId, string idempotencyKey);
+        Task UpdateWalletDepositAsync(Guid depositId, WalletDepositStatus status, string? providerPaymentId, DateTimeOffset? paidAt);
+        Task<List<WalletDepositDto>> GetWalletDepositsAsync(Guid walletId);
+
+        Task ClearNextChargeAtAsync(Guid walletId);
+        Task<List<WalletTariffChargeDto>> GetWalletTariffChargesAsync(Guid walletId);
+
+        /// <summary>Аккаунт, к которому привязан кошелёк (если есть).</summary>
+        Task<Guid?> FindAccountIdByWalletAsync(Guid walletId);
+
+        /// <summary>Организация, к которой привязан кошелёк (если есть).</summary>
+        Task<Guid?> FindOrganizationIdByWalletAsync(Guid walletId);
     }
 }

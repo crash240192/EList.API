@@ -148,5 +148,64 @@ namespace EList.Repositories.Impl
             var result = await _walletsDataProvider.ChargeByTariffAsync(walletId);
             return result;
         }
+
+        public async Task<Guid> CreateWalletDepositAsync(WalletDeposit item)
+        {
+            var mapped = _mapper.Map<WalletDepositDto>(item);
+            return await _walletsDataProvider.CreateWalletDepositAsync(mapped);
+        }
+
+        public async Task<WalletDeposit?> GetWalletDepositAsync(Guid depositId)
+        {
+            var dto = await _walletsDataProvider.GetWalletDepositAsync(depositId);
+            return _mapper.Map<WalletDeposit>(dto);
+        }
+
+        public async Task<WalletDeposit?> GetWalletDepositByProviderPaymentAsync(
+            Models.Enums.PaymentProvider provider, string providerPaymentId)
+        {
+            var mappedProvider = _mapper.Map<DbDataProvider.Models.Enums.PaymentProvider>(provider);
+            var dto = await _walletsDataProvider.GetWalletDepositByProviderPaymentAsync(
+                mappedProvider, providerPaymentId);
+            return _mapper.Map<WalletDeposit>(dto);
+        }
+
+        public async Task<WalletDeposit?> GetWalletDepositByIdempotencyAsync(Guid walletId, string idempotencyKey)
+        {
+            var dto = await _walletsDataProvider.GetWalletDepositByIdempotencyAsync(walletId, idempotencyKey);
+            return _mapper.Map<WalletDeposit>(dto);
+        }
+
+        public async Task UpdateWalletDepositAsync(
+            Guid depositId,
+            Models.Enums.WalletDepositStatus status,
+            string? providerPaymentId,
+            DateTimeOffset? paidAt)
+        {
+            var mappedStatus = _mapper.Map<DbDataProvider.Models.Enums.WalletDepositStatus>(status);
+            await _walletsDataProvider.UpdateWalletDepositAsync(
+                depositId, mappedStatus, providerPaymentId, paidAt);
+        }
+
+        public async Task<List<WalletDeposit>> GetWalletDepositsAsync(Guid walletId)
+        {
+            var list = await _walletsDataProvider.GetWalletDepositsAsync(walletId);
+            return _mapper.Map<List<WalletDeposit>>(list);
+        }
+
+        public Task ClearNextChargeAtAsync(Guid walletId)
+            => _walletsDataProvider.ClearNextChargeAtAsync(walletId);
+
+        public async Task<List<WalletTariffCharge>> GetWalletTariffChargesAsync(Guid walletId)
+        {
+            var list = await _walletsDataProvider.GetWalletTariffChargesAsync(walletId);
+            return _mapper.Map<List<WalletTariffCharge>>(list);
+        }
+
+        public Task<Guid?> FindAccountIdByWalletAsync(Guid walletId)
+            => _walletsDataProvider.FindAccountIdByWalletAsync(walletId);
+
+        public Task<Guid?> FindOrganizationIdByWalletAsync(Guid walletId)
+            => _walletsDataProvider.FindOrganizationIdByWalletAsync(walletId);
     }
 }

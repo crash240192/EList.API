@@ -45,6 +45,7 @@ namespace EList.Services.Impl.BackgroundWorkers
             var logger = new NLogLoggerWrapper(log);
 
             var walletsRepository = scopedServices.GetRequiredService<IWalletsRepository>();
+            var walletsService = scopedServices.GetRequiredService<IWalletsService>();
             var wallets = await walletsRepository.GetOverdueWalletsAsync();
             if (wallets == null || wallets.Count == 0)
             {
@@ -59,7 +60,7 @@ namespace EList.Services.Impl.BackgroundWorkers
                 stoppingToken.ThrowIfCancellationRequested();
                 try
                 {
-                    await walletsRepository.ChargeByTariffAsync(wallet.Id);
+                    await walletsService.ChargeByTariffAsync(wallet.Id);
                 }
                 catch (Exception ex)
                 {

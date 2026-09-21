@@ -14,6 +14,8 @@
     <None Remove="Migrations\M202609142252_cover_focus.sql" />
     <None Remove="Migrations\M202609152340_message_files_system_album.sql" />
     <None Remove="Migrations\M202609211200_ticket_refund_pending.sql" />
+    <None Remove="Migrations\M202609211530_wallet_deposits.sql" />
+    <None Remove="Migrations\M202609211700_wallet_next_charge.sql" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,6 +26,8 @@
     <EmbeddedResource Include="Migrations\M202609142252_cover_focus.sql" />
     <EmbeddedResource Include="Migrations\M202609152340_message_files_system_album.sql" />
     <EmbeddedResource Include="Migrations\M202609211200_ticket_refund_pending.sql" />
+    <EmbeddedResource Include="Migrations\M202609211530_wallet_deposits.sql" />
+    <EmbeddedResource Include="Migrations\M202609211700_wallet_next_charge.sql" />
   </ItemGroup>
 
   <ItemGroup>
