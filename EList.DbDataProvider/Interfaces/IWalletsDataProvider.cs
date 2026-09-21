@@ -1,4 +1,5 @@
 ﻿using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Models.Enums;
 
 namespace EList.DbDataProvider.Interfaces
 {
@@ -29,5 +30,18 @@ namespace EList.DbDataProvider.Interfaces
         Task<List<WalletDto>> GetOverdueWalletsAsync();
         Task DepositeAsync(Guid walletId, double value);
         Task<bool> ChargeByTariffAsync(Guid walletId);
+
+        Task<Guid> CreateWalletDepositAsync(WalletDepositDto item);
+        Task<WalletDepositDto?> GetWalletDepositAsync(Guid depositId);
+        Task<WalletDepositDto?> GetWalletDepositByProviderPaymentAsync(PaymentProvider provider, string providerPaymentId);
+        Task<WalletDepositDto?> GetWalletDepositByIdempotencyAsync(Guid walletId, string idempotencyKey);
+        Task UpdateWalletDepositAsync(Guid depositId, WalletDepositStatus status, string? providerPaymentId, DateTimeOffset? paidAt);
+        Task<List<WalletDepositDto>> GetWalletDepositsAsync(Guid walletId);
+
+        /// <summary>Аккаунт, к которому привязан кошелёк (если есть).</summary>
+        Task<Guid?> FindAccountIdByWalletAsync(Guid walletId);
+
+        /// <summary>Организация, к которой привязан кошелёк (если есть).</summary>
+        Task<Guid?> FindOrganizationIdByWalletAsync(Guid walletId);
     }
 }

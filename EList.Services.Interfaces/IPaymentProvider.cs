@@ -28,6 +28,7 @@ namespace EList.Services.Interfaces
     public class PaymentCreationRequest
     {
         public Guid OrderId { get; set; }
+        public Guid? WalletDepositId { get; set; }
         public decimal Amount { get; set; }
         public string Currency { get; set; } = "RUB";
         public string Description { get; set; }

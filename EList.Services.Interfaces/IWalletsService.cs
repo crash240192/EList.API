@@ -26,7 +26,23 @@ namespace EList.Services.Interfaces
         Task<CommandResult<Wallet?>> GetOrganizationWalletAsync(Guid organizationId);
 
         Task<CommandResult<List<Wallet>>> GetOverdueWalletsAsync();
+
+        /// <summary>
+        /// Внутреннее зачисление на тарифный кошелёк (инкремент). Не билетный контур.
+        /// </summary>
         Task<CommandResult> DepositeAsync(Guid walletId, double value);
+
         Task<CommandResult<bool>> ChargeByTariffAsync(Guid walletId);
+
+        /// <summary>
+        /// Создать пополнение тарифного кошелька через платёжный провайдер (сейчас stub).
+        /// Билеты / сплит сюда не входят.
+        /// </summary>
+        Task<CommandResult<CreateWalletDepositResponse>> CreateWalletDepositAsync(CreateWalletDepositRequest request);
+
+        /// <summary>Stub/debug: имитация успешной оплаты пополнения.</summary>
+        Task<CommandResult<WalletDepositResponse>> CompleteWalletDepositAsync(CompleteWalletDepositRequest request);
+
+        Task<CommandResult<List<WalletDepositResponse>>> GetWalletDepositsAsync(Guid walletId);
     }
 }

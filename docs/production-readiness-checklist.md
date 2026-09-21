@@ -128,7 +128,7 @@
 - [ ] Media album `setParameters`
 - [ ] Invitations: заполнить `result.Event`
 - [ ] Premium-параметры событий по тарифу
-- [ ] Wallets Deposite API / DebtCollector (тарифный контур, не билеты)
+- [x] Wallets Deposit API + stub payment (тарифный контур, не билеты) / DebtCollector
 - [ ] Auto-invitations
 - [ ] Локализация (`localization.enabled: false`)
 - [ ] Swagger v3

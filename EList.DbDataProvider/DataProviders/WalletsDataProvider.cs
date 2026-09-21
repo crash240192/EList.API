@@ -1,12 +1,9 @@
 ﻿using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Models.Enums;
 using LinqToDB;
 using LinqToDB.Async;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 
 namespace EList.DbDataProvider.DataProviders
 {
@@ -198,9 +195,10 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task DepositeAsync(Guid walletId, double value)
         {
+            // Инкремент баланса тарифного кошелька (не overwrite).
             await _connection.Wallets.Where(i => i.Id == walletId)
-                .Set(i => i.PaidDate, DateTimeOffset.Now)
-                .Set(i => i.Balance, value)
+                .Set(i => i.PaidDate, DateTimeOffset.UtcNow)
+                .Set(i => i.Balance, i => i.Balance + value)
                 .UpdateAsync();
         }
 
@@ -229,6 +227,73 @@ namespace EList.DbDataProvider.DataProviders
             }
 
             return false;
+        }
+
+        public async Task<Guid> CreateWalletDepositAsync(WalletDepositDto item)
+        {
+            var result = (Guid)await _connection.InsertWithIdentityAsync(item);
+            return result;
+        }
+
+        public async Task<WalletDepositDto?> GetWalletDepositAsync(Guid depositId)
+        {
+            return await _connection.WalletDeposits.FirstOrDefaultAsync(i => i.Id == depositId);
+        }
+
+        public async Task<WalletDepositDto?> GetWalletDepositByProviderPaymentAsync(
+            PaymentProvider provider, string providerPaymentId)
+        {
+            return await _connection.WalletDeposits.FirstOrDefaultAsync(i =>
+                i.Provider == provider && i.ProviderPaymentId == providerPaymentId);
+        }
+
+        public async Task<WalletDepositDto?> GetWalletDepositByIdempotencyAsync(
+            Guid walletId, string idempotencyKey)
+        {
+            return await _connection.WalletDeposits.FirstOrDefaultAsync(i =>
+                i.WalletId == walletId && i.IdempotencyKey == idempotencyKey);
+        }
+
+        public async Task UpdateWalletDepositAsync(
+            Guid depositId,
+            WalletDepositStatus status,
+            string? providerPaymentId,
+            DateTimeOffset? paidAt)
+        {
+            var query = _connection.WalletDeposits.Where(i => i.Id == depositId)
+                .Set(i => i.Status, status);
+
+            if (providerPaymentId != null)
+                query = query.Set(i => i.ProviderPaymentId, providerPaymentId);
+
+            if (paidAt != null)
+                query = query.Set(i => i.PaidAt, paidAt);
+
+            await query.UpdateAsync();
+        }
+
+        public async Task<List<WalletDepositDto>> GetWalletDepositsAsync(Guid walletId)
+        {
+            return await _connection.WalletDeposits
+                .Where(i => i.WalletId == walletId)
+                .OrderByDescending(i => i.CreateDate)
+                .ToListAsync();
+        }
+
+        public async Task<Guid?> FindAccountIdByWalletAsync(Guid walletId)
+        {
+            return await _connection.Accounts
+                .Where(i => i.WalletId == walletId)
+                .Select(i => (Guid?)i.Id)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<Guid?> FindOrganizationIdByWalletAsync(Guid walletId)
+        {
+            return await _connection.Organizations
+                .Where(i => i.WalletId == walletId)
+                .Select(i => (Guid?)i.Id)
+                .FirstOrDefaultAsync();
         }
     }
 }

@@ -29,5 +29,14 @@ namespace EList.Repositories.Interfaces
         Task<List<Wallet>> GetOverdueWalletsAsync();
         Task DepositeAsync(Guid walletId, double value);
         Task<bool> ChargeByTariffAsync(Guid walletId);
+
+        Task<Guid> CreateWalletDepositAsync(WalletDeposit item);
+        Task<WalletDeposit?> GetWalletDepositAsync(Guid depositId);
+        Task<WalletDeposit?> GetWalletDepositByProviderPaymentAsync(Models.Enums.PaymentProvider provider, string providerPaymentId);
+        Task<WalletDeposit?> GetWalletDepositByIdempotencyAsync(Guid walletId, string idempotencyKey);
+        Task UpdateWalletDepositAsync(Guid depositId, Models.Enums.WalletDepositStatus status, string? providerPaymentId, DateTimeOffset? paidAt);
+        Task<List<WalletDeposit>> GetWalletDepositsAsync(Guid walletId);
+        Task<Guid?> FindAccountIdByWalletAsync(Guid walletId);
+        Task<Guid?> FindOrganizationIdByWalletAsync(Guid walletId);
     }
 }
