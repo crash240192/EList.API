@@ -142,6 +142,8 @@ namespace EList.AutoMapperProfile
             CreateMap<WalletDto, Wallet>().ReverseMap();
             CreateMap<WalletDepositDto, WalletDeposit>().ReverseMap();
             CreateMap<WalletDeposit, WalletDepositResponse>();
+            CreateMap<WalletTariffChargeDto, WalletTariffCharge>().ReverseMap();
+            CreateMap<WalletTariffCharge, WalletTariffChargeResponse>();
             CreateMap<Models.Enums.WalletDepositStatus, DbDataProvider.Models.Enums.WalletDepositStatus>().ReverseMap();
 
             CreateMap<OrganizationDto, Organization>().ReverseMap();

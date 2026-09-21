@@ -193,6 +193,15 @@ namespace EList.Repositories.Impl
             return _mapper.Map<List<WalletDeposit>>(list);
         }
 
+        public Task ClearNextChargeAtAsync(Guid walletId)
+            => _walletsDataProvider.ClearNextChargeAtAsync(walletId);
+
+        public async Task<List<WalletTariffCharge>> GetWalletTariffChargesAsync(Guid walletId)
+        {
+            var list = await _walletsDataProvider.GetWalletTariffChargesAsync(walletId);
+            return _mapper.Map<List<WalletTariffCharge>>(list);
+        }
+
         public Task<Guid?> FindAccountIdByWalletAsync(Guid walletId)
             => _walletsDataProvider.FindAccountIdByWalletAsync(walletId);
 

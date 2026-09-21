@@ -1,39 +1,25 @@
 ﻿namespace EList.Models.Wallets
 {
     /// <summary>
-    /// Кошелёк
+    /// Кошелёк тарифного контура платформы (не билетные деньги).
     /// </summary>
     public class Wallet
     {
-        /// <summary>
-        /// Идентификатор кошелька
-        /// </summary>
         public Guid Id { get; set; }
 
-        /// <summary>
-        /// Текущий баланс
-        /// </summary>
         public double Balance { get; set; }
 
-        /// <summary>
-        /// Дата последней оплаты
-        /// </summary>
+        /// <summary>Устаревающее поле; при списании синхронизируется с LastChargeDate.</summary>
         public DateTimeOffset? PaidDate { get; set; }
 
-        /// <summary>
-        /// Идентификатор тарифа
-        /// </summary>
         public Guid? TariffId { get; set; }
 
-        /// <summary>
-        /// Дата последнего списания
-        /// </summary>
+        /// <summary>Момент последнего успешного списания (= начало текущего оплаченного периода).</summary>
         public DateTimeOffset? LastChargeDate { get; set; }
 
+        /// <summary>Когда пробовать следующее списание. null — тариф не активен / ждёт средств.</summary>
+        public DateTimeOffset? NextChargeAt { get; set; }
 
-        /// <summary>
-        /// Тариф
-        /// </summary>
         public Tariff Tariff { get; set; }
     }
 }

@@ -44,5 +44,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult<WalletDepositResponse>> CompleteWalletDepositAsync(CompleteWalletDepositRequest request);
 
         Task<CommandResult<List<WalletDepositResponse>>> GetWalletDepositsAsync(Guid walletId);
+
+        Task<CommandResult<List<WalletTariffChargeResponse>>> GetWalletTariffChargesAsync(Guid walletId);
     }
 }

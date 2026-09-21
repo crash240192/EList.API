@@ -242,6 +242,13 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+
+            var access = await AssertCanManageWalletAsync(walletId);
+            if (!access.Success)
+                return access;
+
             var tariff = await _walletsRepository.GetTariffAsync(tariffId);
             if (tariff == null)
                 return CommandResult.Fail(ErrorCode.TariffNotFound, $"Тариф с id='{tariffId}' не найден");
@@ -250,9 +257,30 @@ namespace EList.Services.Impl
             if (wallet == null)
                 return CommandResult.Fail(ErrorCode.WalletNotFound, $"Кошелёк с id='{walletId}' не найден");
 
+            var orgId = await _walletsRepository.FindOrganizationIdByWalletAsync(walletId);
+            if (tariff.ForOrganization && orgId == null)
+            {
+                return CommandResult.Fail(ErrorCode.InvalidValue,
+                    "Этот тариф предназначен для организации");
+            }
+            if (!tariff.ForOrganization && orgId != null)
+            {
+                return CommandResult.Fail(ErrorCode.InvalidValue,
+                    "Этот тариф предназначен для личного аккаунта");
+            }
+
             await _walletsRepository.SetWalletTariffAsync(walletId, tariffId);
+            // Смена тарифа: текущий период не переносим — пробуем списать новый сразу.
+            await _walletsRepository.ClearNextChargeAtAsync(walletId);
+            var charged = await _walletsRepository.ChargeByTariffAsync(walletId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            if (!charged && tariff.Cost > 0)
+            {
+                var pending = CommandResult.OK;
+                pending.Message = "Тариф выбран. Для активации периода пополните баланс до суммы тарифа.";
+                return pending;
+            }
             return CommandResult.OK;
         }
 
@@ -626,10 +654,30 @@ namespace EList.Services.Impl
                 deposit.ProviderPaymentId,
                 DateTimeOffset.UtcNow);
 
-            // Баланс в wallets — double; сумма депозита — decimal.
             var credit = (double)deposit.Amount;
             await _walletsRepository.DepositeAsync(deposit.WalletId, credit);
             deposit.Status = WalletDepositStatus.Succeeded;
+
+            // Если период истёк / не был активен и денег хватило — списание сразу, период от now.
+            await _walletsRepository.ChargeByTariffAsync(deposit.WalletId);
+        }
+
+        public async Task<CommandResult<List<WalletTariffChargeResponse>>> GetWalletTariffChargesAsync(Guid walletId)
+        {
+            if (_accountDataHolder.AccountId == null)
+            {
+                return CommandResult<List<WalletTariffChargeResponse>>.Fail(
+                    ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+            }
+
+            var access = await AssertCanManageWalletAsync(walletId);
+            if (!access.Success)
+                return CommandResult<List<WalletTariffChargeResponse>>.Fail(access.ErrorCode, access.Message);
+
+            var list = await _walletsRepository.GetWalletTariffChargesAsync(walletId)
+                ?? new List<WalletTariffCharge>();
+            return new CommandResult<List<WalletTariffChargeResponse>>(
+                list.Select(c => _mapper.Map<WalletTariffChargeResponse>(c)).ToList());
         }
 
         private async Task<CommandResult> AssertCanManageWalletAsync(Guid walletId)

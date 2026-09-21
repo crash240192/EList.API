@@ -107,6 +107,7 @@ namespace EList.DbDataProvider.DataProviders
             {
                 Balance = 0,
                 LastChargeDate = null,
+                NextChargeAt = null,
                 TariffId = null,
                 PaidDate = null
             });
@@ -189,15 +190,18 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<List<WalletDto>> GetOverdueWalletsAsync()
         {
-            var wallets = await _connection.Wallets.Where(i => i.TariffId != null && i.PaidDate > i.LastChargeDate).ToListAsync();
-            return wallets;
+            var now = DateTimeOffset.UtcNow;
+            // Due: есть тариф и (никогда не активирован ИЛИ срок списания наступил).
+            return await _connection.Wallets
+                .Where(i => i.TariffId != null
+                    && (i.NextChargeAt == null || i.NextChargeAt <= now))
+                .ToListAsync();
         }
 
         public async Task DepositeAsync(Guid walletId, double value)
         {
-            // Инкремент баланса тарифного кошелька (не overwrite).
+            // Только инкремент баланса. Период тарифа (NextChargeAt) не трогаем.
             await _connection.Wallets.Where(i => i.Id == walletId)
-                .Set(i => i.PaidDate, DateTimeOffset.UtcNow)
                 .Set(i => i.Balance, i => i.Balance + value)
                 .UpdateAsync();
         }
@@ -205,28 +209,62 @@ namespace EList.DbDataProvider.DataProviders
         public async Task<bool> ChargeByTariffAsync(Guid walletId)
         {
             var wallet = await _connection.Wallets.FirstOrDefaultAsync(i => i.Id == walletId);
-            if (wallet != null && (wallet.LastChargeDate == null || wallet.LastChargeDate < wallet.PaidDate))
+            if (wallet?.TariffId == null)
+                return false;
+
+            var now = DateTimeOffset.UtcNow;
+            if (wallet.NextChargeAt != null && wallet.NextChargeAt > now)
+                return false; // период ещё активен
+
+            var tariff = await _connection.Tariffs.FirstOrDefaultAsync(i => i.Id == wallet.TariffId);
+            if (tariff == null)
+                return false;
+
+            var cost = tariff.Cost;
+            if (cost < 0)
+                cost = 0;
+
+            if (cost > 0 && wallet.Balance < cost)
+                return false; // без минуса; ждём пополнения
+
+            var newBalance = wallet.Balance - cost;
+            var period = tariff.Period <= TimeSpan.Zero ? TimeSpan.FromDays(30) : tariff.Period;
+            var nextChargeAt = now + period;
+
+            await _connection.Wallets.Where(i => i.Id == walletId)
+                .Set(i => i.Balance, newBalance)
+                .Set(i => i.LastChargeDate, now)
+                .Set(i => i.PaidDate, now)
+                .Set(i => i.NextChargeAt, nextChargeAt)
+                .UpdateAsync();
+
+            await _connection.InsertWithIdentityAsync(new WalletTariffChargeDto
             {
-                if (wallet.TariffId != null)
-                {
-                    var tariff = await _connection.Tariffs.FirstOrDefaultAsync(i => i.Id == wallet.TariffId);
+                WalletId = walletId,
+                TariffId = tariff.Id,
+                Amount = (decimal)cost,
+                Currency = "RUB",
+                ChargedAt = now,
+                NextChargeAt = nextChargeAt,
+                BalanceAfter = newBalance
+            });
 
-                    if (tariff != null && tariff?.Cost > 0)
-                    {
-                        if (DateTimeOffset.Now - wallet.PaidDate >= tariff.Period)
-                        {
-                            await _connection.Wallets.Where(i => i.Id == walletId)
-                                .Set(i => i.LastChargeDate, DateTimeOffset.Now)
-                                .Set(i => i.Balance, wallet.Balance - tariff.Cost)
-                                .UpdateAsync();
+            return true;
+        }
 
-                            return true;
-                        }
-                    }
-                }
-            }
+        public async Task ClearNextChargeAtAsync(Guid walletId)
+        {
+            await _connection.Wallets.Where(i => i.Id == walletId)
+                .Set(i => i.NextChargeAt, (DateTimeOffset?)null)
+                .UpdateAsync();
+        }
 
-            return false;
+        public async Task<List<WalletTariffChargeDto>> GetWalletTariffChargesAsync(Guid walletId)
+        {
+            return await _connection.WalletTariffCharges
+                .Where(i => i.WalletId == walletId)
+                .OrderByDescending(i => i.ChargedAt)
+                .ToListAsync();
         }
 
         public async Task<Guid> CreateWalletDepositAsync(WalletDepositDto item)

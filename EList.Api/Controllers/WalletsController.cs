@@ -589,6 +589,30 @@ namespace EList.Api.Controllers
                 throw;
             }
         }
+
+        /// <summary>История списаний тарифа платформы.</summary>
+        [HttpGet("{walletId}/tariffCharges")]
+        public async Task<CommandResult<List<WalletTariffChargeResponse>>> GetWalletTariffChargesAsync(Guid walletId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetWalletTariffChargesAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _walletsService.GetWalletTariffChargesAsync(walletId);
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
         #endregion
     }
 }
