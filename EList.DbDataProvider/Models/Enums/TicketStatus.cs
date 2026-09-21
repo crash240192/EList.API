@@ -17,6 +17,9 @@ namespace EList.DbDataProvider.Models.Enums
         Refunded = 2,
 
         [MapValue(Value = "void")]
-        Void = 3
+        Void = 3,
+
+        [MapValue(Value = "refund_pending")]
+        RefundPending = 4
     }
 }

@@ -303,7 +303,7 @@ namespace EList.Api.Controllers
             }
         }
 
-        /// <summary>Создать возврат по билетам заказа (buyer).</summary>
+        /// <summary>Создать возврат по билетам заказа (buyer/holder).</summary>
         [HttpPost("refunds")]
         public async Task<CommandResult<RefundResponse>> CreateRefundAsync([FromBody] CreateRefundRequest request)
         {
@@ -317,6 +317,34 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _ordersService.CreateRefundAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>Отменить заявку на возврат (пока pending).</summary>
+        [HttpPost("refunds/cancel")]
+        public async Task<CommandResult<RefundResponse>> CancelRefundAsync([FromBody] CancelRefundRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CancelRefundAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _ordersService.CancelRefundAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
