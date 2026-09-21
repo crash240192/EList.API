@@ -442,7 +442,7 @@ namespace EList.Services.Impl
                      || string.Equals(notification.Object.Status, "canceled", StringComparison.OrdinalIgnoreCase))
             {
                 if (refund.Status == RefundStatus.Pending)
-                    await _ordersRepository.UpdateRefundStatusAsync(refund.Id, RefundStatus.Failed, providerRefundId);
+                    await FailPendingRefundAsync(refund, providerRefundId);
             }
 
             await _ordersRepository.MarkWebhookProcessedAsync(webhookId, refund.OrderId);
@@ -466,11 +466,6 @@ namespace EList.Services.Impl
             var order = await _ordersRepository.GetOrderAsync(request.OrderId);
             if (order == null)
                 return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue, "Заказ не найден");
-
-            var isBuyer = order.BuyerAccountId == _accountDataHolder.AccountId.Value;
-            var isStaff = _accountDataHolder.IsPlatformModeratorOrAbove;
-            if (!isBuyer && !isStaff)
-                return CommandResult<RefundResponse>.Fail(ErrorCode.AccessError, "Возврат доступен покупателю заказа");
 
             if (order.Status != OrderStatus.Paid && order.Status != OrderStatus.PartiallyRefunded)
             {
@@ -511,6 +506,16 @@ namespace EList.Services.Impl
             {
                 return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue,
                     "Вернуть можно только билеты в статусе issued");
+            }
+
+            var actorId = _accountDataHolder.AccountId.Value;
+            var isBuyer = order.BuyerAccountId == actorId;
+            var isStaff = _accountDataHolder.IsPlatformModeratorOrAbove;
+            var isHolderOfSelected = selected.All(t => t.HolderAccountId == actorId);
+            if (!isBuyer && !isStaff && !isHolderOfSelected)
+            {
+                return CommandResult<RefundResponse>.Fail(ErrorCode.AccessError,
+                    "Возврат доступен покупателю заказа или держателю билета");
             }
 
             var existingRefunds = await _ordersRepository.GetRefundsByOrderAsync(order.Id) ?? new List<Refund>();
@@ -566,6 +571,10 @@ namespace EList.Services.Impl
             };
             refund.Id = await _ordersRepository.CreateRefundAsync(refund);
 
+            // Заявка принята: билеты сразу в промежуточный статус до webhook/fulfill.
+            foreach (var ticket in selected)
+                await _ordersRepository.UpdateTicketStatusAsync(ticket.Id, TicketStatus.RefundPending);
+
             if (string.IsNullOrWhiteSpace(order.ProviderPaymentId))
             {
                 // Оплачен без провайдера (не должно для amount>0) — fulfill локально
@@ -596,6 +605,56 @@ namespace EList.Services.Impl
             created.TicketIds = refund.TicketIds;
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return new CommandResult<RefundResponse>(_mapper.Map<RefundResponse>(created));
+        }
+
+        public async Task<CommandResult<RefundResponse>> CancelRefundAsync(CancelRefundRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(CancelRefundAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<RefundResponse>.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+
+            if (request == null || request.RefundId == Guid.Empty)
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue, "Не указан возврат");
+
+            var refund = await _ordersRepository.GetRefundAsync(request.RefundId);
+            if (refund == null)
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue, "Возврат не найден");
+
+            if (refund.Status != RefundStatus.Pending)
+            {
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue,
+                    "Отменить можно только заявку в статусе pending");
+            }
+
+            var order = await _ordersRepository.GetOrderAsync(refund.OrderId);
+            if (order == null)
+                return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue, "Заказ не найден");
+
+            var actorId = _accountDataHolder.AccountId.Value;
+            var isBuyer = order.BuyerAccountId == actorId;
+            var isStaff = _accountDataHolder.IsPlatformModeratorOrAbove;
+            var tickets = await _ordersRepository.GetTicketsByOrderAsync(order.Id) ?? new List<Ticket>();
+            var refundTicketIds = (refund.TicketIds ?? new List<Guid>()).ToHashSet();
+            var covered = refundTicketIds.Count == 0
+                ? tickets.Where(t => t.Status == TicketStatus.RefundPending).ToList()
+                : tickets.Where(t => refundTicketIds.Contains(t.Id)).ToList();
+            var isHolder = covered.Count > 0 && covered.All(t => t.HolderAccountId == actorId);
+            if (!isBuyer && !isStaff && !isHolder)
+            {
+                return CommandResult<RefundResponse>.Fail(ErrorCode.AccessError,
+                    "Отмена заявки доступна покупателю или держателю билета");
+            }
+
+            await FailPendingRefundAsync(refund, refund.ProviderRefundId);
+
+            var done = await _ordersRepository.GetRefundAsync(refund.Id) ?? refund;
+            done.TicketIds = refund.TicketIds;
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<RefundResponse>(_mapper.Map<RefundResponse>(done));
         }
 
         public async Task<CommandResult<RefundResponse>> CompleteRefundAsync(CompleteRefundRequest request)
@@ -637,8 +696,15 @@ namespace EList.Services.Impl
             if (order == null)
                 return CommandResult<RefundResponse>.Fail(ErrorCode.InvalidValue, "Заказ не найден");
 
-            if (order.BuyerAccountId != _accountDataHolder.AccountId.Value
-                && !_accountDataHolder.IsPlatformModeratorOrAbove)
+            var actorId = _accountDataHolder.AccountId.Value;
+            var isBuyer = order.BuyerAccountId == actorId;
+            var orderTickets = await _ordersRepository.GetTicketsByOrderAsync(order.Id) ?? new List<Ticket>();
+            var refundTicketIds = (refund.TicketIds ?? new List<Guid>()).ToHashSet();
+            var covered = refundTicketIds.Count == 0
+                ? orderTickets
+                : orderTickets.Where(t => refundTicketIds.Contains(t.Id)).ToList();
+            var isHolder = covered.Count > 0 && covered.All(t => t.HolderAccountId == actorId);
+            if (!isBuyer && !isHolder && !_accountDataHolder.IsPlatformModeratorOrAbove)
             {
                 return CommandResult<RefundResponse>.Fail(ErrorCode.AccessError, "Нет доступа к возврату");
             }
@@ -689,10 +755,13 @@ namespace EList.Services.Impl
             if (order == null)
                 return CommandResult<List<RefundResponse>>.Fail(ErrorCode.InvalidValue, "Заказ не найден");
 
-            var isBuyer = order.BuyerAccountId == _accountDataHolder.AccountId.Value;
+            var actorId = _accountDataHolder.AccountId.Value;
+            var isBuyer = order.BuyerAccountId == actorId;
             var isOrg = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(
-                order.EventId, _accountDataHolder.AccountId.Value);
-            if (!isBuyer && !isOrg && !_accountDataHolder.IsPlatformModeratorOrAbove)
+                order.EventId, actorId);
+            var tickets = await _ordersRepository.GetTicketsByOrderAsync(orderId) ?? new List<Ticket>();
+            var isHolder = tickets.Any(t => t.HolderAccountId == actorId);
+            if (!isBuyer && !isOrg && !isHolder && !_accountDataHolder.IsPlatformModeratorOrAbove)
                 return CommandResult<List<RefundResponse>>.Fail(ErrorCode.AccessError, "Нет доступа");
 
             var refunds = await _ordersRepository.GetRefundsByOrderAsync(orderId) ?? new List<Refund>();
@@ -711,14 +780,37 @@ namespace EList.Services.Impl
             var tickets = await _ordersRepository.GetTicketsByOrderAsync(refund.OrderId) ?? new List<Ticket>();
             var ids = (refund.TicketIds ?? new List<Guid>()).ToHashSet();
             var affected = ids.Count == 0
-                ? tickets.Where(t => t.Status == TicketStatus.Issued).ToList()
+                ? tickets.Where(t =>
+                    t.Status == TicketStatus.Issued || t.Status == TicketStatus.RefundPending).ToList()
                 : tickets.Where(t => ids.Contains(t.Id)).ToList();
 
-            foreach (var ticket in affected.Where(t => t.Status == TicketStatus.Issued))
+            foreach (var ticket in affected.Where(t =>
+                         t.Status == TicketStatus.Issued || t.Status == TicketStatus.RefundPending))
                 await _ordersRepository.UpdateTicketStatusAsync(ticket.Id, TicketStatus.Refunded);
 
             await RefreshOrderRefundStatusAsync(refund.OrderId);
             await CleanupParticipationForTicketsAsync(affected);
+        }
+
+        /// <summary>
+        /// Отмена/отказ провайдера: Refund → Failed, билеты RefundPending → Issued.
+        /// </summary>
+        private async Task FailPendingRefundAsync(Refund refund, string? providerRefundId)
+        {
+            if (refund.Status != RefundStatus.Pending)
+                return;
+
+            await _ordersRepository.UpdateRefundStatusAsync(
+                refund.Id, RefundStatus.Failed, providerRefundId ?? refund.ProviderRefundId);
+
+            var tickets = await _ordersRepository.GetTicketsByOrderAsync(refund.OrderId) ?? new List<Ticket>();
+            var ids = (refund.TicketIds ?? new List<Guid>()).ToHashSet();
+            var affected = ids.Count == 0
+                ? tickets.Where(t => t.Status == TicketStatus.RefundPending).ToList()
+                : tickets.Where(t => ids.Contains(t.Id) && t.Status == TicketStatus.RefundPending).ToList();
+
+            foreach (var ticket in affected)
+                await _ordersRepository.UpdateTicketStatusAsync(ticket.Id, TicketStatus.Issued);
         }
 
         private async Task RefreshOrderRefundStatusAsync(Guid orderId)
@@ -730,9 +822,10 @@ namespace EList.Services.Impl
                 return;
             }
 
+            var anyPending = tickets.Any(t => t.Status == TicketStatus.RefundPending);
             var anyActive = tickets.Any(t => t.Status == TicketStatus.Issued || t.Status == TicketStatus.Used);
             var anyRefunded = tickets.Any(t => t.Status == TicketStatus.Refunded || t.Status == TicketStatus.Void);
-            if (!anyActive && anyRefunded)
+            if (!anyActive && !anyPending && anyRefunded)
                 await _ordersRepository.UpdateOrderStatusAsync(orderId, OrderStatus.Refunded);
             else if (anyRefunded)
                 await _ordersRepository.UpdateOrderStatusAsync(orderId, OrderStatus.PartiallyRefunded);
@@ -902,6 +995,12 @@ namespace EList.Services.Impl
                     $"Билет уже отмечен как использованный ({when})");
             }
 
+            if (ticket.Status == TicketStatus.RefundPending)
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
+                    "Билет на возврате — check-in недоступен");
+            }
+
             if (ticket.Status != TicketStatus.Issued)
             {
                 return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
@@ -955,6 +1054,12 @@ namespace EList.Services.Impl
             {
                 return CommandResult<TicketResponse>.Fail(ErrorCode.AccessError,
                     "Передать можно только свой билет");
+            }
+
+            if (ticket.Status == TicketStatus.RefundPending)
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
+                    "Билет на возврате — передача недоступна");
             }
 
             if (ticket.Status != TicketStatus.Issued)
