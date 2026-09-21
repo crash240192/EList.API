@@ -227,6 +227,7 @@
 | Артефакт | Путь |
 |----------|------|
 | Описание сервиса | [SERVICE.md](./SERVICE.md) |
+| Docker / Staging / correlation id | [docker-environment.md](./docker-environment.md) |
 | Legal ticketing review | [legal-ticketing-review.md](./legal-ticketing-review.md) |
 | UI handoff | [ui-handoff-checklist-and-tickets.md](./ui-handoff-checklist-and-tickets.md) |
 | Tickets workflow | [tickets workflow.txt](./tickets%20workflow.txt) |
