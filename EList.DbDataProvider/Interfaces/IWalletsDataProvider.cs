@@ -46,7 +46,12 @@ namespace EList.DbDataProvider.Interfaces
         Task<WalletDepositDto?> GetWalletDepositAsync(Guid depositId);
         Task<WalletDepositDto?> GetWalletDepositByProviderPaymentAsync(PaymentProvider provider, string providerPaymentId);
         Task<WalletDepositDto?> GetWalletDepositByIdempotencyAsync(Guid walletId, string idempotencyKey);
-        Task UpdateWalletDepositAsync(Guid depositId, WalletDepositStatus status, string? providerPaymentId, DateTimeOffset? paidAt);
+        Task UpdateWalletDepositAsync(
+            Guid depositId,
+            WalletDepositStatus status,
+            string? providerPaymentId,
+            DateTimeOffset? paidAt,
+            double? balanceAfter = null);
         Task<List<WalletDepositDto>> GetWalletDepositsAsync(Guid walletId);
 
         Task ClearNextChargeAtAsync(Guid walletId);

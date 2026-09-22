@@ -342,7 +342,8 @@ namespace EList.DbDataProvider.DataProviders
             Guid depositId,
             WalletDepositStatus status,
             string? providerPaymentId,
-            DateTimeOffset? paidAt)
+            DateTimeOffset? paidAt,
+            double? balanceAfter = null)
         {
             var query = _connection.WalletDeposits.Where(i => i.Id == depositId)
                 .Set(i => i.Status, status);
@@ -352,6 +353,9 @@ namespace EList.DbDataProvider.DataProviders
 
             if (paidAt != null)
                 query = query.Set(i => i.PaidAt, paidAt);
+
+            if (balanceAfter != null)
+                query = query.Set(i => i.BalanceAfter, balanceAfter);
 
             await query.UpdateAsync();
         }

@@ -37,7 +37,12 @@ namespace EList.Repositories.Interfaces
         Task<WalletDeposit?> GetWalletDepositAsync(Guid depositId);
         Task<WalletDeposit?> GetWalletDepositByProviderPaymentAsync(Models.Enums.PaymentProvider provider, string providerPaymentId);
         Task<WalletDeposit?> GetWalletDepositByIdempotencyAsync(Guid walletId, string idempotencyKey);
-        Task UpdateWalletDepositAsync(Guid depositId, Models.Enums.WalletDepositStatus status, string? providerPaymentId, DateTimeOffset? paidAt);
+        Task UpdateWalletDepositAsync(
+            Guid depositId,
+            Models.Enums.WalletDepositStatus status,
+            string? providerPaymentId,
+            DateTimeOffset? paidAt,
+            double? balanceAfter = null);
         Task<List<WalletDeposit>> GetWalletDepositsAsync(Guid walletId);
         Task ClearNextChargeAtAsync(Guid walletId);
         Task<List<WalletTariffCharge>> GetWalletTariffChargesAsync(Guid walletId);

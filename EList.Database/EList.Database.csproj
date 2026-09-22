@@ -16,6 +16,7 @@
     <None Remove="Migrations\M202609211200_ticket_refund_pending.sql" />
     <None Remove="Migrations\M202609211530_wallet_deposits.sql" />
     <None Remove="Migrations\M202609211700_wallet_next_charge.sql" />
+    <None Remove="Migrations\M202609221000_wallet_deposit_balance_after.sql" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,6 +29,7 @@
     <EmbeddedResource Include="Migrations\M202609211200_ticket_refund_pending.sql" />
     <EmbeddedResource Include="Migrations\M202609211530_wallet_deposits.sql" />
     <EmbeddedResource Include="Migrations\M202609211700_wallet_next_charge.sql" />
+    <EmbeddedResource Include="Migrations\M202609221000_wallet_deposit_balance_after.sql" />
   </ItemGroup>
 
   <ItemGroup>

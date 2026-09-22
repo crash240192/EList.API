@@ -198,11 +198,12 @@ namespace EList.Repositories.Impl
             Guid depositId,
             Models.Enums.WalletDepositStatus status,
             string? providerPaymentId,
-            DateTimeOffset? paidAt)
+            DateTimeOffset? paidAt,
+            double? balanceAfter = null)
         {
             var mappedStatus = _mapper.Map<DbDataProvider.Models.Enums.WalletDepositStatus>(status);
             await _walletsDataProvider.UpdateWalletDepositAsync(
-                depositId, mappedStatus, providerPaymentId, paidAt);
+                depositId, mappedStatus, providerPaymentId, paidAt, balanceAfter);
         }
 
         public async Task<List<WalletDeposit>> GetWalletDepositsAsync(Guid walletId)

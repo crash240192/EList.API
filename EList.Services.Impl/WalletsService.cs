@@ -669,15 +669,22 @@ namespace EList.Services.Impl
             if (deposit.Status == WalletDepositStatus.Succeeded)
                 return;
 
+            var credit = (double)deposit.Amount;
+            await _walletsRepository.DepositeAsync(deposit.WalletId, credit);
+
+            var walletAfter = await _walletsRepository.GetWalletAsync(deposit.WalletId);
+            var balanceAfter = walletAfter?.Balance;
+
             await _walletsRepository.UpdateWalletDepositAsync(
                 deposit.Id,
                 WalletDepositStatus.Succeeded,
                 deposit.ProviderPaymentId,
-                DateTimeOffset.UtcNow);
+                DateTimeOffset.UtcNow,
+                balanceAfter);
 
-            var credit = (double)deposit.Amount;
-            await _walletsRepository.DepositeAsync(deposit.WalletId, credit);
             deposit.Status = WalletDepositStatus.Succeeded;
+            deposit.BalanceAfter = balanceAfter;
+            deposit.PaidAt = DateTimeOffset.UtcNow;
 
             // Если период истёк / не был активен и денег хватило — списание сразу, период от now.
             // Выбранный платный тариф снова активируется автоматически.

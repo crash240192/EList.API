@@ -37,6 +37,10 @@ namespace EList.DbDataProvider.Models
         [Column("paid_at")]
         public DateTimeOffset? PaidAt { get; set; }
 
+        /// <summary>Баланс кошелька сразу после зачисления (до возможного автосписания тарифа).</summary>
+        [Column("balance_after")]
+        public double? BalanceAfter { get; set; }
+
         [Association(ThisKey = nameof(WalletId), OtherKey = nameof(WalletDto.Id))]
         public WalletDto Wallet { get; set; }
     }

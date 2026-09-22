@@ -17,5 +17,7 @@ namespace EList.Models.Wallets
         public string? IdempotencyKey { get; set; }
         public DateTimeOffset CreateDate { get; set; }
         public DateTimeOffset? PaidAt { get; set; }
+        /// <summary>Баланс сразу после зачисления (до возможного автосписания тарифа).</summary>
+        public double? BalanceAfter { get; set; }
     }
 }
