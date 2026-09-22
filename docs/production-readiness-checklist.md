@@ -44,7 +44,7 @@
 | Agreements | ✅ | Policy информационна; Consent+Agreement enforced |
 | Media | ✅ | |
 | Participations / Invitations | ✅ | BW + visibility |
-| Wallets / Tariffs | ⚠️ | NextChargeAt + charge ledger; deposit stub; не билетные деньги |
+| Wallets / Tariffs | ⚠️ | Selected vs effective; free default; NextChargeAt; deposit stub |
 
 ### Билеты (в коде, вне prod soft launch)
 
@@ -130,6 +130,7 @@
 - [ ] Premium-параметры событий по тарифу
 - [x] Wallets Deposit API + stub payment (тарифный контур, не билеты) / DebtCollector
 - [x] Wallets NextChargeAt + `wallet_tariff_charges` ledger (списание только при достаточном балансе)
+- [x] Free default tariff (unique cost=0 per scope) + fallback when paid period inactive; debtCollector on
 - [ ] Auto-invitations
 - [ ] Локализация (`localization.enabled: false`)
 - [ ] Swagger v3

@@ -11,15 +11,18 @@ namespace EList.Repositories.Interfaces
         Task<Tariff?> GetTariffAsync(Guid tariffId);
         Task<List<Tariff>?> GetTariffsAsync(bool? forOrganization = null);
         Task<Tariff?> GetWalletTariffAsync(Guid walletId);
+        Task<Tariff?> GetDefaultFreeTariffAsync(bool forOrganization);
+        Task<Tariff?> FindOtherZeroCostTariffAsync(bool forOrganization, Guid? excludeTariffId);
 
         Task<TariffValidator?> GetAccountTariffValidatorAsync(Guid accountId);
         Task<TariffValidator?> GetOrganizationTariffValidatorAsync(Guid organizationId);
+        Task<TariffValidator?> GetEffectiveTariffValidatorForWalletAsync(Guid walletId);
         Task<Guid> CreateTariffValidatorAsync(TariffValidator item);
         Task UpdateTariffValidatorAsync(TariffValidator item);
         Task<TariffValidator?> GetTariffValidatorAsync(Guid tariffValidatorId);
         Task<TariffValidator?> GetTariffValidatorByTariffIdAsync(Guid tariffId);
 
-        Task<Guid> CreateWalletAsync();
+        Task<Guid> CreateWalletAsync(bool forOrganization = false);
         Task SetWalletTariffAsync(Guid walletId, Guid tariffId);
 
         Task<Wallet?> GetWalletAsync(Guid walletId);

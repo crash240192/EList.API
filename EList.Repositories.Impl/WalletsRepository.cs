@@ -46,6 +46,18 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task<Tariff?> GetDefaultFreeTariffAsync(bool forOrganization)
+        {
+            var tariff = await _walletsDataProvider.GetDefaultFreeTariffAsync(forOrganization);
+            return _mapper.Map<Tariff?>(tariff);
+        }
+
+        public async Task<Tariff?> FindOtherZeroCostTariffAsync(bool forOrganization, Guid? excludeTariffId)
+        {
+            var tariff = await _walletsDataProvider.FindOtherZeroCostTariffAsync(forOrganization, excludeTariffId);
+            return _mapper.Map<Tariff?>(tariff);
+        }
+
 
         public async Task<TariffValidator?> GetAccountTariffValidatorAsync(Guid accountId)
         {
@@ -59,6 +71,12 @@ namespace EList.Repositories.Impl
             var validator = await _walletsDataProvider.GetOrganizationTariffValidatorAsync(organizationId);
             var result = _mapper.Map<TariffValidator?>(validator);
             return result;
+        }
+
+        public async Task<TariffValidator?> GetEffectiveTariffValidatorForWalletAsync(Guid walletId)
+        {
+            var validator = await _walletsDataProvider.GetEffectiveTariffValidatorForWalletAsync(walletId);
+            return _mapper.Map<TariffValidator?>(validator);
         }
 
         public async Task<Guid> CreateTariffValidatorAsync(TariffValidator item)
@@ -90,9 +108,9 @@ namespace EList.Repositories.Impl
 
 
 
-        public async Task<Guid> CreateWalletAsync()
+        public async Task<Guid> CreateWalletAsync(bool forOrganization = false)
         {
-            var result = await _walletsDataProvider.CreateWalletAsync();
+            var result = await _walletsDataProvider.CreateWalletAsync(forOrganization);
             return result;
         }
         

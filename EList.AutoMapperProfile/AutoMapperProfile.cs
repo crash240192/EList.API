@@ -139,7 +139,12 @@ namespace EList.AutoMapperProfile
 
             CreateMap<TariffDto, Tariff>().ReverseMap();
             CreateMap<TariffValidatorDto, TariffValidator>().ReverseMap();
-            CreateMap<WalletDto, Wallet>().ReverseMap();
+            CreateMap<WalletDto, Wallet>()
+                .ForMember(d => d.EffectiveTariffId, o => o.Ignore())
+                .ForMember(d => d.IsSelectedTariffActive, o => o.Ignore())
+                .ForMember(d => d.TariffBillingStatus, o => o.Ignore());
+            CreateMap<Wallet, WalletDto>()
+                .ForMember(d => d.Tariff, o => o.Ignore());
             CreateMap<WalletDepositDto, WalletDeposit>().ReverseMap();
             CreateMap<WalletDeposit, WalletDepositResponse>();
             CreateMap<WalletTariffChargeDto, WalletTariffCharge>().ReverseMap();

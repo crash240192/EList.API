@@ -58,6 +58,13 @@ namespace EList.Services.Impl
             if (validator == null)
                 return CommandResult<Guid?>.Fail(ErrorCode.TariffValidatorNotFound, $"Валидатор тарифа с id='{item.ValidatorId}' не найден");
 
+            if (item.Cost < 0)
+                return CommandResult<Guid?>.Fail(ErrorCode.InvalidValue, "Стоимость тарифа не может быть отрицательной");
+
+            var uniqueFree = await AssertUniqueFreeTariffAsync(item.ForOrganization, item.Cost, excludeTariffId: null);
+            if (!uniqueFree.Success)
+                return CommandResult<Guid?>.Fail(uniqueFree.ErrorCode, uniqueFree.Message);
+
             var result = await _walletsRepository.CreateTariffAsync(item);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -78,7 +85,14 @@ namespace EList.Services.Impl
 
             var validator = await _walletsRepository.GetTariffValidatorAsync(item.ValidatorId);
             if (validator == null)
-                return CommandResult<Guid?>.Fail(ErrorCode.TariffValidatorNotFound, $"Валидатор тарифа с id='{item.ValidatorId}' не найден");
+                return CommandResult.Fail(ErrorCode.TariffValidatorNotFound, $"Валидатор тарифа с id='{item.ValidatorId}' не найден");
+
+            if (item.Cost < 0)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Стоимость тарифа не может быть отрицательной");
+
+            var uniqueFree = await AssertUniqueFreeTariffAsync(item.ForOrganization, item.Cost, excludeTariffId: item.Id);
+            if (!uniqueFree.Success)
+                return uniqueFree;
 
             await _walletsRepository.UpdateTariffAsync(item);
 
@@ -227,7 +241,7 @@ namespace EList.Services.Impl
                 return existing;
             }
 
-            var walletId = await _walletsRepository.CreateWalletAsync();
+            var walletId = await _walletsRepository.CreateWalletAsync(forOrganization: true);
             await _organizationsRepository.SetOrganizationWalletAsync(organizationId, walletId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -271,6 +285,7 @@ namespace EList.Services.Impl
 
             await _walletsRepository.SetWalletTariffAsync(walletId, tariffId);
             // Смена тарифа: текущий период не переносим — пробуем списать новый сразу.
+            // Выбранный тариф сохраняется даже если списания не хватило денег (тогда действует free default).
             await _walletsRepository.ClearNextChargeAtAsync(walletId);
             var charged = await _walletsRepository.ChargeByTariffAsync(walletId);
 
@@ -278,7 +293,9 @@ namespace EList.Services.Impl
             if (!charged && tariff.Cost > 0)
             {
                 var pending = CommandResult.OK;
-                pending.Message = "Тариф выбран. Для активации периода пополните баланс до суммы тарифа.";
+                pending.Message =
+                    "Тариф выбран, но период не активен: недостаточно средств. " +
+                    "Действует бесплатный тариф по умолчанию. Пополните баланс — выбранный тариф активируется автоматически.";
                 return pending;
             }
             return CommandResult.OK;
@@ -292,7 +309,7 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var result = await _walletsRepository.GetWalletAsync(walletId);
+            var result = await LoadWalletWithBillingAsync(walletId);
             if (result == null)
                 return CommandResult<Wallet?>.Fail(ErrorCode.WalletNotFound, $"Кошелёк с id='{walletId}' не найден");
 
@@ -312,12 +329,14 @@ namespace EList.Services.Impl
             if (account == null)
                 return CommandResult<Wallet?>.Fail(ErrorCode.AccountNotFound, $"Аккаунт с id='{accountId}' не найден");
 
-            var result = await _walletsRepository.GetAccountWalletAsync(accountId);
-            if (result == null)
+            var wallet = await _walletsRepository.GetAccountWalletAsync(accountId);
+            if (wallet == null)
                 return CommandResult<Wallet?>.Fail(ErrorCode.WalletNotFound, $"Кошелёк для аккаунта с id='{accountId}' не найден");
 
             if (accountId != _accountDataHolder.AccountId)
                 return CommandResult<Wallet?>.Fail(ErrorCode.AccessError, $"Это чужой кошелёк, нечего сюда смотреть");
+
+            var result = await LoadWalletWithBillingAsync(wallet.Id);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Wallet?>(result);
@@ -340,9 +359,11 @@ namespace EList.Services.Impl
                 || !await _organizationsRepository.IsOwnerOrManagerAsync(organizationId, _accountDataHolder.AccountId.Value))
                 return CommandResult<Wallet?>.Fail(ErrorCode.AccessError, "Действие доступно только владельцу или менеджеру организации");
 
-            var result = await _walletsRepository.GetOrganizationWalletAsync(organizationId);
-            if (result == null)
+            var wallet = await _walletsRepository.GetOrganizationWalletAsync(organizationId);
+            if (wallet == null)
                 return CommandResult<Wallet?>.Fail(ErrorCode.WalletNotFound, $"Кошелёк для организации с id='{organizationId}' не найден");
+
+            var result = await LoadWalletWithBillingAsync(wallet.Id);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Wallet?>(result);
@@ -659,6 +680,7 @@ namespace EList.Services.Impl
             deposit.Status = WalletDepositStatus.Succeeded;
 
             // Если период истёк / не был активен и денег хватило — списание сразу, период от now.
+            // Выбранный платный тариф снова активируется автоматически.
             await _walletsRepository.ChargeByTariffAsync(deposit.WalletId);
         }
 
@@ -678,6 +700,103 @@ namespace EList.Services.Impl
                 ?? new List<WalletTariffCharge>();
             return new CommandResult<List<WalletTariffChargeResponse>>(
                 list.Select(c => _mapper.Map<WalletTariffChargeResponse>(c)).ToList());
+        }
+
+        /// <summary>
+        /// Назначить free default при отсутствии тарифа, попробовать списание due, обогатить статус.
+        /// </summary>
+        private async Task<Wallet?> LoadWalletWithBillingAsync(Guid walletId)
+        {
+            var wallet = await _walletsRepository.GetWalletAsync(walletId);
+            if (wallet == null)
+                return null;
+
+            var orgId = await _walletsRepository.FindOrganizationIdByWalletAsync(walletId);
+            var forOrganization = orgId != null;
+
+            if (wallet.TariffId == null)
+            {
+                var free = await _walletsRepository.GetDefaultFreeTariffAsync(forOrganization);
+                if (free != null)
+                {
+                    await _walletsRepository.SetWalletTariffAsync(walletId, free.Id);
+                    await _walletsRepository.ChargeByTariffAsync(walletId);
+                }
+            }
+            else
+            {
+                // Повторное списание при просмотре кошелька (даже если DebtCollector ещё не успел).
+                await _walletsRepository.ChargeByTariffAsync(walletId);
+            }
+
+            wallet = await _walletsRepository.GetWalletAsync(walletId);
+            if (wallet == null)
+                return null;
+
+            await EnrichWalletBillingAsync(wallet, forOrganization);
+            return wallet;
+        }
+
+        private async Task EnrichWalletBillingAsync(Wallet wallet, bool forOrganization)
+        {
+            Tariff? selected = null;
+            if (wallet.TariffId != null)
+                selected = await _walletsRepository.GetTariffAsync(wallet.TariffId.Value);
+
+            var free = await _walletsRepository.GetDefaultFreeTariffAsync(forOrganization);
+            var now = DateTimeOffset.UtcNow;
+            var selectedActive = selected != null && (
+                selected.Cost <= 0
+                || (wallet.NextChargeAt != null && wallet.NextChargeAt > now));
+
+            wallet.IsSelectedTariffActive = selectedActive;
+            wallet.EffectiveTariffId = selectedActive
+                ? selected!.Id
+                : free?.Id;
+
+            if (selected == null)
+            {
+                wallet.TariffBillingStatus = free != null
+                    ? $"Действует бесплатный тариф «{free.Name}»"
+                    : "Тариф не назначен";
+                return;
+            }
+
+            if (selected.Cost <= 0)
+            {
+                wallet.TariffBillingStatus = $"Бесплатный тариф «{selected.Name}» активен";
+                return;
+            }
+
+            if (selectedActive)
+            {
+                wallet.TariffBillingStatus =
+                    $"Тариф «{selected.Name}» активен до {wallet.NextChargeAt:dd.MM.yyyy HH:mm} (UTC) · следующее списание";
+                return;
+            }
+
+            var need = selected.Cost;
+            var shortfall = Math.Max(0, need - wallet.Balance);
+            wallet.TariffBillingStatus =
+                $"Выбран тариф «{selected.Name}», но период не активен: недостаточно средств" +
+                (shortfall > 0 ? $" (нужно ещё {shortfall:0.##} ₽)" : "") +
+                ". Действует бесплатный тариф по умолчанию. После пополнения выбранный тариф активируется автоматически.";
+        }
+
+        private async Task<CommandResult> AssertUniqueFreeTariffAsync(
+            bool forOrganization, double cost, Guid? excludeTariffId)
+        {
+            if (cost > 0)
+                return CommandResult.OK;
+
+            var other = await _walletsRepository.FindOtherZeroCostTariffAsync(forOrganization, excludeTariffId);
+            if (other == null)
+                return CommandResult.OK;
+
+            var scope = forOrganization ? "организаций" : "личных аккаунтов";
+            return CommandResult.Fail(
+                ErrorCode.DefaultFreeTariffAlreadyExists,
+                $"В контуре {scope} уже есть бесплатный тариф «{other.Name}». Допустим только один тариф со стоимостью 0.");
         }
 
         private async Task<CommandResult> AssertCanManageWalletAsync(Guid walletId)

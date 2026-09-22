@@ -64,7 +64,7 @@ namespace EList.Services.Impl
             if (string.IsNullOrWhiteSpace(request?.Name))
                 return CommandResult<Guid?>.Fail(ErrorCode.IsNullOrEmpty, "Название организации обязательно");
 
-            var walletId = await _walletsRepository.CreateWalletAsync();
+            var walletId = await _walletsRepository.CreateWalletAsync(forOrganization: true);
 
             var organization = new Organization
             {

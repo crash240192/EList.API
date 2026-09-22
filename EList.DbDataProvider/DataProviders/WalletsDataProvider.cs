@@ -26,6 +26,7 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.Name, item.Name)
                 .Set(i => i.Period, item.Period)
                 .Set(i => i.ValidatorId, item.ValidatorId)
+                .Set(i => i.ForOrganization, item.ForOrganization)
                 .UpdateAsync();
         }
 
@@ -60,6 +61,23 @@ namespace EList.DbDataProvider.DataProviders
                 return tariff;
             }
             return null;
+        }
+
+        public async Task<TariffDto?> GetDefaultFreeTariffAsync(bool forOrganization)
+        {
+            return await _connection.Tariffs
+                .Where(i => i.ForOrganization == forOrganization && i.Cost <= 0)
+                .OrderBy(i => i.Name)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<TariffDto?> FindOtherZeroCostTariffAsync(bool forOrganization, Guid? excludeTariffId)
+        {
+            var query = _connection.Tariffs
+                .Where(i => i.ForOrganization == forOrganization && i.Cost <= 0);
+            if (excludeTariffId != null && excludeTariffId != Guid.Empty)
+                query = query.Where(i => i.Id != excludeTariffId.Value);
+            return await query.FirstOrDefaultAsync();
         }
 
 
@@ -101,17 +119,23 @@ namespace EList.DbDataProvider.DataProviders
         }
 
 
-        public async Task<Guid> CreateWalletAsync()
+        public async Task<Guid> CreateWalletAsync(bool forOrganization = false)
         {
-            var result = (Guid)await _connection.InsertWithIdentityAsync(new WalletDto
+            var free = await GetDefaultFreeTariffAsync(forOrganization);
+            var walletId = (Guid)await _connection.InsertWithIdentityAsync(new WalletDto
             {
                 Balance = 0,
                 LastChargeDate = null,
                 NextChargeAt = null,
-                TariffId = null,
+                TariffId = free?.Id,
                 PaidDate = null
             });
-            return result;
+
+            // Бесплатный default: активируем период сразу (cost=0).
+            if (free != null)
+                await ChargeByTariffAsync(walletId);
+
+            return walletId;
         }
 
         public async Task SetWalletTariffAsync(Guid walletId, Guid tariffId)
@@ -141,6 +165,37 @@ namespace EList.DbDataProvider.DataProviders
             return null;
         }
 
+        public async Task<TariffValidatorDto?> GetEffectiveTariffValidatorForWalletAsync(Guid walletId)
+        {
+            var wallet = await _connection.Wallets.FirstOrDefaultAsync(i => i.Id == walletId);
+            if (wallet == null)
+                return null;
+
+            var orgId = await FindOrganizationIdByWalletAsync(walletId);
+            var forOrganization = orgId != null;
+
+            TariffDto? selected = null;
+            if (wallet.TariffId != null)
+                selected = await _connection.Tariffs.FirstOrDefaultAsync(i => i.Id == wallet.TariffId);
+
+            var now = DateTimeOffset.UtcNow;
+            var selectedActive = selected != null && (
+                selected.Cost <= 0
+                || (wallet.NextChargeAt != null && wallet.NextChargeAt > now));
+
+            Guid? effectiveTariffId = selectedActive
+                ? selected!.Id
+                : (await GetDefaultFreeTariffAsync(forOrganization))?.Id;
+
+            if (effectiveTariffId == null)
+                return null;
+
+            var tariff = await _connection.Tariffs
+                .LoadWith(i => i.TariffValidator)
+                .FirstOrDefaultAsync(i => i.Id == effectiveTariffId.Value);
+            return tariff?.TariffValidator;
+        }
+
         public async Task<TariffValidatorDto?> GetAccountTariffValidatorAsync(Guid accountId)
         {
             var walletId = await _connection.Accounts
@@ -148,15 +203,10 @@ namespace EList.DbDataProvider.DataProviders
                 .Select(i => i.WalletId)
                 .FirstOrDefaultAsync();
 
-            if (walletId != null)
-            {
-                var tariffValidator = await _connection.Wallets
-                    .Where(i => i.Id == walletId)
-                    .Select(i => i.Tariff.TariffValidator)
-                    .FirstOrDefaultAsync();
-                return tariffValidator;
-            }
-            return null;
+            if (walletId == null)
+                return null;
+
+            return await GetEffectiveTariffValidatorForWalletAsync(walletId.Value);
         }
 
         public async Task<TariffValidatorDto?> GetOrganizationTariffValidatorAsync(Guid organizationId)
@@ -166,15 +216,10 @@ namespace EList.DbDataProvider.DataProviders
                 .Select(i => i.WalletId)
                 .FirstOrDefaultAsync();
 
-            if (walletId != null)
-            {
-                var tariffValidator = await _connection.Wallets
-                    .Where(i => i.Id == walletId)
-                    .Select(i => i.Tariff.TariffValidator)
-                    .FirstOrDefaultAsync();
-                return tariffValidator;
-            }
-            return null;
+            if (walletId == null)
+                return null;
+
+            return await GetEffectiveTariffValidatorForWalletAsync(walletId.Value);
         }
 
         public async Task<WalletDto?> GetOrganizationWalletAsync(Guid organizationId)
@@ -191,7 +236,8 @@ namespace EList.DbDataProvider.DataProviders
         public async Task<List<WalletDto>> GetOverdueWalletsAsync()
         {
             var now = DateTimeOffset.UtcNow;
-            // Due: есть тариф и (никогда не активирован ИЛИ срок списания наступил).
+            // Due: выбран платный тариф и (никогда не активирован ИЛИ срок списания наступил).
+            // Бесплатный (cost=0) тоже попадает при протухшем NextChargeAt — Charge спишет 0 и продлит.
             return await _connection.Wallets
                 .Where(i => i.TariffId != null
                     && (i.NextChargeAt == null || i.NextChargeAt <= now))

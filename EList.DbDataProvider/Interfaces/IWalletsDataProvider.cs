@@ -11,16 +11,22 @@ namespace EList.DbDataProvider.Interfaces
         Task<TariffDto?> GetTariffAsync(Guid tariffId);
         Task<List<TariffDto>?> GetTariffsAsync(bool? forOrganization = null);
         Task<TariffDto?> GetWalletTariffAsync(Guid walletId);
+        /// <summary>Бесплатный тариф контура (cost=0). Не больше одного на forOrganization.</summary>
+        Task<TariffDto?> GetDefaultFreeTariffAsync(bool forOrganization);
+        /// <summary>Другой тариф с cost=0 в том же контуре (для валидации уникальности).</summary>
+        Task<TariffDto?> FindOtherZeroCostTariffAsync(bool forOrganization, Guid? excludeTariffId);
 
         Task<TariffValidatorDto?> GetAccountTariffValidatorAsync(Guid accountId);
         Task<TariffValidatorDto?> GetOrganizationTariffValidatorAsync(Guid organizationId);
+        /// <summary>Валидатор effective-тарифа кошелька (выбранный если активен, иначе free default).</summary>
+        Task<TariffValidatorDto?> GetEffectiveTariffValidatorForWalletAsync(Guid walletId);
         Task<Guid> CreateTariffValidatorAsync(TariffValidatorDto item);
         Task UpdateTariffValidatorAsync(TariffValidatorDto item);
         Task<TariffValidatorDto?> GetTariffValidatorAsync(Guid tariffValidatorId);
         Task<TariffValidatorDto?> GetTariffValidatorByTariffIdAsync(Guid tariffId);
 
 
-        Task<Guid> CreateWalletAsync();
+        Task<Guid> CreateWalletAsync(bool forOrganization = false);
         Task SetWalletTariffAsync(Guid walletId, Guid tariffId);
 
         Task<WalletDto?> GetWalletAsync(Guid walletId);
