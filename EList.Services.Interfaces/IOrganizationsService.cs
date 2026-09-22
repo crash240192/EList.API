@@ -23,6 +23,13 @@ namespace EList.Services.Interfaces
         Task<CommandResult> UpsertPayoutAsync(Guid organizationId, OrganizationPayoutRequest request);
         Task<CommandResult<OrganizationPayoutResponse?>> GetPayoutAsync(Guid organizationId);
 
+        /// <summary>
+        /// Запустить онбординг организации в платёжной системе (ЮKassa / stub через ISellerOnboardingProvider).
+        /// </summary>
+        Task<CommandResult<OrganizationProviderOnboardingResponse?>> StartProviderOnboardingAsync(
+            Guid organizationId,
+            OrganizationProviderOnboardingRequest? request);
+
         Task<CommandResult> SubmitVerificationAsync(Guid organizationId);
         Task<CommandResult> SetCanSellTicketsAsync(Guid organizationId, bool canSellTickets);
 

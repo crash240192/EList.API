@@ -25,6 +25,7 @@ namespace EList.Services.Impl
         private readonly IWalletsRepository _walletsRepository;
         private readonly IAgreementRepository _agreementRepository;
         private readonly IOrganizationRegistryClient _organizationRegistryClient;
+        private readonly ISellerOnboardingProvider _sellerOnboardingProvider;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IMapper _mapper;
@@ -35,6 +36,7 @@ namespace EList.Services.Impl
             IWalletsRepository walletsRepository,
             IAgreementRepository agreementRepository,
             IOrganizationRegistryClient organizationRegistryClient,
+            ISellerOnboardingProvider sellerOnboardingProvider,
             IAccountDataHolder accountDataHolder,
             ICorrelationIdProvider correlationIdProvider,
             IMapper mapper,
@@ -45,6 +47,7 @@ namespace EList.Services.Impl
             _walletsRepository = walletsRepository ?? throw new ArgumentNullException(nameof(walletsRepository));
             _agreementRepository = agreementRepository ?? throw new ArgumentNullException(nameof(agreementRepository));
             _organizationRegistryClient = organizationRegistryClient ?? throw new ArgumentNullException(nameof(organizationRegistryClient));
+            _sellerOnboardingProvider = sellerOnboardingProvider ?? throw new ArgumentNullException(nameof(sellerOnboardingProvider));
             _accountDataHolder = accountDataHolder;
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
@@ -473,6 +476,81 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<OrganizationPayoutResponse?>(response);
+        }
+
+        public async Task<CommandResult<OrganizationProviderOnboardingResponse?>> StartProviderOnboardingAsync(
+            Guid organizationId,
+            OrganizationProviderOnboardingRequest? request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(StartProviderOnboardingAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var accessError = await EnsureOwnerAsync(organizationId);
+            if (accessError != null)
+                return CommandResult<OrganizationProviderOnboardingResponse?>.Fail(accessError.ErrorCode, accessError.Message);
+
+            var organization = await _organizationsRepository.GetOrganizationAsync(organizationId);
+            if (organization == null)
+                return CommandResult<OrganizationProviderOnboardingResponse?>.Fail(
+                    ErrorCode.OrganizationNotFound,
+                    $"Организация с id='{organizationId}' не найдена");
+
+            var payout = await _organizationsRepository.GetPayoutAsync(organizationId);
+            if (payout == null
+                || string.IsNullOrWhiteSpace(payout.BankAccount)
+                || string.IsNullOrWhiteSpace(payout.Bik)
+                || string.IsNullOrWhiteSpace(payout.BankName))
+            {
+                return CommandResult<OrganizationProviderOnboardingResponse?>.Fail(
+                    ErrorCode.IsNullOrEmpty,
+                    "Сначала сохраните банковские реквизиты организации");
+            }
+
+            if (payout.OnboardingStatus == ProviderOnboardingStatus.Active
+                && !string.IsNullOrWhiteSpace(payout.ProviderSellerId))
+            {
+                return new CommandResult<OrganizationProviderOnboardingResponse?>(
+                    new OrganizationProviderOnboardingResponse
+                    {
+                        Provider = payout.Provider ?? _sellerOnboardingProvider.Kind,
+                        ProviderSellerId = payout.ProviderSellerId,
+                        OnboardingStatus = ProviderOnboardingStatus.Active,
+                        ConfirmationUrl = null
+                    });
+            }
+
+            var legal = await _organizationsRepository.GetLegalAsync(organizationId);
+            var start = await _sellerOnboardingProvider.StartAsync(new SellerOnboardingRequest
+            {
+                OrganizationId = organizationId,
+                Inn = legal?.Inn,
+                Ogrn = legal?.Ogrn,
+                LegalName = organization.Name,
+                LegalAddress = legal?.LegalAddress,
+                HeadName = legal?.HeadName,
+                BankAccount = payout.BankAccount,
+                Bik = payout.Bik,
+                BankName = payout.BankName,
+                ReturnUrl = request?.ReturnUrl
+            });
+
+            await _organizationsRepository.SetProviderOnboardingAsync(
+                organizationId,
+                _sellerOnboardingProvider.Kind,
+                start.ProviderSellerId,
+                start.Status);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<OrganizationProviderOnboardingResponse?>(
+                new OrganizationProviderOnboardingResponse
+                {
+                    Provider = _sellerOnboardingProvider.Kind,
+                    ProviderSellerId = start.ProviderSellerId,
+                    OnboardingStatus = start.Status,
+                    ConfirmationUrl = start.ConfirmationUrl
+                });
         }
 
         public async Task<CommandResult> SubmitVerificationAsync(Guid organizationId)

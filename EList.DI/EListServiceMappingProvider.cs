@@ -84,6 +84,8 @@ namespace EList.DI
             mapper.AddSingleton<NotificationFloodGate>();
             // Платежи: сейчас stub; реальная ЮKassa — заменить реализацию IPaymentProvider.
             mapper.AddSingleton<IPaymentProvider, YooKassaStubPaymentProvider>();
+            // Онбординг продавца (организации) в ЮKassa: сейчас stub; реальная — смена ISellerOnboardingProvider.
+            mapper.AddSingleton<ISellerOnboardingProvider, YooKassaStubSellerOnboardingProvider>();
 
             //Repositories
             mapper.AddScoped<IAgreementRepository, AgreementRepository>();

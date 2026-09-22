@@ -465,6 +465,38 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Запустить онбординг организации в платёжной системе (ЮKassa / stub)
+        /// </summary>
+        [HttpPost("payout/{organizationId}/provider-onboarding/start")]
+        public async Task<CommandResult<OrganizationProviderOnboardingResponse?>> StartProviderOnboardingAsync(
+            Guid organizationId,
+            [FromBody] OrganizationProviderOnboardingRequest? request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(StartProviderOnboardingAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _organizationsService.StartProviderOnboardingAsync(organizationId, request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Поиск реквизитов организации/ИП по ИНН (автозаполнение формы)
         /// </summary>
         [HttpGet("lookup/inn/{inn}")]
