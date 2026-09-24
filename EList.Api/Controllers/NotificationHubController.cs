@@ -158,6 +158,33 @@ namespace EList.Api.Controllers
             return result;
         }
 
+        /// <summary>
+        /// Какие из переданных аккаунтов сейчас онлайн (есть открытый notifications WebSocket)
+        /// </summary>
+        [HttpGet("online")]
+        public CommandResult<OnlineAccountsResponse> GetOnlineAccounts([FromQuery] string? ids = null)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(GetOnlineAccounts)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var parsed = new List<Guid>();
+            if (!string.IsNullOrWhiteSpace(ids))
+            {
+                foreach (var part in ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    if (Guid.TryParse(part, out var id))
+                        parsed.Add(id);
+                }
+            }
+
+            var result = _notificationService.GetOnlineAccounts(parsed);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return result;
+        }
+
 
         /// <summary>
         /// История уведомлений текущего пользователя (входящие, включая замечания модерации)

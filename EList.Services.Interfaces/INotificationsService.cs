@@ -12,6 +12,11 @@ namespace EList.Services.Interfaces
         Task<CommandResult> AddConnectionAsync(WebSocket socket);
         CommandResult<ConnectionStats> GetConnectionStats();
 
+        /// <summary>
+        /// Какие из переданных accountId сейчас онлайн (есть открытый notifications WS).
+        /// </summary>
+        CommandResult<OnlineAccountsResponse> GetOnlineAccounts(IEnumerable<Guid> accountIds);
+
         Task<CommandResult> HandleNewNotificationAsync(Notification notification);
         Task<CommandResult> SendToUserAsync(Guid accountId, Notification notification);
         Task<CommandResult> BroadcastAsync(Notification request);

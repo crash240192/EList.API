@@ -80,5 +80,30 @@ namespace EList.Services.Impl
         /// Общее количество активных соединений
         /// </summary>
         public int TotalConnectionsCount => _connections.Values.Sum(d => d.Count);
+
+        /// <summary>
+        /// Есть ли хотя бы одно открытое WebSocket-соединение у аккаунта
+        /// </summary>
+        public bool IsOnline(Guid accountId)
+        {
+            return GetConnections(accountId).Any();
+        }
+
+        /// <summary>
+        /// Из переданных id вернуть тех, кто сейчас онлайн (есть открытый WS)
+        /// </summary>
+        public List<Guid> FilterOnline(IEnumerable<Guid> accountIds)
+        {
+            if (accountIds == null)
+                return new List<Guid>();
+
+            var result = new List<Guid>();
+            foreach (var id in accountIds.Distinct())
+            {
+                if (IsOnline(id))
+                    result.Add(id);
+            }
+            return result;
+        }
     }
 }

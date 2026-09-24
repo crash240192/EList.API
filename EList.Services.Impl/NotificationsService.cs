@@ -135,6 +135,29 @@ namespace EList.Services.Impl
             return result;
         }
 
+        public CommandResult<OnlineAccountsResponse> GetOnlineAccounts(IEnumerable<Guid> accountIds)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetOnlineAccounts)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var ids = (accountIds ?? Enumerable.Empty<Guid>())
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .Take(100)
+                .ToList();
+
+            var online = _connectionManager.FilterOnline(ids);
+            var result = new CommandResult<OnlineAccountsResponse>(new OnlineAccountsResponse
+            {
+                OnlineAccountIds = online
+            });
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return result;
+        }
+
 
         /// <summary>
         /// Обработчик уведомления (сохранение в базу и отправка пользователю)
