@@ -37,8 +37,8 @@ builder.Services.AddSwaggerGen(c =>
         c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
         {
             Version = "v1",
-            Title = "EList API",
-            Description = "EList API"
+            Title = "Твой Спот API",
+            Description = "Твой Спот (tvoy-spot.ru) API"
         });
 
         // Assembly XML is EList.Api.xml (not EList.API.xml). Missing file used to 500 swagger.json on Linux.
@@ -82,7 +82,7 @@ var pathBase = ConfigurationManager.AppSettings["pathBase"] ?? string.Empty;
 app.UsePathBase(pathBase);
 app.UseSwagger(c => { c.SerializeAsV2 = true; });
 // Relative URL so Swagger UI works behind pathBase / reverse proxy without double-prefixing.
-app.UseSwaggerUI(c => { c.SwaggerEndpoint("v1/swagger.json", "EList API v1"); });
+app.UseSwaggerUI(c => { c.SwaggerEndpoint("v1/swagger.json", "Твой Спот API v1"); });
 app.UseHttpsRedirection();
 app.UseWebSockets(new WebSocketOptions
 {

@@ -98,7 +98,7 @@ namespace EList.Services.Impl
                 {
                     IsBodyHtml = true,
                     MessageBody = messageBody,
-                    MessageSubject = notification.Header ?? "EList",
+                    MessageSubject = notification.Header ?? "Твой Спот",
                     RecipientEmail = contact.Value
                 });
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
