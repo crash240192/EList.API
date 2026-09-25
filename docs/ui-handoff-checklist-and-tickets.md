@@ -61,6 +61,12 @@ Whitelist при re-consent (запросы не блокируются): `/api/
 | `CommentLiked` / `CommentLikedDigest` | лайк комментария (first-K + digest) |
 | `NewMessage` | **больше не шлётся** (broadcast отключён до адресации сообщений) |
 
+Дедуп (не слать два пуша за одно действие одному получателю):
+
+- **Accept приглашения:** inviter/organizers получают только `InvitationAccepted`; `Participated` / digest — остальным подписчикам актёра (без overlap).
+- **Добавление в BL / BanFromEvent:** только `AddedToBlackList` (без параллельного `RemovedFromEvent`).
+- **Закрытие WL:** `RemovedFromEvent` участникам и `NotInWhiteList` только приглашённым без участия (уже было разделено).
+
 Правила antiflood (сервер, `appsettings.notificationFlood`):
 
 - рейтинги / join-leave для организаторов: first-K + digest;
