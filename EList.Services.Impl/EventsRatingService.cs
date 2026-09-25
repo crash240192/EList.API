@@ -6,7 +6,7 @@ using EList.Models.Enums;
 using EList.Models.EventsRating;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
-using NetTopologySuite.Index.HPRtree;
+using EList.Validators.Interfaces;
 using NLog;
 using System.Diagnostics;
 
@@ -20,6 +20,7 @@ namespace EList.Services.Impl
         private readonly IEventsRepository _eventsRepository;
         private readonly INotificationsService _notificationsService;
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
+        private readonly IEventAccessValidator _eventAccessValidator;
 
         #region logger
         private static readonly ILogger log = LogManager.GetCurrentClassLogger();
@@ -33,7 +34,8 @@ namespace EList.Services.Impl
             IEventsRepository eventsRepository,
             IAccountDataHolder accountDataHolder,
             INotificationsService notificationsService,
-            IEventOrganizatorsRepository eventOrganizatorsRepository)
+            IEventOrganizatorsRepository eventOrganizatorsRepository,
+            IEventAccessValidator eventAccessValidator)
         {
             _correlationIdProvider = correlationIdProvider;
             _eventsRatingRepository = eventsRatingRepository;
@@ -41,6 +43,7 @@ namespace EList.Services.Impl
             _eventsRepository = eventsRepository;
             _notificationsService = notificationsService;
             _eventOrganizatorsRepository = eventOrganizatorsRepository;
+            _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
         }   
 
         public async Task<CommandResult<EventRating>> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize)
@@ -49,6 +52,11 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(GetEventRatingAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var accessError = await _eventAccessValidator.AssertCanViewEventAsync(
+                eventId, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
+            if (!accessError.Success)
+                return CommandResult<EventRating>.Fail(accessError.ErrorCode, accessError.Message);
 
             var eventRating = await _eventsRatingRepository.GetEventRatingAcync(eventId, eventRatingType, pageIndex, pageSize);
 

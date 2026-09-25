@@ -398,6 +398,11 @@ namespace EList.Services.Impl
             if (eventItem == null)
                 return CommandResult<EventParameters?>.Fail(ErrorCode.EventParametersNotFound, $"Событие с id='{eventId}' не найдено");
 
+            var accessError = await _eventAccessValidator.AssertCanViewEventAsync(
+                eventItem, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
+            if (!accessError.Success)
+                return CommandResult<EventParameters?>.Fail(accessError.ErrorCode, accessError.Message);
+
             var result = await _eventsMetadataRepository.GetEventParametersByEventIdAsync(eventId);
             if (result == null)
                 return CommandResult<EventParameters?>.Fail(ErrorCode.EventParametersNotFound, $"Параметры для события id='{eventId}' не найдены");

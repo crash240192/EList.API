@@ -14,19 +14,26 @@ namespace EList.DbDataProvider.DataProviders
 
 
         #region anonymous agreements
-        public async Task<AnonymousAgeAgreementDto> GetAnonymousAgeAgreementAsync(string jwt)
+        /// <summary>Default TTL if <c>agreements:anonymousAgeTtlHours</c> is missing (must match UI cache).</summary>
+        private const int DefaultAnonymousAgeTtlHours = 24;
+
+        private static int ResolveAnonymousAgeTtlHours()
         {
-            var hours = 1;
             if (EList.Common.Configuration.ConfigurationManager.AppSettings.Contains("agreements:anonymousAgeTtlHours")
                 && int.TryParse(
                     EList.Common.Configuration.ConfigurationManager.AppSettings["agreements:anonymousAgeTtlHours"],
                     out var configuredHours)
                 && configuredHours > 0)
             {
-                hours = configuredHours;
+                return configuredHours;
             }
 
-            var threshold = DateTimeOffset.UtcNow.AddHours(-hours);
+            return DefaultAnonymousAgeTtlHours;
+        }
+
+        public async Task<AnonymousAgeAgreementDto> GetAnonymousAgeAgreementAsync(string jwt)
+        {
+            var threshold = DateTimeOffset.UtcNow.AddHours(-ResolveAnonymousAgeTtlHours());
             var item = await _connection.AnonymousAgeAgreements.FirstOrDefaultAsync(i => i.Jwt == jwt && i.AgreementDate >= threshold);
             return item;
         }
@@ -43,17 +50,7 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<int> PurgeExpiredAnonymousAgeAgreementsAsync()
         {
-            var hours = 24;
-            if (EList.Common.Configuration.ConfigurationManager.AppSettings.Contains("agreements:anonymousAgeTtlHours")
-                && int.TryParse(
-                    EList.Common.Configuration.ConfigurationManager.AppSettings["agreements:anonymousAgeTtlHours"],
-                    out var configuredHours)
-                && configuredHours > 0)
-            {
-                hours = configuredHours;
-            }
-
-            var threshold = DateTimeOffset.UtcNow.AddHours(-hours);
+            var threshold = DateTimeOffset.UtcNow.AddHours(-ResolveAnonymousAgeTtlHours());
             return await _connection.AnonymousAgeAgreements
                 .Where(i => i.AgreementDate < threshold)
                 .DeleteAsync();

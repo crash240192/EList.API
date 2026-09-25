@@ -9,6 +9,7 @@ using EList.Models.Conversations;
 using EList.Models.Enums;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
+using EList.Validators.Interfaces;
 using NLog;
 
 namespace EList.Services.Impl
@@ -34,6 +35,7 @@ namespace EList.Services.Impl
         private readonly IMediaRepository _mediaRepository;
         private readonly IFilestorageClient _filestorageClient;
         private readonly IMediaService _mediaService;
+        private readonly IEventAccessValidator _eventAccessValidator;
 
         public ConversationService(ICorrelationIdProvider correlationIdProvider,
             IConversationRepository conversationsRepository,
@@ -44,7 +46,8 @@ namespace EList.Services.Impl
             IModerationPenaltiesService moderationPenaltiesService,
             IMediaRepository mediaRepository,
             IFilestorageClient filestorageClient,
-            IMediaService mediaService)
+            IMediaService mediaService,
+            IEventAccessValidator eventAccessValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _conversationsRepository = conversationsRepository ?? throw new ArgumentNullException(nameof(conversationsRepository));
@@ -56,6 +59,7 @@ namespace EList.Services.Impl
             _mediaRepository = mediaRepository ?? throw new ArgumentNullException(nameof(mediaRepository));
             _filestorageClient = filestorageClient ?? throw new ArgumentNullException(nameof(filestorageClient));
             _mediaService = mediaService ?? throw new ArgumentNullException(nameof(mediaService));
+            _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
         }
 
         public async Task<CommandResult<Guid>> CreateConversationAsync(ConversationRequest conversation)
@@ -207,7 +211,8 @@ namespace EList.Services.Impl
             var visible = new List<Conversation>();
             foreach (var conversation in result)
             {
-                if (await CanViewConversationAsync(conversation))
+                var access = await AssertCanViewConversationAsync(conversation);
+                if (access.Success)
                     visible.Add(conversation);
             }
 
@@ -227,8 +232,9 @@ namespace EList.Services.Impl
             if (result == null)
                 return new CommandResult<Conversation?>(null);
 
-            if (!await CanViewConversationAsync(result))
-                return CommandResult<Conversation?>.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия");
+            var access = await AssertCanViewConversationAsync(result);
+            if (!access.Success)
+                return CommandResult<Conversation?>.Fail(access.ErrorCode, access.Message);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Conversation?>(result);
@@ -246,8 +252,9 @@ namespace EList.Services.Impl
             if (conversation == null)
                 return CommandResult<PagedList<Message>>.Fail(ErrorCode.IsNullOrEmpty, "Диалог не найден");
 
-            if (!await CanViewConversationAsync(conversation))
-                return CommandResult<PagedList<Message>>.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия");
+            var access = await AssertCanViewConversationAsync(conversation);
+            if (!access.Success)
+                return CommandResult<PagedList<Message>>.Fail(access.ErrorCode, access.Message);
 
             var result = await _conversationsRepository.GetConversationMessagesAsync(conversationId, pageIndex, pageSize);
             await _conversationsRepository.ApplyMessageVoteStatsAsync(result.Result, _accountDataHolder.AccountId);
@@ -268,8 +275,9 @@ namespace EList.Services.Impl
             if (conversation == null)
                 return CommandResult<PagedList<Message>>.Fail(ErrorCode.IsNullOrEmpty, "Диалог не найден");
 
-            if (!await CanViewConversationAsync(conversation))
-                return CommandResult<PagedList<Message>>.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия");
+            var access = await AssertCanViewConversationAsync(conversation);
+            if (!access.Success)
+                return CommandResult<PagedList<Message>>.Fail(access.ErrorCode, access.Message);
 
             var result = await _conversationsRepository.GetConversationRootMessagesAsync(conversationId, pageIndex, pageSize);
             await _conversationsRepository.ApplyMessageVoteStatsAsync(result.Result, _accountDataHolder.AccountId);
@@ -285,6 +293,11 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(GetEventConversations)}";
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventAccess = await _eventAccessValidator.AssertCanViewEventAsync(
+                eventId, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
+            if (!eventAccess.Success)
+                return CommandResult<List<Conversation>>.Fail(eventAccess.ErrorCode, eventAccess.Message);
 
             var result = await _conversationsRepository.GetEventConversations(eventId);
             var isAdmin = await IsEventAdminAsync(eventId);
@@ -311,8 +324,12 @@ namespace EList.Services.Impl
                 return CommandResult<PagedList<Message>>.Fail(ErrorCode.MessageNotFound, "Сообщение не найдено");
 
             var conversation = await _conversationsRepository.GetConversationAsync(message.ConversationId);
-            if (conversation != null && !await CanViewConversationAsync(conversation))
-                return CommandResult<PagedList<Message>>.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия");
+            if (conversation != null)
+            {
+                var access = await AssertCanViewConversationAsync(conversation);
+                if (!access.Success)
+                    return CommandResult<PagedList<Message>>.Fail(access.ErrorCode, access.Message);
+            }
 
             var result = await _conversationsRepository.GetMessageRepliesAsync(messageId, pageIndex, pageSize);
             await _conversationsRepository.ApplyMessageVoteStatsAsync(result.Result, _accountDataHolder.AccountId);
@@ -340,8 +357,12 @@ namespace EList.Services.Impl
                 return CommandResult<MessageLocation>.Fail(ErrorCode.MessageNotFound, "Сообщение не найдено");
 
             var conversation = await _conversationsRepository.GetConversationAsync(location.ConversationId);
-            if (conversation != null && !await CanViewConversationAsync(conversation))
-                return CommandResult<MessageLocation>.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия");
+            if (conversation != null)
+            {
+                var access = await AssertCanViewConversationAsync(conversation);
+                if (!access.Success)
+                    return CommandResult<MessageLocation>.Fail(access.ErrorCode, access.Message);
+            }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<MessageLocation>(location);
@@ -647,8 +668,9 @@ namespace EList.Services.Impl
             if (conversation.EventId == null)
                 return (CommandResult.Fail(ErrorCode.AccessError, "Лайки и дизлайки доступны только для комментариев на страницах мероприятий"), null, null);
 
-            if (!await CanViewConversationAsync(conversation))
-                return (CommandResult.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия"), null, null);
+            var access = await AssertCanViewConversationAsync(conversation);
+            if (!access.Success)
+                return (access, null, null);
 
             var statsMessages = new List<Message> { message };
             await _conversationsRepository.ApplyMessageVoteStatsAsync(statsMessages, _accountDataHolder.AccountId);
@@ -672,15 +694,31 @@ namespace EList.Services.Impl
             return await _participationsRepository.IsUserParticipatedAsync(_accountDataHolder.AccountId.Value, eventId);
         }
 
-        private async Task<bool> CanViewConversationAsync(Conversation conversation)
+        /// <summary>
+        /// Доступ к диалогу: сначала ACL мероприятия (private / 18+ / ЧС), затем participantsOnlyVisible.
+        /// </summary>
+        private async Task<CommandResult> AssertCanViewConversationAsync(Conversation conversation)
         {
+            if (conversation.EventId != null)
+            {
+                var eventAccess = await _eventAccessValidator.AssertCanViewEventAsync(
+                    conversation.EventId.Value,
+                    _accountDataHolder.AccountId,
+                    _accountDataHolder.AdultConfirmed);
+                if (!eventAccess.Success)
+                    return eventAccess;
+            }
+
             if (conversation.EventId == null || !conversation.ParticipantsOnlyVisible)
-                return true;
+                return CommandResult.OK;
 
             if (await IsEventAdminAsync(conversation.EventId.Value))
-                return true;
+                return CommandResult.OK;
 
-            return await IsEventParticipantAsync(conversation.EventId.Value);
+            if (await IsEventParticipantAsync(conversation.EventId.Value))
+                return CommandResult.OK;
+
+            return CommandResult.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия");
         }
 
         private async Task<CommandResult?> EnsureCanWriteAsync(Conversation conversation)
@@ -688,16 +726,13 @@ namespace EList.Services.Impl
             if (conversation.EventId == null)
                 return null;
 
+            var viewAccess = await AssertCanViewConversationAsync(conversation);
+            if (!viewAccess.Success)
+                return viewAccess;
+
             var isAdmin = await IsEventAdminAsync(conversation.EventId.Value);
             if (isAdmin)
                 return null;
-
-            if (conversation.ParticipantsOnlyVisible)
-            {
-                var isParticipant = await IsEventParticipantAsync(conversation.EventId.Value);
-                if (!isParticipant)
-                    return CommandResult.Fail(ErrorCode.AccessError, "Диалог доступен только участникам мероприятия");
-            }
 
             if (conversation.ParticipantsReadonly)
                 return CommandResult.Fail(ErrorCode.AccessError, "Участники могут только читать сообщения в этом диалоге");
