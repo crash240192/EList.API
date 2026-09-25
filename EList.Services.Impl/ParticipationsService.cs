@@ -286,7 +286,6 @@ namespace EList.Services.Impl
                 .ToHashSet();
 
             var notifyBw = request.AccountIds.Where(relatedAccounts.Contains).Distinct().ToList();
-            var kickedParticipants = request.AccountIds.Intersect(existingParticipants).Distinct().ToList();
 
             await _invitationsRepository.DeleteInvitationAsync(request.EventId, request.AccountIds);
             await _participationRepository.DropParticipationsAsync(request.EventId, request.AccountIds);
