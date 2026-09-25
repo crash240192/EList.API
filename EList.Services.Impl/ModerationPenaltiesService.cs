@@ -171,10 +171,9 @@ namespace EList.Services.Impl
                         await _invitationsRepository.DeleteInvitationAsync(penalty.EventId.Value, accountIds);
                         await _participationsRepository.DropParticipationsAsync(penalty.EventId.Value, accountIds);
 
+                        // BL уже подразумевает исключение из участников — без дубля RemovedFromEvent.
                         if (wasParticipant || wasInvited)
                             await _notificationsService.NotifyAddedToBlackListAsync(penalty.EventId.Value, accountIds);
-                        if (wasParticipant)
-                            await _notificationsService.NotifyRemovedFromEventAsync(penalty.EventId.Value, accountIds);
                     }
                     break;
             }

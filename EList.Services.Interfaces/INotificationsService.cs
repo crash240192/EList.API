@@ -33,6 +33,10 @@ namespace EList.Services.Interfaces
         Task<CommandResult> NotifyEventCancelledAsync(Guid eventId);
 
         Task<CommandResult> NotifyUsersInvitedAsync(Guid eventId, List<Guid> subscribers);
+        /// <summary>
+        /// Принятие приглашения: InvitationAccepted inviter/organizers.
+        /// Участие (Participated) — только сторонним подписчикам актёра; получатели InvitationAccepted исключаются.
+        /// </summary>
         Task<CommandResult> NotifyInvitationAcceptedAsync(Guid eventId, Guid invitedAccountId, Guid? inviterAccountId);
         Task<CommandResult> NotifyInvitationDeclinedAsync(Guid eventId, Guid invitedAccountId, Guid? inviterAccountId);
         Task<CommandResult> NotifyInvitationCancelledAsync(Guid eventId, Guid invitedAccountId);
@@ -40,6 +44,13 @@ namespace EList.Services.Interfaces
         Task<CommandResult> NotifyParticipatedAsync(Guid eventId);
         /// <summary>Участие от имени конкретного аккаунта (например после оплаты по webhook без user-сессии).</summary>
         Task<CommandResult> NotifyParticipatedAsync(Guid eventId, Guid actorAccountId);
+        /// <summary>
+        /// Участие с исключением получателей (например уже получивших InvitationAccepted).
+        /// </summary>
+        Task<CommandResult> NotifyParticipatedAsync(
+            Guid eventId,
+            Guid actorAccountId,
+            IEnumerable<Guid>? excludeAccountIds);
         Task<CommandResult> NotifyEventLeftAsync(Guid eventId);
         Task<CommandResult> NotifyRemovedFromEventAsync(Guid eventId, List<Guid> accountIds);
 

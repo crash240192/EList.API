@@ -487,6 +487,10 @@ namespace EList.Services.Impl
 
             await PersistAndSendAsync(notifications);
 
+            // Не дублируем «принял участие» тем же inviter/organizers — InvitationAccepted уже про join.
+            // Сторонним подписчикам актёра Participated всё ещё нужен.
+            await NotifyParticipatedAsync(eventId, invitedAccountId, recipients);
+
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
@@ -548,10 +552,18 @@ namespace EList.Services.Impl
             if (_accountDataHolder.AccountId == null)
                 return Task.FromResult(CommandResult.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован"));
 
-            return NotifyParticipatedAsync(eventId, _accountDataHolder.AccountId.Value);
+            return NotifyParticipatedAsync(eventId, _accountDataHolder.AccountId.Value, excludeAccountIds: null);
         }
 
-        public async Task<CommandResult> NotifyParticipatedAsync(Guid eventId, Guid actorAccountId)
+        public Task<CommandResult> NotifyParticipatedAsync(Guid eventId, Guid actorAccountId)
+        {
+            return NotifyParticipatedAsync(eventId, actorAccountId, excludeAccountIds: null);
+        }
+
+        public async Task<CommandResult> NotifyParticipatedAsync(
+            Guid eventId,
+            Guid actorAccountId,
+            IEnumerable<Guid>? excludeAccountIds)
         {
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(NotifyParticipatedAsync)}";
@@ -561,6 +573,16 @@ namespace EList.Services.Impl
             var eventData = await _eventsRepository.GetEventAsync(eventId);
             var actorName = await ResolveActorDisplayNameAsync(actorAccountId);
             var (subscriberIds, organizatorIds) = await GetParticipationAudienceSplitAsync(eventId, actorAccountId);
+
+            if (excludeAccountIds != null)
+            {
+                var exclude = excludeAccountIds as HashSet<Guid> ?? excludeAccountIds.ToHashSet();
+                if (exclude.Count > 0)
+                {
+                    subscriberIds = subscriberIds.Where(id => !exclude.Contains(id)).ToList();
+                    organizatorIds = organizatorIds.Where(id => !exclude.Contains(id)).ToList();
+                }
+            }
 
             var notifications = new List<Notification>();
             foreach (var accountId in subscriberIds)

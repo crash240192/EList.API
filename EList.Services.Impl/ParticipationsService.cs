@@ -291,8 +291,8 @@ namespace EList.Services.Impl
             await _invitationsRepository.DeleteInvitationAsync(request.EventId, request.AccountIds);
             await _participationRepository.DropParticipationsAsync(request.EventId, request.AccountIds);
 
+            // AddedToBlackList уже подразумевает исключение из участников — без дубля RemovedFromEvent.
             await _notificationsService.NotifyAddedToBlackListAsync(request.EventId, notifyBw);
-            await _notificationsService.NotifyRemovedFromEventAsync(request.EventId, kickedParticipants);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

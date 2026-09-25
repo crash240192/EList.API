@@ -191,11 +191,11 @@ namespace EList.Services.Impl
 
             await _invitationsRepository.DeleteInvitationAsync(invitationId);
 
+            // InvitationAccepted + Participated (без дубля inviter/organizers) — внутри NotifyInvitationAcceptedAsync.
             await _notificationsService.NotifyInvitationAcceptedAsync(
                 invitation.EventId,
                 invitation.InvitedAccountId,
                 invitation.InviterAccountId);
-            await _notificationsService.NotifyParticipatedAsync(invitation.EventId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
