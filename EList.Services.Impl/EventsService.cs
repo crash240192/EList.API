@@ -702,6 +702,8 @@ namespace EList.Services.Impl
             if (!isPrivate)
                 await _notificationsService.NotifyEventCreatedAsync(eventId, subscribersList);
 
+            await EnsureEventCoverPublicAsync(request.Event?.CoverImageId);
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(eventId);
         }
@@ -726,6 +728,9 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
 
             await _eventsRepository.UpdateEventAsync(eventId, request);
+
+            // Обложка через update тоже должна быть Public (иначе гости ловят 401 на download)
+            await EnsureEventCoverPublicAsync(request.CoverImageId);
 
             if (ShouldNotifyEventUpdated(eventItem, request))
                 await _notificationsService.NotifyEventUpdatedAsync(eventId);
@@ -776,23 +781,33 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AccessError, $"Указанный пользователь не является организатором события с id='{eventId}' ");
 
             await _eventsRepository.SetEventCoverImageAsync(eventId, imageId);
-
-            if (imageId != null && imageId != Guid.Empty)
-            {
-                try
-                {
-                    await _filestorageClient.SetFilesVisibilityAsync(
-                        new List<Guid> { imageId.Value }, FileVisibility.Public);
-                }
-                catch (Exception ex)
-                {
-                    logger.Warn(correlationId, null, methodName,
-                        $"Не удалось выставить Public visibility для обложки {imageId}: {ex.Message}");
-                }
-            }
+            await EnsureEventCoverPublicAsync(imageId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(eventId);
+        }
+
+        /// <summary>
+        /// Обложка публичного просмотра события — всегда Public в filestorage
+        /// (гости после age-agree иначе получают 401 на download).
+        /// </summary>
+        private async Task EnsureEventCoverPublicAsync(Guid? imageId)
+        {
+            if (imageId == null || imageId == Guid.Empty)
+                return;
+
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(EnsureEventCoverPublicAsync)}";
+            try
+            {
+                await _filestorageClient.SetFilesVisibilityAsync(
+                    new List<Guid> { imageId.Value }, FileVisibility.Public);
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(correlationId, null, methodName,
+                    $"Не удалось выставить Public visibility для обложки {imageId}: {ex.Message}");
+            }
         }
 
         public async Task<CommandResult<Event>> GetEventAsync(Guid eventId)

@@ -34,6 +34,7 @@ namespace EList.Api.Infrastructure
             "/api/conversations/get/*",
             "/api/conversations/byevent/*",
             "/api/conversations/messages/byconversationid/*",
+            "/api/conversations/messages/roots/byconversationid/*",
             "/api/conversations/messages/replies/*",
 
             "/api/eventorganizators/getbyeventid/*",
@@ -90,10 +91,22 @@ namespace EList.Api.Infrastructure
             get
             {
                 var path = Request.Path.Value?.ToLowerInvariant() ?? string.Empty;
-                return AnonymousMethods.Contains(path)
+                if (AnonymousMethods.Contains(path)
                     || AnonymousMethods
                         .Where(i => i.EndsWith('*'))
-                        .Any(i => path.Contains(i[..^1], StringComparison.Ordinal));
+                        .Any(i => path.Contains(i[..^1], StringComparison.Ordinal)))
+                {
+                    return true;
+                }
+
+                // Deep-link: GET /api/conversations/messages/{id}/location
+                if (path.StartsWith("/api/conversations/messages/", StringComparison.Ordinal)
+                    && path.EndsWith("/location", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                return false;
             }
         }
 
