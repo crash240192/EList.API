@@ -48,11 +48,8 @@ namespace EList.Validators.Impl
             if (!contactType.Active)
                 return CommandResult.Fail(ErrorCode.InvalidValue, $"Тип контакта \"{contactType.Name}\" отключён");
 
-            var isAuthorizationContact = request.IsAuthorizationContact
-                || (existingContact?.IsAuthorizationContact ?? false);
-
-            if (isAuthorizationContact && request.Show)
-                return CommandResult.Fail(ErrorCode.InvalidValue, "Контакт для авторизации нельзя показывать другим пользователям");
+            // Видимость (Show) — на усмотрение владельца (галочка «Показывать» / «скрыть»).
+            // Контакт авторизации не выделяем отдельным запретом на публичность.
 
             if (request.IsAuthorizationContact)
             {
