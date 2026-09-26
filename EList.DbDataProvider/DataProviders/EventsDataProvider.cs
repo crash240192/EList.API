@@ -73,7 +73,6 @@ namespace EList.DbDataProvider.DataProviders
                 .Where(i => request.StartTime != null ? i.EndTime >= request.StartTime : true)
                 .Where(i => request.EndTime != null ? i.EndTime <= request.EndTime : true)
                 .Where(i => request.Active ? i.Active == true : true)
-                .OrderBy(i => i.StartTime)
                 .AsQueryable();
 
             #region location
@@ -267,11 +266,44 @@ namespace EList.DbDataProvider.DataProviders
             }
             #endregion
 
+            eventsRequest = ApplyEventOrder(eventsRequest, request.OrderBy, request.StartTime, request.EndTime);
+
             var totalCount = await eventsRequest.CountAsync();
 
             var resultList = await eventsRequest.ToPagedQuery(request.PageIndex ?? 0, request.PageSize ?? totalCount).ToListAsync();
 
             return new ListResponse<EventDto>(totalCount, resultList);
+        }
+
+        /// <summary>
+        /// Сортировка поиска мероприятий.
+        /// Прошедшие (только EndTime) по умолчанию — свежие сверху (EndTime DESC),
+        /// иначе — ближайшие сверху (StartTime ASC).
+        /// </summary>
+        private static IQueryable<EventDto> ApplyEventOrder(
+            IQueryable<EventDto> query,
+            string? orderBy,
+            DateTimeOffset? startTime,
+            DateTimeOffset? endTime)
+        {
+            var key = (orderBy ?? string.Empty).Trim().ToLowerInvariant();
+            var desc = key.Contains("desc");
+
+            if (key.Contains("endtime") || key.Contains("end_time"))
+                return desc ? query.OrderByDescending(i => i.EndTime) : query.OrderBy(i => i.EndTime);
+
+            if (key.Contains("starttime") || key.Contains("start_time"))
+                return desc ? query.OrderByDescending(i => i.StartTime) : query.OrderBy(i => i.StartTime);
+
+            // Явный orderBy без имени поля — считаем StartTime
+            if (!string.IsNullOrEmpty(key))
+                return desc ? query.OrderByDescending(i => i.StartTime) : query.OrderBy(i => i.StartTime);
+
+            // Архив прошедших: EndTime задан, StartTime нет → недавно закончившиеся первыми
+            if (endTime != null && startTime == null)
+                return query.OrderByDescending(i => i.EndTime);
+
+            return query.OrderBy(i => i.StartTime);
         }
 
         public async Task CancelEventAsync(Guid eventId, Guid? cancelledByAccountId, string? cancelSource, Guid? cancelReportId)

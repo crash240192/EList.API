@@ -23,5 +23,10 @@ namespace EList.DbDataProvider.Models.SearchRequests
         public bool OnlyWithAlbums { get; set; } = false;
         public int? AgeLimit { get; set; }
         public bool AdultOnly { get; set; } = false;
+        /// <summary>
+        /// Порядок сортировки, например "StartTime", "StartTime DESC", "EndTime DESC".
+        /// Если не задан: для выборки только прошедших (EndTime без StartTime) — EndTime DESC, иначе StartTime ASC.
+        /// </summary>
+        public string OrderBy { get; set; }
     }
 }
