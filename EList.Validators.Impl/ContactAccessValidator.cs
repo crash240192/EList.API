@@ -20,9 +20,7 @@ namespace EList.Validators.Impl
 
         public CommandResult CanViewAccountContact(ContactDataItem contact, Guid? viewerAccountId)
         {
-            if (contact.IsAuthorizationContact && contact.AccountId != viewerAccountId)
-                return CommandResult.Fail(ErrorCode.AccessError, "Контакт для авторизации недоступен для просмотра");
-
+            // Как и у остальных контактов: владелец видит всегда, остальные — только при Show.
             if (contact.AccountId != viewerAccountId && !contact.Show)
                 return CommandResult.Fail(ErrorCode.AccessError, "Контакт недоступен для просмотра");
 
@@ -37,8 +35,7 @@ namespace EList.Validators.Impl
             var isOwner = viewerAccountId == ownerAccountId;
 
             return contacts
-                .Where(contact => isOwner
-                    || (!contact.IsAuthorizationContact && contact.Show))
+                .Where(contact => isOwner || contact.Show)
                 .ToList();
         }
 
