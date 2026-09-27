@@ -42,6 +42,10 @@ namespace EList.Validators.Impl
             if (contactType == null)
                 return CommandResult.Fail(ErrorCode.InvalidValue, "Указан неизвестный тип контакта");
 
+            // Компактный +7999… → канон маски +7 (999) 999-99-99 (если маска телефонная).
+            value = ContactValueNormalizer.CanonicalizeForType(value, contactType);
+            request.Value = value;
+
             if (!IsValueValidForType(value, contactType))
                 return CommandResult.Fail(ErrorCode.InvalidValue, $"Значение контакта не соответствует типу \"{contactType.Name}\"");
 

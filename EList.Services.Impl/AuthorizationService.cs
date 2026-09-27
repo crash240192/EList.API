@@ -9,6 +9,7 @@ using EList.Models.Authorization;
 using EList.Models.Enums;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
+using EList.Models.ContactData;
 using EList.Validators.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Formatters;
@@ -473,27 +474,29 @@ namespace EList.Services.Impl
                 var contactTypes = await _contactsRepository.GetAllContactTypesAsync();
                 foreach (var contactType in contactTypes)
                 {
-                    var regexCheck = Regex.Match(login, contactType.Mask);
-                    if (regexCheck.Success)
+                    if (string.IsNullOrWhiteSpace(contactType.Mask))
+                        continue;
+
+                    // +7999… и +7 (999) … — один канон под маску типа «Телефон»
+                    var candidate = ContactValueNormalizer.CanonicalizeForType(login.Trim(), contactType);
+                    if (!Regex.IsMatch(candidate, contactType.Mask))
+                        continue;
+
+                    var loginContact = await _contactsRepository.GetContactAsync(candidate);
+                    if (loginContact != null && loginContact.AccountId != null && loginContact.IsAuthorizationContact)
                     {
-                        var loginContact = await _contactsRepository.GetContactAsync(login);
-                        if (loginContact != null && loginContact.AccountId != null && loginContact.IsAuthorizationContact)
+                        var accountByContact = await _accountsRepository.GetAccountAsync(loginContact.AccountId.Value);
+                        if (accountByContact != null)
                         {
-                            var accountByContact = await _accountsRepository.GetAccountAsync(loginContact.AccountId.Value);
-                            if (accountByContact != null)
+                            if (passwordHash == null)
                             {
-                                if (passwordHash == null)
-                                {
-                                    account = accountByContact;
-                                    break;
-                                }
-                                else
-                                {
-                                    account = await _accountsRepository.GetAccountAsync(accountByContact.Login, passwordHash);
-                                    if (account != null)
-                                        break;
-                                }
+                                account = accountByContact;
+                                break;
                             }
+
+                            account = await _accountsRepository.GetAccountAsync(accountByContact.Login, passwordHash);
+                            if (account != null)
+                                break;
                         }
                     }
                 }

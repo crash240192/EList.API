@@ -130,17 +130,21 @@ namespace EList.Services.Impl
                 }
             }
 
+            // Один объект: ValidateAsync может нормализовать Value (напр. +7999… → +7 (999) …).
+            var authContact = new ContactRequest
+            {
+                TypeId = request.AuthorizationContactType,
+                Value = request.AuthorizationContactValue,
+                IsAuthorizationContact = true,
+                Show = request.ShowContact
+            };
             var contactValidation = await _contactValidator.ValidateAsync(
-                new ContactRequest
-                {
-                    TypeId = request.AuthorizationContactType,
-                    Value = request.AuthorizationContactValue,
-                    IsAuthorizationContact = true,
-                    Show = request.ShowContact
-                },
+                authContact,
                 allowAuthorizationContact: true);
             if (!contactValidation.Success)
                 return CommandResult<Guid?>.Fail(contactValidation.ErrorCode, contactValidation.Message);
+
+            request.AuthorizationContactValue = authContact.Value;
 
             var existingAccount = await _accountsRepository.GetAccountAsync(request.Login);
             if (existingAccount != null)
@@ -158,13 +162,7 @@ namespace EList.Services.Impl
             _accountDataHolder.Token = tokenId;
             _accountDataHolder.Account = account;
 
-            var contactId = await _contactsRepository.CreateContactAsync(new ContactRequest
-            {
-                IsAuthorizationContact = true,
-                TypeId = request.AuthorizationContactType,
-                Value = request.AuthorizationContactValue,
-                Show = request.ShowContact
-            });
+            var contactId = await _contactsRepository.CreateContactAsync(authContact);
 
             await _contactsRepository.BindAccountAndContactAsync(accountId, contactId);
 
