@@ -842,6 +842,7 @@ namespace EList.Services.Impl
             else
                 eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
 
+            SanitizeEventCost(eventItem.Parameters);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Event>(eventItem);
@@ -853,6 +854,25 @@ namespace EList.Services.Impl
             var ageRatingValues = Enum.GetValues<AgeRating>().Cast<int>().ToList();
             var nextAvailableRatingValue = ageRatingValues.FirstOrDefault(x => x >= value, 18);
             return nextAvailableRatingValue;
+        }
+
+        /// <summary>
+        /// Не даём уйти в ответ Infinity/NaN/астрономическим cost —
+        /// иначе System.Text.Json падает на сериализации и ломает поиск.
+        /// </summary>
+        private static void SanitizeEventCost(EventParameters? parameters)
+        {
+            if (parameters?.Cost is not double cost)
+                return;
+
+            if (double.IsNaN(cost) || double.IsInfinity(cost) || cost < 0)
+            {
+                parameters.Cost = 0;
+                return;
+            }
+
+            if (cost > EventCostLimits.Max)
+                parameters.Cost = EventCostLimits.Max;
         }
 
         //private static bool ValidateAgeAccessToEvent(int? eventAgeLimit, int userAge, bool strongValidation)
@@ -889,6 +909,11 @@ namespace EList.Services.Impl
                 return CommandResult<PagedList<Event>?>.Fail(searchError.ErrorCode, searchError.Message);
 
             var searchResult = await _eventsRepository.SearchEventsAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
+            if (searchResult?.Result != null)
+            {
+                foreach (var item in searchResult.Result)
+                    SanitizeEventCost(item.Parameters);
+            }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<Event>?>(searchResult);

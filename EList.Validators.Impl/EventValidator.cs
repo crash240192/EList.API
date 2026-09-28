@@ -16,6 +16,7 @@ namespace EList.Validators.Impl
         public const int MaxLocationRangeMeters = 500_000;
         public const int MaxGuidListSize = 1000;
         public const int MaxMaxPersonsCount = 1_000_000;
+        public const double MaxEventCost = EventCostLimits.Max;
 
         private static readonly int[] AllowedAgeLimits = Enum.GetValues<AgeRating>().Cast<int>().ToArray();
 
@@ -64,6 +65,17 @@ namespace EList.Validators.Impl
 
             if (parameters.Cost is < 0)
                 return CommandResult.Fail(ErrorCode.InvalidValue, "Стоимость не может быть отрицательной");
+
+            if (parameters.Cost is double cost)
+            {
+                if (double.IsNaN(cost) || double.IsInfinity(cost))
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Некорректная стоимость мероприятия");
+
+                if (cost > MaxEventCost)
+                    return CommandResult.Fail(
+                        ErrorCode.InvalidValue,
+                        $"Стоимость не может превышать {MaxEventCost:N0} ₽");
+            }
 
             if (parameters.MaxPersonsCount is < 0)
                 return CommandResult.Fail(ErrorCode.InvalidValue, "Максимальное число участников не может быть отрицательным");
@@ -159,6 +171,17 @@ namespace EList.Validators.Impl
 
             if (request.Price is < 0)
                 return CommandResult.Fail(ErrorCode.InvalidValue, "Стоимость в поиске не может быть отрицательной");
+
+            if (request.Price is double price)
+            {
+                if (double.IsNaN(price) || double.IsInfinity(price))
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Некорректная стоимость в параметрах поиска");
+
+                if (price > MaxEventCost)
+                    return CommandResult.Fail(
+                        ErrorCode.InvalidValue,
+                        $"Стоимость в поиске не может превышать {MaxEventCost:N0} ₽");
+            }
 
             var nameError = ValidationCommon.ValidateOptionalTextLength(request.Name, MaxSearchNameLength, "Название в поиске");
             if (!nameError.Success)
