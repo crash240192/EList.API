@@ -55,7 +55,17 @@ namespace EList.Validators.Impl
             // Видимость (Show) — на усмотрение владельца (галочка «Показывать» / «скрыть»).
             // Контакт авторизации не выделяем отдельным запретом на публичность.
 
-            if (request.IsAuthorizationContact)
+            // Флаг авторизации можно только сохранить у уже существующего auth-контакта
+            // (например, смена Show). Назначить новый — только при регистрации.
+            var preservingExistingAuthContact =
+                existingContact != null && existingContact.IsAuthorizationContact;
+
+            if (preservingExistingAuthContact)
+            {
+                // Не даём снять флаг авторизации обычным update'ом
+                request.IsAuthorizationContact = true;
+            }
+            else if (request.IsAuthorizationContact)
             {
                 if (!allowAuthorizationContact)
                     return CommandResult.Fail(ErrorCode.AccessError, "Контакт для авторизации можно указать только при регистрации аккаунта");
