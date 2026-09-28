@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EList.Repositories.Interfaces\EList.Repositories.Interfaces.csproj" />
+    <ProjectReference Include="..\EList.Services.Interfaces\EList.Services.Interfaces.csproj" />
     <ProjectReference Include="..\EList.Validators.Interfaces\EList.Validators.Interfaces.csproj" />
   </ItemGroup>
 
