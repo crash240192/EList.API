@@ -3,6 +3,7 @@ using EList.Common.Support;
 using EList.Models.Enums;
 using EList.Models.Events;
 using EList.Repositories.Interfaces;
+using EList.Services.Interfaces;
 using EList.Validators.Interfaces;
 
 namespace EList.Validators.Impl
@@ -14,19 +15,22 @@ namespace EList.Validators.Impl
         private readonly IInvitationsRepository _invitationsRepository;
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
+        private readonly IAccountDataHolder _accountDataHolder;
 
         public EventAccessValidator(
             IEventsRepository eventsRepository,
             IParticipationsRepository participationsRepository,
             IInvitationsRepository invitationsRepository,
             IEventOrganizatorsRepository eventOrganizatorsRepository,
-            IParticipantsBWListRepository participantsBWListRepository)
+            IParticipantsBWListRepository participantsBWListRepository,
+            IAccountDataHolder accountDataHolder)
         {
             _eventsRepository = eventsRepository;
             _participationsRepository = participationsRepository;
             _invitationsRepository = invitationsRepository;
             _eventOrganizatorsRepository = eventOrganizatorsRepository;
             _participantsBWListRepository = participantsBWListRepository;
+            _accountDataHolder = accountDataHolder;
         }
 
         public async Task<bool> IsAccountEventOrganizatorAsync(Guid eventId, Guid accountId)
@@ -56,16 +60,18 @@ namespace EList.Validators.Impl
                 ?? (viewerAccountId != null
                     && await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventItem.Id, viewerAccountId.Value));
 
-            if (!organizator)
-            {
-                var privacyError = await AssertPrivacyAccessAsync(eventItem, viewerAccountId);
-                if (!privacyError.Success)
-                    return privacyError;
+            // Организатор и платформенный staff (модерация жалоб / обход WL/BL/18+) —
+            // без ограничений на просмотр.
+            if (organizator || IsPlatformStaffViewer(viewerAccountId))
+                return CommandResult.OK;
 
-                var ageError = AssertAgeAccess(eventItem, adultConfirmed);
-                if (!ageError.Success)
-                    return ageError;
-            }
+            var privacyError = await AssertPrivacyAccessAsync(eventItem, viewerAccountId);
+            if (!privacyError.Success)
+                return privacyError;
+
+            var ageError = AssertAgeAccess(eventItem, adultConfirmed);
+            if (!ageError.Success)
+                return ageError;
 
             return CommandResult.OK;
         }
@@ -75,6 +81,10 @@ namespace EList.Validators.Impl
             Guid accountId,
             bool hasProvenInvitation = false)
         {
+            // Superuser не ограничен WL/BL и при вступлении / покупке билета.
+            if (IsSuperuserAccount(accountId))
+                return CommandResult.OK;
+
             if (eventItem.Parameters?.Private == true)
             {
                 if (await _participantsBWListRepository.IsUserInWhiteListAsync(eventItem.Id, accountId))
@@ -108,6 +118,22 @@ namespace EList.Validators.Impl
             }
 
             return CommandResult.OK;
+        }
+
+        /// <summary>
+        /// Текущий запрос от платформенного staff и viewer — это он сам.
+        /// </summary>
+        private bool IsPlatformStaffViewer(Guid? viewerAccountId)
+        {
+            return viewerAccountId != null
+                && viewerAccountId == _accountDataHolder.AccountId
+                && _accountDataHolder.IsPlatformModeratorOrAbove;
+        }
+
+        private bool IsSuperuserAccount(Guid accountId)
+        {
+            return _accountDataHolder.AccountId == accountId
+                && _accountDataHolder.IsSuperuser;
         }
 
         private async Task<CommandResult> AssertPrivacyAccessAsync(Event eventItem, Guid? viewerAccountId)

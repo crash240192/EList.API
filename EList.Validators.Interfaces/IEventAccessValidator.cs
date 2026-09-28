@@ -10,7 +10,7 @@ namespace EList.Validators.Interfaces
     {
         /// <summary>
         /// Можно ли зрителю просматривать мероприятие (private/WL/BL + возраст 18+).
-        /// Организатор всегда имеет доступ.
+        /// Организатор и платформенный staff (superuser/admin/moderator) всегда имеют доступ.
         /// </summary>
         Task<CommandResult> AssertCanViewEventAsync(
             Guid eventId,
