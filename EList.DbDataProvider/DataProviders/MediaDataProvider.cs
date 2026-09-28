@@ -240,6 +240,7 @@ namespace EList.DbDataProvider.DataProviders
                 .LoadWith(i => i.Parameters)
                 .LoadWith(i => i.AccountParameters)
                 .LoadWith(i => i.EventRelation)
+                .LoadWith(i => i.AccountRelation)
                 .Where(i => i.EventRelation.EventId == eventId)
                 .ToListAsync();
             return result;

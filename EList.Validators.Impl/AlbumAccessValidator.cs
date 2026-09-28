@@ -183,10 +183,9 @@ namespace EList.Validators.Impl
             if (album.AccountId != viewerAccountId)
                 return CommandResult.Fail(ErrorCode.AccessError, "Изменять альбом может только его владелец");
 
-            var parameters = AlbumAccessParameters.FromAccount(album.AccountParameters);
-            if (operation == AlbumAccessOperation.AddFiles && parameters.ParticipantsReadonly)
-                return CommandResult.Fail(ErrorCode.AddPhotosNotAllowed, "Добавление фотографий в этот альбом запрещено");
-
+            // ParticipantsReadonly относится к участникам мероприятия после assign.
+            // Владелец личного альбома (в т.ч. на этапе create→assign) всегда может
+            // добавлять фото и править метаданные — иначе орга не создаст RO-альбом.
             return CommandResult.OK;
         }
 
