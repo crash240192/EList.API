@@ -241,6 +241,8 @@ namespace EList.Api.Controllers
                 var result = await _notificationService.ReadNotificationAsync(notificationId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
@@ -270,6 +272,8 @@ namespace EList.Api.Controllers
                 var result = await _notificationService.ReadAllUserNotificationsAsync();
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
+                else
+                    await _connectionProvider.CommitTransactionAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
