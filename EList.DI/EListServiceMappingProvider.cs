@@ -131,7 +131,7 @@ namespace EList.DI
 
             //clients
             mapper.AddScoped<ISmtpClient, SmtpClientMailKit>();
-            mapper.AddScoped<ISmsClient, GREENSMSSmsClient>();
+            mapper.AddScoped<ISmsClient, SMSRUSmsClient>();
             mapper.AddScoped<IFilestorageClient, FilestorageClient.FilestorageClient>();
 
             //support
