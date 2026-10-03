@@ -84,6 +84,11 @@ namespace EList.Services.Impl.Payments
         /// </summary>
         public string? ManualShopCode { get; set; }
 
+        /// <summary>
+        /// Только для окружений с TLS-intercept (Cloud Agent / корпоративный MITM). На prod = false.
+        /// </summary>
+        public bool DangerouslyAcceptAnyServerCertificate { get; set; }
+
         public TBankSmRegisterSettings SmRegister { get; set; } = new();
 
         public static TBankPaymentSettings Load()
@@ -97,6 +102,7 @@ namespace EList.Services.Impl.Payments
                 SuccessUrl = ReadNullable("payments:tbank:successUrl"),
                 FailUrl = ReadNullable("payments:tbank:failUrl"),
                 ManualShopCode = ReadNullable("payments:tbank:manualShopCode"),
+                DangerouslyAcceptAnyServerCertificate = ReadBool("payments:tbank:dangerouslyAcceptAnyServerCertificate"),
                 SmRegister = new TBankSmRegisterSettings
                 {
                     Username = Read("payments:tbank:smRegister:username"),
@@ -142,6 +148,13 @@ namespace EList.Services.Impl.Payments
             }
 
             return null;
+        }
+
+        private static bool ReadBool(string key)
+        {
+            if (!ConfigurationManager.AppSettings.Contains(key))
+                return false;
+            return bool.TryParse(ConfigurationManager.AppSettings[key], out var flag) && flag;
         }
     }
 

@@ -20,18 +20,34 @@ namespace EList.Services.Impl.Payments.TBank
         private const string LOGGER_NAME = "EList.Services.Impl.Payments.TBank.TBankAcquiringClient.";
         #endregion
 
-        private static readonly HttpClient Http = new()
-        {
-            Timeout = TimeSpan.FromSeconds(30)
-        };
-
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly TBankPaymentSettings _settings;
+        private readonly HttpClient _http;
 
         public TBankAcquiringClient(ICorrelationIdProvider correlationIdProvider, TBankPaymentSettings? settings = null)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _settings = settings ?? TBankPaymentSettings.Load();
+            _http = CreateHttpClient(_settings);
+        }
+
+        internal static HttpClient CreateHttpClient(TBankPaymentSettings settings)
+        {
+            HttpMessageHandler handler;
+            if (settings.DangerouslyAcceptAnyServerCertificate)
+            {
+                handler = new HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback =
+                        HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                };
+            }
+            else
+            {
+                handler = new HttpClientHandler();
+            }
+
+            return new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
         }
 
         public Task<TBankApiResponse> InitAsync(TBankInitRequest request, CancellationToken cancellationToken = default)
@@ -96,7 +112,7 @@ namespace EList.Services.Impl.Payments.TBank
             logger.Debug(correlationId, null, methodName, $"POST {url}", null);
 
             using var content = new StringContent(body, Encoding.UTF8, "application/json");
-            using var response = await Http.PostAsync(url, content, cancellationToken);
+            using var response = await _http.PostAsync(url, content, cancellationToken);
             var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
 
             TBankApiResponse? parsed;

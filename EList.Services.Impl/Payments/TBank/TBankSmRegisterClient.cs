@@ -20,18 +20,16 @@ namespace EList.Services.Impl.Payments.TBank
         private const string LOGGER_NAME = "EList.Services.Impl.Payments.TBank.TBankSmRegisterClient.";
         #endregion
 
-        private static readonly HttpClient Http = new()
-        {
-            Timeout = TimeSpan.FromSeconds(60)
-        };
-
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly TBankPaymentSettings _settings;
+        private readonly HttpClient _http;
 
         public TBankSmRegisterClient(ICorrelationIdProvider correlationIdProvider, TBankPaymentSettings? settings = null)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _settings = settings ?? TBankPaymentSettings.Load();
+            _http = TBankAcquiringClient.CreateHttpClient(_settings);
+            _http.Timeout = TimeSpan.FromSeconds(60);
         }
 
         public async Task<string> AuthorizeAsync(CancellationToken cancellationToken = default)
@@ -153,7 +151,7 @@ namespace EList.Services.Impl.Payments.TBank
 
             logger.Debug(correlationId, null, methodName, $"POST {url}", null);
 
-            using var response = await Http.SendAsync(requestMessage, cancellationToken);
+            using var response = await _http.SendAsync(requestMessage, cancellationToken);
             var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
 
             TResponse? parsed;
