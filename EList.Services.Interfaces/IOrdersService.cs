@@ -17,6 +17,11 @@ namespace EList.Services.Interfaces
         /// </summary>
         Task<CommandResult> ProcessYooKassaWebhookAsync(string rawPayload);
 
+        /// <summary>
+        /// Обработка NotificationURL Т-Банка. Идемпотентно по provider_event_id. Ответ контроллера — тело OK.
+        /// </summary>
+        Task<CommandResult> ProcessTBankWebhookAsync(string rawPayload);
+
         Task<CommandResult<OrderResponse>> GetOrderAsync(Guid orderId);
 
         Task<CommandResult<List<OrderResponse>>> GetMyOrdersAsync();

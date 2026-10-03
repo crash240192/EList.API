@@ -126,20 +126,23 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 
 - **Продавец билета** — организация-организатор.
 - **Площадка** — EList: витрина, заказ, билет, check-in, отчётность.
-- **Оплата** — через ЮKassa: сумма организатору на его реквизиты, сервису — **процент через split** при проведении платежа.
+- **Оплата** — целевой провайдер **Т-Банк (маркетплейс / мультирасчёты)**: в `Init` передаются `Shops[]` с `ShopCode` организатора, доля продавца и `Fee` (комиссия площадки). `yookassaStub` остаётся fallback для локальной разработки без банка.
 - Договор на посещение — между **участником и организатором**.
 
 Согласуется с Пользовательским соглашением (§6) и Соглашением для организаций (§2.4): сервис не продавец.
 
-### Технический статус (14.09.2026)
+### Технический статус (03.10.2026)
 
 | Слой | Статус |
 |------|--------|
 | Orders / tickets / stub payment / webhook path / check-in / transfer / refunds | API есть |
 | Учёт `AmountTotal` / `AmountSeller` / `AmountCommission` в заказе | Есть |
-| Реальный split ЮKassa на реквизиты организатора | **Нет** (stub = один платёж на полную сумму) |
+| Реальный эквайринг Т-Банка (`payments:provider=tbank`) + Init/Shops/Fee | ✅ код; нужны DEMO/prod TerminalKey + ShopCode |
+| Онбординг продавца SM-Register → `ProviderSellerId` (ShopCode) | ✅ код; credentials SM-Register выдаёт менеджер банка |
+| Webhook Т-Банка `POST /eList/api/payments/tbank/webhook` (тело `OK`) | ✅ |
+| `yookassaStub` fallback | ✅ default в appsettings |
 | `features.ticketSalesEnabled` | По умолчанию **`false`** |
-| Принятие `TicketingAgreement` как жёсткий gate на `CanSellTickets` | **Не enforced** (тип документа есть; `SetCanSellTickets` проверяет только верификацию) |
+| Gate `TicketingAgreement` + Active onboarding/ShopCode на `CanSellTickets` / создание заказа | ✅ |
 
 Подробный разбор: [legal-ticketing-review.md](./legal-ticketing-review.md).  
 Пошаговый UI↔API флоу: [tickets workflow.txt](./tickets%20workflow.txt).
@@ -150,7 +153,7 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 |------------------|-------|-----------|
 | `false` | любой | Participate; Cost = «оплата на месте» (информативно) |
 | `true` | `0` | Бесплатный билет: заказ → сразу Paid + Participate |
-| `true` | `> 0` | Заказ → оплата (stub/ЮKassa) → билет + Participate |
+| `true` | `> 0` | Заказ → оплата (T-Bank / yookassaStub) → билет + Participate |
 | `true` | — | Обычный Participate / accept invite **запрещены** (`OrganizationPaymentRequired`) |
 
 ---
@@ -165,8 +168,8 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 | Re-consent Consent/Agreement | ✅ | Middleware + UI Gate + обработчик 403/`AgreementNotFound` |
 | Каталог / карта / карточка события | ✅ | |
 | Участие без билетов | ✅ | |
-| Покупка билета (stub) | ⚠️ | UI+API stub; реальной ЮKassa и split нет |
-| Организации, верификация, payout | ✅ / ⚠️ | Верификация нужна для `CanSellTickets`; payout ещё не связан с реальным split |
+| Покупка билета | ⚠️ | API: T-Bank marketplace + stub; UI redirect на `confirmationUrl` |
+| Организации, верификация, payout | ✅ / ⚠️ | `CanSellTickets` требует verified + TicketingAgreement + Active ShopCode |
 | Кошелёк / тариф | ⚠️ | NextChargeAt + ledger; пополнение stub; не билетный контур |
 | Ошибки / Staging | ✅ | `ASPNETCORE_ENVIRONMENT` + `features:exposeDetailedErrors`; UI показывает `correlationId` — см. [docker-environment.md](./docker-environment.md) |
 | Уведомления (WS + antiflood) | ✅ | |
@@ -192,7 +195,11 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
   "provider": "yookassaStub",
   "commissionPercent": 10,
   "currency": "RUB",
-  "returnUrl": "https://tvoy-spot.ru/payments/return"
+  "returnUrl": "https://tvoy-spot.ru/payments/return",
+  "tbank": {
+    "apiBaseUrl": "https://securepay.tinkoff.ru/v2",
+    "notificationUrl": "https://tvoy-spot.ru/eList/api/payments/tbank/webhook"
+  }
 },
 "features": {
   "ticketSalesEnabled": false,
@@ -202,6 +209,14 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
   "anonymousAgeTtlHours": 24
 }
 ```
+
+Env для Т-Банка (секреты не коммитить):
+
+- `payments__provider=tbank`
+- `payments__tbank__terminalKey` / `payments__tbank__password`
+- `payments__tbank__notificationUrl` (публичный URL webhook)
+- `payments__tbank__smRegister__username` / `payments__tbank__smRegister__password`
+- `payments__tbank__manualShopCode` — DEMO Init без SM-Register
 
 ---
 

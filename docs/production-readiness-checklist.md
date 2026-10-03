@@ -108,7 +108,9 @@
 
 - [ ] Закрыть текст Агентского договора (режим + фискализация) и залить в БД
 - [ ] Gate `TicketingAgreement` + verified + payout реквизиты
-- [ ] Реальный `IPaymentProvider` ЮKassa со split / marketplace transfers
+- [x] Реальный `IPaymentProvider` Т-Банк (мультирасчёты Init+Shops/Fee) + DI `payments:provider`
+- [ ] Прод-креды Т-Банка / SM-Register + фискальные чеки (`Receipt`) при требовании терминала
+- [ ] (опц.) Реальная ЮKassa как альтернативный провайдер
 - [ ] Return URL / `confirmationUrl` в UI вместо (или вместе с) локальной заглушкой
 - [ ] Org check-in UI; transfer/gift UI; refund UI на существующие API
 - [ ] Capacity reservation / гонка мест

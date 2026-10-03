@@ -10,8 +10,10 @@ using EList.Models.Invitations;
 using EList.Models.Orders;
 using EList.Repositories.Interfaces;
 using EList.Services.Impl.Payments;
+using EList.Services.Impl.Payments.TBank;
 using EList.Services.Interfaces;
 using EList.Validators.Interfaces;
+using Newtonsoft.Json.Linq;
 using NLog;
 
 namespace EList.Services.Impl
@@ -151,6 +153,15 @@ namespace EList.Services.Impl
                     "Нет организации-продавца с правом продажи билетов");
             }
 
+            var sellerPayout = await _organizationsRepository.GetPayoutAsync(sellerOrgId.Value);
+            if (sellerPayout == null
+                || sellerPayout.OnboardingStatus != ProviderOnboardingStatus.Active
+                || string.IsNullOrWhiteSpace(sellerPayout.ProviderSellerId))
+            {
+                return CommandResult<CreateOrderResponse>.Fail(ErrorCode.OrganizationNotVerified,
+                    "Организация-продавец не прошла онбординг в платёжной системе (нет активного ShopCode)");
+            }
+
             var settings = PaymentSettings.Load();
             var unitPrice = ToMoney(eventItem.Parameters.Cost);
             var amountTotal = unitPrice * quantity;
@@ -198,7 +209,11 @@ namespace EList.Services.Impl
                 ReturnUrl = settings.ReturnUrl,
                 IdempotencyKey = order.IdempotencyKey,
                 BuyerAccountId = buyerId,
-                EventId = eventItem.Id
+                EventId = eventItem.Id,
+                SellerOrganizationId = sellerOrgId.Value,
+                SellerShopCode = sellerPayout.ProviderSellerId,
+                AmountSeller = amountSeller,
+                AmountCommission = amountCommission
             });
 
             await _ordersRepository.SetProviderPaymentAsync(
@@ -403,6 +418,189 @@ namespace EList.Services.Impl
 
             await _ordersRepository.MarkWebhookProcessedAsync(webhookId, order.Id);
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> ProcessTBankWebhookAsync(string rawPayload)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(ProcessTBankWebhookAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (string.IsNullOrWhiteSpace(rawPayload))
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Пустое тело webhook");
+
+            JObject payload;
+            TBankWebhookNotification? notification;
+            try
+            {
+                payload = JObject.Parse(rawPayload);
+                notification = payload.ToObject<TBankWebhookNotification>();
+            }
+            catch (Exception ex)
+            {
+                logger.Debug(correlationId, null, methodName, $"Invalid JSON: {ex.Message}", null);
+                return CommandResult.Fail(ErrorCode.FormatError, "Некорректный JSON webhook Т-Банка");
+            }
+
+            if (notification == null || string.IsNullOrWhiteSpace(notification.PaymentId))
+                return CommandResult.Fail(ErrorCode.InvalidValue, "В webhook нет PaymentId");
+
+            var settings = PaymentSettings.Load().TBank;
+            try
+            {
+                settings.EnsureAcquiringConfigured();
+            }
+            catch (InvalidOperationException ex)
+            {
+                logger.Debug(correlationId, null, methodName, ex.Message, null);
+                return CommandResult.Fail(ErrorCode.InvalidValue, ex.Message);
+            }
+
+            var client = new TBankAcquiringClient(_correlationIdProvider, settings);
+            if (!client.VerifyNotificationToken(payload))
+            {
+                logger.Debug(correlationId, null, methodName, "Invalid Token signature", null);
+                return CommandResult.Fail(ErrorCode.AccessError, "Неверная подпись Token webhook Т-Банка");
+            }
+
+            var status = string.IsNullOrWhiteSpace(notification.Status)
+                ? "unknown"
+                : notification.Status.Trim().ToUpperInvariant();
+            var providerPaymentId = notification.PaymentId.Trim();
+            var providerEventId = $"{status}:{providerPaymentId}";
+
+            var existingWebhook = await _ordersRepository.GetWebhookEventAsync(
+                PaymentProvider.Tbank, providerEventId);
+            if (existingWebhook?.ProcessedAt != null)
+            {
+                logger.Debug(correlationId, null, methodName, "Method finished (idempotent)", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
+            Guid webhookId;
+            if (existingWebhook != null)
+            {
+                webhookId = existingWebhook.Id;
+            }
+            else
+            {
+                webhookId = await _ordersRepository.CreateWebhookEventAsync(new PaymentWebhookEvent
+                {
+                    Provider = PaymentProvider.Tbank,
+                    ProviderEventId = providerEventId,
+                    Payload = rawPayload,
+                    ReceivedAt = DateTimeOffset.UtcNow
+                });
+            }
+
+            Order? order = await _ordersRepository.GetOrderByProviderPaymentAsync(
+                PaymentProvider.Tbank, providerPaymentId);
+
+            if (order == null
+                && !string.IsNullOrWhiteSpace(notification.OrderId)
+                && Guid.TryParse(notification.OrderId.Trim(), out var orderIdFromBank))
+            {
+                order = await _ordersRepository.GetOrderAsync(orderIdFromBank);
+            }
+
+            if (status is "REFUNDED" or "PARTIAL_REFUNDED" or "REFUNDING")
+            {
+                return await ProcessTBankRefundWebhookAsync(
+                    order, providerPaymentId, status, webhookId, correlationId, methodName, execTime);
+            }
+
+            if (order == null)
+            {
+                await _ordersRepository.MarkWebhookProcessedAsync(webhookId, null);
+                logger.Debug(correlationId, null, methodName,
+                    $"Webhook stored but order not found for payment '{providerPaymentId}'", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
+            if (string.IsNullOrWhiteSpace(order.ProviderPaymentId))
+            {
+                await _ordersRepository.SetProviderPaymentAsync(
+                    order.Id, PaymentProvider.Tbank, providerPaymentId);
+            }
+
+            if (status == "CONFIRMED")
+            {
+                await FulfillPaidOrderAsync(order.Id, order.BuyerAccountId, order.EventId, order.Quantity);
+            }
+            else if (status is "REJECTED" or "CANCELED" or "CANCELLED" or "DEADLINE_EXPIRED" or "AUTH_FAIL")
+            {
+                if (order.Status == OrderStatus.Pending || order.Status == OrderStatus.Authorized)
+                    await _ordersRepository.UpdateOrderStatusAsync(order.Id, OrderStatus.Canceled);
+            }
+            else if (status == "AUTHORIZED")
+            {
+                if (order.Status == OrderStatus.Pending)
+                    await _ordersRepository.UpdateOrderStatusAsync(order.Id, OrderStatus.Authorized);
+            }
+
+            await _ordersRepository.MarkWebhookProcessedAsync(webhookId, order.Id);
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        private async Task<CommandResult> ProcessTBankRefundWebhookAsync(
+            Order? order,
+            string providerPaymentId,
+            string status,
+            Guid webhookId,
+            string correlationId,
+            string methodName,
+            Stopwatch execTime)
+        {
+            if (order == null)
+            {
+                order = await _ordersRepository.GetOrderByProviderPaymentAsync(
+                    PaymentProvider.Tbank, providerPaymentId);
+            }
+
+            if (order == null)
+            {
+                await _ordersRepository.MarkWebhookProcessedAsync(webhookId, null);
+                logger.Debug(correlationId, null, methodName,
+                    $"Refund webhook stored but order not found '{providerPaymentId}'", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
+            var refunds = await _ordersRepository.GetRefundsByOrderAsync(order.Id) ?? new List<Refund>();
+            var pending = refunds
+                .Where(r => r.Status == RefundStatus.Pending)
+                .OrderByDescending(r => r.CreateDate)
+                .FirstOrDefault();
+
+            if (pending == null)
+            {
+                await _ordersRepository.MarkWebhookProcessedAsync(webhookId, order.Id);
+                logger.Debug(correlationId, null, methodName,
+                    "Refund webhook: no pending refund for order", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
+            if (status is "REFUNDED" or "PARTIAL_REFUNDED")
+            {
+                if (string.IsNullOrWhiteSpace(pending.ProviderRefundId))
+                {
+                    await _ordersRepository.UpdateRefundStatusAsync(
+                        pending.Id,
+                        RefundStatus.Pending,
+                        $"{providerPaymentId}:rfnd:{pending.Id:N}");
+                }
+
+                await FulfillRefundAsync(pending);
+            }
+            else if (status == "REJECTED")
+            {
+                await FailPendingRefundAsync(pending, providerPaymentId);
+            }
+
+            await _ordersRepository.MarkWebhookProcessedAsync(webhookId, order.Id);
+            logger.Debug(correlationId, null, methodName, "Method finished (tbank refund)", null, execTime.Elapsed);
             return CommandResult.OK;
         }
 

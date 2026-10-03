@@ -36,6 +36,18 @@ namespace EList.Services.Interfaces
         public string? IdempotencyKey { get; set; }
         public Guid BuyerAccountId { get; set; }
         public Guid EventId { get; set; }
+
+        /// <summary>Организация-продавец (билеты). Null для пополнения кошелька.</summary>
+        public Guid? SellerOrganizationId { get; set; }
+
+        /// <summary>ShopCode / ProviderSellerId продавца для мультирасчётов Т-Банка.</summary>
+        public string? SellerShopCode { get; set; }
+
+        /// <summary>Доля продавца (руб). Для Init.Shops.Amount.</summary>
+        public decimal? AmountSeller { get; set; }
+
+        /// <summary>Комиссия площадки (руб). Для Init.Shops.Fee.</summary>
+        public decimal? AmountCommission { get; set; }
     }
 
     public class PaymentCreationResult

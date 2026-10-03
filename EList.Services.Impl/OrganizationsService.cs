@@ -622,6 +622,15 @@ namespace EList.Services.Impl
                     return CommandResult.Fail(ErrorCode.AgreementNotFound,
                         "Перед включением продажи билетов необходимо принять Агентский договор (TicketingAgreement)");
                 }
+
+                var payout = await _organizationsRepository.GetPayoutAsync(organizationId);
+                if (payout == null
+                    || payout.OnboardingStatus != ProviderOnboardingStatus.Active
+                    || string.IsNullOrWhiteSpace(payout.ProviderSellerId))
+                {
+                    return CommandResult.Fail(ErrorCode.OrganizationNotVerified,
+                        "Перед включением продажи билетов завершите онбординг в платёжной системе (активный ShopCode / ProviderSellerId)");
+                }
             }
 
             await _organizationsRepository.SetCanSellTicketsAsync(organizationId, canSellTickets);
