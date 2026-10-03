@@ -1,16 +1,14 @@
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
 using EList.Common.CorrelationId;
+using EList.Common.HttpRestClient;
 using EList.Common.Logger;
 using EList.Services.Interfaces;
-using Newtonsoft.Json;
 using NLog;
 
 namespace EList.Services.Impl.Payments.TBank
 {
     /// <summary>
     /// Клиент SM-Register Т-Банка: auth → token, register → ShopCode.
+    /// Транспорт — <see cref="HttpRestClient2"/>.
     /// </summary>
     public class TBankSmRegisterClient
     {
@@ -20,41 +18,40 @@ namespace EList.Services.Impl.Payments.TBank
         private const string LOGGER_NAME = "EList.Services.Impl.Payments.TBank.TBankSmRegisterClient.";
         #endregion
 
+        private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60);
+
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly TBankPaymentSettings _settings;
-        private readonly HttpClient _http;
 
         public TBankSmRegisterClient(ICorrelationIdProvider correlationIdProvider, TBankPaymentSettings? settings = null)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _settings = settings ?? TBankPaymentSettings.Load();
-            _http = TBankAcquiringClient.CreateHttpClient(_settings);
-            _http.Timeout = TimeSpan.FromSeconds(60);
         }
 
         public async Task<string> AuthorizeAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             EnsureConfigured();
+
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(AuthorizeAsync)}";
 
-            var payload = new
-            {
-                username = _settings.SmRegister.Username,
-                password = _settings.SmRegister.Password
-            };
-
-            var response = await PostAsync<TBankSmRegisterAuthResponse>(
+            var http = new HttpRestClient2(correlationId, _settings.SmRegister.BaseUrl.TrimEnd('/'));
+            var response = await http.PostAsync<TBankSmRegisterAuthResponse>(
                 "register/auth",
-                payload,
-                bearerToken: null,
-                cancellationToken);
+                new
+                {
+                    username = _settings.SmRegister.Username,
+                    password = _settings.SmRegister.Password
+                },
+                DefaultTimeout);
 
-            var token = response.ResolveToken();
+            var token = response?.ResolveToken();
             if (string.IsNullOrWhiteSpace(token))
             {
                 throw new InvalidOperationException(
-                    $"SM-Register auth не вернул token: {response.ErrorMessage ?? response.Message ?? "empty"}");
+                    $"SM-Register auth не вернул token: {response?.ErrorMessage ?? response?.Message ?? "empty"}");
             }
 
             logger.Debug(correlationId, null, methodName, "SM-Register auth OK", null);
@@ -66,6 +63,7 @@ namespace EList.Services.Impl.Payments.TBank
             SellerOnboardingRequest request,
             CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(bearerToken))
                 throw new ArgumentException("bearerToken is required", nameof(bearerToken));
             if (request == null)
@@ -113,11 +111,17 @@ namespace EList.Services.Impl.Payments.TBank
                 }
             };
 
-            return await PostAsync<TBankSmRegisterShopResponse>(
-                "register",
-                payload,
-                bearerToken,
-                cancellationToken);
+            var correlationId = _correlationIdProvider.Get();
+            var http = new HttpRestClient2(
+                correlationId,
+                _settings.SmRegister.BaseUrl.TrimEnd('/'),
+                $"Bearer {bearerToken.Trim()}");
+
+            var response = await http.PostAsync<TBankSmRegisterShopResponse>("register", payload, DefaultTimeout);
+            if (response == null)
+                throw new InvalidOperationException("SM-Register register: пустой ответ");
+
+            return response;
         }
 
         private void EnsureConfigured()
@@ -127,58 +131,6 @@ namespace EList.Services.Impl.Payments.TBank
                 throw new InvalidOperationException(
                     "SM-Register не настроен: задайте payments__tbank__smRegister__username и payments__tbank__smRegister__password.");
             }
-        }
-
-        private async Task<TResponse> PostAsync<TResponse>(
-            string relativePath,
-            object payload,
-            string? bearerToken,
-            CancellationToken cancellationToken)
-        {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}PostAsync";
-            var baseUrl = _settings.SmRegister.BaseUrl.TrimEnd('/');
-            var url = $"{baseUrl}/{relativePath.TrimStart('/')}";
-
-            var body = JsonConvert.SerializeObject(payload);
-            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, url)
-            {
-                Content = new StringContent(body, Encoding.UTF8, "application/json")
-            };
-
-            if (!string.IsNullOrWhiteSpace(bearerToken))
-                requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
-
-            logger.Debug(correlationId, null, methodName, $"POST {url}", null);
-
-            using var response = await _http.SendAsync(requestMessage, cancellationToken);
-            var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
-
-            TResponse? parsed;
-            try
-            {
-                parsed = JsonConvert.DeserializeObject<TResponse>(responseText);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException(
-                    $"SM-Register {relativePath}: некорректный JSON HTTP {(int)response.StatusCode}: {ex.Message}. Body={Truncate(responseText, 500)}",
-                    ex);
-            }
-
-            if (parsed == null)
-            {
-                throw new InvalidOperationException(
-                    $"SM-Register {relativePath}: пустой ответ HTTP {(int)response.StatusCode}");
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new InvalidOperationException(
-                    $"SM-Register {relativePath} HTTP {(int)response.StatusCode}: {Truncate(responseText, 500)}");
-            }
-
-            return parsed;
         }
 
         private static string SanitizeBillingDescriptor(string value)

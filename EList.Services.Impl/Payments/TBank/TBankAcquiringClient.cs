@@ -1,7 +1,6 @@
 using System.Globalization;
-using System.Net.Http;
-using System.Text;
 using EList.Common.CorrelationId;
+using EList.Common.HttpRestClient;
 using EList.Common.Logger;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -11,6 +10,7 @@ namespace EList.Services.Impl.Payments.TBank
 {
     /// <summary>
     /// HTTP-клиент эквайринга Т-Банка: Init / GetState / Cancel.
+    /// Транспорт — <see cref="HttpRestClient2"/> (общий пул, логирование, SSL как у DaData).
     /// </summary>
     public class TBankAcquiringClient
     {
@@ -20,34 +20,15 @@ namespace EList.Services.Impl.Payments.TBank
         private const string LOGGER_NAME = "EList.Services.Impl.Payments.TBank.TBankAcquiringClient.";
         #endregion
 
+        private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
+
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly TBankPaymentSettings _settings;
-        private readonly HttpClient _http;
 
         public TBankAcquiringClient(ICorrelationIdProvider correlationIdProvider, TBankPaymentSettings? settings = null)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _settings = settings ?? TBankPaymentSettings.Load();
-            _http = CreateHttpClient(_settings);
-        }
-
-        internal static HttpClient CreateHttpClient(TBankPaymentSettings settings)
-        {
-            HttpMessageHandler handler;
-            if (settings.DangerouslyAcceptAnyServerCertificate)
-            {
-                handler = new HttpClientHandler
-                {
-                    ServerCertificateCustomValidationCallback =
-                        HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-                };
-            }
-            else
-            {
-                handler = new HttpClientHandler();
-            }
-
-            return new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
         }
 
         public Task<TBankApiResponse> InitAsync(TBankInitRequest request, CancellationToken cancellationToken = default)
@@ -95,54 +76,36 @@ namespace EList.Services.Impl.Payments.TBank
             TRequest request,
             CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             _settings.EnsureAcquiringConfigured();
+
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{method}";
 
-            var json = JsonConvert.SerializeObject(request);
-            var jObject = JObject.Parse(json);
+            // Token считается по корневым скалярам (Shops/Receipt не входят) — подписываем уже сериализованный JSON.
+            var jObject = JObject.Parse(JsonConvert.SerializeObject(request));
             jObject.Remove("Token");
-            var token = TBankTokenSigner.SignJsonObject(jObject, _settings.Password);
-            jObject["Token"] = token;
-
+            jObject["Token"] = TBankTokenSigner.SignJsonObject(jObject, _settings.Password);
             var body = jObject.ToString(Formatting.None);
-            var baseUrl = _settings.ApiBaseUrl.TrimEnd('/');
-            var url = $"{baseUrl}/{method}";
 
-            logger.Debug(correlationId, null, methodName, $"POST {url}", null);
+            logger.Debug(correlationId, null, methodName, $"POST {_settings.ApiBaseUrl.TrimEnd('/')}/{method}", null);
 
-            using var content = new StringContent(body, Encoding.UTF8, "application/json");
-            using var response = await _http.PostAsync(url, content, cancellationToken);
-            var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
-
+            var http = new HttpRestClient2(correlationId, _settings.ApiBaseUrl.TrimEnd('/'));
             TBankApiResponse? parsed;
             try
             {
-                parsed = JsonConvert.DeserializeObject<TBankApiResponse>(responseText);
+                parsed = await http.PostAsync<TBankApiResponse>(method, body, DefaultTimeout);
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException(
-                    $"Т-Банк {method}: некорректный JSON ответа HTTP {(int)response.StatusCode}: {ex.Message}. Body={Truncate(responseText)}",
-                    ex);
+                throw new InvalidOperationException($"Т-Банк {method}: HTTP/транспортная ошибка: {ex.Message}", ex);
             }
 
             if (parsed == null)
-            {
-                throw new InvalidOperationException(
-                    $"Т-Банк {method}: пустой ответ HTTP {(int)response.StatusCode}. Body={Truncate(responseText)}");
-            }
-
-            if (!response.IsSuccessStatusCode && !parsed.Success)
-            {
-                throw new InvalidOperationException(
-                    $"Т-Банк {method} HTTP {(int)response.StatusCode}: {FormatError(parsed)}");
-            }
+                throw new InvalidOperationException($"Т-Банк {method}: пустой ответ");
 
             if (!parsed.Success)
-            {
                 throw new InvalidOperationException($"Т-Банк {method}: {FormatError(parsed)}");
-            }
 
             return parsed;
         }
@@ -157,13 +120,6 @@ namespace EList.Services.Impl.Payments.TBank
             if (!string.IsNullOrWhiteSpace(response.Details))
                 parts.Add(response.Details);
             return parts.Count == 0 ? "неизвестная ошибка" : string.Join("; ", parts);
-        }
-
-        private static string Truncate(string? value, int max = 500)
-        {
-            if (string.IsNullOrEmpty(value))
-                return string.Empty;
-            return value.Length <= max ? value : value[..max] + "...";
         }
 
         public static long ToKopecks(decimal amount)

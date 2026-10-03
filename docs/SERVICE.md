@@ -217,7 +217,7 @@ Env для Т-Банка (секреты не коммитить):
 - `payments__tbank__notificationUrl` (публичный URL webhook)
 - `payments__tbank__smRegister__username` / `payments__tbank__smRegister__password`
 - `payments__tbank__manualShopCode` — DEMO Init без SM-Register
-- `payments__tbank__dangerouslyAcceptAnyServerCertificate=true` — только для TLS-intercept (Cloud Agent); на prod = false
+- HTTP к банку идёт через `HttpRestClient2` (как DaData)
 
 ---
 
