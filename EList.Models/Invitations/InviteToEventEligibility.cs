@@ -16,8 +16,8 @@ namespace EList.Models.Invitations
         public int ErrorCode { get; set; }
 
         /// <summary>
-        /// Информативно: приглашение не даёт бесплатный вход (нужен билет).
-        /// Не блокирует отправку приглашения.
+        /// Информативно (модель A): при TicketsEnabled приглашение не даёт бесплатный вход —
+        /// после accept нужен билет. Не блокирует отправку приглашения.
         /// </summary>
         public bool TicketsRequired { get; set; }
     }

@@ -90,13 +90,13 @@ namespace EList.Services.Impl
                 return createAccess;
 
             if (curEvent.Active == false)
-                return CommandResult.Fail(ErrorCode.EventCancelled, $"Мероприятие было отменено");
+                return CommandResult.Fail(ErrorCode.EventCancelled, "Мероприятие отменено");
 
             if (curEvent.Parameters?.MaxPersonsCount > 0)
             {
                 var participantsCount = await _participationsRepository.GetParticipantsCountAsync(curEvent.Id);
                 if (participantsCount >= curEvent.Parameters.MaxPersonsCount)
-                    return CommandResult.Fail(ErrorCode.EventIsFull, $"В мероприятии уже участвует максимальное количество человек");
+                    return CommandResult.Fail(ErrorCode.EventIsFull, "Мероприятие заполнено");
             }
 
             var inviterId = _accountDataHolder.AccountId!.Value;
@@ -246,7 +246,7 @@ namespace EList.Services.Impl
             if (curEvent.Active == false)
             {
                 return new CommandResult<InviteToEventEligibility>(Deny(
-                    eventId, inviteeAccountId, "Мероприятие было отменено", ErrorCode.EventCancelled,
+                    eventId, inviteeAccountId, "Мероприятие отменено", ErrorCode.EventCancelled,
                     ticketsRequired: curEvent.Parameters?.TicketsEnabled == true));
             }
 
@@ -257,7 +257,7 @@ namespace EList.Services.Impl
                 {
                     return new CommandResult<InviteToEventEligibility>(Deny(
                         eventId, inviteeAccountId,
-                        "В мероприятии уже участвует максимальное количество человек",
+                        "Мероприятие заполнено",
                         ErrorCode.EventIsFull,
                         ticketsRequired: curEvent.Parameters?.TicketsEnabled == true));
                 }
@@ -389,6 +389,31 @@ namespace EList.Services.Impl
                     return Deny(curEvent.Id, inviteeAccountId, ageGender.Message ?? "Не подходит по возрасту или полу", ageGender.ErrorCode, ticketsRequired);
             }
 
+            // Бан модерации invitee — на create/eligibility, не только на accept.
+            var participateBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                inviteeAccountId, ModerationPenaltyType.BanEventParticipate);
+            if (!participateBan.Success)
+            {
+                return Deny(
+                    curEvent.Id,
+                    inviteeAccountId,
+                    participateBan.Message ?? "Пользователю запрещено участвовать в мероприятиях",
+                    participateBan.ErrorCode,
+                    ticketsRequired);
+            }
+
+            var eventBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                inviteeAccountId, ModerationPenaltyType.BanFromEvent, curEvent.Id);
+            if (!eventBan.Success)
+            {
+                return Deny(
+                    curEvent.Id,
+                    inviteeAccountId,
+                    eventBan.Message ?? "Пользователю запрещено участвовать в этом мероприятии",
+                    eventBan.ErrorCode,
+                    ticketsRequired);
+            }
+
             return new InviteToEventEligibility
             {
                 EventId = curEvent.Id,
@@ -489,13 +514,13 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Мероприятие с id='{invitation.EventId}' не найдено");
 
             if (curEvent.Active == false)
-                return CommandResult.Fail(ErrorCode.EventCancelled, $"Мероприятие было отменено");
+                return CommandResult.Fail(ErrorCode.EventCancelled, "Мероприятие отменено");
 
-            // TicketsEnabled: приглашение не даёт бесплатный вход — нужен билет.
+            // Модель A: TicketsEnabled — приглашение не даёт бесплатный вход; нужен билет.
             if (curEvent.Parameters?.TicketsEnabled == true)
             {
                 return CommandResult.Fail(ErrorCode.OrganizationPaymentRequired,
-                    "Для участия в этом мероприятии нужно купить билет");
+                    "Для участия нужно купить билет");
             }
 
             var participateBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
@@ -521,7 +546,7 @@ namespace EList.Services.Impl
             {
                 var participantsCount = await _participationsRepository.GetParticipantsCountAsync(curEvent.Id);
                 if (participantsCount >= curEvent.Parameters.MaxPersonsCount)
-                    return CommandResult.Fail(ErrorCode.EventIsFull, $"В мероприятии уже участвует максимальное количество человек");
+                    return CommandResult.Fail(ErrorCode.EventIsFull, "Мероприятие заполнено");
             }
 
             await _participationsRepository.ParticipateAsync(_accountDataHolder.AccountId.Value, invitation.EventId);
