@@ -16,9 +16,9 @@ namespace EList.Validators.Interfaces
         CommandResult CanEditPersonInfo(Guid targetAccountId, Guid editorAccountId);
 
         /// <summary>
-        /// Ограничивает набор полей для пользователей, которые не являются владельцем профиля.
+        /// Ограничивает набор полей для пользователей, которые не являются владельцем профиля,
+        /// с учётом настроек приватности.
         /// </summary>
-        PersonInfo ApplyViewPolicy(PersonInfo person, Guid targetAccountId, Guid? viewerAccountId);
+        Task<PersonInfo> ApplyViewPolicyAsync(PersonInfo person, Guid targetAccountId, Guid? viewerAccountId);
     }
-
 }

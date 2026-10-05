@@ -70,6 +70,87 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Пригласить одного пользователя на несколько мероприятий
+        /// </summary>
+        [HttpPost("createToAccount")]
+        public async Task<CommandResult<CreateInvitationsToAccountResult>> CreateInvitationsToAccountAsync(
+            CreateInvitationsToAccountRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CreateInvitationsToAccountAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _invitationsService.CreateToAccountAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Можно ли пригласить список аккаунтов на одно мероприятие (eligibility preview).
+        /// </summary>
+        [HttpPost("canInviteToEvent")]
+        public async Task<CommandResult<List<InviteToEventEligibility>>> CanInviteToEventByEventAsync(
+            CanInviteToEventByEventRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CanInviteToEventByEventAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _invitationsService.CanInviteToEventByEventAsync(request);
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Можно ли пригласить один аккаунт на список мероприятий (eligibility preview).
+        /// </summary>
+        [HttpPost("canInviteToEvents")]
+        public async Task<CommandResult<List<InviteToEventEligibility>>> CanInviteToEventByAccountAsync(
+            CanInviteToEventByAccountRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CanInviteToEventByAccountAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _invitationsService.CanInviteToEventByAccountAsync(request);
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Список приглашений по токену
         /// </summary>
         /// <returns></returns>

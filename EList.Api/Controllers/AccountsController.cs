@@ -7,6 +7,7 @@ using EList.Common.Support;
 using EList.DbDataProvider.Interfaces;
 using EList.Models.Accounts;
 using EList.Models.Location;
+using EList.Models.Privacy;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -32,16 +33,19 @@ namespace EList.Api.Controllers
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
         private readonly IMediaService _mediaService;
+        private readonly IProfilePrivacyService _profilePrivacyService;
 
         public AccountsController(IAccountsService accountsService,
             ICorrelationIdProvider correlationIdProvider,
             IDataConnectionProvider connectionProvider,
-            IMediaService mediaService)
+            IMediaService mediaService,
+            IProfilePrivacyService profilePrivacyService)
         {
             _accountsService = accountsService;
             _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
             _mediaService = mediaService;
+            _profilePrivacyService = profilePrivacyService;
         }
 
 
@@ -219,6 +223,109 @@ namespace EList.Api.Controllers
                 var result = await _accountsService.ExportMyDataAsync();
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Получить настройки приватности текущего аккаунта
+        /// </summary>
+        [HttpGet("privacy")]
+        public async Task<CommandResult<AccountPrivacySettings>> GetPrivacySettingsAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetPrivacySettingsAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _profilePrivacyService.GetMySettingsAsync();
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Обновить настройки приватности текущего аккаунта
+        /// </summary>
+        [HttpPut("privacy")]
+        public async Task<CommandResult<AccountPrivacySettings>> UpdatePrivacySettingsAsync(
+            UpdatePrivacySettingsRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(UpdatePrivacySettingsAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _profilePrivacyService.UpdateMySettingsAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Можно ли текущему пользователю приглашать указанный аккаунт (с учётом whoCanInviteMe).
+        /// </summary>
+        [HttpGet("canInvite/{accountId}")]
+        public async Task<CommandResult<CanInviteResult>> CanInviteAsync(Guid accountId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CanInviteAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _profilePrivacyService.CanInviteAsync(accountId);
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Массовая проверка canInvite (для модалки приглашения с события).
+        /// </summary>
+        [HttpPost("canInvite/batch")]
+        public async Task<CommandResult<List<CanInviteResult>>> CanInviteBatchAsync(CanInviteBatchRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CanInviteBatchAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _profilePrivacyService.CanInviteBatchAsync(request?.AccountIds);
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return result;
             }
             catch (Exception ex)

@@ -54,6 +54,7 @@ namespace EList.DI
             mapper.AddScoped<IAccountPlatformRolesDataProvider, AccountPlatformRolesDataProvider>();
             mapper.AddScoped<IContentReportsDataProvider, ContentReportsDataProvider>();
             mapper.AddScoped<IModerationPenaltiesDataProvider, ModerationPenaltiesDataProvider>();
+            mapper.AddScoped<IAccountPrivacyDataProvider, AccountPrivacyDataProvider>();
 
             //Services
             mapper.AddScoped<IPersonsService, PersonService>();
@@ -79,6 +80,7 @@ namespace EList.DI
             mapper.AddScoped<IContentReportsService, ContentReportsService>();
             mapper.AddScoped<IModerationPenaltiesService, ModerationPenaltiesService>();
             mapper.AddScoped<IOrdersService, OrdersService>();
+            mapper.AddScoped<IProfilePrivacyService, ProfilePrivacyService>();
 
             mapper.AddSingleton<WebSocketConnectionManager>();
             mapper.AddSingleton<NotificationFloodGate>();
@@ -112,6 +114,7 @@ namespace EList.DI
             mapper.AddScoped<IAccountPlatformRolesRepository, AccountPlatformRolesRepository>();
             mapper.AddScoped<IContentReportsRepository, ContentReportsRepository>();
             mapper.AddScoped<IModerationPenaltiesRepository, ModerationPenaltiesRepository>();
+            mapper.AddScoped<IAccountPrivacyRepository, AccountPrivacyRepository>();
 
             //Validators
             mapper.AddScoped<IPersonValidator, PersonValidator>();

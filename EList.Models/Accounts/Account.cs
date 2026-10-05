@@ -61,6 +61,11 @@ namespace EList.Models.Accounts
         /// Идентификатор аватарки
         /// </summary>
         public Guid? AvatarId { get; set; }
+
+        /// <summary>
+        /// Ближайший город по координатам (вычисляется при отдаче, не хранится в БД).
+        /// </summary>
+        public string? ProfileCity { get; set; }
     }
 
     /// <summary>

@@ -1,9 +1,12 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
+using EList.Models.Enums;
+using EList.Models.Events;
 using EList.Models.Invitations;
+using EList.Models.Person;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using EList.Validators.Interfaces;
@@ -31,6 +34,8 @@ namespace EList.Services.Impl
         private readonly IInvitationDataValidator _invitationDataValidator;
         private readonly IEventAccessValidator _eventAccessValidator;
         private readonly IPagingValidator _pagingValidator;
+        private readonly IProfilePrivacyService _profilePrivacyService;
+        private readonly IPersonsRepository _personsRepository;
 
         public InvitationsService(ICorrelationIdProvider correlationIdProvider,
             IEventsRepository eventsRepository,
@@ -43,7 +48,9 @@ namespace EList.Services.Impl
             IInvitationAccessValidator invitationAccessValidator,
             IInvitationDataValidator invitationDataValidator,
             IEventAccessValidator eventAccessValidator,
-            IPagingValidator pagingValidator)
+            IPagingValidator pagingValidator,
+            IProfilePrivacyService profilePrivacyService,
+            IPersonsRepository personsRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
@@ -56,6 +63,8 @@ namespace EList.Services.Impl
             _invitationDataValidator = invitationDataValidator ?? throw new ArgumentNullException(nameof(invitationDataValidator));
             _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
             _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
+            _profilePrivacyService = profilePrivacyService ?? throw new ArgumentNullException(nameof(profilePrivacyService));
+            _personsRepository = personsRepository ?? throw new ArgumentNullException(nameof(personsRepository));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -81,44 +90,54 @@ namespace EList.Services.Impl
                 return createAccess;
 
             if (curEvent.Active == false)
-                return CommandResult.Fail(ErrorCode.EventCancelled, $"Мероприятие было отменено");
+                return CommandResult.Fail(ErrorCode.EventCancelled, "Мероприятие отменено");
 
             if (curEvent.Parameters?.MaxPersonsCount > 0)
             {
                 var participantsCount = await _participationsRepository.GetParticipantsCountAsync(curEvent.Id);
                 if (participantsCount >= curEvent.Parameters.MaxPersonsCount)
-                    return CommandResult.Fail(ErrorCode.EventIsFull, $"В мероприятии уже участвует максимальное количество человек");
+                    return CommandResult.Fail(ErrorCode.EventIsFull, "Мероприятие заполнено");
             }
 
-            #region filterInvitations
+            var inviterId = _accountDataHolder.AccountId!.Value;
             var someInvitationsFiltered = false;
-            var message = string.Empty;
-            if (curEvent.Parameters?.Private ?? false)
+            var messages = new List<string>();
+            var allowedIds = new List<Guid>();
+
+            foreach (var accountId in (request.AccountIds ?? new List<Guid>()).Distinct())
             {
-                var whiteListIsEmpty = await _participantsBWListRepository.IsWhiteListEmptyAsync(curEvent.Id);
-                if (!whiteListIsEmpty)
+                var eligibility = await EvaluateInviteeForEventAsync(
+                    inviterId,
+                    accountId,
+                    curEvent,
+                    checkPrivacy: true,
+                    checkAlreadyInvitedOrParticipating: true,
+                    checkBwLists: true,
+                    checkAgeGender: true);
+
+                if (eligibility.Allowed)
                 {
-                    var filteredAccounts = await _participantsBWListRepository.FilterUsersByWhiteListAsync(curEvent.Id, request.AccountIds);
-                    someInvitationsFiltered = filteredAccounts.Count() != request.AccountIds.Count();
-                    request.AccountIds = filteredAccounts;
-                    if (someInvitationsFiltered)
-                        message = "Некоторых пользователей нет в белом списках. Им не удалось отправить приглашение";
+                    allowedIds.Add(accountId);
+                }
+                else
+                {
+                    someInvitationsFiltered = true;
+                    if (!string.IsNullOrWhiteSpace(eligibility.Reason) && !messages.Contains(eligibility.Reason!))
+                        messages.Add(eligibility.Reason!);
                 }
             }
-            else
-            {
-                var filteredAccounts = await _participantsBWListRepository.FilterUsersByBlackListAsync(curEvent.Id, request.AccountIds);
-                someInvitationsFiltered = filteredAccounts.Count() != request.AccountIds.Count();
-                request.AccountIds = filteredAccounts;
-                if (someInvitationsFiltered)
-                    message = "Некоторые пользователи находятся в чёрном списке. Им не удалось отправить приглашение";
-            }
-            #endregion
+
+            request.AccountIds = allowedIds;
+            var message = messages.Count == 0
+                ? string.Empty
+                : (messages.Count == 1
+                    ? messages[0]
+                    : "Некоторым пользователям нельзя отправить приглашение: " + string.Join("; ", messages));
 
             if (!request.AccountIds?.Any() ?? true)
                 return CommandResult.Fail(ErrorCode.IsNullOrEmpty, message.Length > 0 ? message : "Список пользователей пуст");
 
-            await _invitationsRepository.CreateInvitationsAsync(request, _accountDataHolder.AccountId.Value);
+            await _invitationsRepository.CreateInvitationsAsync(request, inviterId);
 
             await _notificationsService.NotifyUsersInvitedAsync(request.EventId, request.AccountIds);
 
@@ -128,6 +147,349 @@ namespace EList.Services.Impl
             if (someInvitationsFiltered)
                 result.Message = message;
             return result;
+        }
+
+        public async Task<CommandResult<CreateInvitationsToAccountResult>> CreateToAccountAsync(
+            CreateInvitationsToAccountRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CreateToAccountAsync)}";
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            var dataError = _invitationDataValidator.ValidateCreateToAccountRequest(request);
+            if (!dataError.Success)
+                return CommandResult<CreateInvitationsToAccountResult>.Fail(dataError.ErrorCode, dataError.Message);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<CreateInvitationsToAccountResult>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var inviterId = _accountDataHolder.AccountId.Value;
+            var outcome = new CreateInvitationsToAccountResult();
+            var distinctEventIds = request.EventIds.Distinct().Take(100).ToList();
+
+            foreach (var eventId in distinctEventIds)
+            {
+                var eligibilityResult = await AssertCanInviteToEventAsync(
+                    inviterId,
+                    request.InvitedAccountId,
+                    eventId,
+                    request.InviterOrganizationId);
+
+                if (!eligibilityResult.Success || eligibilityResult.Result == null || !eligibilityResult.Result.Allowed)
+                {
+                    outcome.Failures.Add(new InvitationToAccountFailure
+                    {
+                        EventId = eventId,
+                        ErrorCode = eligibilityResult.Result?.ErrorCode
+                            ?? (eligibilityResult.Success ? (int)ErrorCode.InvitationForbidden : eligibilityResult.ErrorCode),
+                        Message = eligibilityResult.Result?.Reason
+                            ?? eligibilityResult.Message
+                            ?? "Не удалось отправить приглашение"
+                    });
+                    continue;
+                }
+
+                var single = await CreateAsync(new CreateInvitationsRequest
+                {
+                    EventId = eventId,
+                    AccountIds = new List<Guid> { request.InvitedAccountId },
+                    InviterOrganizationId = request.InviterOrganizationId
+                });
+
+                if (single.Success)
+                {
+                    outcome.SucceededEventIds.Add(eventId);
+                }
+                else
+                {
+                    outcome.Failures.Add(new InvitationToAccountFailure
+                    {
+                        EventId = eventId,
+                        ErrorCode = single.ErrorCode,
+                        Message = single.Message ?? "Не удалось отправить приглашение"
+                    });
+                }
+            }
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<CreateInvitationsToAccountResult>(outcome);
+        }
+
+        public async Task<CommandResult<InviteToEventEligibility>> AssertCanInviteToEventAsync(
+            Guid inviterAccountId,
+            Guid inviteeAccountId,
+            Guid eventId,
+            Guid? inviterOrganizationId = null)
+        {
+            var curEvent = await _eventsRepository.GetEventAsync(eventId);
+            if (curEvent == null)
+            {
+                return new CommandResult<InviteToEventEligibility>(new InviteToEventEligibility
+                {
+                    EventId = eventId,
+                    AccountId = inviteeAccountId,
+                    Allowed = false,
+                    Reason = "Мероприятие не найдено",
+                    ErrorCode = (int)ErrorCode.EventNotFound
+                });
+            }
+
+            var createAccess = await _invitationAccessValidator.AssertCanCreateInvitationsAsync(
+                curEvent, inviterAccountId, inviterOrganizationId);
+            if (!createAccess.Success)
+            {
+                return new CommandResult<InviteToEventEligibility>(Deny(
+                    eventId, inviteeAccountId, createAccess.Message ?? "Нет прав на приглашение", createAccess.ErrorCode));
+            }
+
+            if (curEvent.Active == false)
+            {
+                return new CommandResult<InviteToEventEligibility>(Deny(
+                    eventId, inviteeAccountId, "Мероприятие отменено", ErrorCode.EventCancelled,
+                    ticketsRequired: curEvent.Parameters?.TicketsEnabled == true));
+            }
+
+            if (curEvent.Parameters?.MaxPersonsCount > 0)
+            {
+                var participantsCount = await _participationsRepository.GetParticipantsCountAsync(curEvent.Id);
+                if (participantsCount >= curEvent.Parameters.MaxPersonsCount)
+                {
+                    return new CommandResult<InviteToEventEligibility>(Deny(
+                        eventId, inviteeAccountId,
+                        "Мероприятие заполнено",
+                        ErrorCode.EventIsFull,
+                        ticketsRequired: curEvent.Parameters?.TicketsEnabled == true));
+                }
+            }
+
+            var inviteeCheck = await EvaluateInviteeForEventAsync(
+                inviterAccountId,
+                inviteeAccountId,
+                curEvent,
+                checkPrivacy: true,
+                checkAlreadyInvitedOrParticipating: true,
+                checkBwLists: true,
+                checkAgeGender: true);
+
+            return new CommandResult<InviteToEventEligibility>(inviteeCheck);
+        }
+
+        public async Task<CommandResult<List<InviteToEventEligibility>>> CanInviteToEventByEventAsync(
+            CanInviteToEventByEventRequest request)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<List<InviteToEventEligibility>>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            if (request == null || request.EventId == Guid.Empty)
+                return CommandResult<List<InviteToEventEligibility>>.Fail(ErrorCode.IsNullOrEmpty, "Не указано мероприятие");
+
+            var ids = (request.AccountIds ?? new List<Guid>())
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .Take(100)
+                .ToList();
+
+            var inviterId = _accountDataHolder.AccountId.Value;
+            var results = new List<InviteToEventEligibility>(ids.Count);
+            foreach (var accountId in ids)
+            {
+                var item = await AssertCanInviteToEventAsync(
+                    inviterId, accountId, request.EventId, request.InviterOrganizationId);
+                results.Add(item.Result ?? Deny(
+                    request.EventId, accountId, item.Message ?? "Ошибка проверки", item.ErrorCode));
+            }
+
+            return new CommandResult<List<InviteToEventEligibility>>(results);
+        }
+
+        public async Task<CommandResult<List<InviteToEventEligibility>>> CanInviteToEventByAccountAsync(
+            CanInviteToEventByAccountRequest request)
+        {
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<List<InviteToEventEligibility>>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            if (request == null || request.AccountId == Guid.Empty)
+                return CommandResult<List<InviteToEventEligibility>>.Fail(ErrorCode.IsNullOrEmpty, "Не указан аккаунт");
+
+            var eventIds = (request.EventIds ?? new List<Guid>())
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .Take(100)
+                .ToList();
+
+            var inviterId = _accountDataHolder.AccountId.Value;
+            var results = new List<InviteToEventEligibility>(eventIds.Count);
+            foreach (var eventId in eventIds)
+            {
+                var item = await AssertCanInviteToEventAsync(
+                    inviterId, request.AccountId, eventId, request.InviterOrganizationId);
+                results.Add(item.Result ?? Deny(
+                    eventId, request.AccountId, item.Message ?? "Ошибка проверки", item.ErrorCode));
+            }
+
+            return new CommandResult<List<InviteToEventEligibility>>(results);
+        }
+
+        private async Task<InviteToEventEligibility> EvaluateInviteeForEventAsync(
+            Guid inviterAccountId,
+            Guid inviteeAccountId,
+            Event curEvent,
+            bool checkPrivacy,
+            bool checkAlreadyInvitedOrParticipating,
+            bool checkBwLists,
+            bool checkAgeGender)
+        {
+            var ticketsRequired = curEvent.Parameters?.TicketsEnabled == true;
+
+            if (inviteeAccountId == Guid.Empty)
+                return Deny(curEvent.Id, inviteeAccountId, "Некорректный аккаунт", ErrorCode.InvalidValue, ticketsRequired);
+
+            if (inviterAccountId == inviteeAccountId)
+                return Deny(curEvent.Id, inviteeAccountId, "Нельзя пригласить самого себя", ErrorCode.InvitationForbidden, ticketsRequired);
+
+            if (checkPrivacy)
+            {
+                var privacy = await _profilePrivacyService.AssertCanSendInvitationAsync(inviterAccountId, inviteeAccountId);
+                if (!privacy.Success)
+                    return Deny(curEvent.Id, inviteeAccountId, privacy.Message ?? "Приглашение запрещено настройками приватности", privacy.ErrorCode, ticketsRequired);
+            }
+
+            if (checkAlreadyInvitedOrParticipating)
+            {
+                if (await _invitationsRepository.IsUserInvitatedAsync(inviteeAccountId, curEvent.Id))
+                    return Deny(curEvent.Id, inviteeAccountId, "Уже приглашён", ErrorCode.InvitationForbidden, ticketsRequired);
+
+                if (await _participationsRepository.IsUserParticipatedAsync(inviteeAccountId, curEvent.Id))
+                    return Deny(curEvent.Id, inviteeAccountId, "Уже участвует", ErrorCode.InvitationForbidden, ticketsRequired);
+            }
+
+            if (checkBwLists)
+            {
+                if (curEvent.Parameters?.Private == true)
+                {
+                    var whiteListIsEmpty = await _participantsBWListRepository.IsWhiteListEmptyAsync(curEvent.Id);
+                    if (!whiteListIsEmpty
+                        && !await _participantsBWListRepository.IsUserInWhiteListAsync(curEvent.Id, inviteeAccountId))
+                    {
+                        return Deny(curEvent.Id, inviteeAccountId, "Пользователя нет в белом списке", ErrorCode.InvitationForbidden, ticketsRequired);
+                    }
+                }
+                else if (await _participantsBWListRepository.IsUserInBlackListAsync(curEvent.Id, inviteeAccountId))
+                {
+                    return Deny(curEvent.Id, inviteeAccountId, "Пользователь в чёрном списке мероприятия", ErrorCode.InvitationForbidden, ticketsRequired);
+                }
+            }
+
+            if (checkAgeGender)
+            {
+                var person = await _personsRepository.GetPersonInfoAsync(inviteeAccountId);
+                var ageGender = AssertAgeAndGender(curEvent, person);
+                if (!ageGender.Success)
+                    return Deny(curEvent.Id, inviteeAccountId, ageGender.Message ?? "Не подходит по возрасту или полу", ageGender.ErrorCode, ticketsRequired);
+            }
+
+            // Бан модерации invitee — на create/eligibility, не только на accept.
+            var participateBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                inviteeAccountId, ModerationPenaltyType.BanEventParticipate);
+            if (!participateBan.Success)
+            {
+                return Deny(
+                    curEvent.Id,
+                    inviteeAccountId,
+                    participateBan.Message ?? "Пользователю запрещено участвовать в мероприятиях",
+                    participateBan.ErrorCode,
+                    ticketsRequired);
+            }
+
+            var eventBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
+                inviteeAccountId, ModerationPenaltyType.BanFromEvent, curEvent.Id);
+            if (!eventBan.Success)
+            {
+                return Deny(
+                    curEvent.Id,
+                    inviteeAccountId,
+                    eventBan.Message ?? "Пользователю запрещено участвовать в этом мероприятии",
+                    eventBan.ErrorCode,
+                    ticketsRequired);
+            }
+
+            return new InviteToEventEligibility
+            {
+                EventId = curEvent.Id,
+                AccountId = inviteeAccountId,
+                Allowed = true,
+                Reason = null,
+                ErrorCode = 0,
+                TicketsRequired = ticketsRequired
+            };
+        }
+
+        private static CommandResult AssertAgeAndGender(Event curEvent, PersonInfo? person)
+        {
+            var ageLimit = curEvent.Parameters?.AgeLimit ?? 0;
+            if (ageLimit > 0)
+            {
+                if (person?.BirthDate == null)
+                    return CommandResult.Fail(ErrorCode.InvitationForbidden, "Не указан возраст приглашаемого");
+
+                var ageYears = CalculateAgeYears(person.BirthDate.Value);
+                if (ageYears == null || ageYears < ageLimit)
+                    return CommandResult.Fail(
+                        ErrorCode.InvitationForbidden,
+                        $"Мероприятие доступно с {ageLimit}+ лет");
+            }
+
+            var allowedGender = curEvent.Parameters?.AllowedGender;
+            if (allowedGender != null)
+            {
+                if (person?.Gender == null)
+                    return CommandResult.Fail(ErrorCode.InvitationForbidden, "Не указан пол приглашаемого");
+
+                if (person.Gender != allowedGender)
+                {
+                    var label = allowedGender == Gender.Male ? "мужчин" : "женщин";
+                    return CommandResult.Fail(ErrorCode.InvitationForbidden, $"Мероприятие только для {label}");
+                }
+            }
+
+            return CommandResult.OK;
+        }
+
+        private static int? CalculateAgeYears(DateTime birthDate)
+        {
+            var today = DateTime.UtcNow.Date;
+            var birth = birthDate.Date;
+            var age = today.Year - birth.Year;
+            if (birth > today.AddYears(-age))
+                age--;
+            return age < 0 ? null : age;
+        }
+
+        private static InviteToEventEligibility Deny(
+            Guid eventId,
+            Guid accountId,
+            string reason,
+            ErrorCode errorCode,
+            bool ticketsRequired = false)
+            => Deny(eventId, accountId, reason, (int)errorCode, ticketsRequired);
+
+        private static InviteToEventEligibility Deny(
+            Guid eventId,
+            Guid accountId,
+            string reason,
+            int errorCode,
+            bool ticketsRequired = false)
+        {
+            return new InviteToEventEligibility
+            {
+                EventId = eventId,
+                AccountId = accountId,
+                Allowed = false,
+                Reason = reason,
+                ErrorCode = errorCode,
+                TicketsRequired = ticketsRequired
+            };
         }
 
         public async Task<CommandResult> AcceptAsync(Guid invitationId)
@@ -152,13 +514,13 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Мероприятие с id='{invitation.EventId}' не найдено");
 
             if (curEvent.Active == false)
-                return CommandResult.Fail(ErrorCode.EventCancelled, $"Мероприятие было отменено");
+                return CommandResult.Fail(ErrorCode.EventCancelled, "Мероприятие отменено");
 
-            // TicketsEnabled: приглашение не даёт бесплатный вход — нужен билет.
+            // Модель A: TicketsEnabled — приглашение не даёт бесплатный вход; нужен билет.
             if (curEvent.Parameters?.TicketsEnabled == true)
             {
                 return CommandResult.Fail(ErrorCode.OrganizationPaymentRequired,
-                    "Для участия в этом мероприятии нужно купить билет");
+                    "Для участия нужно купить билет");
             }
 
             var participateBan = await _moderationPenaltiesService.AssertNotRestrictedAsync(
@@ -184,7 +546,7 @@ namespace EList.Services.Impl
             {
                 var participantsCount = await _participationsRepository.GetParticipantsCountAsync(curEvent.Id);
                 if (participantsCount >= curEvent.Parameters.MaxPersonsCount)
-                    return CommandResult.Fail(ErrorCode.EventIsFull, $"В мероприятии уже участвует максимальное количество человек");
+                    return CommandResult.Fail(ErrorCode.EventIsFull, "Мероприятие заполнено");
             }
 
             await _participationsRepository.ParticipateAsync(_accountDataHolder.AccountId.Value, invitation.EventId);
