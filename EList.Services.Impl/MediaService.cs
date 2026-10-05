@@ -34,6 +34,7 @@ namespace EList.Services.Impl
         private readonly IMediaAlbumValidator _mediaAlbumValidator;
         private readonly IFilestorageClient _filestorageClient;
         private readonly IEventsRepository _eventsRepository;
+        private readonly IProfilePrivacyService _profilePrivacyService;
 
         public MediaService(ICorrelationIdProvider correlationIdProvider,
             IMediaRepository mediaRepository,
@@ -43,7 +44,8 @@ namespace EList.Services.Impl
             IAlbumAccessValidator albumAccessValidator,
             IMediaAlbumValidator mediaAlbumValidator,
             IFilestorageClient filestorageClient,
-            IEventsRepository eventsRepository)
+            IEventsRepository eventsRepository,
+            IProfilePrivacyService profilePrivacyService)
         {
             _correlationIdProvider = correlationIdProvider;
             _mediaRepository = mediaRepository;
@@ -54,6 +56,7 @@ namespace EList.Services.Impl
             _mediaAlbumValidator = mediaAlbumValidator;
             _filestorageClient = filestorageClient;
             _eventsRepository = eventsRepository;
+            _profilePrivacyService = profilePrivacyService ?? throw new ArgumentNullException(nameof(profilePrivacyService));
         }
 
         public async Task<CommandResult<Guid?>> CreateAlbumAsync(EventAlbumRequest request)
@@ -437,6 +440,9 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            if (!await _profilePrivacyService.CanViewerSeeProfilePhotosAsync(accountId, _accountDataHolder.AccountId))
+                return CommandResult<List<Guid>?>.OK(new List<Guid>());
+
             var result = await _mediaRepository.GetAccountAvatarsAsync(accountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -465,6 +471,9 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(GetAccountAvatarAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (!await _profilePrivacyService.CanViewerSeeProfilePhotosAsync(accountId, _accountDataHolder.AccountId))
+                return CommandResult<Guid?>.OK(null);
 
             var result = await _mediaRepository.GetLastAccountAvatarAsync(accountId);
 
