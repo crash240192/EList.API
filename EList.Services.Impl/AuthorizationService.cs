@@ -17,7 +17,6 @@ using Newtonsoft.Json.Linq;
 using NLog;
 using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace EList.Services.Impl
@@ -214,17 +213,6 @@ namespace EList.Services.Impl
 
             var existingToken = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
 
-            // #region agent log
-            AgentDebugLog("H5", "AuthorizationService.ActivateTokenAsync", "token lookup", new
-            {
-                holderToken = _accountDataHolder.Token?.ToString(),
-                existingTokenFound = existingToken != null,
-                existingTokenId = existingToken?.Token.ToString(),
-                keyMatch = existingToken != null && existingToken.ActivationKey == activationKey,
-                activationKeyLength = activationKey?.Length ?? 0,
-            });
-            // #endregion
-
             if (existingToken == null)
                 return CommandResult.Fail(ErrorCode.AuthorizationDataNotFound, $"Не найден авторизационный токен для текущего клиента");
 
@@ -233,13 +221,6 @@ namespace EList.Services.Impl
 
             if (existingToken.ActivationKey != activationKey)
             {
-                // #region agent log
-                AgentDebugLog("H5", "AuthorizationService.ActivateTokenAsync", "activation key mismatch", new
-                {
-                    existingTokenId = existingToken.Token.ToString(),
-                    attemptsRemaining = existingToken.ActivationAttemptsRemaining,
-                });
-                // #endregion
                 await _authorizationRepository.DecreaseActivationAttempts(existingToken.Token);
                 existingToken.ActivationAttemptsRemaining--;
 
@@ -550,30 +531,5 @@ namespace EList.Services.Impl
 
             return "Ваш аккаунт заблокирован. Обратитесь в поддержку.";
         }
-
-        // #region agent log
-        private static void AgentDebugLog(string hypothesisId, string location, string message, object? data = null)
-        {
-            try
-            {
-                var payload = new Dictionary<string, object?>
-                {
-                    ["hypothesisId"] = hypothesisId,
-                    ["location"] = location,
-                    ["message"] = message,
-                    ["timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                };
-                if (data != null)
-                    payload["data"] = data;
-                var line = JsonSerializer.Serialize(payload) + Environment.NewLine;
-                System.IO.Directory.CreateDirectory("/opt/cursor/logs");
-                System.IO.File.AppendAllText("/opt/cursor/logs/debug.log", line);
-            }
-            catch
-            {
-                // ignore debug log failures
-            }
-        }
-        // #endregion
     }
 }
