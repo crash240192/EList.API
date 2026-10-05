@@ -3,6 +3,7 @@ using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
+using EList.Models.Accounts;
 using EList.Models.Enums;
 using EList.Models.Privacy;
 using EList.Repositories.Interfaces;
@@ -191,6 +192,42 @@ namespace EList.Services.Impl
                     && await _subscriptionsRepository.IsSubscriptionExistAsync(viewerAccountId.Value, ownerAccountId),
                 _ => false
             };
+        }
+
+        public async Task<bool> CanViewerSeeProfilePhotosAsync(Guid ownerAccountId, Guid? viewerAccountId)
+        {
+            var settings = await GetOrDefaultAsync(ownerAccountId);
+            return await CanViewerSeeAsync(ownerAccountId, viewerAccountId, settings.ProfilePhotosVisibility);
+        }
+
+        public async Task<Account> ApplyAccountViewPolicyAsync(Account account, Guid? viewerAccountId)
+        {
+            if (account == null)
+                return account!;
+
+            var lat = account.Latitude;
+            var lng = account.Longitude;
+            account.ProfileCity = null;
+
+            if (viewerAccountId == account.Id)
+            {
+                account.ProfileCity = ProfileCityResolver.ResolveNearestCityName(lat, lng);
+                return account;
+            }
+
+            account.Latitude = null;
+            account.Longitude = null;
+            account.PasswordHash = null;
+
+            var settings = await GetOrDefaultAsync(account.Id);
+
+            if (await CanViewerSeeAsync(account.Id, viewerAccountId, settings.LocationVisibility))
+                account.ProfileCity = ProfileCityResolver.ResolveNearestCityName(lat, lng);
+
+            if (!await CanViewerSeeAsync(account.Id, viewerAccountId, settings.ProfilePhotosVisibility))
+                account.AvatarId = null;
+
+            return account;
         }
 
         private static bool IsDefined(PrivacyAudience value) => Enum.IsDefined(typeof(PrivacyAudience), value);

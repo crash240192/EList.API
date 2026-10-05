@@ -54,6 +54,7 @@ namespace EList.Services.Impl
         private readonly ISubscriptionsRepository _subscriptionsRepository;
         private readonly IConversationRepository _conversationRepository;
         private readonly IFilestorageClient _filestorageClient;
+        private readonly IProfilePrivacyService _profilePrivacyService;
 
         public AccountsService(ICorrelationIdProvider correlationIdProvider,
             IAccountsRepository accountsRepository,
@@ -72,7 +73,8 @@ namespace EList.Services.Impl
             IEventsRepository eventsRepository,
             ISubscriptionsRepository subscriptionsRepository,
             IConversationRepository conversationRepository,
-            IFilestorageClient filestorageClient)
+            IFilestorageClient filestorageClient,
+            IProfilePrivacyService profilePrivacyService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
@@ -91,6 +93,7 @@ namespace EList.Services.Impl
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
             _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
             _filestorageClient = filestorageClient ?? throw new ArgumentNullException(nameof(filestorageClient));
+            _profilePrivacyService = profilePrivacyService ?? throw new ArgumentNullException(nameof(profilePrivacyService));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -199,6 +202,8 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _accountsRepository.GetAccountAsync(accountId);
+            if (result != null)
+                result = await _profilePrivacyService.ApplyAccountViewPolicyAsync(result, _accountDataHolder.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Account?>(result);
@@ -213,8 +218,12 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var authorizationInfo = await _authorizationRepository.GetAuthorizationDataAsync(_accountDataHolder.Token.Value);
+            if (authorizationInfo == null)
+                return CommandResult<Account?>.Fail(ErrorCode.AuthorizationDataNotFound, "Не найден авторизационный токен");
 
             var result = await _accountsRepository.GetAccountAsync(authorizationInfo.AccountId);
+            if (result != null)
+                result = await _profilePrivacyService.ApplyAccountViewPolicyAsync(result, result.Id);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Account?>(result);

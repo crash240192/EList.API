@@ -1,4 +1,5 @@
 using EList.Common.Models;
+using EList.Models.Accounts;
 using EList.Models.Privacy;
 
 namespace EList.Services.Interfaces
@@ -19,5 +20,12 @@ namespace EList.Services.Interfaces
         Task<bool> CanViewerSeeAsync(Guid ownerAccountId, Guid? viewerAccountId, Models.Enums.PrivacyAudience audience);
 
         Task<AccountPrivacySettings> GetOrDefaultAsync(Guid accountId);
+
+        /// <summary>
+        /// Ограничивает поля аккаунта для просмотра чужого профиля (город, координаты, аватар).
+        /// </summary>
+        Task<Account> ApplyAccountViewPolicyAsync(Account account, Guid? viewerAccountId);
+
+        Task<bool> CanViewerSeeProfilePhotosAsync(Guid ownerAccountId, Guid? viewerAccountId);
     }
 }
