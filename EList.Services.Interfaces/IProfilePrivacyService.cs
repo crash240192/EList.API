@@ -12,6 +12,8 @@ namespace EList.Services.Interfaces
 
         Task<CommandResult<CanInviteResult>> CanInviteAsync(Guid targetAccountId);
 
+        Task<CommandResult<List<CanInviteResult>>> CanInviteBatchAsync(IEnumerable<Guid> targetAccountIds);
+
         /// <summary>
         /// Может ли <paramref name="inviterAccountId"/> отправить приглашение <paramref name="inviteeAccountId"/>.
         /// </summary>

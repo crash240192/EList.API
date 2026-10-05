@@ -310,5 +310,29 @@ namespace EList.Api.Controllers
                 throw;
             }
         }
+
+        /// <summary>
+        /// Массовая проверка canInvite (для модалки приглашения с события).
+        /// </summary>
+        [HttpPost("canInvite/batch")]
+        public async Task<CommandResult<List<CanInviteResult>>> CanInviteBatchAsync(CanInviteBatchRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CanInviteBatchAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _profilePrivacyService.CanInviteBatchAsync(request?.AccountIds);
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
     }
 }
