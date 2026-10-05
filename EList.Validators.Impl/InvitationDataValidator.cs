@@ -8,6 +8,7 @@ namespace EList.Validators.Impl
     public class InvitationDataValidator : IInvitationDataValidator
     {
         public const int MaxInviteesPerRequest = 500;
+        public const int MaxEventsPerToAccountRequest = 50;
 
         public CommandResult ValidateCreateRequest(CreateInvitationsRequest? request)
         {
@@ -24,6 +25,25 @@ namespace EList.Validators.Impl
                 request.AccountIds,
                 "Список приглашаемых",
                 MaxInviteesPerRequest,
+                allowEmpty: false,
+                requireAtLeastOne: true);
+        }
+
+        public CommandResult ValidateCreateToAccountRequest(CreateInvitationsToAccountRequest? request)
+        {
+            if (request == null)
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Запрос на создание приглашений не указан");
+
+            if (request.InvitedAccountId == Guid.Empty)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Не указан приглашаемый аккаунт");
+
+            if (request.InviterOrganizationId.HasValue && request.InviterOrganizationId.Value == Guid.Empty)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Некорректный идентификатор организации-пригласителя");
+
+            return ValidationCommon.ValidateGuidList(
+                request.EventIds,
+                "Список мероприятий",
+                MaxEventsPerToAccountRequest,
                 allowEmpty: false,
                 requireAtLeastOne: true);
         }

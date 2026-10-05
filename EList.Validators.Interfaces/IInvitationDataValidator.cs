@@ -6,5 +6,6 @@ namespace EList.Validators.Interfaces
     public interface IInvitationDataValidator
     {
         CommandResult ValidateCreateRequest(CreateInvitationsRequest? request);
+        CommandResult ValidateCreateToAccountRequest(CreateInvitationsToAccountRequest? request);
     }
 }
