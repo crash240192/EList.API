@@ -70,6 +70,37 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Пригласить одного пользователя на несколько мероприятий
+        /// </summary>
+        [HttpPost("createToAccount")]
+        public async Task<CommandResult<CreateInvitationsToAccountResult>> CreateInvitationsToAccountAsync(
+            CreateInvitationsToAccountRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CreateInvitationsToAccountAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _invitationsService.CreateToAccountAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Список приглашений по токену
         /// </summary>
         /// <returns></returns>

@@ -95,5 +95,6 @@ namespace EList.DbDataProvider.DataConnections
         public ITable<ContentReportDto> ContentReports => this.GetTable<ContentReportDto>();
         public ITable<ContentReportActionDto> ContentReportActions => this.GetTable<ContentReportActionDto>();
         public ITable<ModerationPenaltyDto> ModerationPenalties => this.GetTable<ModerationPenaltyDto>();
+        public ITable<AccountPrivacySettingsDto> AccountPrivacySettings => this.GetTable<AccountPrivacySettingsDto>();
     }
 }

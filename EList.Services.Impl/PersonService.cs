@@ -95,7 +95,7 @@ namespace EList.Services.Impl
             if (result == null)
                 return CommandResult<PersonInfo?>.Fail(ErrorCode.AccountNotFound, "Персональные данные аккаунта не найдены");
 
-            result = _personAccessValidator.ApplyViewPolicy(result, accountId, _accountDataHolder.AccountId);
+            result = await _personAccessValidator.ApplyViewPolicyAsync(result, accountId, _accountDataHolder.AccountId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PersonInfo?>(result);

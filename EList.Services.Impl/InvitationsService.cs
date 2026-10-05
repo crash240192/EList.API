@@ -31,6 +31,7 @@ namespace EList.Services.Impl
         private readonly IInvitationDataValidator _invitationDataValidator;
         private readonly IEventAccessValidator _eventAccessValidator;
         private readonly IPagingValidator _pagingValidator;
+        private readonly IProfilePrivacyService _profilePrivacyService;
 
         public InvitationsService(ICorrelationIdProvider correlationIdProvider,
             IEventsRepository eventsRepository,
@@ -43,7 +44,8 @@ namespace EList.Services.Impl
             IInvitationAccessValidator invitationAccessValidator,
             IInvitationDataValidator invitationDataValidator,
             IEventAccessValidator eventAccessValidator,
-            IPagingValidator pagingValidator)
+            IPagingValidator pagingValidator,
+            IProfilePrivacyService profilePrivacyService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
@@ -56,6 +58,7 @@ namespace EList.Services.Impl
             _invitationDataValidator = invitationDataValidator ?? throw new ArgumentNullException(nameof(invitationDataValidator));
             _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
             _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
+            _profilePrivacyService = profilePrivacyService ?? throw new ArgumentNullException(nameof(profilePrivacyService));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -113,6 +116,17 @@ namespace EList.Services.Impl
                 if (someInvitationsFiltered)
                     message = "Некоторые пользователи находятся в чёрном списке. Им не удалось отправить приглашение";
             }
+
+            var privacyFiltered = await FilterByInvitePrivacyAsync(
+                _accountDataHolder.AccountId.Value, request.AccountIds);
+            if (privacyFiltered.Count != request.AccountIds.Count)
+            {
+                someInvitationsFiltered = true;
+                request.AccountIds = privacyFiltered;
+                message = string.IsNullOrEmpty(message)
+                    ? "Некоторым пользователям нельзя отправить приглашение из‑за их настроек приватности"
+                    : message + "; части пользователей нельзя отправить приглашение из‑за настроек приватности";
+            }
             #endregion
 
             if (!request.AccountIds?.Any() ?? true)
@@ -128,6 +142,95 @@ namespace EList.Services.Impl
             if (someInvitationsFiltered)
                 result.Message = message;
             return result;
+        }
+
+        public async Task<CommandResult<CreateInvitationsToAccountResult>> CreateToAccountAsync(
+            CreateInvitationsToAccountRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CreateToAccountAsync)}";
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            var dataError = _invitationDataValidator.ValidateCreateToAccountRequest(request);
+            if (!dataError.Success)
+                return CommandResult<CreateInvitationsToAccountResult>.Fail(dataError.ErrorCode, dataError.Message);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<CreateInvitationsToAccountResult>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var inviterId = _accountDataHolder.AccountId.Value;
+            var privacy = await _profilePrivacyService.AssertCanSendInvitationAsync(inviterId, request.InvitedAccountId);
+            if (!privacy.Success)
+                return CommandResult<CreateInvitationsToAccountResult>.Fail(privacy.ErrorCode, privacy.Message);
+
+            var outcome = new CreateInvitationsToAccountResult();
+            var distinctEventIds = request.EventIds.Distinct().ToList();
+
+            foreach (var eventId in distinctEventIds)
+            {
+                if (await _invitationsRepository.IsUserInvitatedAsync(request.InvitedAccountId, eventId))
+                {
+                    outcome.Failures.Add(new InvitationToAccountFailure
+                    {
+                        EventId = eventId,
+                        ErrorCode = (int)ErrorCode.InvitationForbidden,
+                        Message = "Уже приглашён"
+                    });
+                    continue;
+                }
+
+                if (await _participationsRepository.IsUserParticipatedAsync(request.InvitedAccountId, eventId))
+                {
+                    outcome.Failures.Add(new InvitationToAccountFailure
+                    {
+                        EventId = eventId,
+                        ErrorCode = (int)ErrorCode.InvitationForbidden,
+                        Message = "Уже участвует"
+                    });
+                    continue;
+                }
+
+                var single = await CreateAsync(new CreateInvitationsRequest
+                {
+                    EventId = eventId,
+                    AccountIds = new List<Guid> { request.InvitedAccountId },
+                    InviterOrganizationId = request.InviterOrganizationId
+                });
+
+                if (single.Success)
+                {
+                    outcome.SucceededEventIds.Add(eventId);
+                }
+                else
+                {
+                    outcome.Failures.Add(new InvitationToAccountFailure
+                    {
+                        EventId = eventId,
+                        ErrorCode = single.ErrorCode,
+                        Message = single.Message ?? "Не удалось отправить приглашение"
+                    });
+                }
+            }
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<CreateInvitationsToAccountResult>(outcome);
+        }
+
+        private async Task<List<Guid>> FilterByInvitePrivacyAsync(Guid inviterAccountId, List<Guid> accountIds)
+        {
+            if (accountIds == null || accountIds.Count == 0)
+                return new List<Guid>();
+
+            var allowed = new List<Guid>(accountIds.Count);
+            foreach (var accountId in accountIds.Distinct())
+            {
+                var assert = await _profilePrivacyService.AssertCanSendInvitationAsync(inviterAccountId, accountId);
+                if (assert.Success)
+                    allowed.Add(accountId);
+            }
+
+            return allowed;
         }
 
         public async Task<CommandResult> AcceptAsync(Guid invitationId)

@@ -6,6 +6,7 @@ namespace EList.Services.Interfaces
     public interface IInvitationsService
     {
         Task<CommandResult> CreateAsync(CreateInvitationsRequest request);
+        Task<CommandResult<CreateInvitationsToAccountResult>> CreateToAccountAsync(CreateInvitationsToAccountRequest request);
         Task<CommandResult<PagedList<Invitation>>> GetUserInvitationsAsync(int pageIndex = 0, int pageSize = 20);
         Task<CommandResult> AcceptAsync(Guid invitationId);
         Task<CommandResult> DeclineAsync(Guid invitationId);
