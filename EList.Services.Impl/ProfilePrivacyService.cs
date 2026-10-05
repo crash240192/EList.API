@@ -135,12 +135,46 @@ namespace EList.Services.Impl
             var assert = await AssertCanSendInvitationAsync(_accountDataHolder.AccountId.Value, targetAccountId);
             var result = new CanInviteResult
             {
+                AccountId = targetAccountId,
                 Allowed = assert.Success,
                 Reason = assert.Success ? null : assert.Message
             };
 
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return new CommandResult<CanInviteResult>(result);
+        }
+
+        public async Task<CommandResult<List<CanInviteResult>>> CanInviteBatchAsync(IEnumerable<Guid> targetAccountIds)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CanInviteBatchAsync)}";
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<List<CanInviteResult>>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var ids = (targetAccountIds ?? Enumerable.Empty<Guid>())
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .Take(100)
+                .ToList();
+
+            var inviterId = _accountDataHolder.AccountId.Value;
+            var results = new List<CanInviteResult>(ids.Count);
+            foreach (var targetId in ids)
+            {
+                var assert = await AssertCanSendInvitationAsync(inviterId, targetId);
+                results.Add(new CanInviteResult
+                {
+                    AccountId = targetId,
+                    Allowed = assert.Success,
+                    Reason = assert.Success ? null : assert.Message
+                });
+            }
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<CanInviteResult>>(results);
         }
 
         public async Task<CommandResult> AssertCanSendInvitationAsync(Guid inviterAccountId, Guid inviteeAccountId)
