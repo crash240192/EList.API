@@ -566,6 +566,32 @@ namespace EList.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Одно пополнение по id (poll после T-Bank return с depositId в SuccessURL).
+        /// </summary>
+        [HttpGet("deposits/{depositId}")]
+        public async Task<CommandResult<WalletDepositResponse>> GetWalletDepositAsync(Guid depositId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetWalletDepositAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _walletsService.GetWalletDepositAsync(depositId);
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
         /// <summary>История пополнений тарифного кошелька.</summary>
         [HttpGet("{walletId}/deposits")]
         public async Task<CommandResult<List<WalletDepositResponse>>> GetWalletDepositsAsync(Guid walletId)

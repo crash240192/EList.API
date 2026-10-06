@@ -55,6 +55,9 @@ namespace EList.Services.Interfaces
             string? orderIdFromProvider,
             string status);
 
+        /// <summary>Одно пополнение по id (для poll после T-Bank return с depositId в URL).</summary>
+        Task<CommandResult<WalletDepositResponse>> GetWalletDepositAsync(Guid depositId);
+
         Task<CommandResult<List<WalletDepositResponse>>> GetWalletDepositsAsync(Guid walletId);
 
         Task<CommandResult<List<WalletTariffChargeResponse>>> GetWalletTariffChargesAsync(Guid walletId);

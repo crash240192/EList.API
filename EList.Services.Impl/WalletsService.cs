@@ -734,6 +734,34 @@ namespace EList.Services.Impl
             return new CommandResult<Guid?>(deposit.Id);
         }
 
+        public async Task<CommandResult<WalletDepositResponse>> GetWalletDepositAsync(Guid depositId)
+        {
+            if (_accountDataHolder.AccountId == null)
+            {
+                return CommandResult<WalletDepositResponse>.Fail(
+                    ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+            }
+
+            if (depositId == Guid.Empty)
+            {
+                return CommandResult<WalletDepositResponse>.Fail(
+                    ErrorCode.InvalidValue, "Не указан depositId");
+            }
+
+            var deposit = await _walletsRepository.GetWalletDepositAsync(depositId);
+            if (deposit == null)
+            {
+                return CommandResult<WalletDepositResponse>.Fail(
+                    ErrorCode.InvalidValue, "Пополнение не найдено");
+            }
+
+            var access = await AssertCanManageWalletAsync(deposit.WalletId);
+            if (!access.Success)
+                return CommandResult<WalletDepositResponse>.Fail(access.ErrorCode, access.Message);
+
+            return new CommandResult<WalletDepositResponse>(_mapper.Map<WalletDepositResponse>(deposit));
+        }
+
         public async Task<CommandResult<List<WalletDepositResponse>>> GetWalletDepositsAsync(Guid walletId)
         {
             if (_accountDataHolder.AccountId == null)
