@@ -69,12 +69,17 @@ namespace EList.Services.Impl.Payments
 
     public class TBankPaymentSettings
     {
+        /// <summary>Прод-эквайринг. Тест по умолчанию в appsettings: rest-api-test.tinkoff.ru/v2.</summary>
         public const string DefaultApiBaseUrl = "https://securepay.tinkoff.ru/v2";
+
+        /// <summary>Тестовый хост Init/GetState/Cancel (без суффикса метода; клиент добавит /Init).</summary>
+        public const string TestApiBaseUrl = "https://rest-api-test.tinkoff.ru/v2";
+
         public const string DefaultSmRegisterBaseUrl = "https://register.tinkoff.ru/v1";
 
         public string TerminalKey { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
-        public string ApiBaseUrl { get; set; } = DefaultApiBaseUrl;
+        public string ApiBaseUrl { get; set; } = TestApiBaseUrl;
         public string? NotificationUrl { get; set; }
         public string? SuccessUrl { get; set; }
         public string? FailUrl { get; set; }
@@ -92,7 +97,8 @@ namespace EList.Services.Impl.Payments
             {
                 TerminalKey = Read("payments:tbank:terminalKey"),
                 Password = Read("payments:tbank:password"),
-                ApiBaseUrl = Read("payments:tbank:apiBaseUrl", DefaultApiBaseUrl),
+                // Локально/staging по умолчанию — test host; прод задаёт securepay через appsettings/env.
+                ApiBaseUrl = Read("payments:tbank:apiBaseUrl", TestApiBaseUrl),
                 NotificationUrl = ReadNullable("payments:tbank:notificationUrl"),
                 SuccessUrl = ReadNullable("payments:tbank:successUrl"),
                 FailUrl = ReadNullable("payments:tbank:failUrl"),
@@ -106,7 +112,7 @@ namespace EList.Services.Impl.Payments
             };
 
             if (string.IsNullOrWhiteSpace(settings.ApiBaseUrl))
-                settings.ApiBaseUrl = DefaultApiBaseUrl;
+                settings.ApiBaseUrl = TestApiBaseUrl;
             if (string.IsNullOrWhiteSpace(settings.SmRegister.BaseUrl))
                 settings.SmRegister.BaseUrl = DefaultSmRegisterBaseUrl;
 

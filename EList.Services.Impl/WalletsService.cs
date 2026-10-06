@@ -647,6 +647,188 @@ namespace EList.Services.Impl
             return new CommandResult<WalletDepositResponse>(_mapper.Map<WalletDepositResponse>(done));
         }
 
+        public async Task<CommandResult<Guid?>> ApplyProviderWalletDepositStatusAsync(
+            PaymentProvider provider,
+            string providerPaymentId,
+            string? orderIdFromProvider,
+            string status)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(ApplyProviderWalletDepositStatusAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (string.IsNullOrWhiteSpace(providerPaymentId))
+            {
+                return CommandResult<Guid?>.Fail(
+                    ErrorCode.InvalidValue, "Нет providerPaymentId");
+            }
+
+            var paymentId = providerPaymentId.Trim();
+            var normalizedStatus = string.IsNullOrWhiteSpace(status)
+                ? "UNKNOWN"
+                : status.Trim().ToUpperInvariant();
+
+            WalletDeposit? deposit = null;
+
+            if (!string.IsNullOrWhiteSpace(orderIdFromProvider)
+                && orderIdFromProvider.Trim().StartsWith("wallet:", StringComparison.OrdinalIgnoreCase))
+            {
+                var rawId = orderIdFromProvider.Trim().Substring("wallet:".Length).Trim();
+                if (Guid.TryParse(rawId, out var depositId))
+                    deposit = await _walletsRepository.GetWalletDepositAsync(depositId);
+            }
+
+            if (deposit == null)
+            {
+                deposit = await _walletsRepository.GetWalletDepositByProviderPaymentAsync(
+                    provider, paymentId);
+            }
+
+            if (deposit == null)
+            {
+                logger.Debug(correlationId, null, methodName,
+                    "Method finished (not a wallet deposit)", null, execTime.Elapsed);
+                return new CommandResult<Guid?>(null);
+            }
+
+            if (string.IsNullOrWhiteSpace(deposit.ProviderPaymentId))
+            {
+                deposit.ProviderPaymentId = paymentId;
+                await _walletsRepository.UpdateWalletDepositAsync(
+                    deposit.Id,
+                    deposit.Status,
+                    paymentId,
+                    paidAt: null);
+            }
+
+            if (normalizedStatus == "CONFIRMED")
+            {
+                await FulfillWalletDepositAsync(deposit);
+            }
+            else if (normalizedStatus is "REJECTED" or "AUTH_FAIL")
+            {
+                if (deposit.Status == WalletDepositStatus.Pending)
+                {
+                    await _walletsRepository.UpdateWalletDepositAsync(
+                        deposit.Id,
+                        WalletDepositStatus.Failed,
+                        deposit.ProviderPaymentId ?? paymentId,
+                        paidAt: null);
+                }
+            }
+            else if (normalizedStatus is "CANCELED" or "CANCELLED" or "DEADLINE_EXPIRED")
+            {
+                if (deposit.Status == WalletDepositStatus.Pending)
+                {
+                    await _walletsRepository.UpdateWalletDepositAsync(
+                        deposit.Id,
+                        WalletDepositStatus.Canceled,
+                        deposit.ProviderPaymentId ?? paymentId,
+                        paidAt: null);
+                }
+            }
+
+            logger.Debug(correlationId, null, methodName,
+                $"Method finished deposit={deposit.Id} status={normalizedStatus}", null, execTime.Elapsed);
+            return new CommandResult<Guid?>(deposit.Id);
+        }
+
+        public async Task<CommandResult<WalletDepositResponse>> GetWalletDepositAsync(Guid depositId)
+        {
+            if (_accountDataHolder.AccountId == null)
+            {
+                return CommandResult<WalletDepositResponse>.Fail(
+                    ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+            }
+
+            if (depositId == Guid.Empty)
+            {
+                return CommandResult<WalletDepositResponse>.Fail(
+                    ErrorCode.InvalidValue, "Не указан depositId");
+            }
+
+            var deposit = await _walletsRepository.GetWalletDepositAsync(depositId);
+            if (deposit == null)
+            {
+                return CommandResult<WalletDepositResponse>.Fail(
+                    ErrorCode.InvalidValue, "Пополнение не найдено");
+            }
+
+            var access = await AssertCanManageWalletAsync(deposit.WalletId);
+            if (!access.Success)
+                return CommandResult<WalletDepositResponse>.Fail(access.ErrorCode, access.Message);
+
+            // P4: webhook мог не дойти — GetState fallback при Pending.
+            await TrySyncWalletDepositFromProviderAsync(deposit);
+            if (deposit.Status == WalletDepositStatus.Pending)
+            {
+                var refreshed = await _walletsRepository.GetWalletDepositAsync(depositId);
+                if (refreshed != null)
+                    deposit = refreshed;
+            }
+
+            return new CommandResult<WalletDepositResponse>(_mapper.Map<WalletDepositResponse>(deposit));
+        }
+
+        /// <summary>
+        /// GetState fallback для пополнения: CONFIRMED → FulfillWalletDepositAsync.
+        /// </summary>
+        private async Task TrySyncWalletDepositFromProviderAsync(WalletDeposit deposit)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(TrySyncWalletDepositFromProviderAsync)}";
+
+            if (_paymentProvider.SupportsManualComplete)
+                return;
+            if (deposit.Status != WalletDepositStatus.Pending)
+                return;
+            if (string.IsNullOrWhiteSpace(deposit.ProviderPaymentId))
+                return;
+            if (deposit.Provider != null && deposit.Provider != _paymentProvider.Kind)
+                return;
+            if (!Payments.PaymentProviderSyncGate.TryEnter(deposit.ProviderPaymentId))
+                return;
+
+            PaymentStatusInfo statusInfo;
+            try
+            {
+                statusInfo = await _paymentProvider.GetStatusAsync(deposit.ProviderPaymentId.Trim());
+            }
+            catch (Exception ex)
+            {
+                logger.Debug(correlationId, null, methodName,
+                    $"GetState sync skipped: {ex.Message}", null);
+                return;
+            }
+
+            logger.Debug(correlationId, null, methodName,
+                $"GetState sync payment={deposit.ProviderPaymentId} status={statusInfo.Status}", null);
+
+            if (statusInfo.Status == PaymentProviderStatus.Succeeded)
+            {
+                await FulfillWalletDepositAsync(deposit);
+            }
+            else if (statusInfo.Status == PaymentProviderStatus.Failed)
+            {
+                await _walletsRepository.UpdateWalletDepositAsync(
+                    deposit.Id,
+                    WalletDepositStatus.Failed,
+                    deposit.ProviderPaymentId,
+                    paidAt: null);
+                deposit.Status = WalletDepositStatus.Failed;
+            }
+            else if (statusInfo.Status == PaymentProviderStatus.Canceled)
+            {
+                await _walletsRepository.UpdateWalletDepositAsync(
+                    deposit.Id,
+                    WalletDepositStatus.Canceled,
+                    deposit.ProviderPaymentId,
+                    paidAt: null);
+                deposit.Status = WalletDepositStatus.Canceled;
+            }
+        }
+
         public async Task<CommandResult<List<WalletDepositResponse>>> GetWalletDepositsAsync(Guid walletId)
         {
             if (_accountDataHolder.AccountId == null)

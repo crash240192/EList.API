@@ -40,6 +40,7 @@ namespace EList.Services.Impl
         private readonly IEventAccessValidator _eventAccessValidator;
         private readonly IPaymentProvider _paymentProvider;
         private readonly IAccountsRepository _accountsRepository;
+        private readonly IWalletsService _walletsService;
         private readonly IMapper _mapper;
 
         public OrdersService(
@@ -57,6 +58,7 @@ namespace EList.Services.Impl
             IEventAccessValidator eventAccessValidator,
             IPaymentProvider paymentProvider,
             IAccountsRepository accountsRepository,
+            IWalletsService walletsService,
             IMapper mapper)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
@@ -73,6 +75,7 @@ namespace EList.Services.Impl
             _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
             _paymentProvider = paymentProvider ?? throw new ArgumentNullException(nameof(paymentProvider));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
+            _walletsService = walletsService ?? throw new ArgumentNullException(nameof(walletsService));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
 
@@ -495,6 +498,21 @@ namespace EList.Services.Impl
                 });
             }
 
+            var isWalletOrderId = !string.IsNullOrWhiteSpace(notification.OrderId)
+                && notification.OrderId.Trim().StartsWith("wallet:", StringComparison.OrdinalIgnoreCase);
+
+            if (isWalletOrderId)
+            {
+                return await ProcessTBankWalletDepositWebhookAsync(
+                    providerPaymentId,
+                    notification.OrderId,
+                    status,
+                    webhookId,
+                    correlationId,
+                    methodName,
+                    execTime);
+            }
+
             Order? order = await _ordersRepository.GetOrderByProviderPaymentAsync(
                 PaymentProvider.Tbank, providerPaymentId);
 
@@ -513,6 +531,22 @@ namespace EList.Services.Impl
 
             if (order == null)
             {
+                // Fallback: PaymentId может относиться к пополнению кошелька (без префикса в lookup).
+                var walletFallback = await _walletsService.ApplyProviderWalletDepositStatusAsync(
+                    PaymentProvider.Tbank,
+                    providerPaymentId,
+                    notification.OrderId,
+                    status);
+                if (!walletFallback.Success)
+                    return CommandResult.Fail(walletFallback.ErrorCode, walletFallback.Message);
+                if (walletFallback.Result != null)
+                {
+                    await _ordersRepository.MarkWebhookProcessedAsync(webhookId, null);
+                    logger.Debug(correlationId, null, methodName,
+                        $"Method finished (wallet deposit {walletFallback.Result})", null, execTime.Elapsed);
+                    return CommandResult.OK;
+                }
+
                 await _ordersRepository.MarkWebhookProcessedAsync(webhookId, null);
                 logger.Debug(correlationId, null, methodName,
                     $"Webhook stored but order not found for payment '{providerPaymentId}'", null, execTime.Elapsed);
@@ -542,6 +576,39 @@ namespace EList.Services.Impl
 
             await _ordersRepository.MarkWebhookProcessedAsync(webhookId, order.Id);
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        private async Task<CommandResult> ProcessTBankWalletDepositWebhookAsync(
+            string providerPaymentId,
+            string? orderIdFromProvider,
+            string status,
+            Guid webhookId,
+            string correlationId,
+            string methodName,
+            Stopwatch execTime)
+        {
+            var walletResult = await _walletsService.ApplyProviderWalletDepositStatusAsync(
+                PaymentProvider.Tbank,
+                providerPaymentId,
+                orderIdFromProvider,
+                status);
+
+            if (!walletResult.Success)
+                return CommandResult.Fail(walletResult.ErrorCode, walletResult.Message);
+
+            if (walletResult.Result == null)
+            {
+                await _ordersRepository.MarkWebhookProcessedAsync(webhookId, null);
+                logger.Debug(correlationId, null, methodName,
+                    $"Webhook stored but wallet deposit not found for payment '{providerPaymentId}' OrderId='{orderIdFromProvider}'",
+                    null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
+            await _ordersRepository.MarkWebhookProcessedAsync(webhookId, null);
+            logger.Debug(correlationId, null, methodName,
+                $"Method finished (wallet deposit {walletResult.Result})", null, execTime.Elapsed);
             return CommandResult.OK;
         }
 
@@ -1079,8 +1146,61 @@ namespace EList.Services.Impl
                     return CommandResult<OrderResponse>.Fail(ErrorCode.AccessError, "Нет доступа к заказу");
             }
 
+            // P4: webhook мог не дойти (localhost NotificationURL) — подтянуть статус через GetState.
+            await TrySyncOrderFromProviderAsync(order, correlationId, methodName);
+            if (order.Status is OrderStatus.Pending or OrderStatus.Authorized)
+            {
+                var refreshed = await _ordersRepository.GetOrderFullAsync(orderId);
+                if (refreshed != null)
+                    order = refreshed;
+            }
+
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return new CommandResult<OrderResponse>(_mapper.Map<OrderResponse>(order));
+        }
+
+        /// <summary>
+        /// GetState fallback: если заказ ещё Pending/Authorized и провайдер не stub —
+        /// спросить банк и при CONFIRMED зачислить билеты (как webhook).
+        /// </summary>
+        private async Task TrySyncOrderFromProviderAsync(Order order, string correlationId, string methodName)
+        {
+            if (_paymentProvider.SupportsManualComplete)
+                return;
+            if (order.Status is not (OrderStatus.Pending or OrderStatus.Authorized))
+                return;
+            if (string.IsNullOrWhiteSpace(order.ProviderPaymentId))
+                return;
+            if (order.Provider != null && order.Provider != _paymentProvider.Kind)
+                return;
+            if (!PaymentProviderSyncGate.TryEnter(order.ProviderPaymentId))
+                return;
+
+            PaymentStatusInfo statusInfo;
+            try
+            {
+                statusInfo = await _paymentProvider.GetStatusAsync(order.ProviderPaymentId.Trim());
+            }
+            catch (Exception ex)
+            {
+                logger.Debug(correlationId, null, methodName,
+                    $"GetState sync skipped: {ex.Message}", null);
+                return;
+            }
+
+            logger.Debug(correlationId, null, methodName,
+                $"GetState sync payment={order.ProviderPaymentId} status={statusInfo.Status}", null);
+
+            if (statusInfo.Status == PaymentProviderStatus.Succeeded)
+            {
+                await FulfillPaidOrderAsync(order.Id, order.BuyerAccountId, order.EventId, order.Quantity);
+                order.Status = OrderStatus.Paid;
+            }
+            else if (statusInfo.Status is PaymentProviderStatus.Failed or PaymentProviderStatus.Canceled)
+            {
+                await _ordersRepository.UpdateOrderStatusAsync(order.Id, OrderStatus.Canceled);
+                order.Status = OrderStatus.Canceled;
+            }
         }
 
         public async Task<CommandResult<List<OrderResponse>>> GetMyOrdersAsync()

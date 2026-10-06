@@ -49,12 +49,15 @@ namespace EList.Services.Impl.Payments.TBank
                 ? $"wallet:{request.WalletDepositId:D}"
                 : request.OrderId.ToString("D");
 
-            var successUrl = !string.IsNullOrWhiteSpace(_settings.SuccessUrl)
+            var successBase = !string.IsNullOrWhiteSpace(_settings.SuccessUrl)
                 ? _settings.SuccessUrl
                 : request.ReturnUrl;
-            var failUrl = !string.IsNullOrWhiteSpace(_settings.FailUrl)
+            var failBase = !string.IsNullOrWhiteSpace(_settings.FailUrl)
                 ? _settings.FailUrl
                 : request.ReturnUrl;
+
+            var successUrl = BuildCustomerReturnUrl(successBase, request);
+            var failUrl = BuildCustomerReturnUrl(failBase, request);
 
             var init = new TBankInitRequest
             {
@@ -207,6 +210,37 @@ namespace EList.Services.Impl.Payments.TBank
                 // Cancel на NEW/AUTHORIZING часто сразу CANCELED
                 _ => MapStatus(status)
             };
+        }
+
+        /// <summary>
+        /// SuccessURL / FailURL с query для return-страницы UI
+        /// (как у stub: depositId+purpose=wallet или orderId).
+        /// </summary>
+        public static string? BuildCustomerReturnUrl(string? baseUrl, PaymentCreationRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(baseUrl) || request == null)
+                return baseUrl;
+
+            var root = baseUrl.Trim();
+            // Срезаем хвостовой '?' / '&', чтобы стабильно добавить свои параметры.
+            root = root.TrimEnd('?', '&');
+
+            string query;
+            if (request.WalletDepositId != null && request.WalletDepositId != Guid.Empty)
+            {
+                query = $"depositId={request.WalletDepositId:D}&purpose=wallet";
+            }
+            else if (request.OrderId != Guid.Empty)
+            {
+                query = $"orderId={request.OrderId:D}";
+            }
+            else
+            {
+                return root;
+            }
+
+            var separator = root.Contains('?', StringComparison.Ordinal) ? '&' : '?';
+            return $"{root}{separator}{query}";
         }
 
         private static string? Truncate(string? value, int max)

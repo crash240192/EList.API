@@ -1,4 +1,5 @@
 ﻿using EList.Common.Models;
+using EList.Models.Enums;
 using EList.Models.Wallets;
 
 namespace EList.Services.Interfaces
@@ -42,6 +43,20 @@ namespace EList.Services.Interfaces
 
         /// <summary>Stub/debug: имитация успешной оплаты пополнения.</summary>
         Task<CommandResult<WalletDepositResponse>> CompleteWalletDepositAsync(CompleteWalletDepositRequest request);
+
+        /// <summary>
+        /// Webhook провайдера: найти пополнение по OrderId <c>wallet:{guid}</c> или по
+        /// <paramref name="providerPaymentId"/> и применить статус (CONFIRMED → зачисление).
+        /// Без пользовательской авторизации. Result = null, если это не wallet-депозит.
+        /// </summary>
+        Task<CommandResult<Guid?>> ApplyProviderWalletDepositStatusAsync(
+            PaymentProvider provider,
+            string providerPaymentId,
+            string? orderIdFromProvider,
+            string status);
+
+        /// <summary>Одно пополнение по id (для poll после T-Bank return с depositId в URL).</summary>
+        Task<CommandResult<WalletDepositResponse>> GetWalletDepositAsync(Guid depositId);
 
         Task<CommandResult<List<WalletDepositResponse>>> GetWalletDepositsAsync(Guid walletId);
 
