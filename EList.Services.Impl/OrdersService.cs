@@ -40,6 +40,7 @@ namespace EList.Services.Impl
         private readonly IEventAccessValidator _eventAccessValidator;
         private readonly IPaymentProvider _paymentProvider;
         private readonly IAccountsRepository _accountsRepository;
+        private readonly IWalletsService _walletsService;
         private readonly IMapper _mapper;
 
         public OrdersService(
@@ -57,6 +58,7 @@ namespace EList.Services.Impl
             IEventAccessValidator eventAccessValidator,
             IPaymentProvider paymentProvider,
             IAccountsRepository accountsRepository,
+            IWalletsService walletsService,
             IMapper mapper)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
@@ -73,6 +75,7 @@ namespace EList.Services.Impl
             _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
             _paymentProvider = paymentProvider ?? throw new ArgumentNullException(nameof(paymentProvider));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
+            _walletsService = walletsService ?? throw new ArgumentNullException(nameof(walletsService));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
 
@@ -495,6 +498,21 @@ namespace EList.Services.Impl
                 });
             }
 
+            var isWalletOrderId = !string.IsNullOrWhiteSpace(notification.OrderId)
+                && notification.OrderId.Trim().StartsWith("wallet:", StringComparison.OrdinalIgnoreCase);
+
+            if (isWalletOrderId)
+            {
+                return await ProcessTBankWalletDepositWebhookAsync(
+                    providerPaymentId,
+                    notification.OrderId,
+                    status,
+                    webhookId,
+                    correlationId,
+                    methodName,
+                    execTime);
+            }
+
             Order? order = await _ordersRepository.GetOrderByProviderPaymentAsync(
                 PaymentProvider.Tbank, providerPaymentId);
 
@@ -513,6 +531,22 @@ namespace EList.Services.Impl
 
             if (order == null)
             {
+                // Fallback: PaymentId может относиться к пополнению кошелька (без префикса в lookup).
+                var walletFallback = await _walletsService.ApplyProviderWalletDepositStatusAsync(
+                    PaymentProvider.Tbank,
+                    providerPaymentId,
+                    notification.OrderId,
+                    status);
+                if (!walletFallback.Success)
+                    return CommandResult.Fail(walletFallback.ErrorCode, walletFallback.Message);
+                if (walletFallback.Result != null)
+                {
+                    await _ordersRepository.MarkWebhookProcessedAsync(webhookId, null);
+                    logger.Debug(correlationId, null, methodName,
+                        $"Method finished (wallet deposit {walletFallback.Result})", null, execTime.Elapsed);
+                    return CommandResult.OK;
+                }
+
                 await _ordersRepository.MarkWebhookProcessedAsync(webhookId, null);
                 logger.Debug(correlationId, null, methodName,
                     $"Webhook stored but order not found for payment '{providerPaymentId}'", null, execTime.Elapsed);
@@ -542,6 +576,39 @@ namespace EList.Services.Impl
 
             await _ordersRepository.MarkWebhookProcessedAsync(webhookId, order.Id);
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        private async Task<CommandResult> ProcessTBankWalletDepositWebhookAsync(
+            string providerPaymentId,
+            string? orderIdFromProvider,
+            string status,
+            Guid webhookId,
+            string correlationId,
+            string methodName,
+            Stopwatch execTime)
+        {
+            var walletResult = await _walletsService.ApplyProviderWalletDepositStatusAsync(
+                PaymentProvider.Tbank,
+                providerPaymentId,
+                orderIdFromProvider,
+                status);
+
+            if (!walletResult.Success)
+                return CommandResult.Fail(walletResult.ErrorCode, walletResult.Message);
+
+            if (walletResult.Result == null)
+            {
+                await _ordersRepository.MarkWebhookProcessedAsync(webhookId, null);
+                logger.Debug(correlationId, null, methodName,
+                    $"Webhook stored but wallet deposit not found for payment '{providerPaymentId}' OrderId='{orderIdFromProvider}'",
+                    null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
+            await _ordersRepository.MarkWebhookProcessedAsync(webhookId, null);
+            logger.Debug(correlationId, null, methodName,
+                $"Method finished (wallet deposit {walletResult.Result})", null, execTime.Elapsed);
             return CommandResult.OK;
         }
 
