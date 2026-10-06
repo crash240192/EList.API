@@ -30,6 +30,7 @@ namespace EList.Api.Middleware
             "/api/accounts/create",
             "/api/accounts/me",
             "/api/payments/yookassa/webhook",
+            "/api/payments/tbank/webhook",
             "/eList/health",
             "/eList/version",
             "/eList/swagger",
@@ -37,7 +38,8 @@ namespace EList.Api.Middleware
             "/eList/api/authorization",
             "/eList/api/accounts/create",
             "/eList/api/accounts/me",
-            "/eList/api/payments/yookassa/webhook"
+            "/eList/api/payments/yookassa/webhook",
+            "/eList/api/payments/tbank/webhook"
         };
 
         private readonly RequestDelegate _next;

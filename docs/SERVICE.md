@@ -1,9 +1,10 @@
 # EList — описание сервиса
 
-> Актуально: 14 сентября 2026  
+> Актуально: 6 октября 2026  
 > Репозитории: `elist.api` (этот), `elist.ui`, `elist.common`, `elist.filestorage.api`  
 > Этот документ — **источник правды по продуктовой и доменной модели**.  
-> Чеклист готовности: [production-readiness-checklist.md](./production-readiness-checklist.md).
+> Чеклист готовности: [production-readiness-checklist.md](./production-readiness-checklist.md).  
+> Т-Банк (сборка / env / флоу): [tbank-payments.md](./tbank-payments.md).
 
 ---
 
@@ -126,22 +127,29 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 
 - **Продавец билета** — организация-организатор.
 - **Площадка** — EList: витрина, заказ, билет, check-in, отчётность.
-- **Оплата** — через ЮKassa: сумма организатору на его реквизиты, сервису — **процент через split** при проведении платежа.
+- **Оплата** — целевой провайдер **Т-Банк (маркетплейс / мультирасчёты)**: в `Init` передаются `Shops[]` с `ShopCode` организатора, доля продавца и `Fee` (комиссия площадки). `yookassaStub` остаётся fallback для локальной разработки без банка.
 - Договор на посещение — между **участником и организатором**.
 
 Согласуется с Пользовательским соглашением (§6) и Соглашением для организаций (§2.4): сервис не продавец.
 
-### Технический статус (14.09.2026)
+### Технический статус (06.10.2026)
 
 | Слой | Статус |
 |------|--------|
 | Orders / tickets / stub payment / webhook path / check-in / transfer / refunds | API есть |
 | Учёт `AmountTotal` / `AmountSeller` / `AmountCommission` в заказе | Есть |
-| Реальный split ЮKassa на реквизиты организатора | **Нет** (stub = один платёж на полную сумму) |
+| Реальный эквайринг Т-Банка (`payments:provider=tbank`) + Init/`PayType=O`/Shops/Fee | ✅ код; для стенда — TerminalKey + публичный NotificationURL |
+| Онбординг продавца SM-Register → `ProviderSellerId` (ShopCode) | ✅ код; credentials SM-Register выдаёт менеджер банка |
+| Webhook Т-Банка `POST /eList/api/payments/tbank/webhook` (тело `OK`) | ✅ заказы + пополнения (`OrderId` = `wallet:{guid}`) |
+| GetState sync-on-read на GET pending order/deposit (fallback без webhook) | ✅ gate ~2s |
+| Success/Fail URL с query (`orderId` / `depositId` / `walletId`) | ✅ |
+| UI `/payments/return` poll (без manual complete для T-Bank) | ✅ companion UI PR |
+| `yookassaStub` fallback | ✅ для локалки без банка |
 | `features.ticketSalesEnabled` | По умолчанию **`false`** |
-| Принятие `TicketingAgreement` как жёсткий gate на `CanSellTickets` | **Не enforced** (тип документа есть; `SetCanSellTickets` проверяет только верификацию) |
+| Gate `TicketingAgreement` + Active onboarding/ShopCode на `CanSellTickets` / создание заказа | ✅ |
 
-Подробный разбор: [legal-ticketing-review.md](./legal-ticketing-review.md).  
+Операционный гайд: [tbank-payments.md](./tbank-payments.md).  
+Юр. разбор: [legal-ticketing-review.md](./legal-ticketing-review.md).  
 Пошаговый UI↔API флоу: [tickets workflow.txt](./tickets%20workflow.txt).
 
 ### Режимы события
@@ -150,7 +158,7 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 |------------------|-------|-----------|
 | `false` | любой | Participate; Cost = «оплата на месте» (информативно) |
 | `true` | `0` | Бесплатный билет: заказ → сразу Paid + Participate |
-| `true` | `> 0` | Заказ → оплата (stub/ЮKassa) → билет + Participate |
+| `true` | `> 0` | Заказ → оплата (T-Bank / yookassaStub) → билет + Participate |
 | `true` | — | Обычный Participate / accept invite **запрещены** (`OrganizationPaymentRequired`) |
 
 ---
@@ -165,9 +173,9 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 | Re-consent Consent/Agreement | ✅ | Middleware + UI Gate + обработчик 403/`AgreementNotFound` |
 | Каталог / карта / карточка события | ✅ | |
 | Участие без билетов | ✅ | |
-| Покупка билета (stub) | ⚠️ | UI+API stub; реальной ЮKassa и split нет |
-| Организации, верификация, payout | ✅ / ⚠️ | Верификация нужна для `CanSellTickets`; payout ещё не связан с реальным split |
-| Кошелёк / тариф | ⚠️ | NextChargeAt + ledger; пополнение stub; не билетный контур |
+| Покупка билета | ⚠️ | API: T-Bank marketplace + stub; UI → PaymentURL → return poll; prod — после env/ShopCode |
+| Организации, верификация, payout | ✅ / ⚠️ | `CanSellTickets` требует verified + TicketingAgreement + Active ShopCode |
+| Кошелёк / тариф | ⚠️ | NextChargeAt + ledger; пополнение через T-Bank / stub; не билетный контур |
 | Ошибки / Staging | ✅ | `ASPNETCORE_ENVIRONMENT` + `features:exposeDetailedErrors`; UI показывает `correlationId` — см. [docker-environment.md](./docker-environment.md) |
 | Уведомления (WS + antiflood) | ✅ | |
 | Медиа / альбомы | ✅ | |
@@ -189,10 +197,16 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 
 ```json
 "payments": {
-  "provider": "yookassaStub",
+  "provider": "tbank",
   "commissionPercent": 10,
   "currency": "RUB",
-  "returnUrl": "https://tvoy-spot.ru/payments/return"
+  "returnUrl": "https://tvoy-spot.ru/payments/return",
+  "tbank": {
+    "apiBaseUrl": "https://securepay.tinkoff.ru/v2",
+    "notificationUrl": "https://tvoy-spot.ru/eList/api/payments/tbank/webhook",
+    "successUrl": "https://tvoy-spot.ru/payments/return",
+    "failUrl": "https://tvoy-spot.ru/payments/return"
+  }
 },
 "features": {
   "ticketSalesEnabled": false,
@@ -203,6 +217,17 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 }
 ```
 
+Env для Т-Банка (секреты не коммитить) — полный список в [tbank-payments.md](./tbank-payments.md):
+
+- `payments__provider=tbank`
+- `payments__tbank__terminalKey` / `payments__tbank__password`
+- `payments__tbank__apiBaseUrl` (prod: `securepay.tinkoff.ru/v2`)
+- `payments__tbank__notificationUrl` (публичный HTTPS webhook)
+- `payments__tbank__successUrl` / `payments__tbank__failUrl`
+- `payments__tbank__smRegister__username` / `payments__tbank__smRegister__password`
+- `payments__tbank__manualShopCode` — DEMO Init без SM-Register
+- HTTP к банку через `HttpRestClient2` (как DaData)
+
 ---
 
 ## 11. Связанные документы
@@ -210,6 +235,7 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 | Документ | Назначение |
 |----------|------------|
 | [production-readiness-checklist.md](./production-readiness-checklist.md) | Статус готовности и бэклог |
+| [tbank-payments.md](./tbank-payments.md) | Т-Банк: флоу, env, чеклист сборки |
 | [legal-ticketing-review.md](./legal-ticketing-review.md) | Юр. модель билетов vs код |
 | [ui-handoff-checklist-and-tickets.md](./ui-handoff-checklist-and-tickets.md) | Handoff для фронта |
 | [tickets workflow.txt](./tickets%20workflow.txt) | Пошаговый ticket checkout |

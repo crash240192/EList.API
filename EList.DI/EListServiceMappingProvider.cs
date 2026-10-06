@@ -13,6 +13,7 @@ using EList.Services.Impl.AbuseProtection;
 using EList.Services.Impl.Notifications;
 using EList.Services.Impl.OrganizationRegistry;
 using EList.Services.Impl.Payments;
+using EList.Services.Impl.Payments.TBank;
 using EList.Services.Interfaces;
 using EList.Sms;
 using EList.Smtp;
@@ -82,10 +83,19 @@ namespace EList.DI
 
             mapper.AddSingleton<WebSocketConnectionManager>();
             mapper.AddSingleton<NotificationFloodGate>();
-            // Платежи: сейчас stub; реальная ЮKassa — заменить реализацию IPaymentProvider.
-            mapper.AddSingleton<IPaymentProvider, YooKassaStubPaymentProvider>();
-            // Онбординг продавца (организации) в ЮKassa: сейчас stub; реальная — смена ISellerOnboardingProvider.
-            mapper.AddSingleton<ISellerOnboardingProvider, YooKassaStubSellerOnboardingProvider>();
+
+            // Платежи / онбординг: выбор по payments:provider (yookassaStub | tbank).
+            var paymentSettings = PaymentSettings.Load();
+            if (paymentSettings.IsTBankProvider())
+            {
+                mapper.AddSingleton<IPaymentProvider, TBankPaymentProvider>();
+                mapper.AddSingleton<ISellerOnboardingProvider, TBankSellerOnboardingProvider>();
+            }
+            else
+            {
+                mapper.AddSingleton<IPaymentProvider, YooKassaStubPaymentProvider>();
+                mapper.AddSingleton<ISellerOnboardingProvider, YooKassaStubSellerOnboardingProvider>();
+            }
 
             //Repositories
             mapper.AddScoped<IAgreementRepository, AgreementRepository>();
