@@ -759,7 +759,74 @@ namespace EList.Services.Impl
             if (!access.Success)
                 return CommandResult<WalletDepositResponse>.Fail(access.ErrorCode, access.Message);
 
+            // P4: webhook мог не дойти — GetState fallback при Pending.
+            await TrySyncWalletDepositFromProviderAsync(deposit);
+            if (deposit.Status == WalletDepositStatus.Pending)
+            {
+                var refreshed = await _walletsRepository.GetWalletDepositAsync(depositId);
+                if (refreshed != null)
+                    deposit = refreshed;
+            }
+
             return new CommandResult<WalletDepositResponse>(_mapper.Map<WalletDepositResponse>(deposit));
+        }
+
+        /// <summary>
+        /// GetState fallback для пополнения: CONFIRMED → FulfillWalletDepositAsync.
+        /// </summary>
+        private async Task TrySyncWalletDepositFromProviderAsync(WalletDeposit deposit)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(TrySyncWalletDepositFromProviderAsync)}";
+
+            if (_paymentProvider.SupportsManualComplete)
+                return;
+            if (deposit.Status != WalletDepositStatus.Pending)
+                return;
+            if (string.IsNullOrWhiteSpace(deposit.ProviderPaymentId))
+                return;
+            if (deposit.Provider != null && deposit.Provider != _paymentProvider.Kind)
+                return;
+            if (!Payments.PaymentProviderSyncGate.TryEnter(deposit.ProviderPaymentId))
+                return;
+
+            PaymentStatusInfo statusInfo;
+            try
+            {
+                statusInfo = await _paymentProvider.GetStatusAsync(deposit.ProviderPaymentId.Trim());
+            }
+            catch (Exception ex)
+            {
+                logger.Debug(correlationId, null, methodName,
+                    $"GetState sync skipped: {ex.Message}", null);
+                return;
+            }
+
+            logger.Debug(correlationId, null, methodName,
+                $"GetState sync payment={deposit.ProviderPaymentId} status={statusInfo.Status}", null);
+
+            if (statusInfo.Status == PaymentProviderStatus.Succeeded)
+            {
+                await FulfillWalletDepositAsync(deposit);
+            }
+            else if (statusInfo.Status == PaymentProviderStatus.Failed)
+            {
+                await _walletsRepository.UpdateWalletDepositAsync(
+                    deposit.Id,
+                    WalletDepositStatus.Failed,
+                    deposit.ProviderPaymentId,
+                    paidAt: null);
+                deposit.Status = WalletDepositStatus.Failed;
+            }
+            else if (statusInfo.Status == PaymentProviderStatus.Canceled)
+            {
+                await _walletsRepository.UpdateWalletDepositAsync(
+                    deposit.Id,
+                    WalletDepositStatus.Canceled,
+                    deposit.ProviderPaymentId,
+                    paidAt: null);
+                deposit.Status = WalletDepositStatus.Canceled;
+            }
         }
 
         public async Task<CommandResult<List<WalletDepositResponse>>> GetWalletDepositsAsync(Guid walletId)

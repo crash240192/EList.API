@@ -1146,8 +1146,61 @@ namespace EList.Services.Impl
                     return CommandResult<OrderResponse>.Fail(ErrorCode.AccessError, "Нет доступа к заказу");
             }
 
+            // P4: webhook мог не дойти (localhost NotificationURL) — подтянуть статус через GetState.
+            await TrySyncOrderFromProviderAsync(order, correlationId, methodName);
+            if (order.Status is OrderStatus.Pending or OrderStatus.Authorized)
+            {
+                var refreshed = await _ordersRepository.GetOrderFullAsync(orderId);
+                if (refreshed != null)
+                    order = refreshed;
+            }
+
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return new CommandResult<OrderResponse>(_mapper.Map<OrderResponse>(order));
+        }
+
+        /// <summary>
+        /// GetState fallback: если заказ ещё Pending/Authorized и провайдер не stub —
+        /// спросить банк и при CONFIRMED зачислить билеты (как webhook).
+        /// </summary>
+        private async Task TrySyncOrderFromProviderAsync(Order order, string correlationId, string methodName)
+        {
+            if (_paymentProvider.SupportsManualComplete)
+                return;
+            if (order.Status is not (OrderStatus.Pending or OrderStatus.Authorized))
+                return;
+            if (string.IsNullOrWhiteSpace(order.ProviderPaymentId))
+                return;
+            if (order.Provider != null && order.Provider != _paymentProvider.Kind)
+                return;
+            if (!PaymentProviderSyncGate.TryEnter(order.ProviderPaymentId))
+                return;
+
+            PaymentStatusInfo statusInfo;
+            try
+            {
+                statusInfo = await _paymentProvider.GetStatusAsync(order.ProviderPaymentId.Trim());
+            }
+            catch (Exception ex)
+            {
+                logger.Debug(correlationId, null, methodName,
+                    $"GetState sync skipped: {ex.Message}", null);
+                return;
+            }
+
+            logger.Debug(correlationId, null, methodName,
+                $"GetState sync payment={order.ProviderPaymentId} status={statusInfo.Status}", null);
+
+            if (statusInfo.Status == PaymentProviderStatus.Succeeded)
+            {
+                await FulfillPaidOrderAsync(order.Id, order.BuyerAccountId, order.EventId, order.Quantity);
+                order.Status = OrderStatus.Paid;
+            }
+            else if (statusInfo.Status is PaymentProviderStatus.Failed or PaymentProviderStatus.Canceled)
+            {
+                await _ordersRepository.UpdateOrderStatusAsync(order.Id, OrderStatus.Canceled);
+                order.Status = OrderStatus.Canceled;
+            }
         }
 
         public async Task<CommandResult<List<OrderResponse>>> GetMyOrdersAsync()
