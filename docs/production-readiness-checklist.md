@@ -1,29 +1,30 @@
 # EList 3.0.1 — Чеклист готовности к продакшн-релизу
 
 > Первичный аудит: 31 августа 2026  
-> Предыдущая актуализация: 3 сентября 2026  
-> **Пересборка: 14 сентября 2026** (`develop` + tickets API + исходники `Agreements/`)  
+> Предыдущая актуализация: 3 сентября 2026 / 14 сентября 2026  
+> **Пересборка: 6 октября 2026** (T-Bank marketplace P1–P4 в коде; P5 docs)  
 > Продуктовое описание: [SERVICE.md](./SERVICE.md)  
+> Т-Банк ops: [tbank-payments.md](./tbank-payments.md)  
 > Юр. ревью билетов: [legal-ticketing-review.md](./legal-ticketing-review.md)
 
 ### Scope soft launch (рекомендуемый)
 
 **Социальная платформа событий** с выключенной продажей билетов (`features.ticketSalesEnabled=false`).  
-Билетный контур можно включать на стенде; в prod — только после закрытия юр. развилок и реального ЮKassa split.
+Билетный / платёжный контур Т-Банка можно включать на стенде после env (TerminalKey, публичный NotificationURL, ShopCode); в prod — после юр. закрытия и prod-терминала.
 
 ---
 
-## 1. Обзор готовности (14.09.2026)
+## 1. Обзор готовности (06.10.2026)
 
-| Категория | 03.09 | 14.09 | Комментарий |
+| Категория | 14.09 | 06.10 | Комментарий |
 |-----------|-------|-------|-------------|
-| Ядро (аккаунты, auth, события, подписки) | 🟢 ~85% | 🟢 ~90% | Регистрация: consent + person ≥14 в create |
+| Ядро (аккаунты, auth, события, подписки) | 🟢 ~90% | 🟢 ~90% | Регистрация: consent + person ≥14 в create |
 | Социальное (участие, приглашения, чаты) | 🟢 ~80% | 🟢 ~80% | Event-чаты в Conversations — TODO |
 | Организации + модерация | 🟢 ~85% | 🟢 ~85% | Payout encryption; verified → `CanSellTickets` |
 | Медиа | 🟢 ~85% | 🟢 ~85% | Album ACL |
-| Платежи / билеты | 🔴 ~5% | 🟡 ~55% | Stub API есть; split/прод-ЮKassa нет; флаг выкл. |
-| Юридика / compliance | 🟢 ~80% | 🟢 ~85% | Исходники в `Agreements/`; runtime = БД; Policy без галочки |
-| Production hardening | 🟢 ~75% | 🟢 ~75% | CORS/errors/CI/health; secrets из `.env` |
+| Платежи / билеты | 🟡 ~55% | 🟡 ~75% | T-Bank Init/webhook/GetState/wallet в коде; prod env + 54-ФЗ открыты |
+| Юридика / compliance | 🟢 ~85% | 🟢 ~85% | Исходники в `Agreements/`; runtime = БД |
+| Production hardening | 🟢 ~75% | 🟢 ~75% | CORS/errors/CI/health; secrets из env |
 | Автотесты | 🔴 0% | 🔴 0% | Нет test projects |
 
 ---
@@ -44,7 +45,7 @@
 | Agreements | ✅ | Policy информационна; Consent+Agreement enforced |
 | Media | ✅ | |
 | Participations / Invitations | ✅ | BW + visibility |
-| Wallets / Tariffs | ⚠️ | Selected vs effective; free default; NextChargeAt; deposit stub |
+| Wallets / Tariffs | ⚠️ | Selected vs effective; free default; NextChargeAt; deposit T-Bank/stub |
 
 ### Билеты (в коде, вне prod soft launch)
 
@@ -131,6 +132,7 @@
 - [ ] Invitations: заполнить `result.Event`
 - [ ] Premium-параметры событий по тарифу
 - [x] Wallets Deposit API + stub payment (тарифный контур, не билеты) / DebtCollector
+- [x] Wallets deposit через T-Bank (webhook `wallet:{id}` + GetState sync-on-read)
 - [x] Wallets NextChargeAt + `wallet_tariff_charges` ledger (списание только при достаточном балансе)
 - [x] Free default tariff (unique cost=0 per scope) + fallback when paid period inactive; debtCollector on
 - [ ] Auto-invitations
@@ -142,13 +144,18 @@
 
 ### Платежи (v1.1)
 
-- [x] OrdersService + PaymentsController (stub + complete; split/webhook — дальше)
-- [ ] Webhook controller (YooKassa/TBank) + idempotency
+- [x] OrdersService + PaymentsController (stub + complete)
+- [x] T-Bank Init (`PayType=O`) + Shops/Fee при ShopCode
+- [x] Webhook Т-Банка (`POST /api/payments/tbank/webhook`) + fulfill order/wallet
+- [x] GetState sync-on-read на GET pending order/deposit
+- [x] Success/Fail URL query + UI return poll (companion UI)
 - [x] Tickets API (issue / validate / used / transfer) — runtime stub
 - [x] Refunds API (stub provider)
 - [x] TicketingAgreement gate на `CanSellTickets` + capacity с учётом pending заказов
 - [ ] 54-ФЗ / онлайн-касса (разделённая фискализация зафиксирована в черновике агентского договора)
-- [ ] Organization payment-provider onboarding / реальный YooKassa split
+- [ ] Prod TerminalKey + публичный NotificationURL на стенде/проде (ops, не код)
+- [ ] Organization SM-Register credentials / ShopCode на prod-оргах
+- [ ] ~~Organization payment-provider onboarding / реальный YooKassa split~~ — целевой путь Т-Банк (см. [tbank-payments.md](./tbank-payments.md))
 
 ### Compliance (P1)
 
@@ -202,10 +209,10 @@
 | Каталог / карта / событие | ✅ | ✅ | OK |
 | Free participate | ✅ | ✅ | OK |
 | Cost без TicketsEnabled | ✅ | ⚠️ badge | Проверить copy |
-| Ticket purchase | ✅ stub | ✅ stub | E2E stub; не prod |
+| Ticket purchase | ✅ T-Bank/stub | ✅ return poll | Стенд: env банка; soft launch: флаг выкл. |
 | My tickets / gift / refund | ✅ API | ⚠️ | UI «скоро» |
-| Org verify + CanSellTickets | ✅ | ✅ | Нет gate TicketingAgreement |
-| Wallet / tariff | ⚠️ | ⚠️ | Рудимент тарифа |
+| Org verify + CanSellTickets | ✅ | ✅ | Gate TicketingAgreement + ShopCode |
+| Wallet / tariff | ⚠️ T-Bank deposit | ⚠️ return poll | Тарифный контур, не билеты |
 | Notifications WS | ✅ | ✅ | OK |
 | Media | ✅ | ✅ | OK |
 | Delete / export | ✅ | ⚠️ | Сверить UI |
