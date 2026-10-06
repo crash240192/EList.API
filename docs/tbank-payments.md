@@ -110,8 +110,27 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 
 ---
 
-## 6. Известные ограничения
+## 6. Troubleshooting
 
-- Live GetState/Init из Cloud Agent может упираться в egress/DNS к `rest-api-test.tinkoff.ru` — на вашем сервере обычно ок.
+### HTTP 403 Forbidden на `rest-api-test.tinkoff.ru/v2/Init`
+
+Это **не** ошибка `Token` / TerminalKey. Банк отвечает JSON `Success=false` + `ErrorCode` при неверной подписи; **HTTP 403 от nginx** = IP сервера (или вашего ноутбука) **не в White List тестовой среды**.
+
+Что сделать:
+
+1. Узнать внешний IP, с которого идёт Init (сервер API / NAT).
+2. Написать в поддержку эквайринга (`acq_help@tinkoff.ru` или чат Т‑Бизнеса):
+   - ИНН и наименование организации;
+   - IP (или пул), с которого будут запросы;
+   - тестовый URL: `rest-api-test.tinkoff.ru`.
+3. Дождаться добавления в WL и повторить Init.
+
+Пока WL нет — Init/GetState на test host будут 403 с любого клиента (curl, наш `HttpRestClient2`, SDK).
+
+Prod-хост `securepay.tinkoff.ru` WL тестовой среды не использует, но нужны **боевые** TerminalKey/Password (не DEMO).
+
+### Иные ограничения
+
+- Cloud Agent / sandbox иногда не резолвит `rest-api-test` (egress/DNS) — отдельная проблема от 403.
 - 54-ФЗ / онлайн-касса — вне этого контура (см. checklist).
 - ЮKassa split в prod не целевой путь; целевой провайдер — Т-Банк marketplace.
