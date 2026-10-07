@@ -1159,6 +1159,109 @@ namespace EList.Services.Impl
             return new CommandResult<OrderResponse>(_mapper.Map<OrderResponse>(order));
         }
 
+        public async Task<CommandResult<OrderResponse>> CancelOrderAsync(Guid orderId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(CancelOrderAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<OrderResponse>.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+
+            if (orderId == Guid.Empty)
+                return CommandResult<OrderResponse>.Fail(ErrorCode.InvalidValue, "Не указан заказ");
+
+            var order = await _ordersRepository.GetOrderFullAsync(orderId);
+            if (order == null)
+                return CommandResult<OrderResponse>.Fail(ErrorCode.InvalidValue, "Заказ не найден");
+
+            if (order.BuyerAccountId != _accountDataHolder.AccountId.Value)
+                return CommandResult<OrderResponse>.Fail(ErrorCode.AccessError, "Отменить заказ может только покупатель");
+
+            if (order.Status is not (OrderStatus.Pending or OrderStatus.Authorized))
+            {
+                return CommandResult<OrderResponse>.Fail(ErrorCode.InvalidValue,
+                    "Отменить можно только неоплаченный заказ");
+            }
+
+            await CancelUnpaidOrderInternalAsync(order, correlationId, methodName, callProvider: true);
+
+            var refreshed = await _ordersRepository.GetOrderFullAsync(orderId) ?? order;
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<OrderResponse>(_mapper.Map<OrderResponse>(refreshed));
+        }
+
+        public async Task<int> PurgeExpiredPendingOrdersAsync(TimeSpan olderThan, int limit = 50)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(PurgeExpiredPendingOrdersAsync)}";
+
+            if (olderThan <= TimeSpan.Zero)
+                olderThan = TimeSpan.FromMinutes(30);
+            if (limit <= 0)
+                limit = 50;
+
+            var cutoff = DateTimeOffset.UtcNow.Subtract(olderThan);
+            var stale = await _ordersRepository.GetExpiredUnpaidOrdersAsync(cutoff, limit);
+            var canceled = 0;
+
+            foreach (var order in stale)
+            {
+                try
+                {
+                    await CancelUnpaidOrderInternalAsync(order, correlationId, methodName, callProvider: true);
+                    canceled++;
+                }
+                catch (Exception ex)
+                {
+                    logger.Warn(correlationId, null, methodName,
+                        $"Pending order TTL cancel failed order={order.Id}: {ex.Message}", null);
+                }
+            }
+
+            if (canceled > 0)
+            {
+                logger.Info(correlationId, null, methodName,
+                    $"Purged unpaid orders={canceled} olderThan={olderThan}", null);
+            }
+
+            return canceled;
+        }
+
+        /// <summary>
+        /// Общий путь отмены неоплаченного заказа: Cancel у провайдера (best-effort) + статус Canceled.
+        /// Билетов ещё нет — только освобождение soft-hold мест.
+        /// </summary>
+        private async Task CancelUnpaidOrderInternalAsync(
+            Order order,
+            string correlationId,
+            string methodName,
+            bool callProvider)
+        {
+            if (order.Status is not (OrderStatus.Pending or OrderStatus.Authorized))
+                return;
+
+            if (callProvider
+                && !string.IsNullOrWhiteSpace(order.ProviderPaymentId)
+                && (order.Provider == null || order.Provider == _paymentProvider.Kind))
+            {
+                try
+                {
+                    await _paymentProvider.CancelPaymentAsync(order.ProviderPaymentId.Trim());
+                }
+                catch (Exception ex)
+                {
+                    // Места всё равно освобождаем локально; webhook/GetState догонит банк.
+                    logger.Warn(correlationId, null, methodName,
+                        $"Provider Cancel skipped for payment={order.ProviderPaymentId}: {ex.Message}", null);
+                }
+            }
+
+            await _ordersRepository.UpdateOrderStatusAsync(order.Id, OrderStatus.Canceled);
+            order.Status = OrderStatus.Canceled;
+        }
+
         /// <summary>
         /// GetState fallback: если заказ ещё Pending/Authorized и провайдер не stub —
         /// спросить банк и при CONFIRMED зачислить билеты (как webhook).
