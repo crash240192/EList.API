@@ -16,5 +16,11 @@ namespace EList.Models.Events.EventMetadata
         /// Включена ли продажа билетов на мероприятие
         /// </summary>
         public bool TicketsEnabled { get; set; }
+
+        /// <summary>Мин. цена активных типов (derived; дублирует Cost при tickets).</summary>
+        public double? PriceMin { get; set; }
+
+        /// <summary>Макс. цена активных типов.</summary>
+        public double? PriceMax { get; set; }
     }
 }

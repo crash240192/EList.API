@@ -16,5 +16,11 @@ namespace EList.Models.Events.EventMetadata
         /// Требует организацию-организатора с can_sell_tickets = true.
         /// </summary>
         public bool TicketsEnabled { get; set; } = false;
+
+        /// <summary>
+        /// Типы билетов (replace-by-event). При TicketsEnabled=true нужен ≥1 active.
+        /// null — не трогать существующие типы (кроме fallback при первом включении).
+        /// </summary>
+        public List<EventTicketTypeRequest>? TicketTypes { get; set; }
     }
 }
