@@ -96,6 +96,21 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<List<OrderDto>> GetExpiredUnpaidOrdersAsync(DateTimeOffset createdBefore, int limit)
+        {
+            if (limit <= 0)
+                limit = 50;
+
+            var result = await _connection.Orders
+                .Where(i =>
+                    (i.Status == OrderStatus.Pending || i.Status == OrderStatus.Authorized)
+                    && i.CreateDate < createdBefore)
+                .OrderBy(i => i.CreateDate)
+                .Take(limit)
+                .ToListAsync();
+            return result;
+        }
+
         public async Task<List<OrderDto>> GetOrdersByEventAsync(Guid eventId)
         {
             var result = await _connection.Orders

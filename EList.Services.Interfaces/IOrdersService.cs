@@ -24,6 +24,16 @@ namespace EList.Services.Interfaces
 
         Task<CommandResult<OrderResponse>> GetOrderAsync(Guid orderId);
 
+        /// <summary>
+        /// Покупатель отменяет неоплаченный заказ (Pending/Authorized): Cancel у провайдера + статус Canceled.
+        /// </summary>
+        Task<CommandResult<OrderResponse>> CancelOrderAsync(Guid orderId);
+
+        /// <summary>
+        /// Фоновый TTL: отменить брошенные Pending/Authorized старше указанного возраста.
+        /// </summary>
+        Task<int> PurgeExpiredPendingOrdersAsync(TimeSpan olderThan, int limit = 50);
+
         Task<CommandResult<List<OrderResponse>>> GetMyOrdersAsync();
 
         Task<CommandResult<List<TicketResponse>>> GetMyTicketsAsync(Guid? eventId = null);
