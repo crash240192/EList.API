@@ -195,13 +195,14 @@ OR !ticketsEnabled && (cost IS NULL OR cost <= :price)
 
 ## 8. Декомпозиция задач
 
-### Phase A — схема и домен (API)
+### Phase A — схема и домен (API) ✅
 
-1. Миграция FluentMigrator: `event_ticket_types` + FK на orders/tickets (nullable сначала).
-2. DTO / repository / data provider CRUD типов.
-3. Backfill: 1 тип на tickets_enabled события; проставить FK; NOT NULL.
-4. Sync `parameters.cost = min(active)` при save типов.
-5. Валидация: ticketsEnabled ⇒ ≥1 active type; price ≥ 0; capacity > 0 if set.
+1. ✅ Миграция FluentMigrator: `event_ticket_types` + FK на orders/tickets (**nullable** до Phase B).
+2. ✅ DTO / repository / data provider CRUD типов.
+3. ✅ Backfill: 1 тип «Стандарт» на tickets_enabled; проставить FK на orders/tickets.
+4. ✅ Sync `parameters.cost = min(active)` при save типов; `priceMin`/`priceMax` в get parameters.
+5. ✅ Валидация: ticketsEnabled ⇒ ≥1 active type; price ≥ 0; capacity > 0 if set.
+6. ✅ `GET /api/events/{eventId}/ticket-types`; replace через `EventParametersRequest.TicketTypes`.
 
 ### Phase B — заказ и capacity (API)
 

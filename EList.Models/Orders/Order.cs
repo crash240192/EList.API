@@ -31,6 +31,11 @@ namespace EList.Models.Orders
         public Guid SellerOrganizationId { get; set; }
 
         /// <summary>
+        /// Тип билета (один тип на заказ в MVP)
+        /// </summary>
+        public Guid? TicketTypeId { get; set; }
+
+        /// <summary>
         /// Количество билетов
         /// </summary>
         public int Quantity { get; set; }
