@@ -131,11 +131,8 @@ namespace EList.Services.Impl
                 return CommandResult<CreateOrderResponse>.Fail(accessError.ErrorCode, accessError.Message);
 
             var buyerId = _accountDataHolder.AccountId.Value;
-            if (await _participationsRepository.IsUserParticipatedAsync(buyerId, eventItem.Id))
-            {
-                return CommandResult<CreateOrderResponse>.Fail(ErrorCode.InvalidValue,
-                    "Вы уже участвуете в этом мероприятии");
-            }
+            // Уже участвующий покупатель может докупить билеты (в т.ч. в подарок).
+            // Fulfill выдаёт билеты buyer как holder; Participate пропускается, если уже в списке.
 
             if (eventItem.Parameters.MaxPersonsCount > 0)
             {

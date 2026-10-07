@@ -183,6 +183,11 @@ app.UseEndpoints(endpoints =>
         environment = app.Environment.EnvironmentName,
         utc = DateTimeOffset.UtcNow
     }));
+    // Публичные feature-flags для UI (без auth).
+    endpoints.MapGet("/api/features", () => Results.Ok(new
+    {
+        ticketSalesEnabled = EList.Services.Impl.Payments.PaymentSettings.IsTicketSalesGloballyEnabled()
+    }));
 });
 var minThreads = Convert.ToInt32(ConfigurationManager.AppSettings["minThreads"] ?? "0");
 if (minThreads > 0)
