@@ -30,7 +30,8 @@
 | F2 | Global `ticketSalesEnabled` | ✅ | ✅ | Готово | `GET /api/features` + EventPage |
 | F3 | Invite при TicketsEnabled | ✅ | ✅ | Готово | |
 | G1 | 54-ФЗ Receipt / AgentSign | ❌ | — | Отложено | после ТП Т-Банк/касса |
-| G2 | Типы билетов / PDF / Wallet pass | ❌ | — | Бэклог | |
+| G2 | Типы билетов | ❌ | ❌ | План | [ticket-types-plan.md](./ticket-types-plan.md) MVP |
+| G2b | PDF / Wallet pass | ❌ | — | Бэклог | после типов |
 
 ## Волны доработки
 
