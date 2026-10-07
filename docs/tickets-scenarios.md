@@ -10,7 +10,7 @@
 |---|----------|-----|----|--------|--------|
 | A1 | Покупка платного (1 билет) | ✅ | ✅ | Готово* | *нужен WL/securepay + flag |
 | A2 | Покупка пачки (N≤20) | ✅ | ✅ qty | Готово | buyer уже participant → нельзя |
-| A3 | Бесплатный билет Cost=0 | ✅ | ⚠️ | Частично | create-event UI блокирует Cost=0+tickets |
+| A3 | Бесплатный билет Cost=0 | ✅ | ✅ | Готово | W3: create-event Cost=0 + ticketsEnabled |
 | A4 | Оплата T-Bank → webhook/GetState | ✅ | ✅ poll | Готово* | *test host WL |
 | A5 | Оплата stub → complete | ✅ | ✅ | Готово | |
 | A6 | Отказ/истечение оплаты у банка | ✅ | poll fail | Готово | |
@@ -22,10 +22,10 @@
 | B4 | Возврат после check-in (Used) | ✅ block | ✅ | Готово | |
 | C1 | Подарок/transfer | ✅ | ✅ | Готово | W2: подписчики+подписки+login lookup |
 | C2 | Покупка при уже participant (подарок) | ✅ | ✅ | Готово | W2: create + CTA «Купить в подарок» |
-| D1 | Check-in по коду | ✅ | ✅ | Готово | нет QR-сканера |
+| D1 | Check-in по коду / QR | ✅ | ✅ | Готово | W3: камера + QR на билете |
 | D2 | Validate без изменения статуса | ✅ | ✅ | Готово | |
 | E1 | My tickets | ✅ | ✅ | Готово | + pending cancel |
-| E2 | My orders (pending/paid) | ✅ | ⚠️ | Частично | pending на My tickets |
+| E2 | My orders (pending/history) | ✅ | ✅ | Готово | W3: pending + история на My tickets |
 | F1 | Org CanSellTickets + agreement | ✅ | ✅ | Готово | |
 | F2 | Global `ticketSalesEnabled` | ✅ | ✅ | Готово | `GET /api/features` + EventPage |
 | F3 | Invite при TicketsEnabled | ✅ | ✅ | Готово | |
@@ -43,11 +43,11 @@
 1. Create order разрешён при уже participant; CTA «Купить в подарок».
 2. Gift: подписчики + подписки + `GET /api/accounts/lookup?q=`.
 
-### W3 — продукт polish
-1. Free tickets в create-event UI.
-2. My orders страница / блок.
-3. QR check-in (камера).
-4. Adult gate на покупку (если нужно по политике).
+### W3 — продукт polish ✅
+1. Free tickets в create-event UI (`Cost=0` + `ticketsEnabled`).
+2. My orders: pending + история на My tickets; QR билета.
+3. QR check-in камерой у организатора (`TicketCheckInPanel` + `QrScanner`).
+4. Adult gate на покупку — отложено (ageLimit уже на доступе к событию).
 
 ### W4 — фискализация (после ТП)
 1. Receipt в Init (AgentSign / SupplierInfo).
