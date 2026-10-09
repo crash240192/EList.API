@@ -162,9 +162,14 @@ namespace EList.Repositories.Impl
             await _ordersDataProvider.UpdateTicketsStatusByOrderAsync(orderId, mappedStatus);
         }
 
-        public async Task CheckInTicketAsync(Guid ticketId, Guid checkedInByAccountId, DateTimeOffset checkedInAt)
+        public async Task<bool> TryCheckInTicketAsync(Guid ticketId, Guid checkedInByAccountId, DateTimeOffset checkedInAt)
         {
-            await _ordersDataProvider.CheckInTicketAsync(ticketId, checkedInByAccountId, checkedInAt);
+            return await _ordersDataProvider.TryCheckInTicketAsync(ticketId, checkedInByAccountId, checkedInAt);
+        }
+
+        public async Task<bool> TryUndoCheckInTicketAsync(Guid ticketId)
+        {
+            return await _ordersDataProvider.TryUndoCheckInTicketAsync(ticketId);
         }
 
         public async Task ReassignTicketHolderAsync(Guid ticketId, Guid newHolderAccountId)

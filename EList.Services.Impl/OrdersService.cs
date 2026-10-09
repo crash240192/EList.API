@@ -1547,6 +1547,7 @@ namespace EList.Services.Impl
                         Access = "organizer",
                         CanCheckIn = true,
                         CanViewStats = true,
+                        CanUndoCheckIn = true,
                         Sold = stats.Sold,
                         IssuedOpen = stats.IssuedOpen,
                         Used = stats.Used,
@@ -1606,6 +1607,7 @@ namespace EList.Services.Impl
                     Access = "staff",
                     CanCheckIn = staff.CanCheckIn,
                     CanViewStats = staff.CanViewStats,
+                    CanUndoCheckIn = false,
                     Sold = sold,
                     IssuedOpen = issuedOpen,
                     Used = used,
@@ -1637,6 +1639,8 @@ namespace EList.Services.Impl
             var ticketResult = await LoadTicketForEventCheckInAsync(request);
             if (!ticketResult.Success)
                 return ticketResult;
+
+            await ApplyDeskHolderPrivacyAsync(ticketResult.Result!);
 
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return ticketResult;
@@ -1681,14 +1685,84 @@ namespace EList.Services.Impl
             }
 
             var checkedInAt = DateTimeOffset.UtcNow;
-            await _ordersRepository.CheckInTicketAsync(
+            var ok = await _ordersRepository.TryCheckInTicketAsync(
                 ticket.Id,
                 _accountDataHolder.AccountId!.Value,
                 checkedInAt);
+            if (!ok)
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
+                    "Билет уже отмечен как использованный (параллельный check-in)");
+            }
 
             var updated = await _ordersRepository.GetTicketByCodeAsync(ticket.Code) ?? ticket;
+            var response = _mapper.Map<TicketResponse>(updated);
+            await EnrichTicketTypeNamesAsync(new[] { response });
+            await ApplyDeskHolderPrivacyAsync(response);
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
-            return new CommandResult<TicketResponse>(_mapper.Map<TicketResponse>(updated));
+            return new CommandResult<TicketResponse>(response);
+        }
+
+        public async Task<CommandResult<TicketResponse>> UndoCheckInTicketAsync(TicketCheckInRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(UndoCheckInTicketAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<TicketResponse>.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+
+            if (request == null || request.EventId == Guid.Empty)
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue, "Не указано мероприятие");
+
+            if (string.IsNullOrWhiteSpace(request.Code))
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue, "Не указан код билета");
+
+            var eventItem = await _eventsRepository.GetEventAsync(request.EventId);
+            if (eventItem == null)
+                return CommandResult<TicketResponse>.Fail(ErrorCode.EventNotFound, $"Событие с id='{request.EventId}' не найдено");
+
+            var accountId = _accountDataHolder.AccountId.Value;
+            if (!_accountDataHolder.IsPlatformModeratorOrAbove)
+            {
+                var isOrg = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(request.EventId, accountId);
+                if (!isOrg)
+                {
+                    return CommandResult<TicketResponse>.Fail(ErrorCode.AccessError,
+                        "Отменить вход могут только организаторы мероприятия (Owner/Manager)");
+                }
+            }
+
+            var ticket = await _ordersRepository.GetTicketByCodeAsync(request.Code.Trim());
+            if (ticket == null)
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue, "Билет не найден");
+
+            if (ticket.EventId != request.EventId)
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
+                    "Билет относится к другому мероприятию");
+            }
+
+            if (ticket.Status != TicketStatus.Used)
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
+                    "Отменить вход можно только у билета со статусом «Использован»");
+            }
+
+            var ok = await _ordersRepository.TryUndoCheckInTicketAsync(ticket.Id);
+            if (!ok)
+            {
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue,
+                    "Не удалось отменить вход (билет уже изменён)");
+            }
+
+            var updated = await _ordersRepository.GetTicketByCodeAsync(ticket.Code) ?? ticket;
+            var response = _mapper.Map<TicketResponse>(updated);
+            await EnrichTicketTypeNamesAsync(new[] { response });
+            await ApplyDeskHolderPrivacyAsync(response);
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<TicketResponse>(response);
         }
 
         public async Task<CommandResult<TicketResponse>> TransferTicketAsync(TransferTicketRequest request)
@@ -2024,6 +2098,29 @@ namespace EList.Services.Impl
             var mapped = _mapper.Map<TicketResponse>(ticket);
             await EnrichTicketTypeNamesAsync(new[] { mapped });
             return new CommandResult<TicketResponse>(mapped);
+        }
+
+        /// <summary>
+        /// Desk DTO: по умолчанию без login/ФИО holder; при флаге — обогащаем.
+        /// </summary>
+        private async Task ApplyDeskHolderPrivacyAsync(TicketResponse ticket)
+        {
+            if (PaymentSettings.IsTicketDeskRevealHolderEnabled())
+            {
+                if (ticket.HolderAccountId == null || ticket.HolderAccountId == Guid.Empty)
+                    return;
+                var account = await _accountsRepository.GetAccountAsync(ticket.HolderAccountId.Value);
+                if (account == null)
+                    return;
+                ticket.HolderLogin = account.Login;
+                // ФИО — через отдельный PersonInfo; login достаточно для стендового флага.
+                ticket.HolderDisplayName = account.Login;
+                return;
+            }
+
+            ticket.HolderAccountId = null;
+            ticket.HolderLogin = null;
+            ticket.HolderDisplayName = null;
         }
 
         private async Task FulfillPaidOrderAsync(

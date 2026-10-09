@@ -336,8 +336,8 @@ OrdersDataProvider aggregates → OrdersService/EventsController or Organization
 - [ ] Desk `/tickets/desk`: validate + check-in + QR + counters + byType  
 - [ ] Hub org: sold / used / remaining / pending по событиям  
 - [ ] Auth: TT только allow-list; Owner/Manager implicit; mod break-glass  
-- [ ] Undo check-in для Owner/Manager  
-- [ ] Race-safe check-in  
+- [x] Undo check-in для Owner/Manager  
+- [x] Race-safe check-in  
 - [x] MyTickets: «Печать» (системный print / Save as PDF), QR рабочий  
 - [ ] Сайдбар «Билеты» → hub; desk глубже по eventId  
 - [ ] EventPage ведёт на desk  

@@ -46,6 +46,9 @@ namespace EList.Services.Interfaces
         /// <summary>Организатор: отметить присутствие (issued → used).</summary>
         Task<CommandResult<TicketResponse>> CheckInTicketAsync(TicketCheckInRequest request);
 
+        /// <summary>Owner/Manager (не TicketTaker): Used→Issued, сброс checkedIn*.</summary>
+        Task<CommandResult<TicketResponse>> UndoCheckInTicketAsync(TicketCheckInRequest request);
+
         /// <summary>Подарок/передача: сменить holder, покупатель заказа не меняется.</summary>
         Task<CommandResult<TicketResponse>> TransferTicketAsync(TransferTicketRequest request);
 

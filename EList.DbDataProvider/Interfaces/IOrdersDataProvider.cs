@@ -32,7 +32,10 @@ namespace EList.DbDataProvider.Interfaces
         Task<List<TicketDto>> GetTicketsByEventAsync(Guid eventId);
         Task UpdateTicketStatusAsync(Guid ticketId, TicketStatus status);
         Task UpdateTicketsStatusByOrderAsync(Guid orderId, TicketStatus status);
-        Task CheckInTicketAsync(Guid ticketId, Guid checkedInByAccountId, DateTimeOffset checkedInAt);
+        /// <summary>Issued→Used только если status ещё Issued. false — гонка/уже Used.</summary>
+        Task<bool> TryCheckInTicketAsync(Guid ticketId, Guid checkedInByAccountId, DateTimeOffset checkedInAt);
+        /// <summary>Used→Issued только если status ещё Used.</summary>
+        Task<bool> TryUndoCheckInTicketAsync(Guid ticketId);
         Task ReassignTicketHolderAsync(Guid ticketId, Guid newHolderAccountId);
         #endregion
 

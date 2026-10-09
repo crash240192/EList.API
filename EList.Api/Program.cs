@@ -186,7 +186,8 @@ app.UseEndpoints(endpoints =>
     // Публичные feature-flags для UI (без auth).
     endpoints.MapGet("/api/features", () => Results.Ok(new
     {
-        ticketSalesEnabled = EList.Services.Impl.Payments.PaymentSettings.IsTicketSalesGloballyEnabled()
+        ticketSalesEnabled = EList.Services.Impl.Payments.PaymentSettings.IsTicketSalesGloballyEnabled(),
+        ticketDeskRevealHolder = EList.Services.Impl.Payments.PaymentSettings.IsTicketDeskRevealHolderEnabled()
     }));
 });
 var minThreads = Convert.ToInt32(ConfigurationManager.AppSettings["minThreads"] ?? "0");

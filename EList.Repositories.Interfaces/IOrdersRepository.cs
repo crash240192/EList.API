@@ -30,7 +30,8 @@ namespace EList.Repositories.Interfaces
         Task<List<Ticket>> GetTicketsByEventAsync(Guid eventId);
         Task UpdateTicketStatusAsync(Guid ticketId, TicketStatus status);
         Task UpdateTicketsStatusByOrderAsync(Guid orderId, TicketStatus status);
-        Task CheckInTicketAsync(Guid ticketId, Guid checkedInByAccountId, DateTimeOffset checkedInAt);
+        Task<bool> TryCheckInTicketAsync(Guid ticketId, Guid checkedInByAccountId, DateTimeOffset checkedInAt);
+        Task<bool> TryUndoCheckInTicketAsync(Guid ticketId);
         Task ReassignTicketHolderAsync(Guid ticketId, Guid newHolderAccountId);
         #endregion
 

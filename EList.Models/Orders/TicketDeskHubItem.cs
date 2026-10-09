@@ -17,6 +17,8 @@ namespace EList.Models.Orders
         public string Access { get; set; } = "organizer";
         public bool CanCheckIn { get; set; }
         public bool CanViewStats { get; set; }
+        /// <summary>Owner/Manager (и platform mod через organizer path) — undo Used→Issued</summary>
+        public bool CanUndoCheckIn { get; set; }
         public int? Sold { get; set; }
         public int? IssuedOpen { get; set; }
         public int? Used { get; set; }

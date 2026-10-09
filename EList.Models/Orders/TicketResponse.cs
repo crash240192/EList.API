@@ -33,9 +33,19 @@ namespace EList.Models.Orders
         public string? TicketTypeName { get; set; }
 
         /// <summary>
-        /// Идентификатор владельца билета
+        /// Идентификатор владельца билета (на desk может скрываться при ticketDeskRevealHolder=false)
         /// </summary>
-        public Guid HolderAccountId { get; set; }
+        public Guid? HolderAccountId { get; set; }
+
+        /// <summary>
+        /// Login holder — только если features:ticketDeskRevealHolder=true
+        /// </summary>
+        public string? HolderLogin { get; set; }
+
+        /// <summary>
+        /// Отображаемое имя holder — только если features:ticketDeskRevealHolder=true
+        /// </summary>
+        public string? HolderDisplayName { get; set; }
 
         /// <summary>
         /// Статус билета

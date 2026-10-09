@@ -135,9 +135,9 @@ W4 (чеки) не блокирует W6.
 
 - [ ] Owner назначает билетёра на событие; билетёр гасит билет без прав менеджера
 - [ ] Сайдбар «Билеты» → hub; desk глубже (скан → карточка → confirm Used)
-- [ ] Undo для Owner/Manager (карточка / повторный скан / история)
-- [ ] Org summary: продано / использовано / осталось по событиям
-- [ ] `features:ticketDeskRevealHolder` default false
+- [x] Undo для Owner/Manager (карточка / повторный скан)
+- [x] Org summary: продано / использовано / осталось по событиям
+- [x] `features:ticketDeskRevealHolder` default false
 - [x] MyTickets: «Печать» (системный print / Save as PDF)
 - [ ] EventPage — CTA на desk
 
