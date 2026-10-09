@@ -172,7 +172,8 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
   - `0` → есть активный тип с `price = 0`, **или** билеты выкл. и `cost` null/0;
   - `N > 0` → EXISTS активный тип с `price ≤ N`, **или** без билетов `cost ≤ N` (null допускается как «без цены»).
 - Шаблоны событий: `eventParameters.ticketTypes` в snapshot CreateEventRequest.
-- План: [ticket-types-plan.md](./ticket-types-plan.md).
+- План типов: [ticket-types-plan.md](./ticket-types-plan.md).
+- Следующее (W6): роль билетёра, desk на входе, статистика, PDF — [tickets-door-admin-plan.md](./tickets-door-admin-plan.md). W4 (чеки) на паузе.
 
 ---
 

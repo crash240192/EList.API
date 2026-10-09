@@ -1,8 +1,9 @@
 # Билеты — сценарии и пробелы
 
-> Актуально: 7 октября 2026  
+> Актуально: 9 октября 2026  
 > Код: API orders/tickets + UI BuyTicket / MyTickets / return / check-in  
-> Связано: [tickets workflow.txt](./tickets%20workflow.txt), [tbank-payments.md](./tbank-payments.md), [SERVICE.md](./SERVICE.md) §7
+> Интеграция: `cursor/tickets-integration-0b40` / `cursor/tickets-integration-ui-0b40` (от `develop`)  
+> Связано: [tickets workflow.txt](./tickets%20workflow.txt), [tbank-payments.md](./tbank-payments.md), [SERVICE.md](./SERVICE.md) §7, [tickets-door-admin-plan.md](./tickets-door-admin-plan.md)
 
 ## Матрица сценариев
 
@@ -29,9 +30,11 @@
 | F1 | Org CanSellTickets + agreement | ✅ | ✅ | Готово | |
 | F2 | Global `ticketSalesEnabled` | ✅ | ✅ | Готово | `GET /api/features` + EventPage |
 | F3 | Invite при TicketsEnabled | ✅ | ✅ | Готово | |
-| G1 | 54-ФЗ Receipt / AgentSign | ❌ | — | Отложено | после ТП Т-Банк/касса |
-| G2 | Типы билетов | ✅ A+B+C | ✅ D + W5 polish | Готово | заказ/capacity/поиск/карточки/MyTickets/шаблоны; soft-delete T10 |
-| G2b | PDF / Wallet pass | ❌ | — | Бэклог | после типов |
+| G1 | 54-ФЗ Receipt / AgentSign | ❌ | — | Отложено | касса/инструкции API ещё не готовы |
+| G2 | Типы билетов | ✅ A+B+C | ✅ D + W5 polish | Готово | в integration-ветках от develop |
+| G2b | PDF / печатная форма | ❌ | — | W6 | print/PDF; Wallet pass — позже |
+| H1 | Роль билетёра + desk на входе | ❌ | ❌ | W6 | см. [tickets-door-admin-plan.md](./tickets-door-admin-plan.md) |
+| H2 | Статистика билетов по событию/org | ❌ | ❌ | W6 | sold / used / remaining / pending |
 
 ## Волны доработки
 
@@ -50,15 +53,23 @@
 3. QR check-in камерой у организатора (`TicketCheckInPanel` + `QrScanner`).
 4. Adult gate на покупку — отложено (ageLimit уже на доступе к событию).
 
-### W4 — фискализация (после ТП)
-1. Receipt в Init (AgentSign / SupplierInfo).
+### W4 — фискализация (пауза)
+1. Receipt в Init (AgentSign / SupplierInfo) — ждать онлайн-кассу и инструкции API.
 2. Обязательные поля org для чека (телефон и т.д.).
 3. Закрыть §6.2 агентского договора.
 
 ### W5 — типы билетов ✅
 См. [ticket-types-plan.md](./ticket-types-plan.md).  
 - Phase A–C (API): схема, CreateOrder по типу, capacity, `priceMin`/`priceMax`, фильтр поиска по типам.  
-- Phase D + polish (UI): редактор типов, BuyTicketModal, similar-event, диапазон на карточках, MyTickets label, шаблоны restore `ticketTypes`, soft-delete preview.
+- Phase D + polish (UI): редактор типов, BuyTicketModal, similar-event, диапазон на карточках, MyTickets label, шаблоны restore `ticketTypes`, soft-delete preview.  
+- Смержено в `tickets-integration*` от `develop` (база для следующих волн).
+
+### W6 — вход / билетёр / админка / PDF
+См. [tickets-door-admin-plan.md](./tickets-door-admin-plan.md).  
+1. Роль `TicketTaker` + назначение на события.  
+2. Страница Desk (код/QR + counters).  
+3. Stats API по событию и org.  
+4. Печатная форма / client PDF билета (G2b MVP).
 
 ## State machine (кратко)
 
