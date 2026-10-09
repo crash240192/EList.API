@@ -86,6 +86,55 @@ namespace EList.Validators.Impl
             if (parameters.AllowedGender.HasValue && !Enum.IsDefined(typeof(Gender), parameters.AllowedGender.Value))
                 return CommandResult.Fail(ErrorCode.InvalidValue, "Указан некорректный допустимый пол участников");
 
+            if (parameters.TicketTypes != null)
+            {
+                var typesError = ValidateTicketTypes(parameters.TicketTypes, parameters.TicketsEnabled);
+                if (!typesError.Success)
+                    return typesError;
+            }
+            else if (parameters.TicketsEnabled)
+            {
+                // TicketTypes == null: типы не переданы — сервис сделает fallback «Стандарт» из Cost.
+            }
+
+            return CommandResult.OK;
+        }
+
+        private static CommandResult ValidateTicketTypes(List<EventTicketTypeRequest>? ticketTypes, bool ticketsEnabled)
+        {
+            if (ticketTypes == null)
+                return CommandResult.OK;
+
+            if (ticketTypes.Count == 0)
+            {
+                if (ticketsEnabled)
+                    return CommandResult.Fail(ErrorCode.InvalidValue,
+                        "При продаже билетов нужен хотя бы один активный тип билета");
+                return CommandResult.OK;
+            }
+
+            var activeCount = 0;
+            foreach (var t in ticketTypes)
+            {
+                if (string.IsNullOrWhiteSpace(t.Name))
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Укажите название типа билета");
+                if (t.Name.Trim().Length > 120)
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Название типа билета слишком длинное");
+                if (t.Price < 0)
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Цена типа билета не может быть отрицательной");
+                if (t.Price > (decimal)MaxEventCost)
+                    return CommandResult.Fail(ErrorCode.InvalidValue,
+                        $"Цена типа билета не может превышать {MaxEventCost:N0} ₽");
+                if (t.Capacity is <= 0)
+                    return CommandResult.Fail(ErrorCode.InvalidValue, "Лимит мест типа должен быть больше 0");
+                if (t.Active)
+                    activeCount++;
+            }
+
+            if (ticketsEnabled && activeCount == 0)
+                return CommandResult.Fail(ErrorCode.InvalidValue,
+                    "При продаже билетов нужен хотя бы один активный тип билета");
+
             return CommandResult.OK;
         }
 

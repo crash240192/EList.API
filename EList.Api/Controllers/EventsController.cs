@@ -467,6 +467,32 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Типы билетов мероприятия (активные; организатор может запросить includeInactive=true).
+        /// </summary>
+        [HttpGet("{eventId}/ticket-types")]
+        public async Task<CommandResult<List<EventTicketType>?>> GetEventTicketTypesAsync(
+            Guid eventId,
+            [FromQuery] bool includeInactive = false)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventTicketTypesAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                var result = await _eventsService.GetEventTicketTypesAsync(eventId, includeInactive);
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Назначить событию параметры
         /// </summary>
         /// <param name="eventId"></param>

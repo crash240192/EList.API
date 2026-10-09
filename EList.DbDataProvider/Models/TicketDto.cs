@@ -16,6 +16,9 @@ namespace EList.DbDataProvider.Models
         [Column("event_id")]
         public Guid EventId { get; set; }
 
+        [Column("ticket_type_id")]
+        public Guid? TicketTypeId { get; set; }
+
         [Column("holder_account_id")]
         public Guid HolderAccountId { get; set; }
 

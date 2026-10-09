@@ -80,6 +80,12 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task<List<Order>> GetExpiredUnpaidOrdersAsync(DateTimeOffset createdBefore, int limit)
+        {
+            var items = await _ordersDataProvider.GetExpiredUnpaidOrdersAsync(createdBefore, limit);
+            return _mapper.Map<List<Order>>(items) ?? new List<Order>();
+        }
+
         public async Task<List<Order>> GetOrdersBySellerOrganizationAsync(Guid organizationId)
         {
             var items = await _ordersDataProvider.GetOrdersBySellerOrganizationAsync(organizationId);

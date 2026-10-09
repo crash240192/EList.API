@@ -102,6 +102,17 @@ namespace EList.Repositories.Impl
             {
                 var item = _mapper.Map<EventShort>(i);
                 item.Colors = i.Types?.Select(i => i.Type.EventCategory.Color)?.Distinct().ToArray();
+                item.TicketsEnabled = i.Parameters?.TicketsEnabled ?? false;
+                if (!item.TicketsEnabled)
+                {
+                    var cost = i.Parameters?.Cost;
+                    var legacy = cost is double c
+                        && !double.IsNaN(c) && !double.IsInfinity(c) && c > 0
+                        ? c
+                        : 0d;
+                    item.PriceMin = legacy;
+                    item.PriceMax = legacy;
+                }
                 return item;
             }).ToList();
 

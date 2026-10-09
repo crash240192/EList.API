@@ -17,6 +17,7 @@ namespace EList.Repositories.Interfaces
         Task<List<Order>> GetOrdersByBuyerAsync(Guid buyerAccountId);
         Task<List<Order>> GetOrdersBySellerOrganizationAsync(Guid organizationId);
         Task<List<Order>> GetOrdersByEventAsync(Guid eventId);
+        Task<List<Order>> GetExpiredUnpaidOrdersAsync(DateTimeOffset createdBefore, int limit);
         #endregion
 
         #region tickets
