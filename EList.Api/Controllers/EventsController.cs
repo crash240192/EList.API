@@ -497,6 +497,31 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Hub «Билеты»: события, доступные текущему пользователю для desk
+        /// </summary>
+        [HttpGet("ticket-desk/hub")]
+        public async Task<CommandResult<List<TicketDeskHubItem>>> GetMyTicketDeskHubAsync(
+            [FromQuery] int limit = 100)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetMyTicketDeskHubAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                var result = await _ordersService.GetMyTicketDeskHubAsync(limit);
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Сводка билетов мероприятия (продано / на площадке / остаток / byType)
         /// </summary>
         [HttpGet("{eventId}/tickets/stats")]

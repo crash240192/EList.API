@@ -67,5 +67,10 @@ namespace EList.Services.Interfaces
         Task<CommandResult<List<OrganizationEventTicketSummaryItem>>> GetOrganizationEventsTicketSummaryAsync(
             Guid organizationId,
             int limit = 100);
+
+        /// <summary>
+        /// Hub desk: события, где пользователь организатор (Owner/Manager) или назначенный staff.
+        /// </summary>
+        Task<CommandResult<List<TicketDeskHubItem>>> GetMyTicketDeskHubAsync(int limit = 100);
     }
 }

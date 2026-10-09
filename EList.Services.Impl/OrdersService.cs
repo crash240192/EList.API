@@ -1498,6 +1498,131 @@ namespace EList.Services.Impl
             return new CommandResult<List<OrganizationEventTicketSummaryItem>>(items);
         }
 
+        public async Task<CommandResult<List<TicketDeskHubItem>>> GetMyTicketDeskHubAsync(int limit = 100)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(GetMyTicketDeskHubAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+            {
+                return CommandResult<List<TicketDeskHubItem>>.Fail(
+                    ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+            }
+
+            var accountId = _accountDataHolder.AccountId.Value;
+            var take = limit <= 0 ? 100 : Math.Min(limit, 200);
+            var byEvent = new Dictionary<Guid, TicketDeskHubItem>();
+
+            var myOrgs = await _organizationsRepository.GetOrganizationsByAccountIdAsync(accountId, onlyActiveMembers: true)
+                ?? new List<Models.Organizations.Organization>();
+
+            foreach (var org in myOrgs)
+            {
+                var member = await _organizationsRepository.GetMemberAsync(org.Id, accountId);
+                if (member == null || !member.Active)
+                    continue;
+                if (member.Role != OrganizationMemberRole.Owner && member.Role != OrganizationMemberRole.Manager)
+                    continue;
+
+                var events = await _eventsRepository.GetEventsByOrganizationOrganizatorAsync(org.Id, take)
+                    ?? new List<Event>();
+                foreach (var eventItem in events)
+                {
+                    if (byEvent.ContainsKey(eventItem.Id))
+                        continue;
+
+                    var stats = await BuildEventTicketStatsAsync(eventItem);
+                    byEvent[eventItem.Id] = new TicketDeskHubItem
+                    {
+                        EventId = eventItem.Id,
+                        Name = eventItem.Name,
+                        StartTime = eventItem.StartTime,
+                        EndTime = eventItem.EndTime,
+                        Active = eventItem.Active,
+                        TicketsEnabled = eventItem.Parameters?.TicketsEnabled ?? false,
+                        OrganizationId = org.Id,
+                        OrganizationName = org.Name,
+                        Access = "organizer",
+                        CanCheckIn = true,
+                        CanViewStats = true,
+                        Sold = stats.Sold,
+                        IssuedOpen = stats.IssuedOpen,
+                        Used = stats.Used,
+                        OrdersPending = stats.OrdersPending,
+                        Remaining = stats.Remaining
+                    };
+                }
+            }
+
+            var staffRows = await _eventTicketStaffRepository.GetByAccountIdAsync(accountId)
+                ?? new List<EventTicketStaff>();
+            foreach (var staff in staffRows)
+            {
+                if (byEvent.ContainsKey(staff.EventId))
+                    continue;
+
+                var eventItem = await _eventsRepository.GetEventAsync(staff.EventId);
+                if (eventItem == null)
+                    continue;
+
+                Guid? orgId = null;
+                string? orgName = null;
+                var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(staff.EventId);
+                var orgOrg = organizators?.FirstOrDefault(o => o.OrganizationId != null);
+                if (orgOrg?.OrganizationId != null)
+                {
+                    orgId = orgOrg.OrganizationId;
+                    orgName = orgOrg.Organization?.Name;
+                    if (orgName == null)
+                    {
+                        var org = await _organizationsRepository.GetOrganizationAsync(orgId.Value);
+                        orgName = org?.Name;
+                    }
+                }
+
+                int? sold = null, issuedOpen = null, used = null, ordersPending = null, remaining = null;
+                if (staff.CanViewStats)
+                {
+                    var stats = await BuildEventTicketStatsAsync(eventItem);
+                    sold = stats.Sold;
+                    issuedOpen = stats.IssuedOpen;
+                    used = stats.Used;
+                    ordersPending = stats.OrdersPending;
+                    remaining = stats.Remaining;
+                }
+
+                byEvent[staff.EventId] = new TicketDeskHubItem
+                {
+                    EventId = eventItem.Id,
+                    Name = eventItem.Name,
+                    StartTime = eventItem.StartTime,
+                    EndTime = eventItem.EndTime,
+                    Active = eventItem.Active,
+                    TicketsEnabled = eventItem.Parameters?.TicketsEnabled ?? false,
+                    OrganizationId = orgId,
+                    OrganizationName = orgName,
+                    Access = "staff",
+                    CanCheckIn = staff.CanCheckIn,
+                    CanViewStats = staff.CanViewStats,
+                    Sold = sold,
+                    IssuedOpen = issuedOpen,
+                    Used = used,
+                    OrdersPending = ordersPending,
+                    Remaining = remaining
+                };
+            }
+
+            var result = byEvent.Values
+                .OrderByDescending(i => i.StartTime)
+                .Take(take)
+                .ToList();
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<TicketDeskHubItem>>(result);
+        }
+
         public async Task<CommandResult<TicketResponse>> ValidateTicketForEventAsync(TicketCheckInRequest request)
         {
             var correlationId = _correlationIdProvider.Get();

@@ -23,6 +23,12 @@ namespace EList.Repositories.Impl
             return _mapper.Map<List<EventTicketStaff>>(items);
         }
 
+        public async Task<List<EventTicketStaff>> GetByAccountIdAsync(Guid accountId)
+        {
+            var items = await _dataProvider.GetByAccountIdAsync(accountId);
+            return _mapper.Map<List<EventTicketStaff>>(items);
+        }
+
         public async Task<EventTicketStaff?> GetAsync(Guid eventId, Guid accountId)
         {
             var item = await _dataProvider.GetAsync(eventId, accountId);

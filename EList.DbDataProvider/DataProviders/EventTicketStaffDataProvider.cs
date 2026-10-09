@@ -21,6 +21,14 @@ namespace EList.DbDataProvider.DataProviders
                 .ToListAsync();
         }
 
+        public async Task<List<EventTicketStaffDto>> GetByAccountIdAsync(Guid accountId)
+        {
+            return await _connection.EventTicketStaff
+                .Where(i => i.AccountId == accountId)
+                .OrderByDescending(i => i.CreateDate)
+                .ToListAsync();
+        }
+
         public async Task<EventTicketStaffDto?> GetAsync(Guid eventId, Guid accountId)
         {
             return await _connection.EventTicketStaff
