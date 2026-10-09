@@ -274,6 +274,27 @@ namespace EList.DbDataProvider.DataProviders
                 return (null, null);
             return (prices.Min(), prices.Max());
         }
+
+        public async Task<Dictionary<Guid, (decimal Min, decimal Max)>> GetActiveTicketTypePriceRangesAsync(
+            IEnumerable<Guid> eventIds)
+        {
+            var ids = eventIds?.Where(id => id != Guid.Empty).Distinct().ToList() ?? new List<Guid>();
+            if (ids.Count == 0)
+                return new Dictionary<Guid, (decimal Min, decimal Max)>();
+
+            var rows = await _connection.EventTicketTypes
+                .Where(t => ids.Contains(t.EventId) && t.Active)
+                .GroupBy(t => t.EventId)
+                .Select(g => new
+                {
+                    EventId = g.Key,
+                    Min = g.Min(t => t.Price),
+                    Max = g.Max(t => t.Price),
+                })
+                .ToListAsync();
+
+            return rows.ToDictionary(r => r.EventId, r => (r.Min, r.Max));
+        }
         #endregion
     }
 }

@@ -407,16 +407,7 @@ namespace EList.Services.Impl
             if (result == null)
                 return CommandResult<EventParameters?>.Fail(ErrorCode.EventParametersNotFound, $"Параметры для события id='{eventId}' не найдены");
 
-            if (result.TicketsEnabled)
-            {
-                var (min, max) = await _eventsMetadataRepository.GetActiveTicketTypePriceRangeAsync(eventId);
-                if (min != null)
-                {
-                    result.PriceMin = Convert.ToDouble(min.Value);
-                    result.PriceMax = Convert.ToDouble((max ?? min).Value);
-                    result.Cost = result.PriceMin;
-                }
-            }
+            await EnrichTicketPricesAsync(result, eventId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<EventParameters?>(result);
@@ -984,6 +975,7 @@ namespace EList.Services.Impl
             else
                 eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
 
+            await EnrichTicketPricesAsync(eventItem.Parameters, eventItem.Id);
             SanitizeEventCost(eventItem.Parameters);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -1004,17 +996,120 @@ namespace EList.Services.Impl
         /// </summary>
         private static void SanitizeEventCost(EventParameters? parameters)
         {
-            if (parameters?.Cost is not double cost)
+            if (parameters == null)
                 return;
 
+            parameters.Cost = SanitizePriceValue(parameters.Cost);
+            parameters.PriceMin = SanitizePriceValue(parameters.PriceMin);
+            parameters.PriceMax = SanitizePriceValue(parameters.PriceMax);
+        }
+
+        private static double? SanitizePriceValue(double? value)
+        {
+            if (value is not double cost)
+                return value;
+
             if (double.IsNaN(cost) || double.IsInfinity(cost) || cost < 0)
+                return 0;
+
+            if (cost > EventCostLimits.Max)
+                return EventCostLimits.Max;
+
+            return cost;
+        }
+
+        /// <summary>
+        /// Derived priceMin/priceMax (+ cost = min) для tickets_enabled.
+        /// Без билетов: PriceMin/PriceMax = Cost (или 0).
+        /// </summary>
+        private async Task EnrichTicketPricesAsync(EventParameters? parameters, Guid eventId)
+        {
+            if (parameters == null)
+                return;
+
+            if (!parameters.TicketsEnabled)
             {
-                parameters.Cost = 0;
+                var legacy = parameters.Cost is double c && !double.IsNaN(c) && !double.IsInfinity(c) && c > 0
+                    ? c
+                    : 0d;
+                parameters.PriceMin = legacy;
+                parameters.PriceMax = legacy;
                 return;
             }
 
-            if (cost > EventCostLimits.Max)
-                parameters.Cost = EventCostLimits.Max;
+            var (min, max) = await _eventsMetadataRepository.GetActiveTicketTypePriceRangeAsync(eventId);
+            if (min == null)
+                return;
+
+            parameters.PriceMin = Convert.ToDouble(min.Value);
+            parameters.PriceMax = Convert.ToDouble((max ?? min).Value);
+            parameters.Cost = parameters.PriceMin;
+        }
+
+        private async Task EnrichTicketPricesAsync(IEnumerable<Event> events)
+        {
+            var list = events?.Where(e => e != null).ToList() ?? new List<Event>();
+            if (list.Count == 0)
+                return;
+
+            var ticketed = list
+                .Where(e => e.Parameters?.TicketsEnabled == true)
+                .ToList();
+            Dictionary<Guid, (decimal Min, decimal Max)> ranges = new();
+            if (ticketed.Count > 0)
+            {
+                ranges = await _eventsMetadataRepository.GetActiveTicketTypePriceRangesAsync(
+                    ticketed.Select(e => e.Id));
+            }
+
+            foreach (var item in list)
+            {
+                if (item.Parameters == null)
+                    continue;
+
+                if (item.Parameters.TicketsEnabled)
+                {
+                    if (ranges.TryGetValue(item.Id, out var range))
+                    {
+                        item.Parameters.PriceMin = Convert.ToDouble(range.Min);
+                        item.Parameters.PriceMax = Convert.ToDouble(range.Max);
+                        item.Parameters.Cost = item.Parameters.PriceMin;
+                    }
+                }
+                else
+                {
+                    var legacy = item.Parameters.Cost is double c
+                        && !double.IsNaN(c) && !double.IsInfinity(c) && c > 0
+                        ? c
+                        : 0d;
+                    item.Parameters.PriceMin = legacy;
+                    item.Parameters.PriceMax = legacy;
+                }
+            }
+        }
+
+        private async Task EnrichTicketPricesOnShortAsync(IEnumerable<EventShort> items)
+        {
+            var list = items?.Where(i => i != null && i.TicketsEnabled).ToList() ?? new List<EventShort>();
+            if (list.Count == 0)
+                return;
+
+            var ranges = await _eventsMetadataRepository.GetActiveTicketTypePriceRangesAsync(
+                list.Select(i => i.Id));
+
+            foreach (var item in list)
+            {
+                if (ranges.TryGetValue(item.Id, out var range))
+                {
+                    item.PriceMin = Convert.ToDouble(range.Min);
+                    item.PriceMax = Convert.ToDouble(range.Max);
+                }
+                else
+                {
+                    item.PriceMin = 0;
+                    item.PriceMax = 0;
+                }
+            }
         }
 
         //private static bool ValidateAgeAccessToEvent(int? eventAgeLimit, int userAge, bool strongValidation)
@@ -1053,6 +1148,7 @@ namespace EList.Services.Impl
             var searchResult = await _eventsRepository.SearchEventsAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
             if (searchResult?.Result != null)
             {
+                await EnrichTicketPricesAsync(searchResult.Result);
                 foreach (var item in searchResult.Result)
                     SanitizeEventCost(item.Parameters);
             }
@@ -1073,6 +1169,8 @@ namespace EList.Services.Impl
                 return CommandResult<PagedList<EventShort>?>.Fail(searchError.ErrorCode, searchError.Message);
 
             var searchResult = await _eventsRepository.SearchEventsShortAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
+            if (searchResult?.Result != null)
+                await EnrichTicketPricesOnShortAsync(searchResult.Result);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<EventShort>?>(searchResult);

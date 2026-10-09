@@ -33,5 +33,6 @@ namespace EList.Repositories.Interfaces
         Task UpdateTicketTypeAsync(EventTicketType item);
         Task DeactivateTicketTypesAsync(IEnumerable<Guid> ids);
         Task<(decimal? Min, decimal? Max)> GetActiveTicketTypePriceRangeAsync(Guid eventId);
+        Task<Dictionary<Guid, (decimal Min, decimal Max)>> GetActiveTicketTypePriceRangesAsync(IEnumerable<Guid> eventIds);
     }
 }
