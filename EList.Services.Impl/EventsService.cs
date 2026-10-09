@@ -489,6 +489,8 @@ namespace EList.Services.Impl
 
         /// <summary>
         /// Replace / fallback типов билетов + sync event_parameters.cost = min(active).
+        /// Типы, отсутствующие в запросе или с Active=false, только soft-deactivate
+        /// (T10: hard-delete запрещён — у типа могут быть выданные билеты / FK на orders).
         /// </summary>
         private async Task<CommandResult> SyncEventTicketTypesAsync(
             Guid eventId,
@@ -499,6 +501,7 @@ namespace EList.Services.Impl
 
             if (!parameters.TicketsEnabled)
             {
+                // Снимаем продажу: все активные типы → active=false (строки и FK сохраняем).
                 if (existing.Count > 0)
                     await _eventsMetadataRepository.DeactivateTicketTypesAsync(existing.Where(t => t.Active).Select(t => t.Id));
                 return CommandResult.OK;

@@ -1,7 +1,7 @@
 # Типы билетов — план реализации (MVP)
 
-> Дата: 7 октября 2026  
-> Статус: Phase A–C ✅; UI Phase D частично (B+C)  
+> Дата: 7 октября 2026 (обновлено 9 октября 2026)  
+> Статус: MVP ✅ (Phase A–C API + Phase D UI + W5 polish: шаблоны / soft-delete)  
 > Зависит от: W1–W3 (заказы / gift / QR) ✅; W4 (54-ФЗ) — независимо, можно параллелить после ТП  
 > Связано: [tickets-scenarios.md](./tickets-scenarios.md), [SERVICE.md](./SERVICE.md) §7
 
@@ -221,11 +221,12 @@ OR !ticketsEnabled && (cost IS NULL OR cost <= :price)
 
 ### Phase D — UI
 
-13. ✅ Редактор типов в CreateEventPage (Phase B UI) (+ шаблоны — частично через ticketTypes в payload).
+13. ✅ Редактор типов в CreateEventPage (Phase B UI).
 14. ✅ Карточки / EventPage: диапазон цены (Phase C UI).
 15. ✅ BuyTicketModal: выбор типа (Phase B UI).
 16. ✅ MyTickets: имя типа (Phase C UI).
-17. Прогон сценариев T1–T18 (smoke).
+17. ✅ Шаблоны: `ticketTypes` в snapshot + restore при apply; soft-delete только `active=false` (T10).
+18. Smoke T1 / T4 / T11 / T12 (+ ключевые) — при приёмке.
 
 ### Порядок поставки PR
 
@@ -251,10 +252,11 @@ OR !ticketsEnabled && (cost IS NULL OR cost <= :price)
 
 ## 10. Критерии готовности MVP
 
-- [ ] Org может завести ≥2 типа и опубликовать
-- [ ] Покупка только с выбранным типом; сумма верная
-- [ ] Карточка показывает диапазон / «от»
-- [ ] Поиск «Бесплатно» / «до N» учитывает типы
-- [ ] Backfill старых ticket-событий не ломает заказы
-- [ ] Soft-delete типа с проданными билетами
-- [ ] `npm run build` + `dotnet build` + smoke T1, T4, T11, T12
+- [x] Org может завести ≥2 типа и опубликовать
+- [x] Покупка только с выбранным типом; сумма верная
+- [x] Карточка показывает диапазон / «от»
+- [x] Поиск «Бесплатно» / «до N» учитывает типы
+- [x] Backfill старых ticket-событий не ломает заказы
+- [x] Soft-delete типа с проданными билетами (`DeactivateTicketTypesAsync`; CreateOrder отклоняет inactive)
+- [x] Шаблоны событий persist/restore `ticketTypes` (UI W5 polish)
+- [ ] `npm run build` + `dotnet build` + smoke T1, T4, T11, T12 (приёмка на стенде)
