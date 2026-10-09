@@ -1,8 +1,8 @@
 # Билеты на входе + админка + PDF (W6)
 
-> Дата: 9 октября 2026  
-> Статус: план  
-> База: ветки интеграции `cursor/tickets-integration-0b40` (API) / `cursor/tickets-integration-ui-0b40` (UI) от `develop`  
+> Дата: 9 октября 2026 (сценарии: [tickets-door-scenarios.md](./tickets-door-scenarios.md))  
+> Статус: план + детальные сценарии  
+> База: `cursor/tickets-door-0b40` ← `tickets-integration-0b40` ← `develop`  
 > Связано: [tickets-scenarios.md](./tickets-scenarios.md), [ticket-types-plan.md](./ticket-types-plan.md)  
 > Вне scope сейчас: W4 фискализация (касса / API чеков ещё не готовы)
 
@@ -118,14 +118,16 @@ QR payload не менять — тот же `parseTicketCodeFromText` / code st
 
 ## 7. Декомпозиция PR
 
-| PR | Содержимое | База |
-|----|------------|------|
-| API-I | уже: merge W5 → `tickets-integration` | develop |
-| UI-I | уже: merge W5 UI → `tickets-integration-ui` | develop |
-| API-D1 | роль `TicketTaker` + `event_ticket_staff` + auth check-in | integration |
-| API-D2 | stats / org ticket-summary endpoints | API-D1 |
-| UI-D1 | страница Desk + навигация + staff assign | API-D2 + UI-I |
-| UI-D2 | печатная форма / client PDF на MyTickets | UI-I (можно параллельно D1) |
+Полная матрица сценариев, юзкейсы и срезы **W6a–W6e**: [tickets-door-scenarios.md](./tickets-door-scenarios.md) §6–7.
+
+| Срез | Содержимое | База |
+|------|------------|------|
+| API/UI-I | уже: merge W5 → `tickets-integration*` | develop |
+| **W6a** | `TicketTaker` + `event_ticket_staff` + auth check-in + UI ролей/assign | door ← integration |
+| **W6b** | stats + org ticket-summary | W6a |
+| **W6c** | Hub + Desk UI + sidebar | W6a+W6b |
+| **W6d** | Print / client PDF (параллельно) | door-ui |
+| **W6e** | Undo, race-safe check-in, polish smoke | W6a–c |
 
 W4 (чеки) не блокирует W6.
 

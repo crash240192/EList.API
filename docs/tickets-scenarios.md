@@ -65,11 +65,8 @@
 - Смержено в `tickets-integration*` от `develop` (база для следующих волн).
 
 ### W6 — вход / билетёр / админка / PDF
-См. [tickets-door-admin-plan.md](./tickets-door-admin-plan.md).  
-1. Роль `TicketTaker` + назначение на события.  
-2. Страница Desk (код/QR + counters).  
-3. Stats API по событию и org.  
-4. Печатная форма / client PDF билета (G2b MVP).
+См. [tickets-door-scenarios.md](./tickets-door-scenarios.md) (юзкейсы + приёмка) и [tickets-door-admin-plan.md](./tickets-door-admin-plan.md).  
+Срезы: **W6a** роли/staff → **W6b** stats → **W6c** Desk UI; **W6d** PDF параллельно; **W6e** undo/polish.
 
 ## State machine (кратко)
 
