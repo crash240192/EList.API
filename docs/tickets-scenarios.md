@@ -30,7 +30,7 @@
 | F2 | Global `ticketSalesEnabled` | ✅ | ✅ | Готово | `GET /api/features` + EventPage |
 | F3 | Invite при TicketsEnabled | ✅ | ✅ | Готово | |
 | G1 | 54-ФЗ Receipt / AgentSign | ❌ | — | Отложено | после ТП Т-Банк/касса |
-| G2 | Типы билетов | 🟡 Phase A | ❌ | В работе | схема+CRUD; заказ/поиск — B/C; UI — D |
+| G2 | Типы билетов | 🟡 A+B+C | 🟡 B UI | В работе | заказ/capacity/поиск ✅; UI cards/MyTickets — D |
 | G2b | PDF / Wallet pass | ❌ | — | Бэклог | после типов |
 
 ## Волны доработки
@@ -55,9 +55,10 @@
 2. Обязательные поля org для чека (телефон и т.д.).
 3. Закрыть §6.2 агентского договора.
 
-### W5 — типы билетов (план)
+### W5 — типы билетов
 См. [ticket-types-plan.md](./ticket-types-plan.md).  
-Коротко: один тип на заказ; цена события = min/max активных типов; поиск `price` по типам.
+- Phase A–C (API): схема, CreateOrder по типу, capacity, `priceMin`/`priceMax`, фильтр поиска по типам.  
+- UI (частично): редактор типов, BuyTicketModal, similar-event; осталось — диапазон на карточках / MyTickets label.
 
 ## State machine (кратко)
 

@@ -1,7 +1,7 @@
 # Типы билетов — план реализации (MVP)
 
 > Дата: 7 октября 2026  
-> Статус: Phase A ✅; Phase B в работе  
+> Статус: Phase A–C ✅; UI Phase D частично (B+C)  
 > Зависит от: W1–W3 (заказы / gift / QR) ✅; W4 (54-ФЗ) — независимо, можно параллелить после ТП  
 > Связано: [tickets-scenarios.md](./tickets-scenarios.md), [SERVICE.md](./SERVICE.md) §7
 
@@ -215,16 +215,16 @@ OR !ticketsEnabled && (cost IS NULL OR cost <= :price)
 
 ### Phase C — поиск и ответы (API)
 
-10. `priceMin` / `priceMax` в event get + short search.
-11. Переписать фильтр `Price` в `EventsDataProvider` (§1).
-12. Документация SERVICE / tickets-scenarios (G2 → в работе).
+10. ✅ `priceMin` / `priceMax` в event get + short search.
+11. ✅ Переписать фильтр `Price` в `EventsDataProvider` (§1).
+12. ✅ Документация SERVICE / tickets-scenarios (G2 → в работе).
 
 ### Phase D — UI
 
-13. Редактор типов в CreateEventPage (+ шаблоны, если templates хранят parameters).
-14. Карточки / EventPage: диапазон цены.
-15. BuyTicketModal: выбор типа.
-16. MyTickets: имя типа.
+13. ✅ Редактор типов в CreateEventPage (Phase B UI) (+ шаблоны — частично через ticketTypes в payload).
+14. ✅ Карточки / EventPage: диапазон цены (Phase C UI).
+15. ✅ BuyTicketModal: выбор типа (Phase B UI).
+16. ✅ MyTickets: имя типа (Phase C UI).
 17. Прогон сценариев T1–T18 (smoke).
 
 ### Порядок поставки PR

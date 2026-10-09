@@ -234,6 +234,12 @@ namespace EList.Repositories.Impl
         {
             return await _eventsMetadataDataProvider.GetActiveTicketTypePriceRangeAsync(eventId);
         }
+
+        public async Task<Dictionary<Guid, (decimal Min, decimal Max)>> GetActiveTicketTypePriceRangesAsync(
+            IEnumerable<Guid> eventIds)
+        {
+            return await _eventsMetadataDataProvider.GetActiveTicketTypePriceRangesAsync(eventIds);
+        }
         #endregion
     }
 }
