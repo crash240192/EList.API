@@ -8,6 +8,12 @@ namespace EList.Models.Orders
         /// <summary>Идентификатор мероприятия.</summary>
         public Guid EventId { get; set; }
 
+        /// <summary>
+        /// Тип билета. Обязателен, если у события больше одного активного типа;
+        /// при ровно одном типе может быть опущен (подставится автоматически).
+        /// </summary>
+        public Guid? TicketTypeId { get; set; }
+
         /// <summary>Количество билетов (по умолчанию 1).</summary>
         public int Quantity { get; set; } = 1;
 

@@ -1,7 +1,7 @@
 # Типы билетов — план реализации (MVP)
 
 > Дата: 7 октября 2026  
-> Статус: план, код не начат  
+> Статус: Phase A ✅; Phase B в работе  
 > Зависит от: W1–W3 (заказы / gift / QR) ✅; W4 (54-ФЗ) — независимо, можно параллелить после ТП  
 > Связано: [tickets-scenarios.md](./tickets-scenarios.md), [SERVICE.md](./SERVICE.md) §7
 
@@ -206,10 +206,12 @@ OR !ticketsEnabled && (cost IS NULL OR cost <= :price)
 
 ### Phase B — заказ и capacity (API)
 
-6. `CreateOrderRequest.TicketTypeId`; цена и описание платежа из типа.
-7. `CountReserved…` по типу (+ общий maxPersons).
-8. Fulfill: писать `ticket_type_id` на билеты.
-9. Refund / transfer / check-in — прокинуть тип в ответы (без смены логики).
+6. ✅ `CreateOrderRequest.TicketTypeId`; цена и описание платежа из типа.
+7. ✅ `CountReserved…` по типу (+ общий maxPersons).
+8. ✅ Fulfill: писать `ticket_type_id` на билеты.
+9. ✅ Refund / transfer / check-in — `ticketTypeId` / `ticketTypeName` в ответах.
+10. ✅ `orders/tickets.ticket_type_id NOT NULL` (миграция после backfill).
+11. UI: similar-event копирует типы; BuyTicketModal выбирает тип.
 
 ### Phase C — поиск и ответы (API)
 
