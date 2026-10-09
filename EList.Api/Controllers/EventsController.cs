@@ -493,6 +493,60 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Список билетёров, назначенных на мероприятие
+        /// </summary>
+        [HttpGet("{eventId}/ticket-staff")]
+        public async Task<CommandResult<List<EventTicketStaffResponse>?>> GetEventTicketStaffAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventTicketStaffAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                var result = await _eventsService.GetEventTicketStaffAsync(eventId);
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Полная замена списка билетёров мероприятия
+        /// </summary>
+        [HttpPut("{eventId}/ticket-staff")]
+        public async Task<CommandResult> SetEventTicketStaffAsync(
+            Guid eventId,
+            [FromBody] EventTicketStaffUpsertRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SetEventTicketStaffAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                var result = await _eventsService.SetEventTicketStaffAsync(eventId, request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Назначить событию параметры
         /// </summary>
         /// <param name="eventId"></param>

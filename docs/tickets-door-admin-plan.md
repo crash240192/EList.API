@@ -1,7 +1,7 @@
 # Билеты на входе + админка + PDF (W6)
 
 > Дата: 9 октября 2026 (сценарии: [tickets-door-scenarios.md](./tickets-door-scenarios.md))  
-> Статус: план + детальные сценарии  
+> Статус: **W6a в реализации** (роли + staff + auth); W6b–e дальше  
 > База: `cursor/tickets-door-0b40` ← `tickets-integration-0b40` ← `develop`  
 > Связано: [tickets-scenarios.md](./tickets-scenarios.md), [ticket-types-plan.md](./ticket-types-plan.md)  
 > Вне scope сейчас: W4 фискализация (касса / API чеков ещё не готовы)

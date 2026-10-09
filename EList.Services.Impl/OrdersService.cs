@@ -33,6 +33,7 @@ namespace EList.Services.Impl
         private readonly IEventsRepository _eventsRepository;
         private readonly IEventsMetadataRepository _eventsMetadataRepository;
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
+        private readonly IEventTicketStaffRepository _eventTicketStaffRepository;
         private readonly IOrganizationsRepository _organizationsRepository;
         private readonly IParticipationsRepository _participationsRepository;
         private readonly IInvitationsRepository _invitationsRepository;
@@ -52,6 +53,7 @@ namespace EList.Services.Impl
             IEventsRepository eventsRepository,
             IEventsMetadataRepository eventsMetadataRepository,
             IEventOrganizatorsRepository eventOrganizatorsRepository,
+            IEventTicketStaffRepository eventTicketStaffRepository,
             IOrganizationsRepository organizationsRepository,
             IParticipationsRepository participationsRepository,
             IInvitationsRepository invitationsRepository,
@@ -70,6 +72,7 @@ namespace EList.Services.Impl
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
+            _eventTicketStaffRepository = eventTicketStaffRepository ?? throw new ArgumentNullException(nameof(eventTicketStaffRepository));
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
             _participationsRepository = participationsRepository ?? throw new ArgumentNullException(nameof(participationsRepository));
             _invitationsRepository = invitationsRepository ?? throw new ArgumentNullException(nameof(invitationsRepository));
@@ -1631,15 +1634,32 @@ namespace EList.Services.Impl
             if (eventItem == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{request.EventId}' не найдено");
 
-            var isOrg = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(
-                request.EventId, _accountDataHolder.AccountId.Value);
-            if (!isOrg && !_accountDataHolder.IsPlatformModeratorOrAbove)
-            {
-                return CommandResult.Fail(ErrorCode.AccessError,
-                    "Отмечать билеты могут только организаторы мероприятия");
-            }
+            var accountId = _accountDataHolder.AccountId.Value;
+            if (_accountDataHolder.IsPlatformModeratorOrAbove)
+                return CommandResult.OK;
+
+            var canCheckIn = await AssertCanCheckInTicketsAsync(request.EventId, accountId);
+            if (!canCheckIn.Success)
+                return canCheckIn;
 
             return CommandResult.OK;
+        }
+
+        /// <summary>
+        /// Owner/Manager (isOrganizator) или билетёр с staff.can_check_in; иначе AccessError.
+        /// </summary>
+        private async Task<CommandResult> AssertCanCheckInTicketsAsync(Guid eventId, Guid accountId)
+        {
+            var isOrg = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, accountId);
+            if (isOrg)
+                return CommandResult.OK;
+
+            var isStaff = await _eventTicketStaffRepository.CanAccountCheckInAsync(eventId, accountId);
+            if (isStaff)
+                return CommandResult.OK;
+
+            return CommandResult.Fail(ErrorCode.AccessError,
+                "Отмечать билеты могут организаторы мероприятия или назначенные билетёры");
         }
 
         private async Task<CommandResult<TicketResponse>> LoadTicketForEventCheckInAsync(TicketCheckInRequest request)

@@ -41,6 +41,7 @@ namespace EList.DI
             mapper.AddScoped<IEventsMetadataDataProvider, EventsMetadataDataProvider>();
             mapper.AddScoped<IEventsDataProvider, EventsDataProvider>();
             mapper.AddScoped<IEventOrganizatorsDataProvider, EventOrganizatorsDataProvider>();
+            mapper.AddScoped<IEventTicketStaffDataProvider, EventTicketStaffDataProvider>();
             mapper.AddScoped<IParticipationsDataProvider, ParticipationsDataProvider>();
             mapper.AddScoped<IInvitationsDataProvider, InvitationsDataProvider>();
             mapper.AddScoped<IMediaDataProvider, MediaDataProvider>();
@@ -109,6 +110,7 @@ namespace EList.DI
             mapper.AddScoped<ISubscriptionsRepository, SubscriptionsRepository>();
             mapper.AddScoped<IEventsMetadataRepository, EventsMetadataRepository>();
             mapper.AddScoped<IEventOrganizatorsRepository, EventOrganizatorsRepository>();
+            mapper.AddScoped<IEventTicketStaffRepository, EventTicketStaffRepository>();
             mapper.AddScoped<IEventsRepository, EventsRepository>();
             mapper.AddScoped<IParticipationsRepository, ParticipationsRepository>();
             mapper.AddScoped<IInvitationsRepository, InvitationsRepository>();

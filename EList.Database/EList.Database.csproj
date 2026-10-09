@@ -20,6 +20,7 @@
     <None Remove="Migrations\M202610051400_account_privacy_settings.sql" />
     <None Remove="Migrations\M202610072000_event_ticket_types.sql" />
     <None Remove="Migrations\M202610091200_ticket_type_id_not_null.sql" />
+    <None Remove="Migrations\M202610092100_ticket_taker_and_event_staff.sql" />
   </ItemGroup>
 
   <ItemGroup>
@@ -36,6 +37,7 @@
     <EmbeddedResource Include="Migrations\M202610051400_account_privacy_settings.sql" />
     <EmbeddedResource Include="Migrations\M202610072000_event_ticket_types.sql" />
     <EmbeddedResource Include="Migrations\M202610091200_ticket_type_id_not_null.sql" />
+    <EmbeddedResource Include="Migrations\M202610092100_ticket_taker_and_event_staff.sql" />
   </ItemGroup>
 
   <ItemGroup>

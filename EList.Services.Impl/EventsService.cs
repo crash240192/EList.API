@@ -36,6 +36,7 @@ namespace EList.Services.Impl
         private readonly IEventsRepository _eventsRepository;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
+        private readonly IEventTicketStaffRepository _eventTicketStaffRepository;
         private readonly IAuthorizationRepository _authorizationRepository;
         private readonly IMapper _mapper;
         private readonly IAccountDataHolder _accountDataHolder;
@@ -59,6 +60,7 @@ namespace EList.Services.Impl
             IEventsMetadataRepository eventsMetadataRepository,
             IEventsRepository eventsRepository,
             IEventOrganizatorsRepository eventOrganizatorsRepository,
+            IEventTicketStaffRepository eventTicketStaffRepository,
             IAuthorizationRepository authorizationRepository,
             IMapper mapper,
             IInvitationsRepository invitationsRepository,
@@ -82,6 +84,7 @@ namespace EList.Services.Impl
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
+            _eventTicketStaffRepository = eventTicketStaffRepository ?? throw new ArgumentNullException(nameof(eventTicketStaffRepository));
             _authorizationRepository = authorizationRepository ?? throw new Exception(nameof(authorizationRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
             _invitationsRepository = invitationsRepository ?? throw new ArgumentNullException(nameof(invitationsRepository));
@@ -485,6 +488,113 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<EventTicketType>?>(types);
+        }
+
+        public async Task<CommandResult<List<EventTicketStaffResponse>?>> GetEventTicketStaffAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventTicketStaffAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var curEvent = await _eventsRepository.GetEventAsync(eventId);
+            if (curEvent == null)
+                return CommandResult<List<EventTicketStaffResponse>?>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            if (_accountDataHolder.AccountId == null
+                || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
+            {
+                return CommandResult<List<EventTicketStaffResponse>?>.Fail(ErrorCode.AccessError,
+                    "Назначения билетёров доступны только организаторам мероприятия");
+            }
+
+            var staff = await _eventTicketStaffRepository.GetByEventIdAsync(eventId);
+            var response = _mapper.Map<List<EventTicketStaffResponse>>(staff);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<EventTicketStaffResponse>?>(response);
+        }
+
+        public async Task<CommandResult> SetEventTicketStaffAsync(Guid eventId, EventTicketStaffUpsertRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SetEventTicketStaffAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var curEvent = await _eventsRepository.GetEventAsync(eventId);
+            if (curEvent == null)
+                return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            if (_accountDataHolder.AccountId == null
+                || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
+            {
+                return CommandResult.Fail(ErrorCode.AccessError,
+                    "Назначать билетёров могут только организаторы мероприятия");
+            }
+
+            var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId) ?? new List<EventOrganizator>();
+            var organizationIds = organizators
+                .Where(o => o.OrganizationId != null)
+                .Select(o => o.OrganizationId!.Value)
+                .Distinct()
+                .ToList();
+
+            if (organizationIds.Count == 0)
+            {
+                return CommandResult.Fail(ErrorCode.InvalidValue,
+                    "Назначение билетёров доступно только для мероприятий организации");
+            }
+
+            var items = request?.Staff ?? new List<EventTicketStaffItemRequest>();
+            var uniqueAccountIds = items
+                .Where(i => i.AccountId != Guid.Empty)
+                .Select(i => i.AccountId)
+                .Distinct()
+                .ToList();
+
+            foreach (var accountId in uniqueAccountIds)
+            {
+                var isTicketTakerInOrg = false;
+                foreach (var organizationId in organizationIds)
+                {
+                    var member = await _organizationsRepository.GetMemberAsync(organizationId, accountId);
+                    if (member != null
+                        && member.Active
+                        && member.Role == OrganizationMemberRole.TicketTaker)
+                    {
+                        isTicketTakerInOrg = true;
+                        break;
+                    }
+                }
+
+                if (!isTicketTakerInOrg)
+                {
+                    return CommandResult.Fail(ErrorCode.InvalidValue,
+                        $"Аккаунт {accountId} должен быть активным билетёром в организации-организаторе события");
+                }
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var toSave = uniqueAccountIds.Select(accountId =>
+            {
+                var src = items.First(i => i.AccountId == accountId);
+                return new EventTicketStaff
+                {
+                    Id = Guid.NewGuid(),
+                    EventId = eventId,
+                    AccountId = accountId,
+                    CanCheckIn = src.CanCheckIn,
+                    CanViewStats = src.CanViewStats,
+                    CreateDate = now,
+                    UpdateDate = null
+                };
+            }).ToList();
+
+            await _eventTicketStaffRepository.ReplaceForEventAsync(eventId, toSave);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
         }
 
         /// <summary>

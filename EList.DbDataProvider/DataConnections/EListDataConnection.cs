@@ -73,6 +73,7 @@ namespace EList.DbDataProvider.DataConnections
         public ITable<OrderDto> Orders => this.GetTable<OrderDto>();
         public ITable<TicketDto> Tickets => this.GetTable<TicketDto>();
         public ITable<EventTicketTypeDto> EventTicketTypes => this.GetTable<EventTicketTypeDto>();
+        public ITable<EventTicketStaffDto> EventTicketStaff => this.GetTable<EventTicketStaffDto>();
         public ITable<RefundDto> Refunds => this.GetTable<RefundDto>();
         public ITable<PaymentWebhookEventDto> PaymentWebhookEvents => this.GetTable<PaymentWebhookEventDto>();
 

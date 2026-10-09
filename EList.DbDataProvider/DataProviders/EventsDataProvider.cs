@@ -1,6 +1,7 @@
 ﻿using EList.DbDataProvider.Extensions;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Models.Enums;
 using EList.DbDataProvider.Models.SearchRequests;
 using LinqToDB;
 using LinqToDB.Async;
@@ -248,9 +249,12 @@ namespace EList.DbDataProvider.DataProviders
 
             if (request.OrganizatorId != null)
             {
-                // Личные мероприятия аккаунта + мероприятия организаций, где он активный участник
+                // Личные мероприятия + мероприятия org, где аккаунт Owner/Manager (не TicketTaker)
                 var organizatorOrganizationIds = await _connection.OrganizationMembers
-                    .Where(m => m.AccountId == request.OrganizatorId && m.Active)
+                    .Where(m => m.AccountId == request.OrganizatorId
+                        && m.Active
+                        && (m.Role == OrganizationMemberRole.Owner
+                            || m.Role == OrganizationMemberRole.Manager))
                     .Select(m => m.OrganizationId)
                     .ToListAsync();
 

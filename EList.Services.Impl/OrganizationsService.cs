@@ -287,6 +287,94 @@ namespace EList.Services.Impl
             return new CommandResult<Guid?>(memberId);
         }
 
+        public async Task<CommandResult<Guid?>> AddTicketTakerAsync(Guid organizationId, AddOrganizationMemberRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AddTicketTakerAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var accessError = await EnsureOwnerOrManagerAsync(organizationId);
+            if (accessError != null)
+                return CommandResult<Guid?>.Fail(accessError.ErrorCode, accessError.Message);
+
+            if (request.AccountId == Guid.Empty)
+                return CommandResult<Guid?>.Fail(ErrorCode.IsNullOrEmpty, "Не указан аккаунт билетёра");
+
+            var account = await _accountsRepository.GetAccountAsync(request.AccountId);
+            if (account == null)
+                return CommandResult<Guid?>.Fail(ErrorCode.AccountNotFound, $"Аккаунт с id='{request.AccountId}' не найден");
+
+            var existingMember = await _organizationsRepository.GetMemberAsync(organizationId, request.AccountId);
+            if (existingMember != null)
+            {
+                if (existingMember.Active)
+                    return CommandResult<Guid?>.Fail(ErrorCode.OrganizationMemberAlreadyExists, "Пользователь уже является участником организации");
+
+                await _organizationsRepository.SetMemberActiveAsync(organizationId, request.AccountId, true);
+                if (existingMember.Role != OrganizationMemberRole.Owner)
+                    await _organizationsRepository.UpdateMemberRoleAsync(organizationId, request.AccountId, OrganizationMemberRole.TicketTaker);
+
+                await _notificationsService.NotifyOrganizationMemberAddedAsync(organizationId, request.AccountId);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return new CommandResult<Guid?>(existingMember.Id);
+            }
+
+            var memberId = await _organizationsRepository.AddMemberAsync(new OrganizationMember
+            {
+                OrganizationId = organizationId,
+                AccountId = request.AccountId,
+                Role = OrganizationMemberRole.TicketTaker,
+                Active = true,
+                InvitedBy = _accountDataHolder.AccountId
+            });
+
+            await _notificationsService.NotifyOrganizationMemberAddedAsync(organizationId, request.AccountId);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<Guid?>(memberId);
+        }
+
+        public async Task<CommandResult> UpdateMemberRoleAsync(Guid organizationId, UpdateOrganizationMemberRoleRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(UpdateMemberRoleAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var accessError = await EnsureOwnerAsync(organizationId);
+            if (accessError != null)
+                return accessError;
+
+            if (request.AccountId == Guid.Empty)
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Не указан аккаунт участника");
+
+            if (request.Role != OrganizationMemberRole.Manager && request.Role != OrganizationMemberRole.TicketTaker)
+            {
+                return CommandResult.Fail(ErrorCode.InvalidValue,
+                    "Допустимы роли Manager или TicketTaker. Владение передаётся через transferOwnership");
+            }
+
+            var member = await _organizationsRepository.GetMemberAsync(organizationId, request.AccountId);
+            if (member == null || !member.Active)
+                return CommandResult.Fail(ErrorCode.OrganizationMemberNotFound, "Участник организации не найден");
+
+            if (member.Role == OrganizationMemberRole.Owner)
+                return CommandResult.Fail(ErrorCode.AccessError, "Нельзя изменить роль владельца через этот метод");
+
+            if (member.Role == request.Role)
+            {
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
+            await _organizationsRepository.UpdateMemberRoleAsync(organizationId, request.AccountId, request.Role);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
         public async Task<CommandResult> RemoveMemberAsync(Guid organizationId, Guid accountId)
         {
             var correlationId = _correlationIdProvider.Get();

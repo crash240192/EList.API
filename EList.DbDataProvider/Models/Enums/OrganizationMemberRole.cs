@@ -17,6 +17,12 @@ namespace EList.DbDataProvider.Models.Enums
         /// Менеджер
         /// </summary>
         [MapValue(Value = "manager")]
-        Manager = 1
+        Manager = 1,
+
+        /// <summary>
+        /// Билетёр
+        /// </summary>
+        [MapValue(Value = "ticket_taker")]
+        TicketTaker = 2
     }
 }

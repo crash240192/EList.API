@@ -263,6 +263,68 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Добавить билетёра в организацию
+        /// </summary>
+        [HttpPost("ticket-takers/add/{organizationId}")]
+        public async Task<CommandResult<Guid?>> AddTicketTakerAsync(Guid organizationId, [FromBody] AddOrganizationMemberRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AddTicketTakerAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _organizationsService.AddTicketTakerAsync(organizationId, request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Сменить роль участника (Manager ↔ TicketTaker). Только владелец.
+        /// </summary>
+        [HttpPut("members/role/{organizationId}")]
+        public async Task<CommandResult> UpdateMemberRoleAsync(
+            Guid organizationId,
+            [FromBody] UpdateOrganizationMemberRoleRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(UpdateMemberRoleAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _organizationsService.UpdateMemberRoleAsync(organizationId, request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Удалить участника из организации
         /// </summary>
         [HttpDelete("members/remove/{organizationId}/{accountId}")]
