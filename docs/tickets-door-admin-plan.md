@@ -1,8 +1,8 @@
 # Билеты на входе + админка + PDF (W6)
 
 > Дата: 9 октября 2026 (сценарии: [tickets-door-scenarios.md](./tickets-door-scenarios.md))  
-> Статус: **W6a готово**; **W6b в реализации** (stats + org summary); W6c–e дальше  
-> База: `cursor/tickets-door-0b40` ← `tickets-integration-0b40` ← `develop`  
+> Статус: **W6a–e готово**; стенд: `cursor/tickets-staging-0b40`  
+> База: `cursor/tickets-staging-0b40` ← `develop` (+ door/integration stack)  
 > Связано: [tickets-scenarios.md](./tickets-scenarios.md), [ticket-types-plan.md](./ticket-types-plan.md)  
 > Вне scope сейчас: W4 фискализация (касса / API чеков ещё не готовы)
 
@@ -133,15 +133,15 @@ W4 (чеки) не блокирует W6.
 
 ## 8. Критерии готовности W6 MVP
 
-- [ ] Owner назначает билетёра на событие; билетёр гасит билет без прав менеджера
-- [ ] Сайдбар «Билеты» → hub; desk глубже (скан → карточка → confirm Used)
+- [x] Owner назначает билетёра на событие; билетёр гасит билет без прав менеджера
+- [x] Сайдбар «Билеты» → hub; desk глубже (скан → карточка → confirm Used)
 - [x] Undo для Owner/Manager (карточка / повторный скан)
 - [x] Org summary: продано / использовано / осталось по событиям
 - [x] `features:ticketDeskRevealHolder` default false
 - [x] MyTickets: «Печать» (системный print / Save as PDF)
-- [ ] EventPage — CTA на desk
+- [x] EventPage — CTA на desk
 
 ## 9. Решения продукта — CLOSED
 
 См. [tickets-door-scenarios.md](./tickets-door-scenarios.md) §5 и §10.  
-Старт реализации: **W6a**.
+W6 MVP в `cursor/tickets-staging-0b40`.

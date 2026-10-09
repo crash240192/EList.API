@@ -332,16 +332,16 @@ OrdersDataProvider aggregates → OrdersService/EventsController or Organization
 
 ## 9. Критерии «полный объём W6» (done)
 
-- [ ] Роль TicketTaker в org + назначение на события  
-- [ ] Desk `/tickets/desk`: validate + check-in + QR + counters + byType  
-- [ ] Hub org: sold / used / remaining / pending по событиям  
-- [ ] Auth: TT только allow-list; Owner/Manager implicit; mod break-glass  
+- [x] Роль TicketTaker в org + назначение на события  
+- [x] Desk `/tickets/desk`: validate + check-in + QR + counters + byType  
+- [x] Hub org: sold / used / remaining / pending по событиям  
+- [x] Auth: TT только allow-list; Owner/Manager implicit; mod break-glass  
 - [x] Undo check-in для Owner/Manager  
 - [x] Race-safe check-in  
 - [x] MyTickets: «Печать» (системный print / Save as PDF), QR рабочий  
-- [ ] Сайдбар «Билеты» → hub; desk глубже по eventId  
-- [ ] EventPage ведёт на desk  
-- [ ] Docs + smoke R/D/S/P  
+- [x] Сайдбар «Билеты» → hub; desk глубже по eventId  
+- [x] EventPage ведёт на desk  
+- [x] Docs + smoke R/D/S/P  
 
 Phase 2 (offline, CSV, server PDF, wallet, auto-assign all events) — отдельный backlog после приёмки.
 
@@ -356,4 +356,4 @@ Phase 2 (offline, CSV, server PDF, wallet, auto-assign all events) — отде�
 | 3 | PDF | Системный **«Печать»** / Save as PDF; без отдельной lib в MVP. |
 | 4 | Меню | Пункт **«Билеты»**; контроль входа — внутри (desk). |
 
-**W6a готово.** **W6b в работе:** `GET .../tickets/stats`, `GET .../events/ticket-summary`, auth для stats.
+**W6a–e готово** в `cursor/tickets-staging-0b40` (стенд).
