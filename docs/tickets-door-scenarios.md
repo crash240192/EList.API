@@ -338,7 +338,7 @@ OrdersDataProvider aggregates → OrdersService/EventsController or Organization
 - [ ] Auth: TT только allow-list; Owner/Manager implicit; mod break-glass  
 - [ ] Undo check-in для Owner/Manager  
 - [ ] Race-safe check-in  
-- [ ] MyTickets: «Печать» (системный print / Save as PDF), QR рабочий  
+- [x] MyTickets: «Печать» (системный print / Save as PDF), QR рабочий  
 - [ ] Сайдбар «Билеты» → hub; desk глубже по eventId  
 - [ ] EventPage ведёт на desk  
 - [ ] Docs + smoke R/D/S/P  

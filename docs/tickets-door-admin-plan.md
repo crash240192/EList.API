@@ -138,7 +138,7 @@ W4 (чеки) не блокирует W6.
 - [ ] Undo для Owner/Manager (карточка / повторный скан / история)
 - [ ] Org summary: продано / использовано / осталось по событиям
 - [ ] `features:ticketDeskRevealHolder` default false
-- [ ] MyTickets: «Печать» (системный print / Save as PDF)
+- [x] MyTickets: «Печать» (системный print / Save as PDF)
 - [ ] EventPage — CTA на desk
 
 ## 9. Решения продукта — CLOSED
