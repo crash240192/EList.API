@@ -226,7 +226,7 @@ OR !ticketsEnabled && (cost IS NULL OR cost <= :price)
 15. ✅ BuyTicketModal: выбор типа (Phase B UI).
 16. ✅ MyTickets: имя типа (Phase C UI).
 17. ✅ Шаблоны: `ticketTypes` в snapshot + restore при apply; soft-delete только `active=false` (T10).
-18. Smoke T1 / T4 / T11 / T12 (+ ключевые) — при приёмке.
+18. ✅ Smoke T1 / T4 / T10 / T11 / T12 (+ UI template restore).
 
 ### Порядок поставки PR
 
@@ -259,4 +259,4 @@ OR !ticketsEnabled && (cost IS NULL OR cost <= :price)
 - [x] Backfill старых ticket-событий не ломает заказы
 - [x] Soft-delete типа с проданными билетами (`DeactivateTicketTypesAsync`; CreateOrder отклоняет inactive)
 - [x] Шаблоны событий persist/restore `ticketTypes` (UI W5 polish)
-- [ ] `npm run build` + `dotnet build` + smoke T1, T4, T11, T12 (приёмка на стенде)
+- [x] `npm run build` + `dotnet build` + smoke T1, T4, T10, T11, T12 (локально; UI template restore)
