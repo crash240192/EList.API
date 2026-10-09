@@ -356,4 +356,4 @@ Phase 2 (offline, CSV, server PDF, wallet, auto-assign all events) — отде�
 | 3 | PDF | Системный **«Печать»** / Save as PDF; без отдельной lib в MVP. |
 | 4 | Меню | Пункт **«Билеты»**; контроль входа — внутри (desk). |
 
-**W6a в работе** на `tickets-door-*`: миграция M13, `TicketTaker`, `event_ticket_staff`, role/staff API, check-in auth, UI ролей/assign.
+**W6a готово.** **W6b в работе:** `GET .../tickets/stats`, `GET .../events/ticket-summary`, auth для stats.

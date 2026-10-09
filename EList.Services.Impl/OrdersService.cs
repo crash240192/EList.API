@@ -1408,6 +1408,96 @@ namespace EList.Services.Impl
             return new CommandResult<TicketResponse>(mapped);
         }
 
+        public async Task<CommandResult<EventTicketStatsResponse>> GetEventTicketStatsAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventTicketStatsAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<EventTicketStatsResponse>.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+
+            if (eventId == Guid.Empty)
+                return CommandResult<EventTicketStatsResponse>.Fail(ErrorCode.InvalidValue, "Не указано мероприятие");
+
+            var eventItem = await _eventsRepository.GetEventAsync(eventId);
+            if (eventItem == null)
+                return CommandResult<EventTicketStatsResponse>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            var access = await AssertCanViewTicketStatsAsync(eventId, _accountDataHolder.AccountId.Value);
+            if (!access.Success)
+                return CommandResult<EventTicketStatsResponse>.Fail(access.ErrorCode, access.Message);
+
+            var stats = await BuildEventTicketStatsAsync(eventItem);
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<EventTicketStatsResponse>(stats);
+        }
+
+        public async Task<CommandResult<List<OrganizationEventTicketSummaryItem>>> GetOrganizationEventsTicketSummaryAsync(
+            Guid organizationId,
+            int limit = 100)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(GetOrganizationEventsTicketSummaryAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+            {
+                return CommandResult<List<OrganizationEventTicketSummaryItem>>.Fail(
+                    ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+            }
+
+            if (organizationId == Guid.Empty)
+            {
+                return CommandResult<List<OrganizationEventTicketSummaryItem>>.Fail(
+                    ErrorCode.InvalidValue, "Не указана организация");
+            }
+
+            var organization = await _organizationsRepository.GetOrganizationAsync(organizationId);
+            if (organization == null)
+            {
+                return CommandResult<List<OrganizationEventTicketSummaryItem>>.Fail(
+                    ErrorCode.OrganizationNotFound, $"Организация с id='{organizationId}' не найдена");
+            }
+
+            var isOwnerOrManager = await _organizationsRepository.IsOwnerOrManagerAsync(
+                organizationId, _accountDataHolder.AccountId.Value);
+            if (!isOwnerOrManager && !_accountDataHolder.IsPlatformModeratorOrAbove)
+            {
+                return CommandResult<List<OrganizationEventTicketSummaryItem>>.Fail(
+                    ErrorCode.AccessError, "Сводка доступна только владельцу или менеджеру организации");
+            }
+
+            var take = limit <= 0 ? 100 : Math.Min(limit, 200);
+            var events = await _eventsRepository.GetEventsByOrganizationOrganizatorAsync(organizationId, take)
+                ?? new List<Event>();
+
+            var items = new List<OrganizationEventTicketSummaryItem>(events.Count);
+            foreach (var eventItem in events)
+            {
+                var stats = await BuildEventTicketStatsAsync(eventItem);
+                items.Add(new OrganizationEventTicketSummaryItem
+                {
+                    EventId = eventItem.Id,
+                    Name = eventItem.Name,
+                    StartTime = eventItem.StartTime,
+                    EndTime = eventItem.EndTime,
+                    Active = eventItem.Active,
+                    TicketsEnabled = eventItem.Parameters?.TicketsEnabled ?? false,
+                    Sold = stats.Sold,
+                    IssuedOpen = stats.IssuedOpen,
+                    Used = stats.Used,
+                    OrdersPending = stats.OrdersPending,
+                    Remaining = stats.Remaining
+                });
+            }
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<OrganizationEventTicketSummaryItem>>(items);
+        }
+
         public async Task<CommandResult<TicketResponse>> ValidateTicketForEventAsync(TicketCheckInRequest request)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -1660,6 +1750,138 @@ namespace EList.Services.Impl
 
             return CommandResult.Fail(ErrorCode.AccessError,
                 "Отмечать билеты могут организаторы мероприятия или назначенные билетёры");
+        }
+
+        /// <summary>
+        /// Owner/Manager, platform mod, или staff с can_view_stats.
+        /// </summary>
+        private async Task<CommandResult> AssertCanViewTicketStatsAsync(Guid eventId, Guid accountId)
+        {
+            if (_accountDataHolder.IsPlatformModeratorOrAbove)
+                return CommandResult.OK;
+
+            var isOrg = await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, accountId);
+            if (isOrg)
+                return CommandResult.OK;
+
+            var canView = await _eventTicketStaffRepository.CanAccountViewStatsAsync(eventId, accountId);
+            if (canView)
+                return CommandResult.OK;
+
+            return CommandResult.Fail(ErrorCode.AccessError,
+                "Статистика билетов доступна организаторам или назначенным билетёрам");
+        }
+
+        private async Task<EventTicketStatsResponse> BuildEventTicketStatsAsync(Event eventItem)
+        {
+            var eventId = eventItem.Id;
+            var tickets = await _ordersRepository.GetTicketsByEventAsync(eventId) ?? new List<Ticket>();
+            var orders = await _ordersRepository.GetOrdersByEventAsync(eventId) ?? new List<Order>();
+            var types = await _eventsMetadataRepository.GetTicketTypesByEventIdAsync(eventId, includeInactive: true)
+                ?? new List<EventTicketType>();
+
+            var issuedOpen = tickets.Count(t => t.Status == TicketStatus.Issued);
+            var used = tickets.Count(t => t.Status == TicketStatus.Used);
+            var refundPending = tickets.Count(t => t.Status == TicketStatus.RefundPending);
+            var refunded = tickets.Count(t => t.Status == TicketStatus.Refunded);
+            var voided = tickets.Count(t => t.Status == TicketStatus.Void);
+            var sold = issuedOpen + used + refundPending;
+
+            var ordersPending = orders
+                .Where(o => o.Status == OrderStatus.Pending || o.Status == OrderStatus.Authorized)
+                .Sum(o => o.Quantity);
+            var reserved = orders
+                .Where(o => o.Status == OrderStatus.Pending
+                    || o.Status == OrderStatus.Authorized
+                    || o.Status == OrderStatus.Paid)
+                .Sum(o => o.Quantity);
+
+            int? eventRemaining = null;
+            var maxPersons = eventItem.Parameters?.MaxPersonsCount;
+            if (maxPersons is int mp && mp > 0)
+                eventRemaining = Math.Max(0, mp - reserved);
+
+            var byStatus = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                [nameof(TicketStatus.Issued)] = issuedOpen,
+                [nameof(TicketStatus.Used)] = used,
+                [nameof(TicketStatus.RefundPending)] = refundPending,
+                [nameof(TicketStatus.Refunded)] = refunded,
+                [nameof(TicketStatus.Void)] = voided
+            };
+
+            var typeNameById = types.ToDictionary(t => t.Id, t => t.Name);
+            var typeIds = types.Select(t => (Guid?)t.Id)
+                .Concat(tickets.Select(t => t.TicketTypeId))
+                .Concat(orders.Select(o => o.TicketTypeId))
+                .Where(id => id != null && id != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            var byType = new List<EventTicketTypeStatsItem>();
+            foreach (var typeId in typeIds)
+            {
+                var id = typeId!.Value;
+                var typeTickets = tickets.Where(t => t.TicketTypeId == id).ToList();
+                var typeOrders = orders.Where(o => o.TicketTypeId == id).ToList();
+                var typeMeta = types.FirstOrDefault(t => t.Id == id);
+
+                var tIssued = typeTickets.Count(t => t.Status == TicketStatus.Issued);
+                var tUsed = typeTickets.Count(t => t.Status == TicketStatus.Used);
+                var tRefundPending = typeTickets.Count(t => t.Status == TicketStatus.RefundPending);
+                var tRefunded = typeTickets.Count(t => t.Status == TicketStatus.Refunded);
+                var tVoid = typeTickets.Count(t => t.Status == TicketStatus.Void);
+                var tOrdersPending = typeOrders
+                    .Where(o => o.Status == OrderStatus.Pending || o.Status == OrderStatus.Authorized)
+                    .Sum(o => o.Quantity);
+                var tReserved = typeOrders
+                    .Where(o => o.Status == OrderStatus.Pending
+                        || o.Status == OrderStatus.Authorized
+                        || o.Status == OrderStatus.Paid)
+                    .Sum(o => o.Quantity);
+
+                int? remaining = null;
+                if (typeMeta?.Capacity is int cap && cap > 0)
+                    remaining = Math.Max(0, cap - tReserved);
+
+                byType.Add(new EventTicketTypeStatsItem
+                {
+                    TicketTypeId = id,
+                    TicketTypeName = typeMeta?.Name
+                        ?? (typeNameById.TryGetValue(id, out var n) ? n : "Тип"),
+                    Sold = tIssued + tUsed + tRefundPending,
+                    IssuedOpen = tIssued,
+                    Used = tUsed,
+                    RefundPending = tRefundPending,
+                    Refunded = tRefunded,
+                    Void = tVoid,
+                    OrdersPending = tOrdersPending,
+                    Reserved = tReserved,
+                    Capacity = typeMeta?.Capacity,
+                    Remaining = remaining
+                });
+            }
+
+            byType = byType
+                .OrderBy(t => types.FindIndex(x => x.Id == t.TicketTypeId))
+                .ThenBy(t => t.TicketTypeName)
+                .ToList();
+
+            return new EventTicketStatsResponse
+            {
+                EventId = eventId,
+                Sold = sold,
+                IssuedOpen = issuedOpen,
+                Used = used,
+                RefundPending = refundPending,
+                Refunded = refunded,
+                Void = voided,
+                OrdersPending = ordersPending,
+                Reserved = reserved,
+                Remaining = eventRemaining,
+                ByStatus = byStatus,
+                ByType = byType
+            };
         }
 
         private async Task<CommandResult<TicketResponse>> LoadTicketForEventCheckInAsync(TicketCheckInRequest request)

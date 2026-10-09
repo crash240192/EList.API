@@ -135,6 +135,12 @@ namespace EList.Repositories.Impl
         public Task<int> CountActiveEventsByOrganizationOrganizatorAsync(Guid organizationId)
             => _eventsDataProvider.CountActiveEventsByOrganizationOrganizatorAsync(organizationId);
 
+        public async Task<List<Event>> GetEventsByOrganizationOrganizatorAsync(Guid organizationId, int limit = 200)
+        {
+            var items = await _eventsDataProvider.GetEventsByOrganizationOrganizatorAsync(organizationId, limit);
+            return _mapper.Map<List<Event>>(items);
+        }
+
         public Task<int> CountEventsCreatedByAccountSinceAsync(Guid accountId, DateTimeOffset since)
             => _eventsDataProvider.CountEventsCreatedByAccountSinceAsync(accountId, since);
 

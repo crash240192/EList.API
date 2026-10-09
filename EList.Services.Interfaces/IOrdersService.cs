@@ -59,5 +59,13 @@ namespace EList.Services.Interfaces
         Task<CommandResult<RefundResponse>> CompleteRefundAsync(CompleteRefundRequest request);
 
         Task<CommandResult<List<RefundResponse>>> GetRefundsByOrderAsync(Guid orderId);
+
+        /// <summary>Сводка билетов по событию (Owner/Manager или staff с can_view_stats).</summary>
+        Task<CommandResult<EventTicketStatsResponse>> GetEventTicketStatsAsync(Guid eventId);
+
+        /// <summary>Список событий org с краткими счётчиками билетов (Owner/Manager).</summary>
+        Task<CommandResult<List<OrganizationEventTicketSummaryItem>>> GetOrganizationEventsTicketSummaryAsync(
+            Guid organizationId,
+            int limit = 100);
     }
 }

@@ -19,6 +19,9 @@ namespace EList.DbDataProvider.Interfaces
         /// <summary>Active upcoming/ongoing events where organization is an organizator.</summary>
         Task<int> CountActiveEventsByOrganizationOrganizatorAsync(Guid organizationId);
 
+        /// <summary>События, где организация — соорганизатор (для ticket hub).</summary>
+        Task<List<EventDto>> GetEventsByOrganizationOrganizatorAsync(Guid organizationId, int limit = 200);
+
         /// <summary>Events created since timestamp where account is a direct organizator.</summary>
         Task<int> CountEventsCreatedByAccountSinceAsync(Guid accountId, DateTimeOffset since);
 

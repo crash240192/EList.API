@@ -378,6 +378,17 @@ namespace EList.DbDataProvider.DataProviders
                 .CountAsync();
         }
 
+        public async Task<List<EventDto>> GetEventsByOrganizationOrganizatorAsync(Guid organizationId, int limit = 200)
+        {
+            var take = limit <= 0 ? 200 : Math.Min(limit, 500);
+            return await _connection.Events
+                .LoadWith(e => e.Parameters)
+                .Where(e => e.Organizators.Any(o => o.OrganizationId == organizationId))
+                .OrderByDescending(e => e.StartTime)
+                .Take(take)
+                .ToListAsync();
+        }
+
         public async Task<int> CountEventsCreatedByAccountSinceAsync(Guid accountId, DateTimeOffset since)
         {
             return await _connection.Events

@@ -5,6 +5,7 @@ using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.Models.Events;
 using EList.Models.Events.EventMetadata;
+using EList.Models.Orders;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,14 +29,17 @@ namespace EList.Api.Controllers
         #endregion
 
         private readonly IEventsService _eventsService;
+        private readonly IOrdersService _ordersService;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
 
         public EventsController(ICorrelationIdProvider correlationIdProvider,
             IEventsService eventsService,
+            IOrdersService ordersService,
             IDataConnectionProvider connectionProvider)
         {
             _eventsService = eventsService;
+            _ordersService = ordersService;
             _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
         }
@@ -482,6 +486,30 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
                 var result = await _eventsService.GetEventTicketTypesAsync(eventId, includeInactive);
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Сводка билетов мероприятия (продано / на площадке / остаток / byType)
+        /// </summary>
+        [HttpGet("{eventId}/tickets/stats")]
+        public async Task<CommandResult<EventTicketStatsResponse>> GetEventTicketStatsAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventTicketStatsAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                var result = await _ordersService.GetEventTicketStatsAsync(eventId);
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
