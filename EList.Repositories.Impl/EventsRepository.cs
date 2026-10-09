@@ -102,6 +102,17 @@ namespace EList.Repositories.Impl
             {
                 var item = _mapper.Map<EventShort>(i);
                 item.Colors = i.Types?.Select(i => i.Type.EventCategory.Color)?.Distinct().ToArray();
+                item.TicketsEnabled = i.Parameters?.TicketsEnabled ?? false;
+                if (!item.TicketsEnabled)
+                {
+                    var cost = i.Parameters?.Cost;
+                    var legacy = cost is double c
+                        && !double.IsNaN(c) && !double.IsInfinity(c) && c > 0
+                        ? c
+                        : 0d;
+                    item.PriceMin = legacy;
+                    item.PriceMax = legacy;
+                }
                 return item;
             }).ToList();
 
@@ -123,6 +134,12 @@ namespace EList.Repositories.Impl
 
         public Task<int> CountActiveEventsByOrganizationOrganizatorAsync(Guid organizationId)
             => _eventsDataProvider.CountActiveEventsByOrganizationOrganizatorAsync(organizationId);
+
+        public async Task<List<Event>> GetEventsByOrganizationOrganizatorAsync(Guid organizationId, int limit = 200)
+        {
+            var items = await _eventsDataProvider.GetEventsByOrganizationOrganizatorAsync(organizationId, limit);
+            return _mapper.Map<List<Event>>(items);
+        }
 
         public Task<int> CountEventsCreatedByAccountSinceAsync(Guid accountId, DateTimeOffset since)
             => _eventsDataProvider.CountEventsCreatedByAccountSinceAsync(accountId, since);

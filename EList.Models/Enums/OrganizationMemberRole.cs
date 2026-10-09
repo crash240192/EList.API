@@ -13,6 +13,11 @@ namespace EList.Models.Enums
         /// <summary>
         /// Менеджер
         /// </summary>
-        Manager = 1
+        Manager = 1,
+
+        /// <summary>
+        /// Билетёр — check-in / desk по назначенным событиям, без орг-админки
+        /// </summary>
+        TicketTaker = 2
     }
 }

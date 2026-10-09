@@ -24,6 +24,16 @@ namespace EList.Services.Interfaces
 
         Task<CommandResult<OrderResponse>> GetOrderAsync(Guid orderId);
 
+        /// <summary>
+        /// Покупатель отменяет неоплаченный заказ (Pending/Authorized): Cancel у провайдера + статус Canceled.
+        /// </summary>
+        Task<CommandResult<OrderResponse>> CancelOrderAsync(Guid orderId);
+
+        /// <summary>
+        /// Фоновый TTL: отменить брошенные Pending/Authorized старше указанного возраста.
+        /// </summary>
+        Task<int> PurgeExpiredPendingOrdersAsync(TimeSpan olderThan, int limit = 50);
+
         Task<CommandResult<List<OrderResponse>>> GetMyOrdersAsync();
 
         Task<CommandResult<List<TicketResponse>>> GetMyTicketsAsync(Guid? eventId = null);
@@ -35,6 +45,9 @@ namespace EList.Services.Interfaces
 
         /// <summary>Организатор: отметить присутствие (issued → used).</summary>
         Task<CommandResult<TicketResponse>> CheckInTicketAsync(TicketCheckInRequest request);
+
+        /// <summary>Owner/Manager (не TicketTaker): Used→Issued, сброс checkedIn*.</summary>
+        Task<CommandResult<TicketResponse>> UndoCheckInTicketAsync(TicketCheckInRequest request);
 
         /// <summary>Подарок/передача: сменить holder, покупатель заказа не меняется.</summary>
         Task<CommandResult<TicketResponse>> TransferTicketAsync(TransferTicketRequest request);
@@ -49,5 +62,18 @@ namespace EList.Services.Interfaces
         Task<CommandResult<RefundResponse>> CompleteRefundAsync(CompleteRefundRequest request);
 
         Task<CommandResult<List<RefundResponse>>> GetRefundsByOrderAsync(Guid orderId);
+
+        /// <summary>Сводка билетов по событию (Owner/Manager или staff с can_view_stats).</summary>
+        Task<CommandResult<EventTicketStatsResponse>> GetEventTicketStatsAsync(Guid eventId);
+
+        /// <summary>Список событий org с краткими счётчиками билетов (Owner/Manager).</summary>
+        Task<CommandResult<List<OrganizationEventTicketSummaryItem>>> GetOrganizationEventsTicketSummaryAsync(
+            Guid organizationId,
+            int limit = 100);
+
+        /// <summary>
+        /// Hub desk: события, где пользователь организатор (Owner/Manager) или назначенный staff.
+        /// </summary>
+        Task<CommandResult<List<TicketDeskHubItem>>> GetMyTicketDeskHubAsync(int limit = 100);
     }
 }

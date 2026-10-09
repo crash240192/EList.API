@@ -96,6 +96,21 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
 
+        public async Task<List<OrderDto>> GetExpiredUnpaidOrdersAsync(DateTimeOffset createdBefore, int limit)
+        {
+            if (limit <= 0)
+                limit = 50;
+
+            var result = await _connection.Orders
+                .Where(i =>
+                    (i.Status == OrderStatus.Pending || i.Status == OrderStatus.Authorized)
+                    && i.CreateDate < createdBefore)
+                .OrderBy(i => i.CreateDate)
+                .Take(limit)
+                .ToListAsync();
+            return result;
+        }
+
         public async Task<List<OrderDto>> GetOrdersByEventAsync(Guid eventId)
         {
             var result = await _connection.Orders
@@ -183,13 +198,26 @@ namespace EList.DbDataProvider.DataProviders
                 .UpdateAsync();
         }
 
-        public async Task CheckInTicketAsync(Guid ticketId, Guid checkedInByAccountId, DateTimeOffset checkedInAt)
+        public async Task<bool> TryCheckInTicketAsync(Guid ticketId, Guid checkedInByAccountId, DateTimeOffset checkedInAt)
         {
-            await _connection.Tickets.Where(i => i.Id == ticketId)
+            var updated = await _connection.Tickets
+                .Where(i => i.Id == ticketId && i.Status == TicketStatus.Issued)
                 .Set(i => i.Status, TicketStatus.Used)
                 .Set(i => i.CheckedInAt, checkedInAt)
                 .Set(i => i.CheckedInByAccountId, checkedInByAccountId)
                 .UpdateAsync();
+            return updated > 0;
+        }
+
+        public async Task<bool> TryUndoCheckInTicketAsync(Guid ticketId)
+        {
+            var updated = await _connection.Tickets
+                .Where(i => i.Id == ticketId && i.Status == TicketStatus.Used)
+                .Set(i => i.Status, TicketStatus.Issued)
+                .Set(i => i.CheckedInAt, (DateTimeOffset?)null)
+                .Set(i => i.CheckedInByAccountId, (Guid?)null)
+                .UpdateAsync();
+            return updated > 0;
         }
 
         public async Task ReassignTicketHolderAsync(Guid ticketId, Guid newHolderAccountId)

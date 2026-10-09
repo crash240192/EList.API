@@ -5,6 +5,7 @@ using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.Models.Events;
 using EList.Models.Events.EventMetadata;
+using EList.Models.Orders;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,14 +29,17 @@ namespace EList.Api.Controllers
         #endregion
 
         private readonly IEventsService _eventsService;
+        private readonly IOrdersService _ordersService;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
 
         public EventsController(ICorrelationIdProvider correlationIdProvider,
             IEventsService eventsService,
+            IOrdersService ordersService,
             IDataConnectionProvider connectionProvider)
         {
             _eventsService = eventsService;
+            _ordersService = ordersService;
             _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
         }
@@ -461,6 +465,135 @@ namespace EList.Api.Controllers
             }
             catch (Exception ex)
             {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Типы билетов мероприятия (активные; организатор может запросить includeInactive=true).
+        /// </summary>
+        [HttpGet("{eventId}/ticket-types")]
+        public async Task<CommandResult<List<EventTicketType>?>> GetEventTicketTypesAsync(
+            Guid eventId,
+            [FromQuery] bool includeInactive = false)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventTicketTypesAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                var result = await _eventsService.GetEventTicketTypesAsync(eventId, includeInactive);
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Hub «Билеты»: события, доступные текущему пользователю для desk
+        /// </summary>
+        [HttpGet("ticket-desk/hub")]
+        public async Task<CommandResult<List<TicketDeskHubItem>>> GetMyTicketDeskHubAsync(
+            [FromQuery] int limit = 100)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetMyTicketDeskHubAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                var result = await _ordersService.GetMyTicketDeskHubAsync(limit);
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Сводка билетов мероприятия (продано / на площадке / остаток / byType)
+        /// </summary>
+        [HttpGet("{eventId}/tickets/stats")]
+        public async Task<CommandResult<EventTicketStatsResponse>> GetEventTicketStatsAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventTicketStatsAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                var result = await _ordersService.GetEventTicketStatsAsync(eventId);
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Список билетёров, назначенных на мероприятие
+        /// </summary>
+        [HttpGet("{eventId}/ticket-staff")]
+        public async Task<CommandResult<List<EventTicketStaffResponse>?>> GetEventTicketStaffAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventTicketStaffAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                var result = await _eventsService.GetEventTicketStaffAsync(eventId);
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Полная замена списка билетёров мероприятия
+        /// </summary>
+        [HttpPut("{eventId}/ticket-staff")]
+        public async Task<CommandResult> SetEventTicketStaffAsync(
+            Guid eventId,
+            [FromBody] EventTicketStaffUpsertRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SetEventTicketStaffAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                var result = await _eventsService.SetEventTicketStaffAsync(eventId, request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }

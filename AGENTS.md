@@ -74,3 +74,8 @@ All endpoints require an `Authorization-jwt` header (any non-empty string; it ge
 - No test projects exist in this codebase; there are no automated tests to run.
 - Build produces ~318 XML doc warnings (missing XML comments). These are expected.
 - The app path base is `/eList` — all API routes are prefixed with `/eList/api/...`.
+
+### Testing / walkthrough artifacts
+
+- Prefer screenshots, logs, and terminal smoke output as evidence.
+- **Do not** record video walkthroughs by default (no `RecordScreen` / demo videos). Use video only if the user explicitly asks for it.

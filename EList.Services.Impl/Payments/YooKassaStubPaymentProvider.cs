@@ -110,6 +110,30 @@ namespace EList.Services.Impl.Payments
             return Task.CompletedTask;
         }
 
+        public Task CancelPaymentAsync(string providerPaymentId)
+        {
+            if (string.IsNullOrWhiteSpace(providerPaymentId))
+                throw new ArgumentException("providerPaymentId is required", nameof(providerPaymentId));
+
+            _payments.AddOrUpdate(
+                providerPaymentId,
+                _ => new StubPayment
+                {
+                    ProviderPaymentId = providerPaymentId,
+                    Status = PaymentProviderStatus.Canceled,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    Currency = "RUB"
+                },
+                (_, existing) =>
+                {
+                    if (existing.Status != PaymentProviderStatus.Succeeded)
+                        existing.Status = PaymentProviderStatus.Canceled;
+                    return existing;
+                });
+
+            return Task.CompletedTask;
+        }
+
         public Task<RefundCreationResult> CreateRefundAsync(RefundCreationRequest request)
         {
             if (request == null)

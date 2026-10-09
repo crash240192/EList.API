@@ -193,6 +193,53 @@ namespace EList.Repositories.Impl
         {
             await _eventsMetadataDataProvider.BindEventParametersAsync(eventId, eventParametersId);
         }
+
+        public async Task UpdateEventParametersCostAsync(Guid parametersId, double? cost)
+        {
+            await _eventsMetadataDataProvider.UpdateEventParametersCostAsync(parametersId, cost);
+        }
+        #endregion
+
+        #region eventTicketTypes
+        public async Task<List<EventTicketType>> GetTicketTypesByEventIdAsync(Guid eventId, bool includeInactive = false)
+        {
+            var items = await _eventsMetadataDataProvider.GetTicketTypesByEventIdAsync(eventId, includeInactive);
+            return _mapper.Map<List<EventTicketType>>(items);
+        }
+
+        public async Task<EventTicketType?> GetTicketTypeAsync(Guid id)
+        {
+            var item = await _eventsMetadataDataProvider.GetTicketTypeAsync(id);
+            return _mapper.Map<EventTicketType>(item);
+        }
+
+        public async Task<Guid> CreateTicketTypeAsync(EventTicketType item)
+        {
+            var mapped = _mapper.Map<EventTicketTypeDto>(item);
+            return await _eventsMetadataDataProvider.CreateTicketTypeAsync(mapped);
+        }
+
+        public async Task UpdateTicketTypeAsync(EventTicketType item)
+        {
+            var mapped = _mapper.Map<EventTicketTypeDto>(item);
+            await _eventsMetadataDataProvider.UpdateTicketTypeAsync(mapped);
+        }
+
+        public async Task DeactivateTicketTypesAsync(IEnumerable<Guid> ids)
+        {
+            await _eventsMetadataDataProvider.DeactivateTicketTypesAsync(ids);
+        }
+
+        public async Task<(decimal? Min, decimal? Max)> GetActiveTicketTypePriceRangeAsync(Guid eventId)
+        {
+            return await _eventsMetadataDataProvider.GetActiveTicketTypePriceRangeAsync(eventId);
+        }
+
+        public async Task<Dictionary<Guid, (decimal Min, decimal Max)>> GetActiveTicketTypePriceRangesAsync(
+            IEnumerable<Guid> eventIds)
+        {
+            return await _eventsMetadataDataProvider.GetActiveTicketTypePriceRangesAsync(eventIds);
+        }
         #endregion
     }
 }

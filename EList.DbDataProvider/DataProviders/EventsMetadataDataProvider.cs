@@ -203,6 +203,98 @@ namespace EList.DbDataProvider.DataProviders
             eventItem.EventParametersId = eventParametersId;
             await _connection.UpdateAsync(eventItem);
         }
+
+        public async Task UpdateEventParametersCostAsync(Guid parametersId, double? cost)
+        {
+            await _connection.EventParameters.Where(i => i.Id == parametersId)
+                .Set(i => i.Cost, cost)
+                .UpdateAsync();
+        }
+        #endregion
+
+        #region eventTicketTypes
+        public async Task<List<EventTicketTypeDto>> GetTicketTypesByEventIdAsync(Guid eventId, bool includeInactive = false)
+        {
+            var q = _connection.EventTicketTypes.Where(t => t.EventId == eventId);
+            if (!includeInactive)
+                q = q.Where(t => t.Active);
+            return await q
+                .OrderBy(t => t.SortOrder)
+                .ThenBy(t => t.CreateDate)
+                .ToListAsync();
+        }
+
+        public async Task<EventTicketTypeDto?> GetTicketTypeAsync(Guid id)
+        {
+            return await _connection.EventTicketTypes.FirstOrDefaultAsync(t => t.Id == id);
+        }
+
+        public async Task<Guid> CreateTicketTypeAsync(EventTicketTypeDto item)
+        {
+            var now = DateTimeOffset.UtcNow;
+            item.CreateDate = now;
+            item.UpdateDate = now;
+            if (string.IsNullOrWhiteSpace(item.Currency))
+                item.Currency = "RUB";
+            return (Guid)await _connection.InsertWithIdentityAsync(item);
+        }
+
+        public async Task UpdateTicketTypeAsync(EventTicketTypeDto item)
+        {
+            await _connection.EventTicketTypes.Where(t => t.Id == item.Id)
+                .Set(t => t.Name, item.Name)
+                .Set(t => t.Description, item.Description)
+                .Set(t => t.Price, item.Price)
+                .Set(t => t.Currency, item.Currency)
+                .Set(t => t.Capacity, item.Capacity)
+                .Set(t => t.SortOrder, item.SortOrder)
+                .Set(t => t.Active, item.Active)
+                .Set(t => t.UpdateDate, DateTimeOffset.UtcNow)
+                .UpdateAsync();
+        }
+
+        public async Task DeactivateTicketTypesAsync(IEnumerable<Guid> ids)
+        {
+            var idList = ids.ToList();
+            if (idList.Count == 0)
+                return;
+            await _connection.EventTicketTypes.Where(t => idList.Contains(t.Id))
+                .Set(t => t.Active, false)
+                .Set(t => t.UpdateDate, DateTimeOffset.UtcNow)
+                .UpdateAsync();
+        }
+
+        public async Task<(decimal? Min, decimal? Max)> GetActiveTicketTypePriceRangeAsync(Guid eventId)
+        {
+            var prices = await _connection.EventTicketTypes
+                .Where(t => t.EventId == eventId && t.Active)
+                .Select(t => t.Price)
+                .ToListAsync();
+            if (prices.Count == 0)
+                return (null, null);
+            return (prices.Min(), prices.Max());
+        }
+
+        public async Task<Dictionary<Guid, (decimal Min, decimal Max)>> GetActiveTicketTypePriceRangesAsync(
+            IEnumerable<Guid> eventIds)
+        {
+            var ids = eventIds?.Where(id => id != Guid.Empty).Distinct().ToList() ?? new List<Guid>();
+            if (ids.Count == 0)
+                return new Dictionary<Guid, (decimal Min, decimal Max)>();
+
+            var rows = await _connection.EventTicketTypes
+                .Where(t => ids.Contains(t.EventId) && t.Active)
+                .GroupBy(t => t.EventId)
+                .Select(g => new
+                {
+                    EventId = g.Key,
+                    Min = g.Min(t => t.Price),
+                    Max = g.Max(t => t.Price),
+                })
+                .ToListAsync();
+
+            return rows.ToDictionary(r => r.EventId, r => (r.Min, r.Max));
+        }
         #endregion
     }
 }

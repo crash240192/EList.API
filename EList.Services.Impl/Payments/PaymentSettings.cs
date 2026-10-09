@@ -65,6 +65,18 @@ namespace EList.Services.Impl.Payments
             return bool.TryParse(ConfigurationManager.AppSettings["features:ticketSalesEnabled"], out var flag)
                 && flag;
         }
+
+        /// <summary>
+        /// Desk validate/check-in/undo: отдавать login/ФИО holder. Default false.
+        /// </summary>
+        public static bool IsTicketDeskRevealHolderEnabled()
+        {
+            if (!ConfigurationManager.AppSettings.Contains("features:ticketDeskRevealHolder"))
+                return false;
+
+            return bool.TryParse(ConfigurationManager.AppSettings["features:ticketDeskRevealHolder"], out var flag)
+                && flag;
+        }
     }
 
     public class TBankPaymentSettings

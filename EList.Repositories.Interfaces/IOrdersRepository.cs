@@ -17,6 +17,7 @@ namespace EList.Repositories.Interfaces
         Task<List<Order>> GetOrdersByBuyerAsync(Guid buyerAccountId);
         Task<List<Order>> GetOrdersBySellerOrganizationAsync(Guid organizationId);
         Task<List<Order>> GetOrdersByEventAsync(Guid eventId);
+        Task<List<Order>> GetExpiredUnpaidOrdersAsync(DateTimeOffset createdBefore, int limit);
         #endregion
 
         #region tickets
@@ -29,7 +30,8 @@ namespace EList.Repositories.Interfaces
         Task<List<Ticket>> GetTicketsByEventAsync(Guid eventId);
         Task UpdateTicketStatusAsync(Guid ticketId, TicketStatus status);
         Task UpdateTicketsStatusByOrderAsync(Guid orderId, TicketStatus status);
-        Task CheckInTicketAsync(Guid ticketId, Guid checkedInByAccountId, DateTimeOffset checkedInAt);
+        Task<bool> TryCheckInTicketAsync(Guid ticketId, Guid checkedInByAccountId, DateTimeOffset checkedInAt);
+        Task<bool> TryUndoCheckInTicketAsync(Guid ticketId);
         Task ReassignTicketHolderAsync(Guid ticketId, Guid newHolderAccountId);
         #endregion
 

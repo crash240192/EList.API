@@ -19,6 +19,12 @@ namespace EList.Services.Interfaces
         /// <summary>Только для stub: имитация успешной оплаты.</summary>
         Task CompleteManuallyAsync(string providerPaymentId);
 
+        /// <summary>
+        /// Отмена неоплаченного платежа (Pending/Authorized) у провайдера.
+        /// Для T-Bank — Cancel без частичной суммы; для stub — локальный статус Canceled.
+        /// </summary>
+        Task CancelPaymentAsync(string providerPaymentId);
+
         Task<RefundCreationResult> CreateRefundAsync(RefundCreationRequest request);
 
         /// <summary>Только для stub: имитация успешного возврата.</summary>

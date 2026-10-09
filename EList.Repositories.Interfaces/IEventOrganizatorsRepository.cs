@@ -10,7 +10,7 @@ namespace EList.Repositories.Interfaces
         Task<List<EventOrganizator>?> GetByEventIdAsync(Guid eventId);
         Task<List<Guid>> GetOrganizatorIdsByEventIdAsync(Guid eventId);
         /// <summary>
-        /// Прямые организаторы-аккаунты и активные участники организаций-соорганизаторов.
+        /// Прямые организаторы-аккаунты и Owner/Manager организаций-соорганизаторов (без TicketTaker).
         /// </summary>
         Task<List<Guid>> GetAllOrganizerAccountIdsAsync(Guid eventId);
         Task<bool> IsAccountEventOrganizatorAsync(Guid eventId, Guid accountId);

@@ -73,6 +73,9 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<OrganizationVerifi
 builder.Services.AddSingleton<RetentionPurgeWorker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RetentionPurgeWorker>());
 
+builder.Services.AddSingleton<PendingOrdersPurgeWorker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PendingOrdersPurgeWorker>());
+
 builder.Services.AddSingleton<OrphanFileGcWorker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<OrphanFileGcWorker>());
 
@@ -179,6 +182,12 @@ app.UseEndpoints(endpoints =>
         version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown",
         environment = app.Environment.EnvironmentName,
         utc = DateTimeOffset.UtcNow
+    }));
+    // Публичные feature-flags для UI (без auth).
+    endpoints.MapGet("/api/features", () => Results.Ok(new
+    {
+        ticketSalesEnabled = EList.Services.Impl.Payments.PaymentSettings.IsTicketSalesGloballyEnabled(),
+        ticketDeskRevealHolder = EList.Services.Impl.Payments.PaymentSettings.IsTicketDeskRevealHolderEnabled()
     }));
 });
 var minThreads = Convert.ToInt32(ConfigurationManager.AppSettings["minThreads"] ?? "0");
