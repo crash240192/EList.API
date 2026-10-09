@@ -33,6 +33,11 @@ namespace EList.Models.Orders
         public Guid? TicketTypeId { get; set; }
 
         /// <summary>
+        /// Название типа билета (если известно)
+        /// </summary>
+        public string? TicketTypeName { get; set; }
+
+        /// <summary>
         /// Количество билетов
         /// </summary>
         public int Quantity { get; set; }
