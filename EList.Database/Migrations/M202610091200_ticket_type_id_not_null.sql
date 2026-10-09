@@ -29,7 +29,7 @@ WHERE tk.ticket_type_id IS NULL
 
 -- Если остались «сироты» без типа события — создать fallback-тип и привязать
 INSERT INTO public.event_ticket_types (event_id, name, description, price, currency, capacity, sort_order, active)
-SELECT DISTINCT o.event_id, 'Стандарт', NULL, 0, 'RUB', NULL, 0, true
+SELECT DISTINCT o.event_id, 'Стандарт', NULL::text, 0::numeric(12,2), 'RUB', NULL::int, 0, true
 FROM public.orders o
 WHERE o.ticket_type_id IS NULL
 	AND NOT EXISTS (
@@ -37,7 +37,7 @@ WHERE o.ticket_type_id IS NULL
 	);
 
 INSERT INTO public.event_ticket_types (event_id, name, description, price, currency, capacity, sort_order, active)
-SELECT DISTINCT tk.event_id, 'Стандарт', NULL, 0, 'RUB', NULL, 0, true
+SELECT DISTINCT tk.event_id, 'Стандарт', NULL::text, 0::numeric(12,2), 'RUB', NULL::int, 0, true
 FROM public.tickets tk
 WHERE tk.ticket_type_id IS NULL
 	AND NOT EXISTS (
