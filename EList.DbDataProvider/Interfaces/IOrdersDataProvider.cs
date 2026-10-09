@@ -17,6 +17,9 @@ namespace EList.DbDataProvider.Interfaces
         Task<List<OrderDto>> GetOrdersByBuyerAsync(Guid buyerAccountId);
         Task<List<OrderDto>> GetOrdersBySellerOrganizationAsync(Guid organizationId);
         Task<List<OrderDto>> GetOrdersByEventAsync(Guid eventId);
+
+        /// <summary>Pending/Authorized заказы старше cutoff (для TTL-отмены неоплаченных).</summary>
+        Task<List<OrderDto>> GetExpiredUnpaidOrdersAsync(DateTimeOffset createdBefore, int limit);
         #endregion
 
         #region tickets

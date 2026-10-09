@@ -177,6 +177,30 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Lookup аккаунта по логину или GUID (для передачи билета / подарка).
+        /// </summary>
+        [HttpGet("lookup")]
+        public async Task<CommandResult<AccountLookupResponse?>> LookupAccountAsync([FromQuery] string q)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(LookupAccountAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _accountsService.LookupAccountAsync(q);
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Удаление (деактивация + анонимизация) текущего аккаунта
         /// </summary>
         [HttpDelete("me")]

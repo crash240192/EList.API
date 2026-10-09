@@ -22,8 +22,17 @@ namespace EList.Repositories.Interfaces
         Task<Guid> CreateEventParametersAsync(EventParametersRequest request);
         Task DeleteEventParametersAsync(Guid id);
         Task UpdateEventParametersAsync(Guid id, EventParametersRequest request);
+        Task UpdateEventParametersCostAsync(Guid parametersId, double? cost);
         Task<EventParameters?> GetEventParametersByEventIdAsync(Guid eventId);
         Task<EventParameters?> GetEventParametersAsync(Guid id);
         Task BindEventParametersAsync(Guid eventId, Guid eventParametersId);
+
+        Task<List<EventTicketType>> GetTicketTypesByEventIdAsync(Guid eventId, bool includeInactive = false);
+        Task<EventTicketType?> GetTicketTypeAsync(Guid id);
+        Task<Guid> CreateTicketTypeAsync(EventTicketType item);
+        Task UpdateTicketTypeAsync(EventTicketType item);
+        Task DeactivateTicketTypesAsync(IEnumerable<Guid> ids);
+        Task<(decimal? Min, decimal? Max)> GetActiveTicketTypePriceRangeAsync(Guid eventId);
+        Task<Dictionary<Guid, (decimal Min, decimal Max)>> GetActiveTicketTypePriceRangesAsync(IEnumerable<Guid> eventIds);
     }
 }

@@ -161,6 +161,19 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 | `true` | `> 0` | Заказ → оплата (T-Bank / yookassaStub) → билет + Participate |
 | `true` | — | Обычный Participate / accept invite **запрещены** (`OrganizationPaymentRequired`) |
 
+### Типы билетов (W5) ✅
+
+- Таблица `event_ticket_types`: имя, цена, capacity типа, `active`, порядок.
+- Заказ: один `ticketTypeId` + `quantity`; цена **только** с сервера из типа; inactive тип → отказ.
+- При `ticketsEnabled` поле `event_parameters.cost` синхронизируется в `MIN(active.price)` (совместимость старых клиентов).
+- Удаление типа: только soft-delete (`active=false`); hard-delete нет (FK на orders/tickets).
+- В ответах get/search parameters дополнительно: `priceMin` / `priceMax` (derived).
+- Поиск `EventsSearchRequest.Price`:
+  - `0` → есть активный тип с `price = 0`, **или** билеты выкл. и `cost` null/0;
+  - `N > 0` → EXISTS активный тип с `price ≤ N`, **или** без билетов `cost ≤ N` (null допускается как «без цены»).
+- Шаблоны событий: `eventParameters.ticketTypes` в snapshot CreateEventRequest.
+- План: [ticket-types-plan.md](./ticket-types-plan.md).
+
 ---
 
 ## 8. Основные воркфлоу (целостность)

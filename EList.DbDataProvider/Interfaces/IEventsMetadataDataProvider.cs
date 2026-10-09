@@ -22,8 +22,17 @@ namespace EList.DbDataProvider.Interfaces
         Task<Guid> CreateEventParametersAsync(EventParametersDto request);
         Task DeleteEventParametersAsync(Guid id);
         Task UpdateEventParametersAsync(EventParametersDto request);
+        Task UpdateEventParametersCostAsync(Guid parametersId, double? cost);
         Task<EventParametersDto?> GetEventParametersByEventIdAsync(Guid eventId);
         Task<EventParametersDto?> GetEventParametersAsync(Guid id);
         Task BindEventParametersAsync(Guid eventId, Guid eventParametersId);
+
+        Task<List<EventTicketTypeDto>> GetTicketTypesByEventIdAsync(Guid eventId, bool includeInactive = false);
+        Task<EventTicketTypeDto?> GetTicketTypeAsync(Guid id);
+        Task<Guid> CreateTicketTypeAsync(EventTicketTypeDto item);
+        Task UpdateTicketTypeAsync(EventTicketTypeDto item);
+        Task DeactivateTicketTypesAsync(IEnumerable<Guid> ids);
+        Task<(decimal? Min, decimal? Max)> GetActiveTicketTypePriceRangeAsync(Guid eventId);
+        Task<Dictionary<Guid, (decimal Min, decimal Max)>> GetActiveTicketTypePriceRangesAsync(IEnumerable<Guid> eventIds);
     }
 }

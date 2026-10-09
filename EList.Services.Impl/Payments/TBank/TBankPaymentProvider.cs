@@ -148,6 +148,14 @@ namespace EList.Services.Impl.Payments.TBank
                 "Ручное подтверждение недоступно для Т-Банка; дождитесь webhook NotificationURL.");
         }
 
+        public async Task CancelPaymentAsync(string providerPaymentId)
+        {
+            if (string.IsNullOrWhiteSpace(providerPaymentId))
+                throw new ArgumentException("providerPaymentId is required", nameof(providerPaymentId));
+
+            await _client.CancelAsync(providerPaymentId.Trim(), amountKopecks: null);
+        }
+
         public async Task<RefundCreationResult> CreateRefundAsync(RefundCreationRequest request)
         {
             if (request == null)

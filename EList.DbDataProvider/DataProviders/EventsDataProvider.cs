@@ -100,8 +100,30 @@ namespace EList.DbDataProvider.DataProviders
 
             //Добавить сюда проверку что пользователь без пола или запрещённого пола не может видеть мероприятие
 
+            // Цена: при tickets_enabled — EXISTS активный тип в бюджете; иначе legacy cost.
+            // price=0 → бесплатный тип / бесплатное участие без билетов.
             if (request.Price != null)
-                eventsRequest = eventsRequest.Where(e => e.Parameters.Cost == null || e.Parameters.Cost <= request.Price);
+            {
+                var priceLimit = Convert.ToDecimal(request.Price.Value);
+                if (priceLimit <= 0)
+                {
+                    eventsRequest = eventsRequest.Where(e =>
+                        (e.Parameters.TicketsEnabled
+                            && _connection.EventTicketTypes.Any(t =>
+                                t.EventId == e.Id && t.Active && t.Price == 0m))
+                        || (!e.Parameters.TicketsEnabled
+                            && (e.Parameters.Cost == null || e.Parameters.Cost <= 0)));
+                }
+                else
+                {
+                    eventsRequest = eventsRequest.Where(e =>
+                        (e.Parameters.TicketsEnabled
+                            && _connection.EventTicketTypes.Any(t =>
+                                t.EventId == e.Id && t.Active && t.Price <= priceLimit))
+                        || (!e.Parameters.TicketsEnabled
+                            && (e.Parameters.Cost == null || e.Parameters.Cost <= request.Price)));
+                }
+            }
 
             if (request.AgeLimit != null)
                 eventsRequest = eventsRequest.Where(e => e.Parameters.AgeLimit <= request.AgeLimit);

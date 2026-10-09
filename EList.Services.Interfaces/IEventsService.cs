@@ -28,6 +28,7 @@ namespace EList.Services.Interfaces
 
         Task<CommandResult<EventParameters?>> GetEventParametersByEventIdAsync(Guid eventId);
         Task<CommandResult> SetEventParametersAsync(Guid eventId, EventParametersRequest parameters);
+        Task<CommandResult<List<EventTicketType>?>> GetEventTicketTypesAsync(Guid eventId, bool includeInactive = false);
         
 
         Task<CommandResult<Guid?>> CreateEventAsync(CreateEventRequest request);
