@@ -62,10 +62,10 @@
 | ID | Юзкейс | Актор | Результат |
 |----|--------|-------|-----------|
 | UC-D1 | Открыть desk события (крупный UI) | A2–A4, A6 | Экран: код, QR, counters, last result |
-| UC-D2 | Validate по коду (без гашения) | A2–A4 | Статус/тип/время; билет не меняется |
-| UC-D3 | Check-in по коду | A2–A4 | Issued→Used; counters++; audit who/when |
-| UC-D4 | Check-in по QR (камера) | A2–A4 | То же; авто-check-in после decode |
-| UC-D5 | Повторный скан уже Used | A2–A4 | Явный отказ + когда был check-in (+ кто, если есть) |
+| UC-D2 | Скан / ввод кода → **карточка билета** (ещё не Used) | A2–A4 | Показать тип/статус; кнопки «Отметить вход» / закрыть (validate без гашения) |
+| UC-D3 | Подтвердить вход на карточке | A2–A4 | Issued→Used; counters++; audit who/when; на карточке появляется «Отменить вход» (только A2–A3) |
+| UC-D4 | Скан QR (камера) → та же карточка | A2–A4 | Не гасить молча: сначала карточка, затем confirm (или явный one-tap confirm в UX) |
+| UC-D5 | Повторный скан уже Used | A2–A4 | Карточка «уже на площадке» + время/кто; Owner/Manager — «Отменить вход» |
 | UC-D6 | Скан чужого события | A2–A4 | Отказ «другой event» |
 | UC-D7 | Скан RefundPending / Refunded / Void | A2–A4 | Отказ с понятным текстом |
 | UC-D8 | Два сканера одновременно на один код | A2–A4 | Один success, второй «уже использован» (гонка) |
@@ -81,7 +81,7 @@
 | UC-S3 | Список событий org | A2–A3 | Карточки с sold/used/pending |
 | UC-S4 | Live refresh на desk | A2–A4 | Poll 5–15s или refresh после check-in |
 | UC-S5 | Экспорт CSV (phase 2) | A2–A3 | Список билетов события |
-| UC-S6 | История check-in (кто/когда) | A2–A3 | Список Used с `checkedInBy` |
+| UC-S6 | История операций с билетами события | A2–A3 | Лента/таблица: validate/check-in/undo; открыть карточку билета → undo |
 
 \*TicketTaker: stats только если `can_view_stats` на staff (default true); без PII holder — см. §5.
 
@@ -89,8 +89,8 @@
 
 | ID | Юзкейс | Актор | Результат |
 |----|--------|-------|-----------|
-| UC-P1 | Печать одного билета из MyTickets | A1 | Print layout: event, type, code, QR |
-| UC-P2 | Скачать PDF одного билета | A1 | Файл `ticket-{code}.pdf` (MVP: client-side) |
+| UC-P1 | Печать одного билета из MyTickets | A1 | Print layout: event, type, code, QR → `window.print` |
+| UC-P2 | «PDF» через системный диалог | A1 | В print-dialog выбрать «Сохранить как PDF» (отдельной lib в MVP нет) |
 | UC-P3 | Печать после gift/transfer | A1 (новый holder) | Актуальный holder + тот же code |
 | UC-P4 | Печать из desk (дубликат для гостя) | A2–A3 | Phase 2; MVP не обязателен |
 | UC-P5 | Wallet pass / Apple/Google | A1 | **Вне W6** (после PDF) |
@@ -99,11 +99,11 @@
 
 | ID | Юзкейс | Решение MVP |
 |----|--------|-------------|
-| UC-X1 | Undo check-in (Used→Issued) | Только Owner/Manager; пишет audit; не TT |
+| UC-X1 | Undo check-in (Used→Issued) | Owner/Manager: с открытой карточки / повторный скан / из истории; audit; не TT |
 | UC-X2 | Событие отменено / tickets выключены | Desk read-only validate; check-in запрещён |
 | UC-X3 | Тип soft-deleted, билеты уже выданы | Check-in по коду работает; тип в ответе с именем |
 | UC-X4 | Capacity типа исчерпан, но Issued ещё не Used | Counters: remaining seats = capacity − reserved; «на площадке» = Used |
-| UC-X5 | Privacy holder | TT по умолчанию **не** видит ФИО/login; Owner/Manager — опционально |
+| UC-X5 | Privacy holder | Пока `ticketDeskRevealHolder=false` — desk API без login/ФИО holder |
 
 ---
 
@@ -151,9 +151,9 @@
 | # | Сценарий | Ожидание |
 |---|----------|----------|
 | D1 | Validate Issued | OK, status Issued, type name |
-| D2 | Check-in Issued | Used + checkedInAt/By |
-| D3 | Повторный check-in | Ошибка с временем первого |
-| D4 | QR → auto check-in | Как D2 |
+| D2 | Скан Issued → confirm → Used | Used + checkedInAt/By; на карточке Undo (Owner/Manager) |
+| D3 | Повторный скан Used | Карточка «уже использован» + Undo для Owner/Manager |
+| D4 | QR → карточка → confirm | Без тихого auto-check-in |
 | D5 | Код другого event | Ошибка |
 | D6 | RefundPending | Ошибка |
 | D7 | Гонка двух клиентов | Ровно один Used |
@@ -173,7 +173,7 @@
 | # | Сценарий | Ожидание |
 |---|----------|----------|
 | P1 | Print Issued билета | QR сканируется тем же парсером |
-| P2 | PDF скачивается | Файл открывается, код читаем |
+| P2 | Save as PDF из print-dialog | Файл/превью читаемы, код/QR рабочие |
 | P3 | После transfer печатает новый holder | Код тот же, UI «мой билет» |
 
 ### Undo (U) — если включаем в MVP
@@ -185,19 +185,20 @@
 
 ---
 
-## 5. Продуктовые решения (зафиксировать)
+## 5. Продуктовые решения (зафиксировано 9.10.2026)
 
-| Тема | Решение для полного W6 |
-|------|-------------------------|
+| Тема | Решение |
+|------|---------|
 | Модель доступа | Org role `TicketTaker` **+** `event_ticket_staff` allow-list |
 | Implicit check-in | Owner/Manager org события — всегда; TT — только allow-list |
-| PII на desk | TT: тип, статус, код (mask optional); Owner/Manager: + login/name по флагу события/org |
-| Undo | Да, Owner/Manager only |
+| **PII holder на desk** | **Серверный флаг** `features:ticketDeskRevealHolder` в `appsettings` (и/или env). **Default `false`**: validate/check-in/desk ticket DTO **без** login/ФИО. При `true` API начинает отдавать holder-поля (для стенда/org-политики). Не per-user UI-toggle в MVP. |
+| **Undo check-in** | **Да.** Поток desk: скан QR → карточка подтверждения → «Отметить вход» (Issued→Used). Пока карточка открыта — «Отменить вход»; повторный скан того же Used-билета открывает карточку с «Отменить вход»; плюс **история операций** по событию → открыть билет → undo. Кто может: Owner/Manager (и mod); **TicketTaker — нет**. |
 | Offline | Нет в MVP; явный offline banner |
-| PDF | MVP client print + client PDF; server PDF — phase 2 |
+| **Печать / PDF** | MVP: кнопка **«Печать»** → системный диалог браузера (принтер или «Сохранить как PDF»). Отдельная lib / server PDF — phase 2. |
 | Wallet | Вне W6 |
 | Personal events | Вне W6 (нет CanSellTickets) |
-| EventPage panel | Оставить thin entry «Открыть desk» + для org с правом; полный UX на `/tickets/desk` |
+| **Навигация** | Сайдбар: **«Билеты»** → hub (события, счётчики, назначения). **Контроль входа (desk)** — глубже: `/tickets/desk?eventId=…` из карточки события hub / CTA на EventPage. |
+| EventPage panel | Thin entry «Рабочее место / контроль входа» → desk; не дублировать полный UX |
 | Экспорт CSV | Phase 2 |
 | Мульти-тип в одном QR | Нет (1 билет = 1 код) |
 
@@ -237,10 +238,10 @@
 ### B4. PDF / печать (UI ± API)
 
 21. `TicketPrintLayout` (event, type, when, where, code, QR).  
-22. MyTickets: «Печать» (`window.print` + `@media print`).  
-23. MyTickets: «PDF» (client: html2canvas/jspdf **или** browser print-to-pdf UX).  
+22. MyTickets: «Печать» (`window.print` + `@media print`; PDF = системный Save as PDF).  
+23. ~~Отдельная PDF-lib~~ — не в MVP.  
 24. Единый QR payload с текущим `parseTicketCodeFromText`.  
-25. Phase 2: `GET /api/orders/tickets/{id}/pdf`.
+25. Phase 2: server `GET /api/orders/tickets/{id}/pdf` / one-click download.
 
 ### B5. Документация / ops
 
@@ -281,9 +282,9 @@ W6d PDF/Print ───┘ (параллельно с W6a–c)
 |------|-----|-----|-----------------|
 | **W6a** | TicketTaker + staff table + role API + check-in auth | Members: роль TT; assign staff на событие | R1–R7 |
 | **W6b** | stats + org summary (+ optional tickets list) | — (можно stub JSON) | S1–S3 API |
-| **W6c** | — (consumes a+b) | Hub + Desk + sidebar + EventPage CTA | D1–D8, S1 UI |
-| **W6d** | — | Print layout + PDF на MyTickets | P1–P3 |
-| **W6e** | Undo + race-safe check-in + docs | UX ошибок, poll counters | U1–U2, D7 |
+| **W6c** | — (consumes a+b) | Сайдбар «Билеты» → hub; desk глубже; карточка confirm; EventPage CTA | D1–D8, S1 UI |
+| **W6d** | — | Print layout + «Печать» на MyTickets | P1–P3 |
+| **W6e** | Undo API + история операций + race-safe check-in; флаг `ticketDeskRevealHolder` | Undo на карточке/истории; poll counters | U1–U2, D3, D7 |
 
 ### Оценка сложности (техн., не календарь)
 
@@ -337,7 +338,8 @@ OrdersDataProvider aggregates → OrdersService/EventsController or Organization
 - [ ] Auth: TT только allow-list; Owner/Manager implicit; mod break-glass  
 - [ ] Undo check-in для Owner/Manager  
 - [ ] Race-safe check-in  
-- [ ] MyTickets: печать + PDF с рабочим QR  
+- [ ] MyTickets: «Печать» (системный print / Save as PDF), QR рабочий  
+- [ ] Сайдбар «Билеты» → hub; desk глубже по eventId  
 - [ ] EventPage ведёт на desk  
 - [ ] Docs + smoke R/D/S/P  
 
@@ -345,13 +347,13 @@ Phase 2 (offline, CSV, server PDF, wallet, auto-assign all events) — отде�
 
 ---
 
-## 10. Открытые вопросы к продукту (короткий список)
+## 10. Решения продукта — CLOSED
 
-Остальное в §5 уже с рекомендацией; нужно явное ОК:
+| # | Вопрос | Решение (9.10.2026) |
+|---|--------|---------------------|
+| 1 | Undo | **Да.** Карточка после скана → confirm Used → Undo на открытой карточке / повторный скан / история. Owner/Manager only. |
+| 2 | Holder PII | Флаг API `features:ticketDeskRevealHolder`, **default false** (данные holder не отдаются). |
+| 3 | PDF | Системный **«Печать»** / Save as PDF; без отдельной lib в MVP. |
+| 4 | Меню | Пункт **«Билеты»**; контроль входа — внутри (desk). |
 
-1. **Undo в MVP или W6e?** → Рекомендуем да (W6e).  
-2. **Показывать login holder Owner/Manager сразу или за toggle?** → Рекомендуем toggle «Показать покупателя», default off.  
-3. **Client PDF библиотека vs только print dialog?** → Рекомендуем print + «Сохранить как PDF» системный; отдельная кнопка PDF через лёгкую lib — по желанию в W6d.  
-4. **Имя пункта меню:** «Билеты» / «Вход» / «Контроль»? → Рекомендуем **«Билеты»**.
-
-После ответов на §10 можно стартовать **W6a** без перепроектирования.
+Можно стартовать **W6a**.
