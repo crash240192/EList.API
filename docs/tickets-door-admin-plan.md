@@ -134,14 +134,14 @@ W4 (чеки) не блокирует W6.
 ## 8. Критерии готовности W6 MVP
 
 - [ ] Owner назначает билетёра на событие; билетёр гасит билет без прав менеджера
-- [ ] Desk: код + QR + counters по статусам и типам
+- [ ] Сайдбар «Билеты» → hub; desk глубже (скан → карточка → confirm Used)
+- [ ] Undo для Owner/Manager (карточка / повторный скан / история)
 - [ ] Org summary: продано / использовано / осталось по событиям
-- [ ] MyTickets: печать / PDF одного билета с QR
-- [ ] Старый `TicketCheckInPanel` на EventPage либо редирект на Desk, либо thin wrapper
+- [ ] `features:ticketDeskRevealHolder` default false
+- [ ] MyTickets: «Печать» (системный print / Save as PDF)
+- [ ] EventPage — CTA на desk
 
-## 9. Открытые вопросы (решить при старте D1)
+## 9. Решения продукта — CLOSED
 
-1. Билетёр видит ФИО holder или только «валидный / тип / код»? (privacy)  
-2. Offline / плохая сеть на входе — нужен ли queue + sync? (скорее phase 2)  
-3. Один билетёр на много событий vs allow-list — confirm allow-list.  
-4. Нужен ли undo check-in (Used → Issued) для Owner? (сейчас нет)
+См. [tickets-door-scenarios.md](./tickets-door-scenarios.md) §5 и §10.  
+Старт реализации: **W6a**.
