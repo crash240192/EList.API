@@ -11,6 +11,8 @@ namespace EList.Models.Orders
         public DateTimeOffset EndTime { get; set; }
         public bool Active { get; set; }
         public bool TicketsEnabled { get; set; }
+        /// <summary>Адрес площадки (если задан)</summary>
+        public string? Address { get; set; }
         public Guid? OrganizationId { get; set; }
         public string? OrganizationName { get; set; }
         /// <summary>organizer | staff</summary>
