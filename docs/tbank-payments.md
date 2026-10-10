@@ -73,10 +73,14 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 | Ключ | Смысл |
 |------|--------|
 | `payments__tbank__smRegister__username` / `password` | SM-Register → ShopCode |
-| `payments__tbank__manualShopCode` | только DEMO/стенд без SM-Register |
-| `features__ticketSalesEnabled` | kill-switch билетов (`true` на стенде с банком) |
+| `payments__tbank__manualShopCode` | DEMO/стенд: ShopCode без SM-Register |
+| `payments__tbank__allowTicketsWithoutShopCode` | Init **без** `Shops[]` (сумма на терминал площадки). По умолчанию **true** на `rest-api-test`, **false** на `securepay` |
+| `payments__provider` | `tbank` \| `yookassaStub` — stub не требует ShopCode |
+| `features__ticketSalesEnabled` | kill-switch билетов (`true` на стенде) |
 
-Без Active ShopCode у org заказ с билетами не создастся (`CanSellTickets`).
+**ShopCode** нужен только для marketplace-сплита (`Init.Shops[]`).  
+Бесплатные билеты — без онбординга. Stub (`yookassaStub`) — достаточно `OnboardingStatus=Active` (без `ProviderSellerId`).  
+На test-host T-Bank платный заказ без ShopCode допускается (Init без сплита), если не выключить `allowTicketsWithoutShopCode`.
 
 ### Не коммитить в prod-образ
 
@@ -107,6 +111,15 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 | GET | `/eList/api/Wallets/deposits/{id}` | статус депозита (+ GetState) |
 | POST | `/eList/api/payments/tbank/webhook` | NotificationURL |
 | POST | `/eList/api/orders/payments/complete` | **только stub** |
+
+---
+
+## 5.1 CloudKassir (фискализация) ≠ сплит
+
+Документация [API кассы CloudKassir](https://developers.cloudkassir.ru/#api-kassy) описывает **только фискализацию** (`kkt/receipt`, AgentSign / SupplierInfo для 54‑ФЗ).  
+Там **нет** `ShopCode`, `Shops[]` и сплита платежей — это зона **эквайринга Т‑Банка (мультирасчёты / Init)**, не облачной кассы.
+
+Сплит в чеке (агент/поставщик) и сплит денег на ShopCode продавца — разные механизмы; W4 (касса) не заменяет marketplace ShopCode.
 
 ---
 

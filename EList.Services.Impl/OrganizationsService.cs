@@ -712,12 +712,12 @@ namespace EList.Services.Impl
                 }
 
                 var payout = await _organizationsRepository.GetPayoutAsync(organizationId);
-                if (payout == null
-                    || payout.OnboardingStatus != ProviderOnboardingStatus.Active
-                    || string.IsNullOrWhiteSpace(payout.ProviderSellerId))
+                var readiness = Payments.SellerPayoutGate.AssessCanEnableTicketSales(payout);
+                if (!readiness.Ok)
                 {
                     return CommandResult.Fail(ErrorCode.OrganizationNotVerified,
-                        "Перед включением продажи билетов завершите онбординг в платёжной системе (активный ShopCode / ProviderSellerId)");
+                        readiness.ErrorMessage
+                        ?? "Перед включением продажи билетов завершите онбординг в платёжной системе");
                 }
             }
 

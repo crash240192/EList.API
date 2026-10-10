@@ -101,6 +101,12 @@ namespace EList.Services.Impl.Payments
         /// </summary>
         public string? ManualShopCode { get; set; }
 
+        /// <summary>
+        /// Разрешить платные билеты без ShopCode (Init без Shops[] — вся сумма на терминал площадки).
+        /// По умолчанию true на test host, false на securepay.
+        /// </summary>
+        public bool AllowTicketsWithoutShopCode { get; set; }
+
         public TBankSmRegisterSettings SmRegister { get; set; } = new();
 
         public static TBankPaymentSettings Load()
@@ -128,7 +134,22 @@ namespace EList.Services.Impl.Payments
             if (string.IsNullOrWhiteSpace(settings.SmRegister.BaseUrl))
                 settings.SmRegister.BaseUrl = DefaultSmRegisterBaseUrl;
 
+            var isTestHost = settings.ApiBaseUrl.Contains("rest-api-test", StringComparison.OrdinalIgnoreCase)
+                || settings.ApiBaseUrl.Contains("DEMO", StringComparison.OrdinalIgnoreCase);
+            settings.AllowTicketsWithoutShopCode = ReadBool(
+                "payments:tbank:allowTicketsWithoutShopCode",
+                defaultValue: isTestHost);
+
             return settings;
+        }
+
+        private static bool ReadBool(string key, bool defaultValue)
+        {
+            if (!ConfigurationManager.AppSettings.Contains(key)
+                || string.IsNullOrWhiteSpace(ConfigurationManager.AppSettings[key]))
+                return defaultValue;
+
+            return bool.TryParse(ConfigurationManager.AppSettings[key], out var flag) && flag;
         }
 
         public void EnsureAcquiringConfigured()

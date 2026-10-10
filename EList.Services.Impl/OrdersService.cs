@@ -181,15 +181,6 @@ namespace EList.Services.Impl
                     "Нет организации-продавца с правом продажи билетов");
             }
 
-            var sellerPayout = await _organizationsRepository.GetPayoutAsync(sellerOrgId.Value);
-            if (sellerPayout == null
-                || sellerPayout.OnboardingStatus != ProviderOnboardingStatus.Active
-                || string.IsNullOrWhiteSpace(sellerPayout.ProviderSellerId))
-            {
-                return CommandResult<CreateOrderResponse>.Fail(ErrorCode.OrganizationNotVerified,
-                    "Организация-продавец не прошла онбординг в платёжной системе (нет активного ShopCode)");
-            }
-
             var settings = PaymentSettings.Load();
             var unitPrice = Math.Round(ticketType.Price, 2, MidpointRounding.AwayFromZero);
             if (unitPrice < 0)
@@ -202,6 +193,22 @@ namespace EList.Services.Impl
             if (amountCommission > amountTotal)
                 amountCommission = amountTotal;
             var amountSeller = amountTotal - amountCommission;
+
+            var sellerPayout = await _organizationsRepository.GetPayoutAsync(sellerOrgId.Value);
+            string? sellerShopCode = null;
+            // Бесплатные билеты — без платёжного онбординга / ShopCode.
+            if (amountTotal > 0)
+            {
+                var readiness = SellerPayoutGate.AssessPaidTicketSales(sellerPayout);
+                if (!readiness.Ok)
+                {
+                    return CommandResult<CreateOrderResponse>.Fail(ErrorCode.OrganizationNotVerified,
+                        readiness.ErrorMessage
+                        ?? "Организация-продавец не готова принимать оплату за билеты");
+                }
+
+                sellerShopCode = readiness.ResolvedShopCode;
+            }
 
             var order = new Order
             {
@@ -243,7 +250,7 @@ namespace EList.Services.Impl
                 BuyerAccountId = buyerId,
                 EventId = eventItem.Id,
                 SellerOrganizationId = sellerOrgId.Value,
-                SellerShopCode = sellerPayout.ProviderSellerId,
+                SellerShopCode = sellerShopCode,
                 AmountSeller = amountSeller,
                 AmountCommission = amountCommission
             });

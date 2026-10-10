@@ -733,15 +733,29 @@ namespace EList.Services.Impl
                     "Продажу билетов можно включить только для мероприятия с организацией-организатором");
             }
 
+            CommandResult? lastPayoutError = null;
             foreach (var organizationId in organizationIds)
             {
                 var organization = await _organizationsRepository.GetOrganizationAsync(organizationId);
-                if (organization?.CanSellTickets == true)
+                if (organization?.CanSellTickets != true)
+                    continue;
+
+                // CanSellTickets есть — проверяем готовность payout/ShopCode под текущий payments:provider.
+                var payout = await _organizationsRepository.GetPayoutAsync(organizationId);
+                var readiness = Payments.SellerPayoutGate.AssessCanEnableTicketSales(payout);
+                if (readiness.Ok)
                     return null;
+
+                lastPayoutError = CommandResult.Fail(ErrorCode.OrganizationNotVerified,
+                    readiness.ErrorMessage
+                    ?? "Организация не готова принимать оплату за билеты");
             }
 
+            if (lastPayoutError != null)
+                return lastPayoutError;
+
             return CommandResult.Fail(ErrorCode.OrganizationNotVerified,
-                "Ни одна организация-организатор не имеет права продавать билеты");
+                "Ни одна организация-организатор не имеет права продавать билеты (CanSellTickets)");
         }
 
         #region events
