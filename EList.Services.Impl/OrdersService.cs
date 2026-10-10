@@ -1532,6 +1532,9 @@ namespace EList.Services.Impl
                 {
                     if (byEvent.ContainsKey(eventItem.Id))
                         continue;
+                    // Hub desk — только события с включёнными билетами
+                    if (!(eventItem.Parameters?.TicketsEnabled ?? false))
+                        continue;
 
                     var stats = await BuildEventTicketStatsAsync(eventItem);
                     byEvent[eventItem.Id] = new TicketDeskHubItem
@@ -1541,7 +1544,8 @@ namespace EList.Services.Impl
                         StartTime = eventItem.StartTime,
                         EndTime = eventItem.EndTime,
                         Active = eventItem.Active,
-                        TicketsEnabled = eventItem.Parameters?.TicketsEnabled ?? false,
+                        TicketsEnabled = true,
+                        Address = string.IsNullOrWhiteSpace(eventItem.Address) ? null : eventItem.Address.Trim(),
                         OrganizationId = org.Id,
                         OrganizationName = org.Name,
                         Access = "organizer",
@@ -1566,6 +1570,8 @@ namespace EList.Services.Impl
 
                 var eventItem = await _eventsRepository.GetEventAsync(staff.EventId);
                 if (eventItem == null)
+                    continue;
+                if (!(eventItem.Parameters?.TicketsEnabled ?? false))
                     continue;
 
                 Guid? orgId = null;
@@ -1601,7 +1607,8 @@ namespace EList.Services.Impl
                     StartTime = eventItem.StartTime,
                     EndTime = eventItem.EndTime,
                     Active = eventItem.Active,
-                    TicketsEnabled = eventItem.Parameters?.TicketsEnabled ?? false,
+                    TicketsEnabled = true,
+                    Address = string.IsNullOrWhiteSpace(eventItem.Address) ? null : eventItem.Address.Trim(),
                     OrganizationId = orgId,
                     OrganizationName = orgName,
                     Access = "staff",
