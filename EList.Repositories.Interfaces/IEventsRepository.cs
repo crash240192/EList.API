@@ -16,6 +16,7 @@ namespace EList.Repositories.Interfaces
 
         Task<int> CountActiveEventsByAccountOrganizatorAsync(Guid accountId);
         Task<int> CountActiveEventsByOrganizationOrganizatorAsync(Guid organizationId);
+        Task<List<Event>> GetEventsByOrganizationOrganizatorAsync(Guid organizationId, int limit = 200);
         Task<int> CountEventsCreatedByAccountSinceAsync(Guid accountId, DateTimeOffset since);
         Task<int> CountEventsCreatedByOrganizationSinceAsync(Guid organizationId, DateTimeOffset since);
         Task<int> CountEventsNearLocationSinceAsync(

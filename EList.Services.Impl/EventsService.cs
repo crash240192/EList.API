@@ -36,6 +36,7 @@ namespace EList.Services.Impl
         private readonly IEventsRepository _eventsRepository;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IEventOrganizatorsRepository _eventOrganizatorsRepository;
+        private readonly IEventTicketStaffRepository _eventTicketStaffRepository;
         private readonly IAuthorizationRepository _authorizationRepository;
         private readonly IMapper _mapper;
         private readonly IAccountDataHolder _accountDataHolder;
@@ -59,6 +60,7 @@ namespace EList.Services.Impl
             IEventsMetadataRepository eventsMetadataRepository,
             IEventsRepository eventsRepository,
             IEventOrganizatorsRepository eventOrganizatorsRepository,
+            IEventTicketStaffRepository eventTicketStaffRepository,
             IAuthorizationRepository authorizationRepository,
             IMapper mapper,
             IInvitationsRepository invitationsRepository,
@@ -82,6 +84,7 @@ namespace EList.Services.Impl
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _eventOrganizatorsRepository = eventOrganizatorsRepository ?? throw new ArgumentNullException(nameof(eventOrganizatorsRepository));
+            _eventTicketStaffRepository = eventTicketStaffRepository ?? throw new ArgumentNullException(nameof(eventTicketStaffRepository));
             _authorizationRepository = authorizationRepository ?? throw new Exception(nameof(authorizationRepository));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
             _invitationsRepository = invitationsRepository ?? throw new ArgumentNullException(nameof(invitationsRepository));
@@ -407,6 +410,8 @@ namespace EList.Services.Impl
             if (result == null)
                 return CommandResult<EventParameters?>.Fail(ErrorCode.EventParametersNotFound, $"Параметры для события id='{eventId}' не найдены");
 
+            await EnrichTicketPricesAsync(result, eventId);
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<EventParameters?>(result);
         }
@@ -443,15 +448,256 @@ namespace EList.Services.Impl
             {
                 var parametersId = await _eventsMetadataRepository.CreateEventParametersAsync(parameters);
                 await _eventsMetadataRepository.BindEventParametersAsync(curEvent.Id, parametersId);
+                curEvent.EventParametersId = parametersId;
             }
             else
             {
                 await _eventsMetadataRepository.UpdateEventParametersAsync(curEvent.EventParametersId.Value, parameters);
             }
 
+            var ticketTypesResult = await SyncEventTicketTypesAsync(eventId, curEvent.EventParametersId.Value, parameters);
+            if (!ticketTypesResult.Success)
+                return ticketTypesResult;
+
             await _mediaService.SyncEventAlbumsVisibilityAsync(eventId);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult<List<EventTicketType>?>> GetEventTicketTypesAsync(Guid eventId, bool includeInactive = false)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventTicketTypesAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var curEvent = await _eventsRepository.GetEventAsync(eventId);
+            if (curEvent == null)
+                return CommandResult<List<EventTicketType>?>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            var accessError = await _eventAccessValidator.AssertCanViewEventAsync(
+                curEvent, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
+            if (!accessError.Success)
+                return CommandResult<List<EventTicketType>?>.Fail(accessError.ErrorCode, accessError.Message);
+
+            var isOrganizator = _accountDataHolder.AccountId != null
+                && await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value);
+            var include = includeInactive && isOrganizator;
+            var types = await _eventsMetadataRepository.GetTicketTypesByEventIdAsync(eventId, include);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<EventTicketType>?>(types);
+        }
+
+        public async Task<CommandResult<List<EventTicketStaffResponse>?>> GetEventTicketStaffAsync(Guid eventId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventTicketStaffAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var curEvent = await _eventsRepository.GetEventAsync(eventId);
+            if (curEvent == null)
+                return CommandResult<List<EventTicketStaffResponse>?>.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            if (_accountDataHolder.AccountId == null
+                || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
+            {
+                return CommandResult<List<EventTicketStaffResponse>?>.Fail(ErrorCode.AccessError,
+                    "Назначения билетёров доступны только организаторам мероприятия");
+            }
+
+            var staff = await _eventTicketStaffRepository.GetByEventIdAsync(eventId);
+            var response = _mapper.Map<List<EventTicketStaffResponse>>(staff);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<EventTicketStaffResponse>?>(response);
+        }
+
+        public async Task<CommandResult> SetEventTicketStaffAsync(Guid eventId, EventTicketStaffUpsertRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SetEventTicketStaffAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var curEvent = await _eventsRepository.GetEventAsync(eventId);
+            if (curEvent == null)
+                return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
+
+            if (_accountDataHolder.AccountId == null
+                || !await _eventOrganizatorsRepository.IsAccountEventOrganizatorAsync(eventId, _accountDataHolder.AccountId.Value))
+            {
+                return CommandResult.Fail(ErrorCode.AccessError,
+                    "Назначать билетёров могут только организаторы мероприятия");
+            }
+
+            var organizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId) ?? new List<EventOrganizator>();
+            var organizationIds = organizators
+                .Where(o => o.OrganizationId != null)
+                .Select(o => o.OrganizationId!.Value)
+                .Distinct()
+                .ToList();
+
+            if (organizationIds.Count == 0)
+            {
+                return CommandResult.Fail(ErrorCode.InvalidValue,
+                    "Назначение билетёров доступно только для мероприятий организации");
+            }
+
+            var items = request?.Staff ?? new List<EventTicketStaffItemRequest>();
+            var uniqueAccountIds = items
+                .Where(i => i.AccountId != Guid.Empty)
+                .Select(i => i.AccountId)
+                .Distinct()
+                .ToList();
+
+            foreach (var accountId in uniqueAccountIds)
+            {
+                var isTicketTakerInOrg = false;
+                foreach (var organizationId in organizationIds)
+                {
+                    var member = await _organizationsRepository.GetMemberAsync(organizationId, accountId);
+                    if (member != null
+                        && member.Active
+                        && member.Role == OrganizationMemberRole.TicketTaker)
+                    {
+                        isTicketTakerInOrg = true;
+                        break;
+                    }
+                }
+
+                if (!isTicketTakerInOrg)
+                {
+                    return CommandResult.Fail(ErrorCode.InvalidValue,
+                        $"Аккаунт {accountId} должен быть активным билетёром в организации-организаторе события");
+                }
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var toSave = uniqueAccountIds.Select(accountId =>
+            {
+                var src = items.First(i => i.AccountId == accountId);
+                return new EventTicketStaff
+                {
+                    Id = Guid.NewGuid(),
+                    EventId = eventId,
+                    AccountId = accountId,
+                    CanCheckIn = src.CanCheckIn,
+                    CanViewStats = src.CanViewStats,
+                    CreateDate = now,
+                    UpdateDate = null
+                };
+            }).ToList();
+
+            await _eventTicketStaffRepository.ReplaceForEventAsync(eventId, toSave);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        /// <summary>
+        /// Replace / fallback типов билетов + sync event_parameters.cost = min(active).
+        /// Типы, отсутствующие в запросе или с Active=false, только soft-deactivate
+        /// (T10: hard-delete запрещён — у типа могут быть выданные билеты / FK на orders).
+        /// </summary>
+        private async Task<CommandResult> SyncEventTicketTypesAsync(
+            Guid eventId,
+            Guid eventParametersId,
+            EventParametersRequest parameters)
+        {
+            var existing = await _eventsMetadataRepository.GetTicketTypesByEventIdAsync(eventId, includeInactive: true);
+
+            if (!parameters.TicketsEnabled)
+            {
+                // Снимаем продажу: все активные типы → active=false (строки и FK сохраняем).
+                if (existing.Count > 0)
+                    await _eventsMetadataRepository.DeactivateTicketTypesAsync(existing.Where(t => t.Active).Select(t => t.Id));
+                return CommandResult.OK;
+            }
+
+            List<EventTicketTypeRequest>? desired;
+            if (parameters.TicketTypes != null)
+            {
+                desired = parameters.TicketTypes;
+            }
+            else if (existing.Any(t => t.Active))
+            {
+                // Не передали типы — оставляем активные как есть, только sync cost.
+                desired = null;
+            }
+            else
+            {
+                // Fallback: один тип «Стандарт» из Cost (обратная совместимость UI без редактора типов).
+                var price = parameters.Cost is double c && c > 0
+                    ? Convert.ToDecimal(c)
+                    : 0m;
+                desired = new List<EventTicketTypeRequest>
+                {
+                    new()
+                    {
+                        Name = "Стандарт",
+                        Price = price,
+                        SortOrder = 0,
+                        Active = true,
+                    },
+                };
+            }
+
+            if (desired != null)
+            {
+                var keptIds = new HashSet<Guid>();
+                foreach (var req in desired)
+                {
+                    var name = req.Name.Trim();
+                    if (req.Id is Guid existingId)
+                    {
+                        var cur = existing.FirstOrDefault(t => t.Id == existingId);
+                        if (cur == null || cur.EventId != eventId)
+                            return CommandResult.Fail(ErrorCode.InvalidValue, $"Тип билета id='{existingId}' не найден на этом мероприятии");
+
+                        cur.Name = name;
+                        cur.Description = req.Description;
+                        cur.Price = req.Price;
+                        cur.Capacity = req.Capacity;
+                        cur.SortOrder = req.SortOrder;
+                        cur.Active = req.Active;
+                        cur.Currency = "RUB";
+                        await _eventsMetadataRepository.UpdateTicketTypeAsync(cur);
+                        keptIds.Add(cur.Id);
+                    }
+                    else
+                    {
+                        var id = await _eventsMetadataRepository.CreateTicketTypeAsync(new EventTicketType
+                        {
+                            EventId = eventId,
+                            Name = name,
+                            Description = req.Description,
+                            Price = req.Price,
+                            Currency = "RUB",
+                            Capacity = req.Capacity,
+                            SortOrder = req.SortOrder,
+                            Active = req.Active,
+                        });
+                        keptIds.Add(id);
+                    }
+                }
+
+                var toDeactivate = existing.Where(t => t.Active && !keptIds.Contains(t.Id)).Select(t => t.Id).ToList();
+                if (toDeactivate.Count > 0)
+                    await _eventsMetadataRepository.DeactivateTicketTypesAsync(toDeactivate);
+            }
+
+            var (min, max) = await _eventsMetadataRepository.GetActiveTicketTypePriceRangeAsync(eventId);
+            if (min == null)
+                return CommandResult.Fail(ErrorCode.InvalidValue,
+                    "При продаже билетов нужен хотя бы один активный тип билета");
+
+            await _eventsMetadataRepository.UpdateEventParametersCostAsync(
+                eventParametersId,
+                Convert.ToDouble(min.Value));
+
             return CommandResult.OK;
         }
         #endregion
@@ -842,6 +1088,7 @@ namespace EList.Services.Impl
             else
                 eventItem.Parameters.AgeLimit = GetEventMinAllowedAge(eventItem.Parameters?.AgeLimit);
 
+            await EnrichTicketPricesAsync(eventItem.Parameters, eventItem.Id);
             SanitizeEventCost(eventItem.Parameters);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -862,17 +1109,120 @@ namespace EList.Services.Impl
         /// </summary>
         private static void SanitizeEventCost(EventParameters? parameters)
         {
-            if (parameters?.Cost is not double cost)
+            if (parameters == null)
                 return;
 
+            parameters.Cost = SanitizePriceValue(parameters.Cost);
+            parameters.PriceMin = SanitizePriceValue(parameters.PriceMin);
+            parameters.PriceMax = SanitizePriceValue(parameters.PriceMax);
+        }
+
+        private static double? SanitizePriceValue(double? value)
+        {
+            if (value is not double cost)
+                return value;
+
             if (double.IsNaN(cost) || double.IsInfinity(cost) || cost < 0)
+                return 0;
+
+            if (cost > EventCostLimits.Max)
+                return EventCostLimits.Max;
+
+            return cost;
+        }
+
+        /// <summary>
+        /// Derived priceMin/priceMax (+ cost = min) для tickets_enabled.
+        /// Без билетов: PriceMin/PriceMax = Cost (или 0).
+        /// </summary>
+        private async Task EnrichTicketPricesAsync(EventParameters? parameters, Guid eventId)
+        {
+            if (parameters == null)
+                return;
+
+            if (!parameters.TicketsEnabled)
             {
-                parameters.Cost = 0;
+                var legacy = parameters.Cost is double c && !double.IsNaN(c) && !double.IsInfinity(c) && c > 0
+                    ? c
+                    : 0d;
+                parameters.PriceMin = legacy;
+                parameters.PriceMax = legacy;
                 return;
             }
 
-            if (cost > EventCostLimits.Max)
-                parameters.Cost = EventCostLimits.Max;
+            var (min, max) = await _eventsMetadataRepository.GetActiveTicketTypePriceRangeAsync(eventId);
+            if (min == null)
+                return;
+
+            parameters.PriceMin = Convert.ToDouble(min.Value);
+            parameters.PriceMax = Convert.ToDouble((max ?? min).Value);
+            parameters.Cost = parameters.PriceMin;
+        }
+
+        private async Task EnrichTicketPricesAsync(IEnumerable<Event> events)
+        {
+            var list = events?.Where(e => e != null).ToList() ?? new List<Event>();
+            if (list.Count == 0)
+                return;
+
+            var ticketed = list
+                .Where(e => e.Parameters?.TicketsEnabled == true)
+                .ToList();
+            Dictionary<Guid, (decimal Min, decimal Max)> ranges = new();
+            if (ticketed.Count > 0)
+            {
+                ranges = await _eventsMetadataRepository.GetActiveTicketTypePriceRangesAsync(
+                    ticketed.Select(e => e.Id));
+            }
+
+            foreach (var item in list)
+            {
+                if (item.Parameters == null)
+                    continue;
+
+                if (item.Parameters.TicketsEnabled)
+                {
+                    if (ranges.TryGetValue(item.Id, out var range))
+                    {
+                        item.Parameters.PriceMin = Convert.ToDouble(range.Min);
+                        item.Parameters.PriceMax = Convert.ToDouble(range.Max);
+                        item.Parameters.Cost = item.Parameters.PriceMin;
+                    }
+                }
+                else
+                {
+                    var legacy = item.Parameters.Cost is double c
+                        && !double.IsNaN(c) && !double.IsInfinity(c) && c > 0
+                        ? c
+                        : 0d;
+                    item.Parameters.PriceMin = legacy;
+                    item.Parameters.PriceMax = legacy;
+                }
+            }
+        }
+
+        private async Task EnrichTicketPricesOnShortAsync(IEnumerable<EventShort> items)
+        {
+            var list = items?.Where(i => i != null && i.TicketsEnabled).ToList() ?? new List<EventShort>();
+            if (list.Count == 0)
+                return;
+
+            var ranges = await _eventsMetadataRepository.GetActiveTicketTypePriceRangesAsync(
+                list.Select(i => i.Id));
+
+            foreach (var item in list)
+            {
+                if (ranges.TryGetValue(item.Id, out var range))
+                {
+                    item.PriceMin = Convert.ToDouble(range.Min);
+                    item.PriceMax = Convert.ToDouble(range.Max);
+                }
+                else
+                {
+                    item.PriceMin = 0;
+                    item.PriceMax = 0;
+                }
+            }
         }
 
         //private static bool ValidateAgeAccessToEvent(int? eventAgeLimit, int userAge, bool strongValidation)
@@ -911,6 +1261,7 @@ namespace EList.Services.Impl
             var searchResult = await _eventsRepository.SearchEventsAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
             if (searchResult?.Result != null)
             {
+                await EnrichTicketPricesAsync(searchResult.Result);
                 foreach (var item in searchResult.Result)
                     SanitizeEventCost(item.Parameters);
             }
@@ -931,6 +1282,8 @@ namespace EList.Services.Impl
                 return CommandResult<PagedList<EventShort>?>.Fail(searchError.ErrorCode, searchError.Message);
 
             var searchResult = await _eventsRepository.SearchEventsShortAsync(request, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
+            if (searchResult?.Result != null)
+                await EnrichTicketPricesOnShortAsync(searchResult.Result);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<EventShort>?>(searchResult);

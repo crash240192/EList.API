@@ -157,6 +157,36 @@ namespace EList.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Покупатель: отменить неоплаченный заказ (Pending/Authorized). Освобождает soft-hold мест.
+        /// </summary>
+        [HttpPost("{orderId}/cancel")]
+        public async Task<CommandResult<OrderResponse>> CancelOrderAsync(Guid orderId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CancelOrderAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _ordersService.CancelOrderAsync(orderId);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
         /// <summary>Мои билеты (опционально фильтр по eventId).</summary>
         [HttpGet("tickets/my")]
         public async Task<CommandResult<List<TicketResponse>>> GetMyTicketsAsync([FromQuery] Guid? eventId = null)
@@ -259,6 +289,36 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _ordersService.CheckInTicketAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Owner/Manager: отменить check-in (used → issued). Билетёры — AccessError.
+        /// </summary>
+        [HttpPost("tickets/undo-check-in")]
+        public async Task<CommandResult<TicketResponse>> UndoCheckInTicketAsync([FromBody] TicketCheckInRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(UndoCheckInTicketAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _ordersService.UndoCheckInTicketAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 

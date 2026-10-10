@@ -48,5 +48,20 @@ namespace EList.Models.Events
         /// Перечень цветов категорий мероприятий
         /// </summary>
         public string[]? Colors { get; set; }
+
+        /// <summary>
+        /// Мин. цена (для tickets — min активных типов; иначе cost / 0).
+        /// </summary>
+        public double? PriceMin { get; set; }
+
+        /// <summary>
+        /// Макс. цена (для tickets — max активных типов; иначе = PriceMin).
+        /// </summary>
+        public double? PriceMax { get; set; }
+
+        /// <summary>
+        /// Включена ли продажа билетов.
+        /// </summary>
+        public bool TicketsEnabled { get; set; }
     }
 }

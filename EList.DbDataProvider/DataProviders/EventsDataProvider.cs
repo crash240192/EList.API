@@ -1,6 +1,7 @@
 ﻿using EList.DbDataProvider.Extensions;
 using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Models.Enums;
 using EList.DbDataProvider.Models.SearchRequests;
 using LinqToDB;
 using LinqToDB.Async;
@@ -100,8 +101,30 @@ namespace EList.DbDataProvider.DataProviders
 
             //Добавить сюда проверку что пользователь без пола или запрещённого пола не может видеть мероприятие
 
+            // Цена: при tickets_enabled — EXISTS активный тип в бюджете; иначе legacy cost.
+            // price=0 → бесплатный тип / бесплатное участие без билетов.
             if (request.Price != null)
-                eventsRequest = eventsRequest.Where(e => e.Parameters.Cost == null || e.Parameters.Cost <= request.Price);
+            {
+                var priceLimit = Convert.ToDecimal(request.Price.Value);
+                if (priceLimit <= 0)
+                {
+                    eventsRequest = eventsRequest.Where(e =>
+                        (e.Parameters.TicketsEnabled
+                            && _connection.EventTicketTypes.Any(t =>
+                                t.EventId == e.Id && t.Active && t.Price == 0m))
+                        || (!e.Parameters.TicketsEnabled
+                            && (e.Parameters.Cost == null || e.Parameters.Cost <= 0)));
+                }
+                else
+                {
+                    eventsRequest = eventsRequest.Where(e =>
+                        (e.Parameters.TicketsEnabled
+                            && _connection.EventTicketTypes.Any(t =>
+                                t.EventId == e.Id && t.Active && t.Price <= priceLimit))
+                        || (!e.Parameters.TicketsEnabled
+                            && (e.Parameters.Cost == null || e.Parameters.Cost <= request.Price)));
+                }
+            }
 
             if (request.AgeLimit != null)
                 eventsRequest = eventsRequest.Where(e => e.Parameters.AgeLimit <= request.AgeLimit);
@@ -226,9 +249,12 @@ namespace EList.DbDataProvider.DataProviders
 
             if (request.OrganizatorId != null)
             {
-                // Личные мероприятия аккаунта + мероприятия организаций, где он активный участник
+                // Личные мероприятия + мероприятия org, где аккаунт Owner/Manager (не TicketTaker)
                 var organizatorOrganizationIds = await _connection.OrganizationMembers
-                    .Where(m => m.AccountId == request.OrganizatorId && m.Active)
+                    .Where(m => m.AccountId == request.OrganizatorId
+                        && m.Active
+                        && (m.Role == OrganizationMemberRole.Owner
+                            || m.Role == OrganizationMemberRole.Manager))
                     .Select(m => m.OrganizationId)
                     .ToListAsync();
 
@@ -350,6 +376,17 @@ namespace EList.DbDataProvider.DataProviders
                     && e.EndTime >= now
                     && e.Organizators.Any(o => o.OrganizationId == organizationId))
                 .CountAsync();
+        }
+
+        public async Task<List<EventDto>> GetEventsByOrganizationOrganizatorAsync(Guid organizationId, int limit = 200)
+        {
+            var take = limit <= 0 ? 200 : Math.Min(limit, 500);
+            return await _connection.Events
+                .LoadWith(e => e.Parameters)
+                .Where(e => e.Organizators.Any(o => o.OrganizationId == organizationId))
+                .OrderByDescending(e => e.StartTime)
+                .Take(take)
+                .ToListAsync();
         }
 
         public async Task<int> CountEventsCreatedByAccountSinceAsync(Guid accountId, DateTimeOffset since)

@@ -70,7 +70,13 @@ All endpoints require an `Authorization-jwt` header (any non-empty string; it ge
 ### Key gotchas
 
 - Host configuration (JSON, environment variables, user secrets, command line) is what `ConfigurationManager` reads after `Initialize`. Override the database with `connectionStrings__elist_main_db__connectionString` instead of editing `appsettings.json`.
+- If `appsettings.Production.json` exists in the content root (server-generated deploy overlay), it is applied **even when** `ASPNETCORE_ENVIRONMENT` is not `Production` (e.g. Staging). Env vars still override JSON.
 - `UseHttpsRedirection()` is enabled. With `ASPNETCORE_URLS` set to HTTP only and `--no-launch-profile`, requests to `http://127.0.0.1:5131` are not redirected.
 - No test projects exist in this codebase; there are no automated tests to run.
 - Build produces ~318 XML doc warnings (missing XML comments). These are expected.
 - The app path base is `/eList` — all API routes are prefixed with `/eList/api/...`.
+
+### Testing / walkthrough artifacts
+
+- Prefer screenshots, logs, and terminal smoke output as evidence.
+- **Do not** record video walkthroughs by default (no `RecordScreen` / demo videos). Use video only if the user explicitly asks for it.

@@ -209,6 +209,56 @@ namespace EList.Services.Impl
             return new CommandResult<Account?>(result);
         }
 
+        public async Task<CommandResult<AccountLookupResponse?>> LookupAccountAsync(string loginOrId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(LookupAccountAsync)}";
+
+            if (_accountDataHolder.AccountId == null)
+            {
+                return CommandResult<AccountLookupResponse?>.Fail(
+                    ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+            }
+
+            if (string.IsNullOrWhiteSpace(loginOrId))
+            {
+                return CommandResult<AccountLookupResponse?>.Fail(
+                    ErrorCode.IsNullOrEmpty, "Укажите логин или id аккаунта");
+            }
+
+            var query = loginOrId.Trim();
+            Account? account = null;
+            if (Guid.TryParse(query, out var accountId))
+                account = await _accountsRepository.GetAccountAsync(accountId);
+            else
+                account = await _accountsRepository.GetAccountAsync(query);
+
+            if (account == null || !account.Active)
+            {
+                return CommandResult<AccountLookupResponse?>.Fail(
+                    ErrorCode.AccountNotFound, "Аккаунт не найден");
+            }
+
+            if (account.Id == _accountDataHolder.AccountId.Value)
+            {
+                return CommandResult<AccountLookupResponse?>.Fail(
+                    ErrorCode.InvalidValue, "Нельзя выбрать свой аккаунт");
+            }
+
+            var person = await _personsRepository.GetPersonInfoAsync(account.Id);
+            var response = new AccountLookupResponse
+            {
+                Id = account.Id,
+                Login = account.Login,
+                AvatarId = account.AvatarId,
+                FirstName = person?.FirstName,
+                LastName = person?.LastName
+            };
+
+            logger.Debug(correlationId, null, methodName, $"Lookup ok account={account.Id:D}", null);
+            return new CommandResult<AccountLookupResponse?>(response);
+        }
+
         public async Task<CommandResult<Account?>> GetAccountByTokenAsync()
         {
             var correlationId = _correlationIdProvider.Get();

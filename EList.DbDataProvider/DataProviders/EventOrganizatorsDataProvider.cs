@@ -1,5 +1,6 @@
 ﻿using EList.DbDataProvider.Interfaces;
 using EList.DbDataProvider.Models;
+using EList.DbDataProvider.Models.Enums;
 using LinqToDB;
 using LinqToDB.Async;
 using LinqToDB.Data;
@@ -74,8 +75,12 @@ namespace EList.DbDataProvider.DataProviders
             if (organizationIds.Count == 0)
                 return directIds.Distinct().ToList();
 
+            // Только Owner/Manager — TicketTaker не считается организатором события
             var fromOrganizations = await _connection.OrganizationMembers
-                .Where(m => m.Active && organizationIds.Contains(m.OrganizationId))
+                .Where(m => m.Active
+                    && organizationIds.Contains(m.OrganizationId)
+                    && (m.Role == OrganizationMemberRole.Owner
+                        || m.Role == OrganizationMemberRole.Manager))
                 .Select(m => m.AccountId)
                 .ToListAsync();
 
@@ -97,10 +102,13 @@ namespace EList.DbDataProvider.DataProviders
             if (organizationIds.Count == 0)
                 return false;
 
+            // TicketTaker не должен получать полный isOrganizator через членство в org
             return await _connection.OrganizationMembers
                 .AnyAsync(m => m.AccountId == accountId
                     && m.Active
-                    && organizationIds.Contains(m.OrganizationId));
+                    && organizationIds.Contains(m.OrganizationId)
+                    && (m.Role == OrganizationMemberRole.Owner
+                        || m.Role == OrganizationMemberRole.Manager));
         }
 
         public async Task AssignAsync(Guid eventId, List<Guid> accountIds, List<Guid> organizationIds)

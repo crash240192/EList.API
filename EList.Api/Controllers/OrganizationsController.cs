@@ -2,6 +2,7 @@ using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
+using EList.Models.Orders;
 using EList.Models.Organizations;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -25,14 +26,17 @@ namespace EList.Api.Controllers
         #endregion
 
         private readonly IOrganizationsService _organizationsService;
+        private readonly IOrdersService _ordersService;
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
 
         public OrganizationsController(IOrganizationsService organizationsService,
+            IOrdersService ordersService,
             ICorrelationIdProvider correlationIdProvider,
             IDataConnectionProvider connectionProvider)
         {
             _organizationsService = organizationsService;
+            _ordersService = ordersService;
             _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
         }
@@ -248,6 +252,68 @@ namespace EList.Api.Controllers
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _organizationsService.AddManagerAsync(organizationId, request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Добавить билетёра в организацию
+        /// </summary>
+        [HttpPost("ticket-takers/add/{organizationId}")]
+        public async Task<CommandResult<Guid?>> AddTicketTakerAsync(Guid organizationId, [FromBody] AddOrganizationMemberRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(AddTicketTakerAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _organizationsService.AddTicketTakerAsync(organizationId, request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Сменить роль участника (Manager ↔ TicketTaker). Только владелец.
+        /// </summary>
+        [HttpPut("members/role/{organizationId}")]
+        public async Task<CommandResult> UpdateMemberRoleAsync(
+            Guid organizationId,
+            [FromBody] UpdateOrganizationMemberRoleRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(UpdateMemberRoleAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _organizationsService.UpdateMemberRoleAsync(organizationId, request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
@@ -577,6 +643,32 @@ namespace EList.Api.Controllers
             catch (Exception ex)
             {
                 await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Сводка билетов по событиям организации (hub)
+        /// </summary>
+        [HttpGet("{organizationId}/events/ticket-summary")]
+        public async Task<CommandResult<List<OrganizationEventTicketSummaryItem>>> GetEventsTicketSummaryAsync(
+            Guid organizationId,
+            [FromQuery] int limit = 100)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetEventsTicketSummaryAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+                var result = await _ordersService.GetOrganizationEventsTicketSummaryAsync(organizationId, limit);
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
