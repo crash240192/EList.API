@@ -7,9 +7,16 @@
 | `dotnet publish -c Release` | **сборка** образа | оптимизация кода |
 | `ASPNETCORE_ENVIRONMENT` | **запуск** контейнера | какой `appsettings.*.json` и режим ошибок |
 
-В image лежат **и** `appsettings.json` (база), **и** `appsettings.{Environment}.json` (оверлей). Это нормально: ASP.NET Core всегда мержит базу + оверлей + переменные окружения.
+В image лежат **и** `appsettings.json` (база), **и** `appsettings.{Environment}.json` (оверлей). Это нормально: ASP.NET Core всегда мержит база + оверлей + переменные окружения.
 
-Не удаляйте `appsettings.json` из контейнера. Секреты перекрывайте env / volume, не зашивайте в образ.
+Дополнительно (deploy-convention): если в content root есть **`appsettings.Production.json`** (часто генерируется на сервере), `EList.Common.ConfigurationManager` подключает его **поверх** base/`appsettings.{Env}.json`, даже когда `ASPNETCORE_ENVIRONMENT` ≠ `Production` (например Staging). Приоритет:
+
+1. `appsettings.json`
+2. `appsettings.{ASPNETCORE_ENVIRONMENT}.json`
+3. `appsettings.Production.json` (если файл есть)
+4. переменные окружения / CLI (выше JSON)
+
+Не удаляйте `appsettings.json` из контейнера. Секреты — в `appsettings.Production.json` и/или env, не зашивайте в образ.
 
 ---
 
