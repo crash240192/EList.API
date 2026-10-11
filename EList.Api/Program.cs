@@ -186,11 +186,19 @@ app.UseEndpoints(endpoints =>
         utc = DateTimeOffset.UtcNow
     }));
     // Публичные feature-flags для UI (без auth).
-    endpoints.MapGet("/api/features", () => Results.Ok(new
+    endpoints.MapGet("/api/features", () =>
     {
-        ticketSalesEnabled = EList.Services.Impl.Payments.PaymentSettings.IsTicketSalesGloballyEnabled(),
-        ticketDeskRevealHolder = EList.Services.Impl.Payments.PaymentSettings.IsTicketDeskRevealHolderEnabled()
-    }));
+        var ticketsModule = EList.Services.Impl.FeatureFlags.IsTicketsEnabled();
+        var ticketSales = ticketsModule
+            && EList.Services.Impl.Payments.PaymentSettings.IsTicketSalesGloballyEnabled();
+        return Results.Ok(new
+        {
+            organizationsEnabled = EList.Services.Impl.FeatureFlags.IsOrganizationsEnabled(),
+            ticketsEnabled = ticketsModule,
+            ticketSalesEnabled = ticketSales,
+            ticketDeskRevealHolder = EList.Services.Impl.Payments.PaymentSettings.IsTicketDeskRevealHolderEnabled()
+        });
+    });
 });
 var minThreads = Convert.ToInt32(ConfigurationManager.AppSettings["minThreads"] ?? "0");
 if (minThreads > 0)

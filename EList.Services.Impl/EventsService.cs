@@ -522,6 +522,9 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SetEventTicketStaffAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            if (!FeatureFlags.IsTicketsEnabled())
+                return CommandResult.Fail(ErrorCode.InvalidValue, FeatureFlags.TicketsDisabledMessage);
+
             var curEvent = await _eventsRepository.GetEventAsync(eventId);
             if (curEvent == null)
                 return CommandResult.Fail(ErrorCode.EventNotFound, $"Событие с id='{eventId}' не найдено");
@@ -707,14 +710,12 @@ namespace EList.Services.Impl
             if (!ticketsEnabled)
                 return null;
 
-            var ticketSalesGloballyEnabled = true;
-            if (ConfigurationManager.AppSettings.Contains("features:ticketSalesEnabled")
-                && bool.TryParse(ConfigurationManager.AppSettings["features:ticketSalesEnabled"], out var flag))
+            if (!FeatureFlags.IsTicketsEnabled())
             {
-                ticketSalesGloballyEnabled = flag;
+                return CommandResult.Fail(ErrorCode.InvalidValue, FeatureFlags.TicketsDisabledMessage);
             }
 
-            if (!ticketSalesGloballyEnabled)
+            if (!Payments.PaymentSettings.IsTicketSalesGloballyEnabled())
             {
                 return CommandResult.Fail(ErrorCode.InvalidValue,
                     "Продажа билетов временно отключена. Можно указать стоимость в анонсе, но включить продажу билетов нельзя.");

@@ -61,6 +61,9 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(CreateOrganizationAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            if (!FeatureFlags.IsOrganizationsEnabled())
+                return CommandResult<Guid?>.Fail(ErrorCode.InvalidValue, FeatureFlags.OrganizationsDisabledMessage);
+
             if (_accountDataHolder.AccountId == null)
                 return CommandResult<Guid?>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
 
@@ -467,6 +470,9 @@ namespace EList.Services.Impl
 
         public async Task<CommandResult> UpsertLegalAsync(Guid organizationId, OrganizationLegalRequest request)
         {
+            if (!FeatureFlags.IsOrganizationsEnabled())
+                return CommandResult.Fail(ErrorCode.InvalidValue, FeatureFlags.OrganizationsDisabledMessage);
+
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(UpsertLegalAsync)}";
@@ -521,6 +527,9 @@ namespace EList.Services.Impl
 
         public async Task<CommandResult> UpsertPayoutAsync(Guid organizationId, OrganizationPayoutRequest request)
         {
+            if (!FeatureFlags.IsOrganizationsEnabled())
+                return CommandResult.Fail(ErrorCode.InvalidValue, FeatureFlags.OrganizationsDisabledMessage);
+
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(UpsertPayoutAsync)}";
@@ -574,6 +583,12 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(StartProviderOnboardingAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (!FeatureFlags.IsOrganizationsEnabled())
+            {
+                return CommandResult<OrganizationProviderOnboardingResponse?>.Fail(
+                    ErrorCode.InvalidValue, FeatureFlags.OrganizationsDisabledMessage);
+            }
 
             var accessError = await EnsureOwnerAsync(organizationId);
             if (accessError != null)
@@ -648,6 +663,9 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(SubmitVerificationAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            if (!FeatureFlags.IsOrganizationsEnabled())
+                return CommandResult.Fail(ErrorCode.InvalidValue, FeatureFlags.OrganizationsDisabledMessage);
+
             var accessError = await EnsureOwnerAsync(organizationId);
             if (accessError != null)
                 return accessError;
@@ -682,6 +700,11 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(SetCanSellTicketsAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (canSellTickets && !FeatureFlags.IsOrganizationsEnabled())
+                return CommandResult.Fail(ErrorCode.InvalidValue, FeatureFlags.OrganizationsDisabledMessage);
+            if (canSellTickets && !FeatureFlags.IsTicketsEnabled())
+                return CommandResult.Fail(ErrorCode.InvalidValue, FeatureFlags.TicketsDisabledMessage);
 
             var accessError = await EnsureOwnerAsync(organizationId);
             if (accessError != null)
@@ -733,6 +756,12 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             var methodName = $"{LOGGER_NAME}{nameof(LookupByInnAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (!FeatureFlags.IsOrganizationsEnabled())
+            {
+                return CommandResult<OrganizationRegistryParty?>.Fail(
+                    ErrorCode.InvalidValue, FeatureFlags.OrganizationsDisabledMessage);
+            }
 
             if (_accountDataHolder.AccountId == null)
                 return CommandResult<OrganizationRegistryParty?>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");

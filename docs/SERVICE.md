@@ -145,7 +145,10 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 | Success/Fail URL с query (`orderId` / `depositId` / `walletId`) | ✅ |
 | UI `/payments/return` poll (без manual complete для T-Bank) | ✅ companion UI PR |
 | `yookassaStub` fallback | ✅ для локалки без банка |
-| `features.ticketSalesEnabled` | По умолчанию **`false`** |
+| `features.organizationsEnabled` | По умолчанию **`false`** — создание орг. и сбор legal/payout/verification |
+| `features.ticketsEnabled` | По умолчанию **`false`** — весь билетный модуль (заказы, desk, my-tickets) |
+| `features.ticketSalesEnabled` | По умолчанию **`false`** (имеет смысл только при `ticketsEnabled=true`) |
+| Публичный `GET /api/features` | `organizationsEnabled`, `ticketsEnabled`, `ticketSalesEnabled`, `ticketDeskRevealHolder` |
 | Gate `TicketingAgreement` + Active onboarding/ShopCode на `CanSellTickets` / создание заказа | ✅ |
 
 Операционный гайд: [tbank-payments.md](./tbank-payments.md).  
@@ -223,6 +226,8 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
   }
 },
 "features": {
+  "organizationsEnabled": false,
+  "ticketsEnabled": false,
   "ticketSalesEnabled": false,
   "reConsentEnforcementEnabled": true
 },

@@ -103,6 +103,12 @@ namespace EList.Services.Impl
             if (quantity > 20)
                 return CommandResult<CreateOrderResponse>.Fail(ErrorCode.InvalidValue, "Максимум 20 билетов в одном заказе");
 
+            if (!FeatureFlags.IsTicketsEnabled())
+            {
+                return CommandResult<CreateOrderResponse>.Fail(ErrorCode.InvalidValue,
+                    FeatureFlags.TicketsDisabledMessage);
+            }
+
             if (!PaymentSettings.IsTicketSalesGloballyEnabled())
             {
                 return CommandResult<CreateOrderResponse>.Fail(ErrorCode.InvalidValue,
@@ -1353,6 +1359,12 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, "Method started", null);
 
+            if (!FeatureFlags.IsTicketsEnabled())
+            {
+                return CommandResult<List<OrderResponse>>.Fail(
+                    ErrorCode.InvalidValue, FeatureFlags.TicketsDisabledMessage);
+            }
+
             if (_accountDataHolder.AccountId == null)
                 return CommandResult<List<OrderResponse>>.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
 
@@ -1370,6 +1382,12 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(GetMyTicketsAsync)}";
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (!FeatureFlags.IsTicketsEnabled())
+            {
+                return CommandResult<List<TicketResponse>>.Fail(
+                    ErrorCode.InvalidValue, FeatureFlags.TicketsDisabledMessage);
+            }
 
             if (_accountDataHolder.AccountId == null)
                 return CommandResult<List<TicketResponse>>.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
@@ -1392,6 +1410,9 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(GetTicketByCodeAsync)}";
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (!FeatureFlags.IsTicketsEnabled())
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue, FeatureFlags.TicketsDisabledMessage);
 
             if (_accountDataHolder.AccountId == null)
                 return CommandResult<TicketResponse>.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
@@ -1422,6 +1443,12 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, "Method started", null);
 
+            if (!FeatureFlags.IsTicketsEnabled())
+            {
+                return CommandResult<EventTicketStatsResponse>.Fail(
+                    ErrorCode.InvalidValue, FeatureFlags.TicketsDisabledMessage);
+            }
+
             if (_accountDataHolder.AccountId == null)
                 return CommandResult<EventTicketStatsResponse>.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
 
@@ -1449,6 +1476,12 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(GetOrganizationEventsTicketSummaryAsync)}";
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (!FeatureFlags.IsTicketsEnabled())
+            {
+                return CommandResult<List<OrganizationEventTicketSummaryItem>>.Fail(
+                    ErrorCode.InvalidValue, FeatureFlags.TicketsDisabledMessage);
+            }
 
             if (_accountDataHolder.AccountId == null)
             {
@@ -1516,6 +1549,12 @@ namespace EList.Services.Impl
             {
                 return CommandResult<List<TicketDeskHubItem>>.Fail(
                     ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+            }
+
+            if (!FeatureFlags.IsTicketsEnabled())
+            {
+                return CommandResult<List<TicketDeskHubItem>>.Fail(
+                    ErrorCode.InvalidValue, FeatureFlags.TicketsDisabledMessage);
             }
 
             var accountId = _accountDataHolder.AccountId.Value;
@@ -1786,6 +1825,9 @@ namespace EList.Services.Impl
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, "Method started", null);
 
+            if (!FeatureFlags.IsTicketsEnabled())
+                return CommandResult<TicketResponse>.Fail(ErrorCode.InvalidValue, FeatureFlags.TicketsDisabledMessage);
+
             if (_accountDataHolder.AccountId == null)
                 return CommandResult<TicketResponse>.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
 
@@ -1924,12 +1966,14 @@ namespace EList.Services.Impl
 
         private async Task<CommandResult> AssertOrganizerCanManageTicketsAsync(TicketCheckInRequest? request)
         {
+            if (!FeatureFlags.IsTicketsEnabled())
+                return CommandResult.Fail(ErrorCode.InvalidValue, FeatureFlags.TicketsDisabledMessage);
+
             if (_accountDataHolder.AccountId == null)
                 return CommandResult.Fail(ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
 
             if (request == null || request.EventId == Guid.Empty)
                 return CommandResult.Fail(ErrorCode.InvalidValue, "Не указано мероприятие");
-
             if (string.IsNullOrWhiteSpace(request.Code))
                 return CommandResult.Fail(ErrorCode.InvalidValue, "Не указан код билета");
 
