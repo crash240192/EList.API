@@ -74,7 +74,8 @@ namespace EList.Services.Impl
                 return CommandResult<Guid?>.Fail(ErrorCode.EventCancelled, "Мероприятие было отменено");
 
             // TicketsEnabled: участие только через покупку билета (OrdersService).
-            if (curEvent.Parameters?.TicketsEnabled == true)
+            // При выключенном билетном модуле — обычный Participate.
+            if (FeatureFlags.IsTicketsEnabled() && curEvent.Parameters?.TicketsEnabled == true)
             {
                 return CommandResult<Guid?>.Fail(ErrorCode.OrganizationPaymentRequired,
                     "Для участия в этом мероприятии нужно купить билет");

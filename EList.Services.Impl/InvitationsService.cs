@@ -247,7 +247,8 @@ namespace EList.Services.Impl
             {
                 return new CommandResult<InviteToEventEligibility>(Deny(
                     eventId, inviteeAccountId, "Мероприятие отменено", ErrorCode.EventCancelled,
-                    ticketsRequired: curEvent.Parameters?.TicketsEnabled == true));
+                    ticketsRequired: FeatureFlags.IsTicketsEnabled()
+                        && curEvent.Parameters?.TicketsEnabled == true));
             }
 
             if (curEvent.Parameters?.MaxPersonsCount > 0)
@@ -259,7 +260,8 @@ namespace EList.Services.Impl
                         eventId, inviteeAccountId,
                         "Мероприятие заполнено",
                         ErrorCode.EventIsFull,
-                        ticketsRequired: curEvent.Parameters?.TicketsEnabled == true));
+                        ticketsRequired: FeatureFlags.IsTicketsEnabled()
+                            && curEvent.Parameters?.TicketsEnabled == true));
                 }
             }
 
@@ -340,7 +342,8 @@ namespace EList.Services.Impl
             bool checkBwLists,
             bool checkAgeGender)
         {
-            var ticketsRequired = curEvent.Parameters?.TicketsEnabled == true;
+            var ticketsRequired = FeatureFlags.IsTicketsEnabled()
+                && curEvent.Parameters?.TicketsEnabled == true;
 
             if (inviteeAccountId == Guid.Empty)
                 return Deny(curEvent.Id, inviteeAccountId, "Некорректный аккаунт", ErrorCode.InvalidValue, ticketsRequired);
@@ -517,7 +520,8 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.EventCancelled, "Мероприятие отменено");
 
             // Модель A: TicketsEnabled — приглашение не даёт бесплатный вход; нужен билет.
-            if (curEvent.Parameters?.TicketsEnabled == true)
+            // При выключенном билетном модуле — обычный accept (базовый запуск без эквайринга).
+            if (FeatureFlags.IsTicketsEnabled() && curEvent.Parameters?.TicketsEnabled == true)
             {
                 return CommandResult.Fail(ErrorCode.OrganizationPaymentRequired,
                     "Для участия нужно купить билет");

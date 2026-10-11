@@ -59,6 +59,10 @@ namespace EList.Services.Impl.Payments
 
         public static bool IsTicketSalesGloballyEnabled()
         {
+            // Мастер-флаг ticketsEnabled гасит и платные продажи.
+            if (!FeatureFlags.IsTicketsEnabled())
+                return false;
+
             if (!ConfigurationManager.AppSettings.Contains("features:ticketSalesEnabled"))
                 return true;
 
