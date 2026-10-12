@@ -37,6 +37,7 @@ namespace EList.DbDataProvider.DataConnections
         public ITable<SystemNotificationDto> SystemNotifications => this.GetTable<SystemNotificationDto>();
         public ITable<NotificationDto> UserNotifications => this.GetTable<NotificationDto>();
         public ITable<SubscriptionDto> Subscriptions => this.GetTable<SubscriptionDto>();
+        public ITable<OrganizationSubscriptionDto> OrganizationSubscriptions => this.GetTable<OrganizationSubscriptionDto>();
         public ITable<EventCategoryDto> EventCategories => this.GetTable<EventCategoryDto>();
         public ITable<EventTypeDto> EventTypes => this.GetTable<EventTypeDto>();
         public ITable<EventParametersDto> EventParameters => this.GetTable<EventParametersDto>();

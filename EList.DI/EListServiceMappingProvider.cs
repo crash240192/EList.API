@@ -38,6 +38,7 @@ namespace EList.DI
             mapper.AddScoped<INotificationsDataProvider, NotificationsDataProvider>();
             mapper.AddScoped<IDataConnectionProvider, DataConnectionProvider>();
             mapper.AddScoped<ISubscriptionsDataProvider, SubscriptionsDataProvider>();
+            mapper.AddScoped<IOrganizationSubscriptionsDataProvider, OrganizationSubscriptionsDataProvider>();
             mapper.AddScoped<IEventsMetadataDataProvider, EventsMetadataDataProvider>();
             mapper.AddScoped<IEventsDataProvider, EventsDataProvider>();
             mapper.AddScoped<IEventOrganizatorsDataProvider, EventOrganizatorsDataProvider>();
@@ -65,6 +66,7 @@ namespace EList.DI
             mapper.AddScoped<IAccountsService, AccountsService>();
             mapper.AddScoped<ISystemNotificationsService, SystemNotificationsService>();
             mapper.AddScoped<ISubscriptionsService, SubscriptionsService>();
+            mapper.AddScoped<IOrganizationSubscriptionsService, OrganizationSubscriptionsService>();
             mapper.AddScoped<IEventsService, EventsService>();
             mapper.AddScoped<IParticipationsService, ParticipationsService>();
             mapper.AddScoped<IInvitationsService, InvitationsService>();
@@ -108,6 +110,7 @@ namespace EList.DI
             mapper.AddScoped<IAccountsRepository, AccountsRepository>();
             mapper.AddScoped<INotificationsRepository, NotificationsRepository>();
             mapper.AddScoped<ISubscriptionsRepository, SubscriptionsRepository>();
+            mapper.AddScoped<IOrganizationSubscriptionsRepository, OrganizationSubscriptionsRepository>();
             mapper.AddScoped<IEventsMetadataRepository, EventsMetadataRepository>();
             mapper.AddScoped<IEventOrganizatorsRepository, EventOrganizatorsRepository>();
             mapper.AddScoped<IEventTicketStaffRepository, EventTicketStaffRepository>();
@@ -138,6 +141,7 @@ namespace EList.DI
             mapper.AddScoped<IAlbumAccessValidator, AlbumAccessValidator>();
             mapper.AddScoped<IParticipationAccessValidator, ParticipationAccessValidator>();
             mapper.AddScoped<ISubscriptionAccessValidator, SubscriptionAccessValidator>();
+            mapper.AddScoped<IOrganizationSubscriptionAccessValidator, OrganizationSubscriptionAccessValidator>();
             mapper.AddScoped<IInvitationAccessValidator, InvitationAccessValidator>();
             mapper.AddScoped<IEventValidator, EventValidator>();
             mapper.AddScoped<IMediaAlbumValidator, MediaAlbumValidator>();

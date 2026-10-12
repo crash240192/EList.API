@@ -46,6 +46,7 @@ namespace EList.Services.Impl
         private readonly IParticipantsBWListRepository _participantsBWListRepository;
         private readonly INotificationsService _notificationsService;
         private readonly ISubscriptionsRepository _subscriptionsRepository;
+        private readonly IOrganizationSubscriptionsRepository _organizationSubscriptionsRepository;
         private readonly IOrganizationsRepository _organizationsRepository;
         private readonly IModerationPenaltiesService _moderationPenaltiesService;
         private readonly IEventCreateRateLimiter _eventCreateRateLimiter;
@@ -70,6 +71,7 @@ namespace EList.Services.Impl
             IParticipantsBWListRepository participantsBWListRepository,
             INotificationsService notificationsService,
             ISubscriptionsRepository subscriptionsRepository,
+            IOrganizationSubscriptionsRepository organizationSubscriptionsRepository,
             IOrganizationsRepository organizationsRepository,
             IModerationPenaltiesService moderationPenaltiesService,
             IEventCreateRateLimiter eventCreateRateLimiter,
@@ -94,6 +96,7 @@ namespace EList.Services.Impl
             _participantsBWListRepository = participantsBWListRepository ?? throw new ArgumentNullException(nameof(participantsBWListRepository));
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
+            _organizationSubscriptionsRepository = organizationSubscriptionsRepository ?? throw new ArgumentNullException(nameof(organizationSubscriptionsRepository));
             _organizationsRepository = organizationsRepository ?? throw new ArgumentNullException(nameof(organizationsRepository));
             _moderationPenaltiesService = moderationPenaltiesService ?? throw new ArgumentNullException(nameof(moderationPenaltiesService));
             _eventCreateRateLimiter = eventCreateRateLimiter ?? throw new ArgumentNullException(nameof(eventCreateRateLimiter));
@@ -943,7 +946,24 @@ namespace EList.Services.Impl
                 {
                     AccountId = _accountDataHolder.AccountId.Value,
                     NotifyEventCreated = true,
-                });
+                }) ?? new List<Guid>();
+
+                if (request.OrganizatorOrganizationIds?.Count > 0)
+                {
+                    foreach (var organizationId in request.OrganizatorOrganizationIds.Distinct())
+                    {
+                        var orgSubscribers = await _organizationSubscriptionsRepository.GetSubscriberIdsAsync(
+                            new Models.Subscriptions.OrganizationSubscriptionsSearchRequest
+                            {
+                                OrganizationId = organizationId,
+                                NotifyEventCreated = true,
+                            });
+                        if (orgSubscribers?.Count > 0)
+                            subscribersList.AddRange(orgSubscribers);
+                    }
+
+                    subscribersList = subscribersList.Distinct().ToList();
+                }
 
                 if (request.InviteAllSubscribers)
                     usersToInvite = subscribersList;

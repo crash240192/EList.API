@@ -355,17 +355,48 @@ namespace EList.Services.Impl
 
             if (subscribers?.Any() ?? false)
             {
-                var notifications = subscribers.Select(subscriberId => new Notification
+                var actorLabel = _accountDataHolder.AccountNameFullString;
+                Guid? organizationId = null;
+                string? organizationName = null;
+
+                var orgOrganizators = await _eventOrganizatorsRepository.GetByEventIdAsync(eventId);
+                var firstOrgId = orgOrganizators?
+                    .Where(o => o.OrganizationId != null)
+                    .Select(o => o.OrganizationId!.Value)
+                    .FirstOrDefault() ?? Guid.Empty;
+                if (firstOrgId != Guid.Empty)
+                {
+                    organizationId = firstOrgId;
+                    var organization = await _organizationsRepository.GetOrganizationAsync(firstOrgId);
+                    if (!string.IsNullOrWhiteSpace(organization?.Name))
+                    {
+                        organizationName = organization.Name;
+                        actorLabel = organization.Name;
+                    }
+                }
+
+                object notificationData = organizationId == null
+                    ? new EventShort(eventData)
+                    : new
+                    {
+                        Event = new EventShort(eventData),
+                        OrganizationId = organizationId,
+                        OrganizationName = organizationName
+                    };
+
+                var notifications = subscribers.Distinct().Select(subscriberId => new Notification
                 {
                     Id = Guid.NewGuid(),
                     AccountId = subscriberId,
                     EventId = eventId,
                     CreatedAt = DateTime.UtcNow,
-                    Message = $"{_accountDataHolder.AccountNameFullString} создал новое мероприятие {eventData.Name}",
+                    Message = organizationId == null
+                        ? $"{actorLabel} создал новое мероприятие {eventData.Name}"
+                        : $"Организация \"{actorLabel}\" создала новое мероприятие {eventData.Name}",
                     Title = "Новое событие",
                     RelatedAccountId = _accountDataHolder.AccountId,
                     Type = UserNotificationType.EventCreated,
-                    Data = new EventShort(eventData)
+                    Data = notificationData
                 }).ToList();
 
                 await _notificationsRepository.CreateNotificationsAsync(notifications);
@@ -848,6 +879,130 @@ namespace EList.Services.Impl
             #endregion
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        public async Task<CommandResult> NotifyOrganizationSubscribedAsync(Guid organizationId)
+        {
+            return await NotifyOrganizationSubscriptionChangeAsync(
+                organizationId,
+                isSubscribe: true);
+        }
+
+        public async Task<CommandResult> NotifyOrganizationUnsubscribedAsync(Guid organizationId)
+        {
+            return await NotifyOrganizationSubscriptionChangeAsync(
+                organizationId,
+                isSubscribe: false);
+        }
+
+        private async Task<CommandResult> NotifyOrganizationSubscriptionChangeAsync(
+            Guid organizationId,
+            bool isSubscribe)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}NotifyOrganizationSubscriptionChangeAsync";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var organization = await _organizationsRepository.GetOrganizationAsync(organizationId);
+            var orgName = organization?.Name ?? "организация";
+            var orgData = new
+            {
+                OrganizationId = organizationId,
+                Id = organizationId,
+                Name = orgName
+            };
+
+            #region RelatedPerson* — подписчики актёра с notify_subscribed
+            var relatedRecipients = await _subscriptionsRepository.GetSubscribersIdsAsync(new SubscriptionsSearchRequest
+            {
+                AccountId = _accountDataHolder.AccountId.Value,
+                NotifySubscribed = true
+            });
+
+            if (relatedRecipients?.Any() ?? false)
+            {
+                var flood = _floodGate.GetSettings().RelatedSocial;
+                var relatedNotifications = new List<Notification>();
+                foreach (var subscriberId in relatedRecipients)
+                {
+                    var decision = _floodGate.EvaluateMode(
+                        isSubscribe ? $"related-org-sub:{subscriberId}" : $"related-org-unsub:{subscriberId}",
+                        flood.Mode,
+                        flood.DigestWindowMinutes,
+                        out var pendingCount);
+
+                    if (decision == FloodDecision.Suppress)
+                        continue;
+
+                    if (decision == FloodDecision.SendDigest)
+                    {
+                        relatedNotifications.Add(BuildNotification(
+                            subscriberId,
+                            null,
+                            _accountDataHolder.AccountId,
+                            UserNotificationType.RelatedPersonActivityDigest,
+                            "Активность подписок",
+                            $"{pendingCount} новых действий подписок у ваших контактов",
+                            new { Count = pendingCount, Kind = isSubscribe ? "org-subscribed" : "org-unsubscribed", OrganizationId = organizationId }));
+                        continue;
+                    }
+
+                    relatedNotifications.Add(BuildNotification(
+                        subscriberId,
+                        null,
+                        _accountDataHolder.AccountId,
+                        isSubscribe
+                            ? UserNotificationType.RelatedPersonSubscribed
+                            : UserNotificationType.RelatedPersonUnsubscribed,
+                        null,
+                        isSubscribe
+                            ? $"{_accountDataHolder.AccountNameFullString} подписался на организацию \"{orgName}\""
+                            : $"{_accountDataHolder.AccountNameFullString} отписался от организации \"{orgName}\"",
+                        orgData));
+                }
+
+                await PersistAndSendAsync(relatedNotifications);
+            }
+            #endregion
+
+            #region NewSubscription / Unsubscribed — владельцы и менеджеры организации
+            var members = await _organizationsRepository.GetMembersByOrganizationIdAsync(organizationId, onlyActive: true);
+            var managers = members?
+                .Where(m => m.Role == OrganizationMemberRole.Owner || m.Role == OrganizationMemberRole.Manager)
+                .Select(m => m.AccountId)
+                .Where(id => id != _accountDataHolder.AccountId)
+                .Distinct()
+                .ToList() ?? new List<Guid>();
+
+            if (managers.Count > 0)
+            {
+                var type = isSubscribe
+                    ? UserNotificationType.NewSubscription
+                    : UserNotificationType.Unsubscribed;
+                var title = isSubscribe ? "У организации новый подписчик" : "От организации отписались";
+                var message = isSubscribe
+                    ? $"На организацию \"{orgName}\" подписался {_accountDataHolder.AccountNameFullString}"
+                    : $"От организации \"{orgName}\" отписался {_accountDataHolder.AccountNameFullString}";
+
+                var managerNotifications = managers.Select(accountId => BuildNotification(
+                    accountId,
+                    null,
+                    _accountDataHolder.AccountId,
+                    type,
+                    title,
+                    message,
+                    orgData)).ToList();
+
+                await PersistAndSendAsync(managerNotifications);
+            }
+            #endregion
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
         }
         #endregion subscription
