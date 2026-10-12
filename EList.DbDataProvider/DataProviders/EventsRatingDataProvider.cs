@@ -87,11 +87,23 @@ namespace EList.DbDataProvider.DataProviders
 
         public async Task<double?> GetOrganizatorRatingAsync(Guid accountId)
         {
-            // Average() over empty set / no ratings returns SQL NULL — must use nullable selector
-            // (same pattern as GetEventRatingAsync).
-            var result = await _connection.Organizators
-                .Where(i => i.AccountId == accountId)
-                .AverageAsync(i => (double?)i.Event.Rating.Value);
+            // Average event ratings for events where this account is an organizer.
+            // Join EventsRating explicitly: Event.Rating is a 1:N association and
+            // Average over the singular nav property returns NULL when multiple rows exist.
+            var result = await _connection.EventsRating
+                .Where(r => _connection.Organizators.Any(o =>
+                    o.AccountId == accountId && o.EventId == r.EventId))
+                .AverageAsync(r => (double?)r.Value);
+            return result;
+        }
+
+        public async Task<double?> GetOrganizationRatingAsync(Guid organizationId)
+        {
+            // Same aggregate as account organizer rating, filtered by organization host.
+            var result = await _connection.EventsRating
+                .Where(r => _connection.Organizators.Any(o =>
+                    o.OrganizationId == organizationId && o.EventId == r.EventId))
+                .AverageAsync(r => (double?)r.Value);
             return result;
         }
     }

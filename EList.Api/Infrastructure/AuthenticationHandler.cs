@@ -67,6 +67,7 @@ namespace EList.Api.Infrastructure
 
             "/api/rating/events/getrating",
             "/api/rating/organizators/*",
+            "/api/rating/organizations/*",
 
             "/api/subscriptions/getsubscriptions*",
             "/api/subscriptions/getsubscribers*",

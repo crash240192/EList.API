@@ -83,6 +83,22 @@ namespace EList.Services.Impl
             return new CommandResult<double?>(eventRating);
         }
 
+        public async Task<CommandResult<double?>> GetOrganizationRatingAsync(Guid organizationId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetOrganizationRatingAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            var eventRating = await _eventsRatingRepository.GetOrganizationRatingAsync(organizationId);
+
+            if (eventRating == null)
+                return new CommandResult<double?>(null);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<double?>(eventRating);
+        }
+
         public async Task<CommandResult> DeleteAsync(Guid itemId)
         {
             var correlationId = _correlationIdProvider.Get();

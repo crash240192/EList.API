@@ -76,5 +76,10 @@ namespace EList.Repositories.Impl
             var result = await _eventsRatingDataProvider.GetOrganizatorRatingAsync(accountId);
             return result;
         }
+
+        public async Task<double?> GetOrganizationRatingAsync(Guid organizationId)
+        {
+            return await _eventsRatingDataProvider.GetOrganizationRatingAsync(organizationId);
+        }
     }
 }

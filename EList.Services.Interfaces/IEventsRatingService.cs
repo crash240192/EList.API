@@ -9,6 +9,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult<Guid>> VoteAsync(EventsRatingItem request);
         Task<CommandResult<EventRating>> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex, int? pageSize);
         Task<CommandResult<double?>> GetOrganizatorRatingAsync(Guid accountId);
+        Task<CommandResult<double?>> GetOrganizationRatingAsync(Guid organizationId);
         Task<CommandResult> DeleteAsync(Guid itemId);
     }
 }

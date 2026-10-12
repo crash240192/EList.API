@@ -141,6 +141,34 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Рейтинг организации-организатора (средняя оценка мероприятий от её имени)
+        /// </summary>
+        /// <param name="organizationId"></param>
+        /// <returns></returns>
+        [HttpGet("organizations/{organizationId}")]
+        public async Task<CommandResult<double?>> GetOrganizationRatingAsync(Guid organizationId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetOrganizationRatingAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+                var result = await _eventsRatingService.GetOrganizationRatingAsync(organizationId);
+
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Удалить оценку
         /// </summary>
         /// <param name="itemId"></param>
