@@ -35,6 +35,11 @@ namespace EList.Models.UserAgreements
         public string Version { get; set; }
 
         /// <summary>
+        /// Требует явного согласия (галочка принятия).
+        /// </summary>
+        public bool RequiresAgreement { get; set; }
+
+        /// <summary>
         /// Дата создания
         /// </summary>
         public DateTimeOffset CreationDate { get; set; }

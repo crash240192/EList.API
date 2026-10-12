@@ -1710,6 +1710,7 @@ namespace EList.Services.Impl
                 DocumentType.Agreement => "Пользовательское соглашение",
                 DocumentType.OrganizationAgreement => "Соглашение организации",
                 DocumentType.TicketingAgreement => "Соглашение о билетах",
+                DocumentType.DistributionConsent => "Согласие на распространение ПДн",
                 _ => documentType.ToString()
             };
 

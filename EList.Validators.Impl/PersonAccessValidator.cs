@@ -49,6 +49,19 @@ namespace EList.Validators.Impl
                 return person;
             }
 
+            // Без согласия на распространение ПДн чужим закрыты все ПДн (кроме логина аккаунта).
+            if (!await _profilePrivacyService.HasPersonalDataDistributionConsentAsync(targetAccountId))
+            {
+                person.FirstName = string.Empty;
+                person.LastName = string.Empty;
+                person.Patronymic = null;
+                person.Gender = null;
+                person.BirthDate = null;
+                person.AgeYears = null;
+                person.IsBirthdayToday = null;
+                return person;
+            }
+
             var settings = await _profilePrivacyService.GetOrDefaultAsync(targetAccountId);
 
             var canSeeAge = await _profilePrivacyService.CanViewerSeeAsync(

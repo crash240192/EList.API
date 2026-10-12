@@ -113,7 +113,7 @@ BEGIN
 	if not exists (select 1 from pg_type where typname = 'document_type')
 	then
 		CREATE TYPE public.document_type AS ENUM (
-			'policy', 'consent', 'agreement', 'organization_agreement', 'ticketing_agreement');
+			'policy', 'consent', 'agreement', 'organization_agreement', 'ticketing_agreement', 'distribution_consent');
 	end if;
 end $CREATE_DOCUMENT_TYPE$;
 
@@ -761,6 +761,7 @@ CREATE TABLE IF NOT EXISTS public.documents (
 	hash varchar NOT NULL,
 	"type" public.document_type NOT NULL,
 	"version" varchar NOT NULL,
+	requires_agreement boolean DEFAULT true NOT NULL,
 	creation_date timestamptz DEFAULT now() NOT NULL,
 	CONSTRAINT documents_pk PRIMARY KEY (id)
 );

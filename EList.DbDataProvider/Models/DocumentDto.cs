@@ -25,6 +25,9 @@ namespace EList.DbDataProvider.Models
         [Column("version")]
         public string Version { get; set; }
 
+        [Column("requires_agreement")]
+        public bool RequiresAgreement { get; set; }
+
         [Column("creation_date")]
         public DateTimeOffset CreationDate { get; set; }
     }

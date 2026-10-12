@@ -28,6 +28,7 @@ namespace EList.Services.Impl
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IContactValidator _contactValidator;
         private readonly IContactAccessValidator _contactAccessValidator;
+        private readonly IProfilePrivacyService _profilePrivacyService;
 
         public ContactDataService(ICorrelationIdProvider correlationIdProvider,
             IContactsRepository contactDataRepository,
@@ -36,7 +37,8 @@ namespace EList.Services.Impl
             IOrganizationsRepository organizationsRepository,
             IAccountDataHolder accountDataHolder,
             IContactValidator contactValidator,
-            IContactAccessValidator contactAccessValidator)
+            IContactAccessValidator contactAccessValidator,
+            IProfilePrivacyService profilePrivacyService)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _contactDataRepository = contactDataRepository ?? throw new ArgumentNullException(nameof(contactDataRepository));
@@ -46,6 +48,7 @@ namespace EList.Services.Impl
             _accountDataHolder = accountDataHolder;
             _contactValidator = contactValidator ?? throw new ArgumentNullException(nameof(contactValidator));
             _contactAccessValidator = contactAccessValidator ?? throw new ArgumentNullException(nameof(contactAccessValidator));
+            _profilePrivacyService = profilePrivacyService ?? throw new ArgumentNullException(nameof(profilePrivacyService));
         }
 
         #region contact types
@@ -146,6 +149,14 @@ namespace EList.Services.Impl
             if (!validationResult.Success)
                 return CommandResult<Guid?>.Fail(validationResult.ErrorCode, validationResult.Message);
 
+            if (request.Show && _accountDataHolder.AccountId != null
+                && !await _profilePrivacyService.HasPersonalDataDistributionConsentAsync(_accountDataHolder.AccountId.Value))
+            {
+                return CommandResult<Guid?>.Fail(
+                    ErrorCode.DistributionConsentRequired,
+                    "Чтобы показывать контакт другим, необходимо согласие на распространение персональных данных");
+            }
+
             var result = await _contactDataRepository.CreateContactAsync(request);
 
             await _contactDataRepository.BindAccountAndContactAsync(_accountDataHolder.AccountId.Value, result);
@@ -207,6 +218,14 @@ namespace EList.Services.Impl
             if (!validationResult.Success)
                 return validationResult;
 
+            if (request.Show
+                && !await _profilePrivacyService.HasPersonalDataDistributionConsentAsync(contact.AccountId.Value))
+            {
+                return CommandResult.Fail(
+                    ErrorCode.DistributionConsentRequired,
+                    "Чтобы показывать контакт другим, необходимо согласие на распространение персональных данных");
+            }
+
             await _contactDataRepository.UpdateContactAsync(id, request);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -254,6 +273,12 @@ namespace EList.Services.Impl
             if (contact?.AccountId == null)
                 return CommandResult<ContactDataItem?>.Fail(ErrorCode.ContactNotFound, "Контакт пользователя не найден");
 
+            if (_accountDataHolder.AccountId != contact.AccountId
+                && !await _profilePrivacyService.HasPersonalDataDistributionConsentAsync(contact.AccountId.Value))
+            {
+                return CommandResult<ContactDataItem?>.Fail(ErrorCode.AccessError, "Контакт недоступен для просмотра");
+            }
+
             var viewAccess = _contactAccessValidator.CanViewAccountContact(contact, _accountDataHolder.AccountId);
             if (!viewAccess.Success)
                 return CommandResult<ContactDataItem?>.Fail(viewAccess.ErrorCode, viewAccess.Message);
@@ -275,7 +300,15 @@ namespace EList.Services.Impl
                 return CommandResult<List<ContactDataItem>?>.Fail(ErrorCode.AccountNotFound, $"Аккаунт с id='{accountId}' не найден");
 
             var contacts = await _contactDataRepository.GetAccountContactsAsync(accountId);
-            contacts = _contactAccessValidator.FilterAccountContacts(contacts, accountId, _accountDataHolder.AccountId);
+            if (_accountDataHolder.AccountId != accountId
+                && !await _profilePrivacyService.HasPersonalDataDistributionConsentAsync(accountId))
+            {
+                contacts = new List<ContactDataItem>();
+            }
+            else
+            {
+                contacts = _contactAccessValidator.FilterAccountContacts(contacts, accountId, _accountDataHolder.AccountId);
+            }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<ContactDataItem>?>(contacts);

@@ -1,7 +1,7 @@
 ﻿namespace EList.Models.Enums
 {
     /// <summary>
-    /// Тип уведомления
+    /// Тип юридического документа
     /// </summary>
     public enum DocumentType
     {
@@ -28,6 +28,11 @@
         /// <summary>
         /// Соглашение по билетам
         /// </summary>
-        TicketingAgreement = 4  
+        TicketingAgreement = 4,
+
+        /// <summary>
+        /// Согласие на распространение персональных данных
+        /// </summary>
+        DistributionConsent = 5
     }
 }

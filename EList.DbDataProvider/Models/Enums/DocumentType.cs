@@ -35,6 +35,12 @@ namespace EList.DbDataProvider.Models.Enums
         /// Соглашение по билетам
         /// </summary>
         [MapValue(Value = "ticketing_agreement")]
-        TicketingAgreement = 4
+        TicketingAgreement = 4,
+
+        /// <summary>
+        /// Согласие на распространение персональных данных
+        /// </summary>
+        [MapValue(Value = "distribution_consent")]
+        DistributionConsent = 5
     }
 }

@@ -23,5 +23,10 @@ namespace EList.Models.UserAgreements
         /// какой из элементов номера версии увеличивается (0.1.2)
         /// </summary>
         public string Version { get; set; }
+
+        /// <summary>
+        /// Требует явного согласия (галочка принятия). Если null — значение по умолчанию для типа.
+        /// </summary>
+        public bool? RequiresAgreement { get; set; }
     }
 }

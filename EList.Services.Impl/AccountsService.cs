@@ -246,13 +246,14 @@ namespace EList.Services.Impl
             }
 
             var person = await _personsRepository.GetPersonInfoAsync(account.Id);
+            var hasDistributionConsent = await _profilePrivacyService.HasPersonalDataDistributionConsentAsync(account.Id);
             var response = new AccountLookupResponse
             {
                 Id = account.Id,
                 Login = account.Login,
-                AvatarId = account.AvatarId,
-                FirstName = person?.FirstName,
-                LastName = person?.LastName
+                AvatarId = hasDistributionConsent ? account.AvatarId : null,
+                FirstName = hasDistributionConsent ? person?.FirstName : null,
+                LastName = hasDistributionConsent ? person?.LastName : null
             };
 
             logger.Debug(correlationId, null, methodName, $"Lookup ok account={account.Id:D}", null);
