@@ -25,19 +25,22 @@ namespace EList.Services.Impl
         private readonly ISubscriptionsRepository _subscriptionsRepository;
         private readonly IAccountsRepository _accountsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
+        private readonly IAgreementRepository _agreementRepository;
 
         public ProfilePrivacyService(
             ICorrelationIdProvider correlationIdProvider,
             IAccountPrivacyRepository privacyRepository,
             ISubscriptionsRepository subscriptionsRepository,
             IAccountsRepository accountsRepository,
-            IAccountDataHolder accountDataHolder)
+            IAccountDataHolder accountDataHolder,
+            IAgreementRepository agreementRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _privacyRepository = privacyRepository ?? throw new ArgumentNullException(nameof(privacyRepository));
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _accountDataHolder = accountDataHolder ?? throw new ArgumentNullException(nameof(accountDataHolder));
+            _agreementRepository = agreementRepository ?? throw new ArgumentNullException(nameof(agreementRepository));
         }
 
         public async Task<AccountPrivacySettings> GetOrDefaultAsync(Guid accountId)
@@ -76,6 +79,20 @@ namespace EList.Services.Impl
 
             var accountId = _accountDataHolder.AccountId.Value;
             var current = await _privacyRepository.GetOrDefaultAsync(accountId);
+
+            var opensPersonalData =
+                (request.AgeVisibility.HasValue && request.AgeVisibility.Value != PrivacyAudience.Nobody)
+                || (request.GenderVisibility.HasValue && request.GenderVisibility.Value != PrivacyAudience.Nobody)
+                || (request.LocationVisibility.HasValue && request.LocationVisibility.Value != PrivacyAudience.Nobody)
+                || (request.ProfilePhotosVisibility.HasValue && request.ProfilePhotosVisibility.Value != PrivacyAudience.Nobody)
+                || (request.ShowBirthdayToday == true);
+
+            if (opensPersonalData && !await HasPersonalDataDistributionConsentAsync(accountId))
+            {
+                return CommandResult<AccountPrivacySettings>.Fail(
+                    ErrorCode.DistributionConsentRequired,
+                    "Чтобы показывать персональные данные другим, необходимо согласие на распространение персональных данных");
+            }
 
             if (request.WhoCanInviteMe.HasValue)
             {
@@ -230,6 +247,10 @@ namespace EList.Services.Impl
 
         public async Task<bool> CanViewerSeeProfilePhotosAsync(Guid ownerAccountId, Guid? viewerAccountId)
         {
+            if (viewerAccountId != ownerAccountId
+                && !await HasPersonalDataDistributionConsentAsync(ownerAccountId))
+                return false;
+
             var settings = await GetOrDefaultAsync(ownerAccountId);
             return await CanViewerSeeAsync(ownerAccountId, viewerAccountId, settings.ProfilePhotosVisibility);
         }
@@ -253,6 +274,13 @@ namespace EList.Services.Impl
             account.Longitude = null;
             account.PasswordHash = null;
 
+            // Без согласия на распространение ПДн чужим виден только логин.
+            if (!await HasPersonalDataDistributionConsentAsync(account.Id))
+            {
+                account.AvatarId = null;
+                return account;
+            }
+
             var settings = await GetOrDefaultAsync(account.Id);
 
             if (await CanViewerSeeAsync(account.Id, viewerAccountId, settings.LocationVisibility))
@@ -262,6 +290,19 @@ namespace EList.Services.Impl
                 account.AvatarId = null;
 
             return account;
+        }
+
+        public async Task<bool> HasPersonalDataDistributionConsentAsync(Guid accountId)
+        {
+            if (accountId == Guid.Empty)
+                return false;
+
+            var latest = await _agreementRepository.GetLatestDocumentAsync(DocumentType.DistributionConsent);
+            if (latest == null)
+                return false;
+
+            return await _agreementRepository.DoesUserAgreedWithLatestDocumentVersion(
+                accountId, DocumentType.DistributionConsent);
         }
 
         private static bool IsDefined(PrivacyAudience value) => Enum.IsDefined(typeof(PrivacyAudience), value);

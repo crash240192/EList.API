@@ -94,7 +94,7 @@ namespace EList.Api.Middleware
             {
                 errorCode = ErrorCode.AgreementNotFound,
                 success = false,
-                message = "Необходимо принять обновлённые юридические документы, прежде чем продолжить пользоваться сервисом",
+                message = "Необходимо принять обновлённые условия пользования сервисом",
                 missingDocuments = missing
             });
             await context.Response.WriteAsync(body);

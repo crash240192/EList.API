@@ -29,5 +29,12 @@ namespace EList.Services.Interfaces
         Task<Account> ApplyAccountViewPolicyAsync(Account account, Guid? viewerAccountId);
 
         Task<bool> CanViewerSeeProfilePhotosAsync(Guid ownerAccountId, Guid? viewerAccountId);
+
+        /// <summary>
+        /// Есть ли актуальное согласие на распространение ПДн.
+        /// Без него персональные данные (кроме логина) скрыты от других пользователей.
+        /// Если документ ещё не загружен админом — считаем, что согласия нет.
+        /// </summary>
+        Task<bool> HasPersonalDataDistributionConsentAsync(Guid accountId);
     }
 }

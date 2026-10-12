@@ -208,6 +208,9 @@ namespace EList.Services.Impl
             if (!versionesult.Success)
                 return versionesult;
 
+            var requiresAgreement = request.RequiresAgreement
+                ?? DefaultRequiresAgreement(request.Type);
+
             await _agreementRepository.AddNewDocumentAsync(new Document
             {
                 Text = request.Text,
@@ -215,10 +218,14 @@ namespace EList.Services.Impl
                 CreationDate = DateTime.UtcNow,
                 Header = request.Header,
                 Type = request.Type,
-                Version = versionesult.Result
+                Version = versionesult.Result,
+                RequiresAgreement = requiresAgreement
             });
 
-            if (latestDocument != null && UserReconsentDocumentTypes.Contains(request.Type))
+            // Re-consent push только для сервисных Consent/Agreement и только если галочка обязательна.
+            if (latestDocument != null
+                && requiresAgreement
+                && UserReconsentDocumentTypes.Contains(request.Type))
             {
                 var accountIds = await _agreementRepository.GetAccountIdsAgreedToDocumentAsync(latestDocument.Id);
                 await _notificationsService.NotifyAgreementUpdateRequiredAsync(
@@ -286,5 +293,10 @@ namespace EList.Services.Impl
 
             return CommandResult<string>.Fail(ErrorCode.InvalidVersion, "Новая версия должна быть выше текущей");
         }
+
+        /// <summary>
+        /// Policy — информационный документ; остальные типы по умолчанию требуют галочку.
+        /// </summary>
+        private static bool DefaultRequiresAgreement(DocumentType type) => type != DocumentType.Policy;
     }
 }

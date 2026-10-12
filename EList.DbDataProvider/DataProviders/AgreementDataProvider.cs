@@ -75,7 +75,8 @@ namespace EList.DbDataProvider.DataProviders
                 DocumentType.Consent,
                 DocumentType.Policy,
                 DocumentType.OrganizationAgreement,
-                DocumentType.TicketingAgreement
+                DocumentType.TicketingAgreement,
+                DocumentType.DistributionConsent
             };
 
             foreach (var documentType in documentTypes)
