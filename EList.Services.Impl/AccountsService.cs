@@ -52,6 +52,7 @@ namespace EList.Services.Impl
         private readonly IPersonValidator _personValidator;
         private readonly IEventsRepository _eventsRepository;
         private readonly ISubscriptionsRepository _subscriptionsRepository;
+        private readonly IOrganizationSubscriptionsRepository _organizationSubscriptionsRepository;
         private readonly IConversationRepository _conversationRepository;
         private readonly IFilestorageClient _filestorageClient;
         private readonly IProfilePrivacyService _profilePrivacyService;
@@ -72,6 +73,7 @@ namespace EList.Services.Impl
             IPersonValidator personValidator,
             IEventsRepository eventsRepository,
             ISubscriptionsRepository subscriptionsRepository,
+            IOrganizationSubscriptionsRepository organizationSubscriptionsRepository,
             IConversationRepository conversationRepository,
             IFilestorageClient filestorageClient,
             IProfilePrivacyService profilePrivacyService)
@@ -91,6 +93,7 @@ namespace EList.Services.Impl
             _personValidator = personValidator ?? throw new ArgumentNullException(nameof(personValidator));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
+            _organizationSubscriptionsRepository = organizationSubscriptionsRepository ?? throw new ArgumentNullException(nameof(organizationSubscriptionsRepository));
             _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
             _filestorageClient = filestorageClient ?? throw new ArgumentNullException(nameof(filestorageClient));
             _profilePrivacyService = profilePrivacyService ?? throw new ArgumentNullException(nameof(profilePrivacyService));
@@ -409,6 +412,7 @@ namespace EList.Services.Impl
 
             await _conversationRepository.AnonymizeAccountMessagesAsync(accountId);
             await _subscriptionsRepository.DeleteAllForAccountAsync(accountId);
+            await _organizationSubscriptionsRepository.DeleteAllForAccountAsync(accountId);
             await _accountsRepository.ClearSensitiveDataAsync(accountId);
 
             await _accountsRepository.SetAccountActiveAsync(accountId, false);
@@ -456,6 +460,15 @@ namespace EList.Services.Impl
                 PageSize = 500
             });
             export.Subscriptions = subscriptions?.Result ?? new List<Subscription>();
+
+            var orgSubscriptions = await _organizationSubscriptionsRepository.GetSubscriptionsAsync(
+                new OrganizationSubscriptionsSearchRequest
+                {
+                    AccountId = accountId,
+                    PageIndes = 0,
+                    PageSize = 500
+                });
+            export.OrganizationSubscriptions = orgSubscriptions?.Result ?? new List<OrganizationSubscription>();
 
             foreach (var documentType in Enum.GetValues<DocumentType>())
             {

@@ -17,6 +17,8 @@ namespace EList.Models.Accounts
         public List<EventShort> OrganizedEvents { get; set; } = new();
         public List<EventShort> ParticipatingEvents { get; set; } = new();
         public List<Subscription> Subscriptions { get; set; } = new();
+
+        public List<OrganizationSubscription> OrganizationSubscriptions { get; set; } = new();
         public List<string> AcceptedAgreements { get; set; } = new();
     }
 }

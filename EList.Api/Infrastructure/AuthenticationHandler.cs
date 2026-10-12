@@ -72,6 +72,9 @@ namespace EList.Api.Infrastructure
             "/api/subscriptions/getsubscriptions*",
             "/api/subscriptions/getsubscribers*",
 
+            "/api/organizationsubscriptions/getsubscriptions*",
+            "/api/organizationsubscriptions/getsubscribers*",
+
             "/api/agreements/age/anonymous/agree",
             "/api/agreements/age/anonymous/get",
 
