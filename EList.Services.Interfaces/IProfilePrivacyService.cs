@@ -28,6 +28,12 @@ namespace EList.Services.Interfaces
         /// </summary>
         Task<Account> ApplyAccountViewPolicyAsync(Account account, Guid? viewerAccountId);
 
+        /// <summary>
+        /// Скрывает <see cref="AccountPublicData.AvatarId"/>, если зрителю нельзя видеть фото профиля
+        /// (нет DistributionConsent и/или ProfilePhotosVisibility не допускает зрителя).
+        /// </summary>
+        Task ApplyAccountPublicDataViewPolicyAsync(AccountPublicData? data, Guid ownerAccountId, Guid? viewerAccountId);
+
         Task<bool> CanViewerSeeProfilePhotosAsync(Guid ownerAccountId, Guid? viewerAccountId);
 
         /// <summary>

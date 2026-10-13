@@ -32,6 +32,8 @@ namespace EList.Services.Impl
         private readonly IParticipationAccessValidator _participationAccessValidator;
         private readonly IEventAccessValidator _eventAccessValidator;
         private readonly IPagingValidator _pagingValidator;
+        private readonly IProfilePrivacyService _profilePrivacyService;
+        private readonly IPersonAccessValidator _personAccessValidator;
 
         public ParticipationsService(ICorrelationIdProvider correlationIdProvider,
             IEventsRepository eventsRepository,
@@ -43,7 +45,9 @@ namespace EList.Services.Impl
             IModerationPenaltiesService moderationPenaltiesService,
             IParticipationAccessValidator participationAccessValidator,
             IEventAccessValidator eventAccessValidator,
-            IPagingValidator pagingValidator)
+            IPagingValidator pagingValidator,
+            IProfilePrivacyService profilePrivacyService,
+            IPersonAccessValidator personAccessValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsRepository = eventsRepository ?? throw new ArgumentNullException(nameof(eventsRepository));
@@ -56,6 +60,8 @@ namespace EList.Services.Impl
             _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
             _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
             _accountDataHolder = accountDataHolder;
+            _profilePrivacyService = profilePrivacyService ?? throw new ArgumentNullException(nameof(profilePrivacyService));
+            _personAccessValidator = personAccessValidator ?? throw new ArgumentNullException(nameof(personAccessValidator));
         }
 
         public async Task<CommandResult<Guid?>> ParticipateAsync(Guid eventId)
@@ -169,6 +175,7 @@ namespace EList.Services.Impl
             request.PageSize = pageSize;
 
             var result = await _participationRepository.GetEventParticipantsAsync(request);
+            await ApplyParticipantPiiPolicyAsync(result);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<Participant>>(result);
@@ -396,6 +403,29 @@ namespace EList.Services.Impl
                 return true;
 
             return await _invitationsRepository.IsUserInvitatedAsync(accountId, eventId);
+        }
+
+        private async Task ApplyParticipantPiiPolicyAsync(PagedList<Participant>? page)
+        {
+            if (page?.Result == null || page.Result.Count == 0)
+                return;
+
+            var viewerId = _accountDataHolder.AccountId;
+            foreach (var item in page.Result)
+            {
+                if (item.Account == null)
+                    continue;
+
+                var ownerId = item.Account.Id;
+                await _profilePrivacyService.ApplyAccountPublicDataViewPolicyAsync(
+                    item.Account, ownerId, viewerId);
+
+                if (item.PersonInfo != null)
+                {
+                    item.PersonInfo = await _personAccessValidator.ApplyViewPolicyAsync(
+                        item.PersonInfo, ownerId, viewerId);
+                }
+            }
         }
     }
 }

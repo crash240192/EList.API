@@ -211,6 +211,14 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(GetAccountAlbumsAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
+            // Альбомы профиля — часть «фото профиля»: те же DistributionConsent + ProfilePhotosVisibility.
+            if (_accountDataHolder.AccountId != accountId
+                && !await _profilePrivacyService.CanViewerSeeProfilePhotosAsync(accountId, _accountDataHolder.AccountId))
+            {
+                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+                return new CommandResult<List<MediaAlbum>>(new List<MediaAlbum>());
+            }
+
             var result = await _mediaRepository.GetAccountAlbumsAsync(accountId);
 
             if (_accountDataHolder.AccountId != accountId)
@@ -408,7 +416,13 @@ namespace EList.Services.Impl
                 return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
 
             await _mediaRepository.SetNewAccountAvatarAsync(_accountDataHolder.AccountId.Value, fileId);
-            await SyncFileIdsVisibilityAsync(new List<Guid> { fileId }, isPrivate: false);
+
+            // Filestorage: Public/Private only. Audience finer than Nobody is enforced in elist.api.
+            var accountId = _accountDataHolder.AccountId.Value;
+            var settings = await _profilePrivacyService.GetOrDefaultAsync(accountId);
+            var hasConsent = await _profilePrivacyService.HasPersonalDataDistributionConsentAsync(accountId);
+            var isPrivate = !hasConsent || settings.ProfilePhotosVisibility == Models.Enums.PrivacyAudience.Nobody;
+            await SyncFileIdsVisibilityAsync(new List<Guid> { fileId }, isPrivate);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;

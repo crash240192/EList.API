@@ -3,12 +3,14 @@ using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
+using EList.FilestorageClient;
 using EList.Models.Accounts;
 using EList.Models.Enums;
 using EList.Models.Privacy;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using NLog;
+using FileVisibility = EList.FilestorageClient.FileVisibility;
 
 namespace EList.Services.Impl
 {
@@ -26,6 +28,8 @@ namespace EList.Services.Impl
         private readonly IAccountsRepository _accountsRepository;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IAgreementRepository _agreementRepository;
+        private readonly IMediaRepository _mediaRepository;
+        private readonly IFilestorageClient _filestorageClient;
 
         public ProfilePrivacyService(
             ICorrelationIdProvider correlationIdProvider,
@@ -33,7 +37,9 @@ namespace EList.Services.Impl
             ISubscriptionsRepository subscriptionsRepository,
             IAccountsRepository accountsRepository,
             IAccountDataHolder accountDataHolder,
-            IAgreementRepository agreementRepository)
+            IAgreementRepository agreementRepository,
+            IMediaRepository mediaRepository,
+            IFilestorageClient filestorageClient)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _privacyRepository = privacyRepository ?? throw new ArgumentNullException(nameof(privacyRepository));
@@ -41,6 +47,8 @@ namespace EList.Services.Impl
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _accountDataHolder = accountDataHolder ?? throw new ArgumentNullException(nameof(accountDataHolder));
             _agreementRepository = agreementRepository ?? throw new ArgumentNullException(nameof(agreementRepository));
+            _mediaRepository = mediaRepository ?? throw new ArgumentNullException(nameof(mediaRepository));
+            _filestorageClient = filestorageClient ?? throw new ArgumentNullException(nameof(filestorageClient));
         }
 
         public async Task<AccountPrivacySettings> GetOrDefaultAsync(Guid accountId)
@@ -79,6 +87,7 @@ namespace EList.Services.Impl
 
             var accountId = _accountDataHolder.AccountId.Value;
             var current = await _privacyRepository.GetOrDefaultAsync(accountId);
+            var previousPhotosVisibility = current.ProfilePhotosVisibility;
 
             var opensPersonalData =
                 (request.AgeVisibility.HasValue && request.AgeVisibility.Value != PrivacyAudience.Nobody)
@@ -134,6 +143,17 @@ namespace EList.Services.Impl
 
             current.UpdatedAt = DateTimeOffset.UtcNow;
             await _privacyRepository.UpsertAsync(current);
+
+            // Filestorage ACL: Public/Private only. Audience finer than Nobody stays in elist.api.
+            // Nobody → Private (block anonymous UUID guessing); otherwise Public when consent allows.
+            if (request.ProfilePhotosVisibility.HasValue
+                && request.ProfilePhotosVisibility.Value != previousPhotosVisibility)
+            {
+                await SyncAccountAvatarFilesVisibilityAsync(
+                    accountId,
+                    isPrivate: current.ProfilePhotosVisibility == PrivacyAudience.Nobody
+                        || !await HasPersonalDataDistributionConsentAsync(accountId));
+            }
 
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return new CommandResult<AccountPrivacySettings>(current);
@@ -286,10 +306,25 @@ namespace EList.Services.Impl
             if (await CanViewerSeeAsync(account.Id, viewerAccountId, settings.LocationVisibility))
                 account.ProfileCity = ProfileCityResolver.ResolveNearestCityName(lat, lng);
 
-            if (!await CanViewerSeeAsync(account.Id, viewerAccountId, settings.ProfilePhotosVisibility))
+            if (!await CanViewerSeeProfilePhotosAsync(account.Id, viewerAccountId))
                 account.AvatarId = null;
 
             return account;
+        }
+
+        public async Task ApplyAccountPublicDataViewPolicyAsync(
+            AccountPublicData? data,
+            Guid ownerAccountId,
+            Guid? viewerAccountId)
+        {
+            if (data == null || ownerAccountId == Guid.Empty)
+                return;
+
+            if (viewerAccountId == ownerAccountId)
+                return;
+
+            if (!await CanViewerSeeProfilePhotosAsync(ownerAccountId, viewerAccountId))
+                data.AvatarId = null;
         }
 
         public async Task<bool> HasPersonalDataDistributionConsentAsync(Guid accountId)
@@ -303,6 +338,28 @@ namespace EList.Services.Impl
 
             return await _agreementRepository.DoesUserAgreedWithLatestDocumentVersion(
                 accountId, DocumentType.DistributionConsent);
+        }
+
+        private async Task SyncAccountAvatarFilesVisibilityAsync(Guid accountId, bool isPrivate)
+        {
+            var avatarIds = await _mediaRepository.GetAccountAvatarsAsync(accountId) ?? new List<Guid>();
+            if (avatarIds.Count == 0)
+                return;
+
+            var visibility = isPrivate ? FileVisibility.Private : FileVisibility.Public;
+            try
+            {
+                await _filestorageClient.SetFilesVisibilityAsync(avatarIds, visibility);
+            }
+            catch (Exception ex)
+            {
+                var correlationId = _correlationIdProvider.Get();
+                logger.Warn(
+                    correlationId,
+                    null,
+                    $"{LOGGER_NAME}{nameof(SyncAccountAvatarFilesVisibilityAsync)}",
+                    $"Не удалось обновить visibility ({visibility}) для {avatarIds.Count} аватаров аккаунта {accountId}: {ex.Message}");
+            }
         }
 
         private static bool IsDefined(PrivacyAudience value) => Enum.IsDefined(typeof(PrivacyAudience), value);

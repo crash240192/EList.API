@@ -249,12 +249,16 @@ namespace EList.Services.Impl
             }
 
             var person = await _personsRepository.GetPersonInfoAsync(account.Id);
+            var viewerId = _accountDataHolder.AccountId;
             var hasDistributionConsent = await _profilePrivacyService.HasPersonalDataDistributionConsentAsync(account.Id);
+            var canSeePhotos = await _profilePrivacyService.CanViewerSeeProfilePhotosAsync(account.Id, viewerId);
             var response = new AccountLookupResponse
             {
                 Id = account.Id,
                 Login = account.Login,
-                AvatarId = hasDistributionConsent ? account.AvatarId : null,
+                // Avatar: DistributionConsent + ProfilePhotosVisibility (не только consent).
+                AvatarId = canSeePhotos ? account.AvatarId : null,
+                // ФИО: без отдельной audience — только DistributionConsent (как PersonAccessValidator).
                 FirstName = hasDistributionConsent ? person?.FirstName : null,
                 LastName = hasDistributionConsent ? person?.LastName : null
             };

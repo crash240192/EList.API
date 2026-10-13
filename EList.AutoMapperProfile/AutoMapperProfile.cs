@@ -51,13 +51,16 @@ namespace EList.AutoMapperProfile
 
             CreateMap<AccountDto, CreateAccountRequest>().ReverseMap();
 
-            CreateMap<AccountDto, Account>();
+            // AvatarId на AccountDto — computed из Avatars; явно маппим, чтобы не терять fileId.
+            CreateMap<AccountDto, Account>()
+                .ForMember(d => d.AvatarId, o => o.MapFrom(s => s.AvatarId));
             CreateMap<Account, AccountDto>()
                 .ForMember(dest => dest.Avatars, opt => opt.Ignore());
 
             CreateMap<AccountAvatarDto, AccountAvatarItem>().ReverseMap();
 
-            CreateMap<AccountDto, AccountPublicData>();
+            CreateMap<AccountDto, AccountPublicData>()
+                .ForMember(d => d.AvatarId, o => o.MapFrom(s => s.AvatarId));
 
             CreateMap<PersonInfoDto, PersonInfo>()
                 .ForMember(d => d.FirstName, o => o.MapFrom(s => fieldEncryptor.Decrypt(s.FirstName)))

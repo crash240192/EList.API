@@ -24,6 +24,8 @@ namespace EList.DbDataProvider.DataProviders
             var subscriptionsRequest = _connection.Subscriptions
                 .LoadWith(i => i.SubscribedTo)
                 .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.SubscribedTo)
+                .ThenLoad(i => i.Avatars)
                 .OrderBy(i => i.SubscribedTo.Login)
                 .Where(i => i.SubscriberId == request.AccountId);
 
@@ -85,6 +87,8 @@ namespace EList.DbDataProvider.DataProviders
             var subscriptionsRequest = _connection.Subscriptions
                 .LoadWith(i => i.Subscriber)
                 .ThenLoad(i => i.PersonInfo)
+                .LoadWith(i => i.Subscriber)
+                .ThenLoad(i => i.Avatars)
                 .Where(i => i.SubscribedToId == request.AccountId);
 
             if (request.NotifyParticipated != null)

@@ -25,6 +25,8 @@ namespace EList.Services.Impl
         private readonly INotificationsService _notificationsService;
         private readonly ISubscriptionAccessValidator _subscriptionAccessValidator;
         private readonly IPagingValidator _pagingValidator;
+        private readonly IProfilePrivacyService _profilePrivacyService;
+        private readonly IPersonAccessValidator _personAccessValidator;
 
         public SubscriptionsService(
             ICorrelationIdProvider correlationIdProvider,
@@ -32,7 +34,9 @@ namespace EList.Services.Impl
             IAccountDataHolder accountDataHolder,
             INotificationsService notificationsService,
             ISubscriptionAccessValidator subscriptionAccessValidator,
-            IPagingValidator pagingValidator)
+            IPagingValidator pagingValidator,
+            IProfilePrivacyService profilePrivacyService,
+            IPersonAccessValidator personAccessValidator)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _subscriptionsRepository = subscriptionsRepository ?? throw new ArgumentNullException(nameof(subscriptionsRepository));
@@ -40,6 +44,8 @@ namespace EList.Services.Impl
             _subscriptionAccessValidator = subscriptionAccessValidator ?? throw new ArgumentNullException(nameof(subscriptionAccessValidator));
             _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
             _accountDataHolder = accountDataHolder;
+            _profilePrivacyService = profilePrivacyService ?? throw new ArgumentNullException(nameof(profilePrivacyService));
+            _personAccessValidator = personAccessValidator ?? throw new ArgumentNullException(nameof(personAccessValidator));
         }
 
         public async Task<CommandResult> SubscribeToAccountAsync(Guid subscribeToId)
@@ -119,6 +125,7 @@ namespace EList.Services.Impl
             request.PageSize = pageSize;
 
             var subscriptions = await _subscriptionsRepository.GetSubscriptionsAsync(request);
+            await ApplySubscriberPiiPolicyAsync(subscriptions);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<Subscription>?>(subscriptions);
@@ -167,6 +174,7 @@ namespace EList.Services.Impl
             request.PageSize = pageSize;
 
             var subscriptions = await _subscriptionsRepository.GetSubscribersAsync(request);
+            await ApplySubscriberPiiPolicyAsync(subscriptions);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<Subscription>?>(subscriptions);
@@ -239,6 +247,30 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
+        }
+
+        private async Task ApplySubscriberPiiPolicyAsync(PagedList<Subscription>? page)
+        {
+            if (page?.Result == null || page.Result.Count == 0)
+                return;
+
+            var viewerId = _accountDataHolder.AccountId;
+            foreach (var item in page.Result)
+            {
+                var target = item.SubscribedTo ?? item.Subscriber;
+                if (target?.Account == null)
+                    continue;
+
+                var ownerId = target.Account.Id;
+                await _profilePrivacyService.ApplyAccountPublicDataViewPolicyAsync(
+                    target.Account, ownerId, viewerId);
+
+                if (target.PersonInfo != null)
+                {
+                    target.PersonInfo = await _personAccessValidator.ApplyViewPolicyAsync(
+                        target.PersonInfo, ownerId, viewerId);
+                }
+            }
         }
     }
 }

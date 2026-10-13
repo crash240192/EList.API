@@ -78,7 +78,7 @@ namespace EList.Models.Accounts
         public AccountPublicData(Account account) 
         {
             Id = account.Id;
-            account.Active = account.Active;
+            Active = account.Active;
             Login = account.Login;
             AvatarId = account.AvatarId;
         }
