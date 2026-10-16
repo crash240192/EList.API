@@ -29,6 +29,7 @@ namespace EList.Api.Middleware
             "/api/agreements",
             "/api/authorization",
             "/api/accounts/create",
+            "/api/accounts/checkAvailability",
             "/api/accounts/me",
             "/api/payments/yookassa/webhook",
             "/api/payments/tbank/webhook",
@@ -39,6 +40,7 @@ namespace EList.Api.Middleware
             "/eList/api/agreements",
             "/eList/api/authorization",
             "/eList/api/accounts/create",
+            "/eList/api/accounts/checkAvailability",
             "/eList/api/accounts/me",
             "/eList/api/payments/yookassa/webhook",
             "/eList/api/payments/tbank/webhook"

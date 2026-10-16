@@ -10,6 +10,7 @@ using EList.Models.ContactData;
 using EList.Models.Enums;
 using EList.Models.Events;
 using EList.Models.Person;
+using EList.Models.Privacy;
 using EList.Models.Subscriptions;
 using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
@@ -56,6 +57,7 @@ namespace EList.Services.Impl
         private readonly IConversationRepository _conversationRepository;
         private readonly IFilestorageClient _filestorageClient;
         private readonly IProfilePrivacyService _profilePrivacyService;
+        private readonly IAccountPrivacyRepository _accountPrivacyRepository;
 
         public AccountsService(ICorrelationIdProvider correlationIdProvider,
             IAccountsRepository accountsRepository,
@@ -76,7 +78,8 @@ namespace EList.Services.Impl
             IOrganizationSubscriptionsRepository organizationSubscriptionsRepository,
             IConversationRepository conversationRepository,
             IFilestorageClient filestorageClient,
-            IProfilePrivacyService profilePrivacyService)
+            IProfilePrivacyService profilePrivacyService,
+            IAccountPrivacyRepository accountPrivacyRepository)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
@@ -97,6 +100,7 @@ namespace EList.Services.Impl
             _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
             _filestorageClient = filestorageClient ?? throw new ArgumentNullException(nameof(filestorageClient));
             _profilePrivacyService = profilePrivacyService ?? throw new ArgumentNullException(nameof(profilePrivacyService));
+            _accountPrivacyRepository = accountPrivacyRepository ?? throw new ArgumentNullException(nameof(accountPrivacyRepository));
             _accountDataHolder = accountDataHolder;
         }
 
@@ -136,13 +140,26 @@ namespace EList.Services.Impl
                 }
             }
 
+            if (request.AcceptDistributionConsent)
+            {
+                var distributionDoc = await _agreementRepository.GetLatestDocumentAsync(DocumentType.DistributionConsent);
+                if (distributionDoc == null)
+                {
+                    return CommandResult<Guid?>.Fail(ErrorCode.AgreementDocumentNotFound,
+                        "Документ «DistributionConsent» ещё не загружен администратором. Регистрация временно недоступна.");
+                }
+            }
+
+            // Без согласия на распространение контакт другим не показываем.
+            var showContact = request.AcceptDistributionConsent && request.ShowContact;
+
             // Один объект: ValidateAsync может нормализовать Value (напр. +7999… → +7 (999) …).
             var authContact = new ContactRequest
             {
                 TypeId = request.AuthorizationContactType,
                 Value = request.AuthorizationContactValue,
                 IsAuthorizationContact = true,
-                Show = request.ShowContact
+                Show = showContact
             };
             var contactValidation = await _contactValidator.ValidateAsync(
                 authContact,
@@ -181,6 +198,27 @@ namespace EList.Services.Impl
                 await _agreementRepository.SaveUserAgreementAsync(accountId, document.Id);
             }
 
+            if (request.AcceptDistributionConsent)
+            {
+                var distributionDoc = await _agreementRepository.GetLatestDocumentAsync(DocumentType.DistributionConsent);
+                await _agreementRepository.SaveUserAgreementAsync(accountId, distributionDoc.Id);
+            }
+            else
+            {
+                // Без согласия — все аудитории ПДн закрыты (Nobody), в т.ч. фото профиля.
+                await _accountPrivacyRepository.UpsertAsync(new AccountPrivacySettings
+                {
+                    AccountId = accountId,
+                    WhoCanInviteMe = PrivacyAudience.Nobody,
+                    AgeVisibility = PrivacyAudience.Nobody,
+                    GenderVisibility = PrivacyAudience.Nobody,
+                    ShowBirthdayToday = false,
+                    LocationVisibility = PrivacyAudience.Nobody,
+                    ProfilePhotosVisibility = PrivacyAudience.Nobody,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                });
+            }
+
             await _walletsService.CreateAccountWalletAsync(accountId);
 
             var welcomeNotify = await _notificationsService.NotifyUserByContactAsync(
@@ -194,6 +232,42 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(accountId);
+        }
+
+        public async Task<CommandResult> CheckRegistrationAvailabilityAsync(CheckRegistrationAvailabilityRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CheckRegistrationAvailabilityAsync)}";
+
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (request == null || string.IsNullOrWhiteSpace(request.Login))
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Введите логин");
+
+            var login = request.Login.Trim();
+            if (login.Length < 3)
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Логин — не менее 3 символов");
+
+            var existingAccount = await _accountsRepository.GetAccountAsync(login);
+            if (existingAccount != null)
+                return CommandResult.Fail(ErrorCode.DublicateAccount, "Указанный логин уже занят");
+
+            var authContact = new ContactRequest
+            {
+                TypeId = request.AuthorizationContactType,
+                Value = request.AuthorizationContactValue,
+                IsAuthorizationContact = true,
+                Show = false
+            };
+            var contactValidation = await _contactValidator.ValidateAsync(
+                authContact,
+                allowAuthorizationContact: true);
+            if (!contactValidation.Success)
+                return CommandResult.Fail(contactValidation.ErrorCode, contactValidation.Message);
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
         }
 
         public async Task<CommandResult<Account?>> GetAccountAsync(Guid accountId)

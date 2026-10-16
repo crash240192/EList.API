@@ -116,7 +116,8 @@ namespace EList.Api.Infrastructure
         }
 
         private bool IsRegistrationFlow => // Jwt обязателен
-            (Request.Path == "/api/accounts/create" && Request.Method == "POST");
+            (Request.Path == "/api/accounts/create" && Request.Method == "POST")
+            || (Request.Path == "/api/accounts/checkAvailability" && Request.Method == "POST");
 
         private bool IsAuthorizationFlow => // Jwt обязателен
             (Request.Path == "/api/authorization" && Request.Method == "POST");

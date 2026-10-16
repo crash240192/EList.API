@@ -64,6 +64,12 @@ namespace EList.Models.Accounts
         public bool AcceptAgreement { get; set; }
 
         /// <summary>
+        /// Опциональное согласие на распространение персональных данных (DistributionConsent).
+        /// Если false — согласие не сохраняется, контакт скрыт, настройки приватности закрыты (Nobody).
+        /// </summary>
+        public bool AcceptDistributionConsent { get; set; }
+
+        /// <summary>
         /// Имя (обязательно; профиль создаётся в той же транзакции)
         /// </summary>
         public string FirstName { get; set; }

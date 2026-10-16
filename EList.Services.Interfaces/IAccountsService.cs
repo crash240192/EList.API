@@ -6,6 +6,12 @@ namespace EList.Services.Interfaces
     public interface IAccountsService
     {
         Task<CommandResult<Guid?>> CreateAccountAsync(CreateAccountRequest request);
+
+        /// <summary>
+        /// Проверка, что логин и контакт авторизации свободны (до шага 2 регистрации).
+        /// </summary>
+        Task<CommandResult> CheckRegistrationAvailabilityAsync(CheckRegistrationAvailabilityRequest request);
+
         Task<CommandResult<Account?>> GetAccountByTokenAsync();
         Task<CommandResult<Account?>> GetAccountAsync(Guid accountId);
 

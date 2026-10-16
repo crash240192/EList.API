@@ -90,6 +90,40 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Проверка уникальности логина и контакта авторизации (шаг 1 регистрации).
+        /// </summary>
+        [AllowAnonymous]
+        [HttpPost("checkAvailability")]
+        public async Task<CommandResult> CheckRegistrationAvailabilityAsync(CheckRegistrationAvailabilityRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CheckRegistrationAvailabilityAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var configurationAllowed = false;
+                if (ConfigurationManager.AppSettings.Contains("registrationAllowed"))
+                    configurationAllowed = bool.Parse(ConfigurationManager.AppSettings["registrationAllowed"]);
+
+                if (!configurationAllowed)
+                    return CommandResult.Fail(ErrorCode.RegistrationForbiden, "Регистрация временно недоступна");
+
+                var result = await _accountsService.CheckRegistrationAvailabilityAsync(request);
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Получить информацию о текущем аккаунте
         /// </summary>
         /// <returns></returns>
