@@ -129,31 +129,35 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 
 - **Продавец билета** — организация-организатор.
 - **Площадка** — EList: витрина, заказ, билет, check-in, отчётность.
-- **Оплата** — целевой провайдер **Т-Банк (маркетплейс / мультирасчёты)**: в `Init` передаются `Shops[]` с `ShopCode` организатора, доля продавца и `Fee` (комиссия площадки). `yookassaStub` остаётся fallback для локальной разработки без банка.
+- **Оплата** — целевой провайдер **Т‑Банк Мультирасчёты (Deal NN)** по PDF в [`docs/мультирасчеты/`](./мультирасчеты/): `Init` + `CreateDealWithType=NN` → холд → `Confirm` → выплата продавцу через A2C (`DealId`) → закрытие сделки; комиссия площадки — остаток сделки.  
+  **Legacy в коде (до миграции):** `Init` + `Shops[]`/`Fee` + `PayType=O` — не целевая модель терминала (см. план).  
+  `yookassaStub` — fallback для локалки без банка.
 - Договор на посещение — между **участником и организатором**.
 
 Согласуется с Пользовательским соглашением (§6) и Соглашением для организаций (§2.4): сервис не продавец.
 
-### Технический статус (06.10.2026)
+### Технический статус (25.10.2026)
 
 | Слой | Статус |
 |------|--------|
 | Orders / tickets / stub payment / webhook path / check-in / transfer / refunds | API есть |
 | Учёт `AmountTotal` / `AmountSeller` / `AmountCommission` в заказе | Есть |
-| Реальный эквайринг Т-Банка (`payments:provider=tbank`) + Init/`PayType=O`/Shops/Fee | ✅ код; для стенда — TerminalKey + публичный NotificationURL |
-| Онбординг продавца SM-Register → `ProviderSellerId` (ShopCode) | ✅ код; credentials SM-Register выдаёт менеджер банка |
-| Webhook Т-Банка `POST /eList/api/payments/tbank/webhook` (тело `OK`) | ✅ заказы + пополнения (`OrderId` = `wallet:{guid}`) |
+| **Целевое:** Мультирасчёты Deal NN (Init/Confirm/A2C/close) | 📋 план [tbank-multisplit-plan.md](./tbank-multisplit-plan.md); код ещё на legacy Shops/Fee |
+| Legacy: Init/`PayType=O`/Shops/Fee + webhook/GetState | ✅ код (будет заменён в P2) |
+| Онбординг продавца (целевой acqapi OAuth; сейчас `register.tinkoff.ru`) | ⚠️ клиент есть; URL/схема под PDF — P1 |
+| Webhook Т-Банка `POST /eList/api/payments/tbank/webhook` (тело `OK`) | ✅ заказы + пополнения (`OrderId` = `wallet:{guid}`); доработать DealId/`SpAccumulationId` |
 | GetState sync-on-read на GET pending order/deposit (fallback без webhook) | ✅ gate ~2s |
 | Success/Fail URL с query (`orderId` / `depositId` / `walletId`) | ✅ |
-| UI `/payments/return` poll (без manual complete для T-Bank) | ✅ companion UI PR |
+| UI `/payments/return` poll (без manual complete для T-Bank) | ✅ |
 | `yookassaStub` fallback | ✅ для локалки без банка |
-| `features.organizationsEnabled` | По умолчанию **`false`** — создание орг. и сбор legal/payout/verification |
-| `features.ticketsEnabled` | По умолчанию **`false`** — весь билетный модуль (заказы, desk, my-tickets) |
-| `features.ticketSalesEnabled` | По умолчанию **`false`** (имеет смысл только при `ticketsEnabled=true`) |
+| `features.organizationsEnabled` | По умолчанию **`false`** |
+| `features.ticketsEnabled` | По умолчанию **`false`** |
+| `features.ticketSalesEnabled` | По умолчанию **`false`** |
 | Публичный `GET /api/features` | `organizationsEnabled`, `ticketsEnabled`, `ticketSalesEnabled`, `ticketDeskRevealHolder` |
-| Gate `TicketingAgreement` + Active onboarding/ShopCode на `CanSellTickets` / создание заказа | ✅ |
+| Gate `TicketingAgreement` + Active onboarding на `CanSellTickets` / создание заказа | ✅ |
 
-Операционный гайд: [tbank-payments.md](./tbank-payments.md).  
+План Мультирасчётов: [tbank-multisplit-plan.md](./tbank-multisplit-plan.md).  
+Операционный гайд (текущий runtime): [tbank-payments.md](./tbank-payments.md).  
 Юр. разбор: [legal-ticketing-review.md](./legal-ticketing-review.md).  
 Пошаговый UI↔API флоу: [tickets workflow.txt](./tickets%20workflow.txt).
 
@@ -256,7 +260,9 @@ Env для Т-Банка (секреты не коммитить) — полны
 | Документ | Назначение |
 |----------|------------|
 | [production-readiness-checklist.md](./production-readiness-checklist.md) | Статус готовности и бэклог |
-| [tbank-payments.md](./tbank-payments.md) | Т-Банк: флоу, env, чеклист сборки |
+| [tbank-payments.md](./tbank-payments.md) | Т-Банк: текущий runtime-флоу, env |
+| [tbank-multisplit-plan.md](./tbank-multisplit-plan.md) | Целевые Мультирасчёты Deal NN — план внедрения |
+| [мультирасчеты/](./мультирасчеты/) | PDF протоколов банка (EACQ / A2C / регистрация) |
 | [legal-ticketing-review.md](./legal-ticketing-review.md) | Юр. модель билетов vs код |
 | [ui-handoff-checklist-and-tickets.md](./ui-handoff-checklist-and-tickets.md) | Handoff для фронта |
 | [tickets workflow.txt](./tickets%20workflow.txt) | Пошаговый ticket checkout |

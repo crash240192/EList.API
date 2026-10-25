@@ -1,20 +1,23 @@
 # Т-Банк: эквайринг и пополнение кошелька
 
-> Актуально: 6 октября 2026  
+> Актуально: 25 октября 2026  
 > Код: API `cursor/tbank-marketplace-acquiring-0b40`, UI `cursor/tbank-payment-return-poll-0b40`  
 > Продуктовая модель: [SERVICE.md §7](./SERVICE.md)
 
-Документ для **сборки / staging / prod**: что уже в коде, какие env нужны, как устроен флоу.  
-**P5 = только документация** — runtime-поведение платежей закрыто в P1–P4.
+Документ для **сборки / staging / prod**: что **сейчас** в runtime-коде, какие env нужны, как устроен флоу.
+
+> **Важно (25.10.2026):** целевой продукт сплита — **Мультирасчёты Deal NN**  
+> ([`docs/мультирасчеты/`](./мультирасчеты/), план: [tbank-multisplit-plan.md](./tbank-multisplit-plan.md)).  
+> Таблица ниже и Init с `Shops[]`/`Fee` — **legacy runtime** до миграции P2; не проектировать новые фичи на Shops.
 
 ---
 
-## 1. Модель (кратко)
+## 1. Модель (кратко) — legacy runtime
 
-| | Билеты | Кошелёк (тариф) |
+| | Билеты (legacy) | Кошелёк (тариф) |
 |--|--------|-----------------|
 | Провайдер | `payments.provider=tbank` | тот же |
-| Init | `PayType=O`, `Shops[]` + `Fee` при ShopCode org | без `Shops` (деньги площадки) |
+| Init | `PayType=O`, `Shops[]` + `Fee` при ShopCode org | без `Shops` (деньги площадки) — **останется** и после Мультирасчётов |
 | OrderId в банке | GUID заказа | `wallet:{depositId}` |
 | Успех | webhook CONFIRMED → билеты + Participate | webhook CONFIRMED → кредит кошелька |
 | Fallback | GET order → GetState (~2s gate) | GET deposit → GetState |
@@ -117,9 +120,9 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 ## 5.1 CloudKassir (фискализация) ≠ сплит
 
 Документация [API кассы CloudKassir](https://developers.cloudkassir.ru/#api-kassy) описывает **только фискализацию** (`kkt/receipt`, AgentSign / SupplierInfo для 54‑ФЗ).  
-Там **нет** `ShopCode`, `Shops[]` и сплита платежей — это зона **эквайринга Т‑Банка (мультирасчёты / Init)**, не облачной кассы.
+Там **нет** сплита денег — это зона **эквайринга Т‑Банка (Мультирасчёты Deal NN / A2C)**.
 
-Сплит в чеке (агент/поставщик) и сплит денег на ShopCode продавца — разные механизмы; W4 (касса) не заменяет marketplace ShopCode.
+Сплит в чеке (агент/поставщик) и сплит денег по сделке — разные механизмы; W4 (касса) не заменяет Deal/выплаты. См. [tbank-multisplit-plan.md](./tbank-multisplit-plan.md).
 
 ---
 
