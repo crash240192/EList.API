@@ -65,7 +65,7 @@ namespace EList.Services.Impl.Payments
                         Ok = false,
                         ErrorMessage =
                             "Онбординг продавца в Т-Банке не в статусе Active. " +
-                            "Завершите SM-Register или задайте payments:tbank:manualShopCode для DEMO."
+                            "Завершите онбординг точки (acqapi) или задайте payments:tbank:manualShopCode для DEMO."
                     };
                 }
 

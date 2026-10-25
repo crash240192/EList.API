@@ -7,7 +7,8 @@ using NLog;
 namespace EList.Services.Impl.Payments.TBank
 {
     /// <summary>
-    /// Клиент SM-Register Т-Банка: auth → token, register → ShopCode.
+    /// Legacy SM-Register (<c>register.tinkoff.ru/v1</c>): auth → token, register → ShopCode.
+    /// Целевой онбординг Мультирасчётов — <see cref="TBankAcqApiClient"/> (acqapi).
     /// Транспорт — <see cref="HttpRestClient2"/>.
     /// </summary>
     public class TBankSmRegisterClient

@@ -129,8 +129,8 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 
 - **Продавец билета** — организация-организатор.
 - **Площадка** — EList: витрина, заказ, билет, check-in, отчётность.
-- **Оплата** — целевой провайдер **Т‑Банк Мультирасчёты (Deal NN)** по PDF в [`docs/мультирасчеты/`](./мультирасчеты/): `Init` + `CreateDealWithType=NN` → холд → `Confirm` → выплата продавцу через A2C (`DealId`) → закрытие сделки; комиссия площадки — остаток сделки.  
-  **Legacy в коде (до миграции):** `Init` + `Shops[]`/`Fee` + `PayType=O` — не целевая модель терминала (см. план).  
+- **Оплата** — целевой провайдер **Т‑Банк Мультирасчёты (Deal NN)** по PDF в [`docs/мультирасчеты/`](./мультирасчеты/): `Init` + `CreateDealWithType=NN` + одностадийка → Deal → A2C продавцу → закрытие; комиссия — остаток сделки.  
+  **Legacy в коде (до миграции P2):** `Init` + `Shops[]`/`Fee`.  
   `yookassaStub` — fallback для локалки без банка.
 - Договор на посещение — между **участником и организатором**.
 
@@ -142,9 +142,9 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 |------|--------|
 | Orders / tickets / stub payment / webhook path / check-in / transfer / refunds | API есть |
 | Учёт `AmountTotal` / `AmountSeller` / `AmountCommission` в заказе | Есть |
-| **Целевое:** Мультирасчёты Deal NN (Init/Confirm/A2C/close) | 📋 план [tbank-multisplit-plan.md](./tbank-multisplit-plan.md); код ещё на legacy Shops/Fee |
+| **Целевое:** Мультирасчёты Deal NN (Init NN + A2C/close; одностадийка) | 📋 план [tbank-multisplit-plan.md](./tbank-multisplit-plan.md); Init ещё legacy Shops/Fee (P2) |
 | Legacy: Init/`PayType=O`/Shops/Fee + webhook/GetState | ✅ код (будет заменён в P2) |
-| Онбординг продавца (целевой acqapi OAuth; сейчас `register.tinkoff.ru`) | ⚠️ клиент есть; URL/схема под PDF — P1 |
+| Онбординг продавца acqapi OAuth (`/sm-register/register`) | ✅ P1 (`TBankAcqApiClient`); legacy SM-Register — fallback; нужен WL/mTLS на стенде |
 | Webhook Т-Банка `POST /eList/api/payments/tbank/webhook` (тело `OK`) | ✅ заказы + пополнения (`OrderId` = `wallet:{guid}`); доработать DealId/`SpAccumulationId` |
 | GetState sync-on-read на GET pending order/deposit (fallback без webhook) | ✅ gate ~2s |
 | Success/Fail URL с query (`orderId` / `depositId` / `walletId`) | ✅ |
