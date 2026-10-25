@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace EList.Services.Impl.Payments.TBank
 {
@@ -44,6 +45,18 @@ namespace EList.Services.Impl.Payments.TBank
         [JsonProperty("PayType", NullValueHandling = NullValueHandling.Ignore)]
         public string? PayType { get; set; }
 
+        /// <summary>
+        /// Мультирасчёты: создать новую сделку типа NN.
+        /// Передаётся либо CreateDealWithType, либо DealId (не оба).
+        /// </summary>
+        [JsonProperty("CreateDealWithType", NullValueHandling = NullValueHandling.Ignore)]
+        public string? CreateDealWithType { get; set; }
+
+        /// <summary>Существующая сделка (повторный платёж в ту же сделку).</summary>
+        [JsonProperty("DealId", NullValueHandling = NullValueHandling.Ignore)]
+        public string? DealId { get; set; }
+
+        /// <summary>Legacy marketplace Shops/Fee — не использовать для новых билетных Init.</summary>
         [JsonProperty("Shops", NullValueHandling = NullValueHandling.Ignore)]
         public List<TBankShopDto>? Shops { get; set; }
 
@@ -97,6 +110,23 @@ namespace EList.Services.Impl.Payments.TBank
 
         [JsonProperty("PaymentURL")]
         public string? PaymentURL { get; set; }
+
+        /// <summary>Идентификатор сделки Мультирасчётов (часто как SpAccumulationId).</summary>
+        [JsonProperty("DealId")]
+        public JToken? DealId { get; set; }
+
+        [JsonProperty("SpAccumulationId")]
+        public JToken? SpAccumulationId { get; set; }
+
+        public string? ResolveDealId() => FormatDealId(SpAccumulationId) ?? FormatDealId(DealId);
+
+        internal static string? FormatDealId(JToken? token)
+        {
+            if (token == null || token.Type == JTokenType.Null)
+                return null;
+            var value = token.Type == JTokenType.String ? token.Value<string>() : token.ToString();
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
     }
 
     public class TBankWebhookNotification
@@ -122,8 +152,17 @@ namespace EList.Services.Impl.Payments.TBank
         [JsonProperty("Amount")]
         public long? Amount { get; set; }
 
+        [JsonProperty("DealId")]
+        public JToken? DealId { get; set; }
+
+        [JsonProperty("SpAccumulationId")]
+        public JToken? SpAccumulationId { get; set; }
+
         [JsonProperty("Token")]
         public string? Token { get; set; }
+
+        public string? ResolveDealId()
+            => TBankApiResponse.FormatDealId(SpAccumulationId) ?? TBankApiResponse.FormatDealId(DealId);
     }
 
     public class TBankSmRegisterAuthResponse

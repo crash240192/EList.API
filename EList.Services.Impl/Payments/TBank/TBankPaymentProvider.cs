@@ -7,7 +7,8 @@ using NLog;
 namespace EList.Services.Impl.Payments.TBank
 {
     /// <summary>
-    /// Реальный эквайринг Т-Банка с мультирасчётами (Init + Shops/Fee).
+    /// Эквайринг Т‑Банка: билеты — Мультирасчёты Deal NN (Init + CreateDealWithType);
+    /// кошелёк — обычный Init без сделки. Legacy Shops/Fee больше не шлём.
     /// </summary>
     public class TBankPaymentProvider : IPaymentProvider
     {
@@ -75,36 +76,16 @@ namespace EList.Services.Impl.Payments.TBank
                 ? request.SellerShopCode.Trim()
                 : null;
 
-            // Билетный сплит — только при наличии ShopCode. Кошелёк/площадка — без Shops.
-            if (!string.IsNullOrWhiteSpace(shopCode)
-                && request.AmountSeller != null
-                && request.WalletDepositId == null)
-            {
-                var sellerKopecks = TBankAcquiringClient.ToKopecks(request.AmountSeller.Value);
-                var feeKopecks = request.AmountCommission != null
-                    ? TBankAcquiringClient.ToKopecks(request.AmountCommission.Value)
-                    : 0L;
+            // Билеты с онбордингом продавца → сделка NN (одностадийка). Кошелёк — без Deal.
+            var useDeal = !string.IsNullOrWhiteSpace(shopCode)
+                && request.WalletDepositId == null
+                && request.SellerOrganizationId != null;
 
-                if (sellerKopecks + feeKopecks != amountKopecks && feeKopecks > 0)
-                {
-                    // Подгонка копеек: Fee = total - seller.
-                    feeKopecks = Math.Max(0, amountKopecks - sellerKopecks);
-                }
-
-                init.Shops = new List<TBankShopDto>
-                {
-                    new()
-                    {
-                        ShopCode = shopCode,
-                        Amount = sellerKopecks,
-                        Name = Truncate(request.Description, 100),
-                        Fee = feeKopecks > 0 ? TBankAcquiringClient.FormatKopecks(feeKopecks) : null
-                    }
-                };
-            }
+            if (useDeal)
+                init.CreateDealWithType = "NN";
 
             logger.Debug(correlationId, null, methodName,
-                $"Init OrderId={orderId} Amount={amountKopecks} Shops={(init.Shops != null ? "yes" : "no")}",
+                $"Init OrderId={orderId} Amount={amountKopecks} Deal={(useDeal ? "NN" : "no")}",
                 null);
 
             var response = await _client.InitAsync(init);
@@ -115,7 +96,8 @@ namespace EList.Services.Impl.Payments.TBank
             {
                 ProviderPaymentId = response.PaymentId.Trim(),
                 ConfirmationUrl = response.PaymentURL,
-                Status = MapStatus(response.Status)
+                Status = MapStatus(response.Status),
+                ProviderDealId = response.ResolveDealId()
             };
         }
 
@@ -138,7 +120,8 @@ namespace EList.Services.Impl.Payments.TBank
                 Amount = response.Amount != null
                     ? TBankAcquiringClient.FromKopecks(response.Amount.Value)
                     : null,
-                Currency = "RUB"
+                Currency = "RUB",
+                ProviderDealId = response.ResolveDealId()
             };
         }
 

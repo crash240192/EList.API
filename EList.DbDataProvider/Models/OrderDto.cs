@@ -46,6 +46,10 @@ namespace EList.DbDataProvider.Models
         [Column("provider_payment_id")]
         public string? ProviderPaymentId { get; set; }
 
+        /// <summary>DealId / SpAccumulationId Мультирасчётов Т‑Банка.</summary>
+        [Column("provider_deal_id")]
+        public string? ProviderDealId { get; set; }
+
         [Column("idempotency_key")]
         public string? IdempotencyKey { get; set; }
 

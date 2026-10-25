@@ -46,13 +46,16 @@ namespace EList.Services.Interfaces
         /// <summary>Организация-продавец (билеты). Null для пополнения кошелька.</summary>
         public Guid? SellerOrganizationId { get; set; }
 
-        /// <summary>ShopCode / ProviderSellerId продавца для мультирасчётов Т-Банка.</summary>
+        /// <summary>
+        /// ShopCode / ProviderSellerId продавца.
+        /// Для Deal NN — признак, что билетный Init создаёт сделку (A2C позже по этому коду).
+        /// </summary>
         public string? SellerShopCode { get; set; }
 
-        /// <summary>Доля продавца (руб). Для Init.Shops.Amount.</summary>
+        /// <summary>Доля продавца (руб). Учёт в заказе; A2C payout в P3.</summary>
         public decimal? AmountSeller { get; set; }
 
-        /// <summary>Комиссия площадки (руб). Для Init.Shops.Fee.</summary>
+        /// <summary>Комиссия площадки (руб). Остаток сделки при close/FinalPayout.</summary>
         public decimal? AmountCommission { get; set; }
     }
 
@@ -61,6 +64,9 @@ namespace EList.Services.Interfaces
         public string ProviderPaymentId { get; set; }
         public string? ConfirmationUrl { get; set; }
         public PaymentProviderStatus Status { get; set; }
+
+        /// <summary>DealId, если банк вернул сразу (обычно приходит в webhook как SpAccumulationId).</summary>
+        public string? ProviderDealId { get; set; }
     }
 
     public class PaymentStatusInfo
@@ -69,6 +75,7 @@ namespace EList.Services.Interfaces
         public PaymentProviderStatus Status { get; set; }
         public decimal? Amount { get; set; }
         public string? Currency { get; set; }
+        public string? ProviderDealId { get; set; }
     }
 
     public class RefundCreationRequest

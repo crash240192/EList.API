@@ -102,18 +102,17 @@
 
 **Выход:** org с Active onboarding даёт `shopCode` (= PartnerId для A2C).
 
-### P2 — Оплата EACQ Deal (замена Shops)
+### P2 — Оплата EACQ Deal (замена Shops) — **в коде (MVP)**
 
-Переписать `TBankPaymentProvider` / `TBankInitRequest`:
+- [x] Убрать `Shops[]` / `Fee` из Init билетов  
+- [x] `CreateDealWithType = "NN"` + `PayType=O` при наличии ShopCode org  
+- [x] Миграция: `orders.provider_deal_id`  
+- [x] Webhook / GetState: `SpAccumulationId` → `provider_deal_id`; успех = `CONFIRMED` → билеты  
+- [ ] Отдельная таблица/enum статусов deal (`Opened` / …) — позже с P3  
+- [ ] Cancel-матрица D5 — уточнить с юр.  
+- [x] Кошелёк: Init **без** Deal  
 
-- Убрать `Shops[]` / `Fee` из Init билетов  
-- Добавить `CreateDealWithType = "NN"` + `PayType=O` (без `DealId` при новой сделке)  
-- Миграция БД: `orders.provider_deal_id`, статусы deal (`Opened` / `Captured` / `PartiallyPaidOut` / `Closed` / `Expired`)  
-- Webhook: парсить `SpAccumulationId`, сохранять DealId; успех = `CONFIRMED`  
-- `Cancel` по матрице D5  
-- Кошелёк: Init **без** Deal (как сейчас без Shops)  
-
-**Выход:** покупка билета создаёт сделку; poll/webhook стабильны; билеты после `CONFIRMED`.
+**Выход:** покупка билета создаёт сделку; DealId сохраняется; билеты после `CONFIRMED`. A2C — P3.
 
 ### P3 — Выплаты A2C_V2
 

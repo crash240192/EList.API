@@ -78,6 +78,16 @@ namespace EList.DbDataProvider.DataProviders
                 .UpdateAsync();
         }
 
+        public async Task SetProviderDealIdAsync(Guid orderId, string providerDealId)
+        {
+            if (string.IsNullOrWhiteSpace(providerDealId))
+                return;
+
+            await _connection.Orders.Where(i => i.Id == orderId)
+                .Set(i => i.ProviderDealId, providerDealId.Trim())
+                .UpdateAsync();
+        }
+
         public async Task<List<OrderDto>> GetOrdersByBuyerAsync(Guid buyerAccountId)
         {
             var result = await _connection.Orders
