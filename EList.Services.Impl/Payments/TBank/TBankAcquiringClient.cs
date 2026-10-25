@@ -9,7 +9,7 @@ using NLog;
 namespace EList.Services.Impl.Payments.TBank
 {
     /// <summary>
-    /// HTTP-клиент эквайринга Т-Банка: Init / GetState / Cancel.
+    /// HTTP-клиент эквайринга Т-Банка: Init / GetState / Cancel / closeSpDeal.
     /// Транспорт — <see cref="HttpRestClient2"/> (общий пул, логирование, SSL как у DaData).
     /// </summary>
     public class TBankAcquiringClient
@@ -62,6 +62,24 @@ namespace EList.Services.Impl.Payments.TBank
                 Amount = amountKopecks
             };
             return PostSignedAsync("Cancel", request, cancellationToken);
+        }
+
+        /// <summary>
+        /// Закрыть сделку: остаток баланса → вознаграждение площадки.
+        /// </summary>
+        public Task<TBankApiResponse> CloseSpDealAsync(
+            string spAccumulationId,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(spAccumulationId))
+                throw new ArgumentException("spAccumulationId is required", nameof(spAccumulationId));
+
+            var request = new TBankCloseSpDealRequest
+            {
+                TerminalKey = _settings.TerminalKey,
+                SpAccumulationId = spAccumulationId.Trim()
+            };
+            return PostSignedAsync("closeSpDeal", request, cancellationToken);
         }
 
         public bool VerifyNotificationToken(JObject payload)

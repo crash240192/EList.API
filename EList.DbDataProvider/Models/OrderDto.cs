@@ -50,6 +50,10 @@ namespace EList.DbDataProvider.Models
         [Column("provider_deal_id")]
         public string? ProviderDealId { get; set; }
 
+        /// <summary>Когда сделка закрыта (FinalPayout / closeSpDeal).</summary>
+        [Column("provider_deal_closed_at")]
+        public DateTimeOffset? ProviderDealClosedAt { get; set; }
+
         [Column("idempotency_key")]
         public string? IdempotencyKey { get; set; }
 

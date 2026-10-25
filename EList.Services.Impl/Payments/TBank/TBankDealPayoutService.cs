@@ -9,7 +9,7 @@ using NLog;
 namespace EList.Services.Impl.Payments.TBank
 {
     /// <summary>
-    /// P3: после CONFIRMED — e2c Init+Payment продавцу (PartnerId = shopCode), FinalPayout=true.
+    /// P3/P4: A2C продавцу + sync Initiated + retry + closeSpDeal по TTL сделки.
     /// </summary>
     public class TBankDealPayoutService : IOrderDealPayoutService
     {
@@ -24,6 +24,7 @@ namespace EList.Services.Impl.Payments.TBank
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly TBankPaymentSettings _settings;
         private readonly TBankA2cClient _a2cClient;
+        private readonly TBankAcquiringClient _acquiringClient;
 
         public TBankDealPayoutService(
             IOrdersRepository ordersRepository,
@@ -35,6 +36,7 @@ namespace EList.Services.Impl.Payments.TBank
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _settings = TBankPaymentSettings.Load();
             _a2cClient = new TBankA2cClient(correlationIdProvider, _settings);
+            _acquiringClient = new TBankAcquiringClient(correlationIdProvider, _settings);
         }
 
         public async Task TryPayoutSellerAfterPaidAsync(Guid orderId)
@@ -60,6 +62,13 @@ namespace EList.Services.Impl.Payments.TBank
 
                 if (order.AmountTotal <= 0 || order.AmountSeller <= 0)
                     return;
+
+                if (order.ProviderDealClosedAt != null)
+                {
+                    logger.Debug(correlationId, null, methodName,
+                        $"Skip payout order={orderId:D}: deal already closed", null);
+                    return;
+                }
 
                 if (string.IsNullOrWhiteSpace(order.ProviderDealId))
                 {
@@ -126,6 +135,9 @@ namespace EList.Services.Impl.Payments.TBank
                     payout.FinalPayout = true;
                     payout.Status = OrderPayoutStatus.Pending;
                     payout.ErrorMessage = null;
+                    payout.ProviderPaymentId = null;
+                    payout.ProviderOrderId = null;
+                    payout.CompletedAt = null;
                     await _ordersRepository.UpdateOrderPayoutAsync(payout);
                 }
 
@@ -157,28 +169,7 @@ namespace EList.Services.Impl.Payments.TBank
 
                 var payment = await _a2cClient.PaymentAsync(payout.ProviderPaymentId);
                 var status = (payment.Status ?? init.Status ?? string.Empty).Trim().ToUpperInvariant();
-
-                if (status is "REJECTED" or "CANCELED" or "CANCELLED" or "DEADLINE_EXPIRED" or "AUTH_FAIL")
-                {
-                    payout.Status = OrderPayoutStatus.Failed;
-                    payout.ErrorMessage = $"e2c Payment status={status}";
-                }
-                else if (status is "COMPLETED" or "CONFIRMED" or "SUCCESS" or "CHECKED" or "")
-                {
-                    // Пустой Status при Success=true — ок. Иначе COMPLETED и аналоги.
-                    payout.Status = OrderPayoutStatus.Succeeded;
-                    payout.CompletedAt = DateTimeOffset.UtcNow;
-                    payout.ErrorMessage = null;
-                }
-                else
-                {
-                    // CREDIT_CHECKING / etc. — Initiated; GetState/worker — P4.
-                    payout.Status = OrderPayoutStatus.Initiated;
-                    payout.ErrorMessage = $"e2c Payment in progress status={status}";
-                }
-
-                payout.UpdatedAt = DateTimeOffset.UtcNow;
-                await _ordersRepository.UpdateOrderPayoutAsync(payout);
+                await ApplyPayoutTerminalStatusAsync(payout, status, order.Id);
 
                 logger.Debug(correlationId, null, methodName,
                     $"Payout order={orderId:D} status={payout.Status} payment={payout.ProviderPaymentId}", null);
@@ -201,6 +192,192 @@ namespace EList.Services.Impl.Payments.TBank
                     // ignore secondary failures
                 }
             }
+        }
+
+        public async Task<int> SyncInitiatedPayoutsAsync(int limit = 50)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(SyncInitiatedPayoutsAsync)}";
+            if (limit <= 0)
+                limit = 50;
+
+            var initiated = await _ordersRepository.GetOrderPayoutsByStatusAsync(
+                OrderPayoutStatus.Initiated, limit);
+            var updated = 0;
+
+            foreach (var payout in initiated)
+            {
+                if (string.IsNullOrWhiteSpace(payout.ProviderPaymentId))
+                    continue;
+
+                try
+                {
+                    _settings.EnsureAcquiringConfigured();
+                    var state = await _a2cClient.GetStateAsync(payout.ProviderPaymentId);
+                    var status = (state.Status ?? string.Empty).Trim().ToUpperInvariant();
+                    var before = payout.Status;
+                    await ApplyPayoutTerminalStatusAsync(payout, status, payout.OrderId);
+                    if (payout.Status != before)
+                        updated++;
+                }
+                catch (Exception ex)
+                {
+                    logger.Warn(correlationId, null, methodName,
+                        $"GetState payout={payout.Id}: {ex.Message}", null);
+                }
+            }
+
+            if (updated > 0)
+            {
+                logger.Info(correlationId, null, methodName,
+                    $"Synced initiated payouts updated={updated}/{initiated.Count}", null);
+            }
+
+            return updated;
+        }
+
+        public async Task<int> RetryOpenDealPayoutsAsync(int limit = 50)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(RetryOpenDealPayoutsAsync)}";
+            if (limit <= 0)
+                limit = 50;
+
+            // Ранний ретрай Failed: через 15 минут; общий open-deal — с половины deal term.
+            var retryAfter = TimeSpan.FromDays(Math.Max(1, _settings.DealTermDays) / 2.0);
+            if (retryAfter < TimeSpan.FromHours(1))
+                retryAfter = TimeSpan.FromHours(1);
+
+            var paidBefore = DateTimeOffset.UtcNow.Subtract(TimeSpan.FromMinutes(15));
+            var orders = await _ordersRepository.GetPaidOrdersWithOpenDealAsync(paidBefore, limit);
+            var retried = 0;
+
+            foreach (var order in orders)
+            {
+                var existing = await _ordersRepository.GetOrderPayoutAsync(order.Id, OrderPayoutKind.Seller);
+                if (existing?.Status == OrderPayoutStatus.Succeeded)
+                    continue;
+                if (existing?.Status == OrderPayoutStatus.Initiated)
+                    continue; // SyncInitiated разберёт
+
+                if (existing?.Status == OrderPayoutStatus.Failed)
+                {
+                    if (existing.UpdatedAt > DateTimeOffset.UtcNow.Subtract(TimeSpan.FromMinutes(15)))
+                        continue;
+                }
+                else if (existing?.Status == OrderPayoutStatus.Skipped
+                         || existing == null)
+                {
+                    var paidAt = order.PaidAt ?? order.CreateDate;
+                    if (paidAt > DateTimeOffset.UtcNow.Subtract(retryAfter))
+                        continue;
+                }
+
+                await TryPayoutSellerAfterPaidAsync(order.Id);
+                retried++;
+            }
+
+            if (retried > 0)
+            {
+                logger.Info(correlationId, null, methodName,
+                    $"Retry payouts started={retried}", null);
+            }
+
+            return retried;
+        }
+
+        public async Task<int> CloseExpiredOpenDealsAsync(int limit = 50)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(CloseExpiredOpenDealsAsync)}";
+            if (limit <= 0)
+                limit = 50;
+
+            var term = TimeSpan.FromDays(Math.Max(1, _settings.DealTermDays));
+            var paidBefore = DateTimeOffset.UtcNow.Subtract(term);
+            var orders = await _ordersRepository.GetPaidOrdersWithOpenDealAsync(paidBefore, limit);
+            var closed = 0;
+
+            foreach (var order in orders)
+            {
+                if (string.IsNullOrWhiteSpace(order.ProviderDealId))
+                    continue;
+
+                // Последняя попытка payout перед close.
+                await TryPayoutSellerAfterPaidAsync(order.Id);
+                var refreshed = await _ordersRepository.GetOrderAsync(order.Id);
+                if (refreshed?.ProviderDealClosedAt != null)
+                {
+                    closed++;
+                    continue;
+                }
+
+                var seller = await _ordersRepository.GetOrderPayoutAsync(order.Id, OrderPayoutKind.Seller);
+                if (seller?.Status == OrderPayoutStatus.Succeeded && seller.FinalPayout)
+                {
+                    await MarkDealClosedAsync(order.Id);
+                    closed++;
+                    continue;
+                }
+
+                if (seller?.Status == OrderPayoutStatus.Initiated)
+                    continue; // ждём GetState
+
+                try
+                {
+                    _settings.EnsureAcquiringConfigured();
+                    await _acquiringClient.CloseSpDealAsync(order.ProviderDealId);
+                    await MarkDealClosedAsync(order.Id);
+                    closed++;
+                    logger.Info(correlationId, null, methodName,
+                        $"closeSpDeal OK order={order.Id:D} deal={order.ProviderDealId}", null);
+                }
+                catch (Exception ex)
+                {
+                    logger.Warn(correlationId, null, methodName,
+                        $"closeSpDeal failed order={order.Id:D}: {ex.Message}", null);
+                }
+            }
+
+            if (closed > 0)
+            {
+                logger.Info(correlationId, null, methodName,
+                    $"Closed deals={closed}", null);
+            }
+
+            return closed;
+        }
+
+        private async Task ApplyPayoutTerminalStatusAsync(OrderPayout payout, string status, Guid orderId)
+        {
+            if (status is "REJECTED" or "CANCELED" or "CANCELLED" or "DEADLINE_EXPIRED" or "AUTH_FAIL")
+            {
+                payout.Status = OrderPayoutStatus.Failed;
+                payout.ErrorMessage = $"e2c status={status}";
+                payout.CompletedAt = DateTimeOffset.UtcNow;
+            }
+            else if (status is "COMPLETED" or "CONFIRMED" or "SUCCESS" or "CHECKED" or "")
+            {
+                payout.Status = OrderPayoutStatus.Succeeded;
+                payout.CompletedAt = DateTimeOffset.UtcNow;
+                payout.ErrorMessage = null;
+            }
+            else
+            {
+                payout.Status = OrderPayoutStatus.Initiated;
+                payout.ErrorMessage = $"e2c in progress status={status}";
+            }
+
+            payout.UpdatedAt = DateTimeOffset.UtcNow;
+            await _ordersRepository.UpdateOrderPayoutAsync(payout);
+
+            if (payout.Status == OrderPayoutStatus.Succeeded && payout.FinalPayout)
+                await MarkDealClosedAsync(orderId);
+        }
+
+        private async Task MarkDealClosedAsync(Guid orderId)
+        {
+            await _ordersRepository.SetProviderDealClosedAtAsync(orderId, DateTimeOffset.UtcNow);
         }
 
         private async Task UpsertSkippedAsync(Order order, string? partnerId, string reason)
@@ -252,7 +429,6 @@ namespace EList.Services.Impl.Payments.TBank
         private static string BuildProviderOrderId(Guid payoutId)
             => $"po:{payoutId:N}"[..Math.Min(50, $"po:{payoutId:N}".Length)];
 
-        /// <summary>PaymentRecipientId ≤ 16 символов.</summary>
         private static string BuildPaymentRecipientId(Guid sellerOrganizationId, string partnerId)
         {
             var digits = new string(partnerId.Where(char.IsDigit).ToArray());
@@ -269,9 +445,14 @@ namespace EList.Services.Impl.Payments.TBank
         }
     }
 
-    /// <summary>No-op для stub / не-tbank провайдера.</summary>
     public class NoOpOrderDealPayoutService : IOrderDealPayoutService
     {
         public Task TryPayoutSellerAfterPaidAsync(Guid orderId) => Task.CompletedTask;
+
+        public Task<int> SyncInitiatedPayoutsAsync(int limit = 50) => Task.FromResult(0);
+
+        public Task<int> RetryOpenDealPayoutsAsync(int limit = 50) => Task.FromResult(0);
+
+        public Task<int> CloseExpiredOpenDealsAsync(int limit = 50) => Task.FromResult(0);
     }
 }

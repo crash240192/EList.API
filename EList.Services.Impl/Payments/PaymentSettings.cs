@@ -130,6 +130,12 @@ namespace EList.Services.Impl.Payments
         /// </summary>
         public bool AutoPayoutOnPaid { get; set; } = true;
 
+        /// <summary>
+        /// Срок жизни сделки (дни) для maintenance-воркера: после него — retry payout / closeSpDeal.
+        /// Договор с банком уточняет фактический term; default 7.
+        /// </summary>
+        public int DealTermDays { get; set; } = 7;
+
         /// <summary>Целевой онбординг точек: acqapi OAuth + /sm-register/register.</summary>
         public TBankAcqApiSettings AcqApi { get; set; } = new();
 
@@ -185,8 +191,29 @@ namespace EList.Services.Impl.Payments
             settings.AutoPayoutOnPaid = ReadBool(
                 "payments:tbank:autoPayoutOnPaid",
                 defaultValue: true);
+            settings.DealTermDays = ReadInt(
+                "payments:tbank:dealTermDays",
+                defaultValue: 7,
+                min: 1,
+                max: 365);
 
             return settings;
+        }
+
+        private static int ReadInt(string key, int defaultValue, int min, int max)
+        {
+            if (!ConfigurationManager.AppSettings.Contains(key)
+                || string.IsNullOrWhiteSpace(ConfigurationManager.AppSettings[key])
+                || !int.TryParse(ConfigurationManager.AppSettings[key], out var value))
+            {
+                return defaultValue;
+            }
+
+            if (value < min)
+                return min;
+            if (value > max)
+                return max;
+            return value;
         }
 
         /// <summary>Базовый URL e2c API (<c>.../e2c/v2</c>).</summary>

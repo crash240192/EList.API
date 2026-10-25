@@ -120,16 +120,21 @@
 - [x] После `CONFIRMED` + fulfill: A2C на `amount_seller`, `PartnerId` = shopCode, **`FinalPayout=true`** (остаток = комиссия площадке)  
 - [x] Журнал `order_payouts` (unique order+kind, статусы)  
 - [x] `payments:tbank:autoPayoutOnPaid` (default true); soft-fail без кредов/DealId  
-- [ ] Ретраи / GetState worker для `Initiated` — P4  
+- [x] Ретраи / GetState worker для `Initiated` — P4  
 - [ ] CancelPayment / GetSbpMembers — по необходимости  
 
 **Выход:** после оплаты на стенде с e2c-доступом org получает долю; комиссия остаётся площадке при закрытии сделки.
 
-### P4 — Закрытие, TTL, воркеры
+### P4 — Закрытие, TTL, воркеры — **в коде**
 
-- `closeSpDeal` / контроль FinalPayout  
-- Worker: сделки без Confirm / без payout к дедлайну deal term  
-- Согласовать с `PendingOrdersPurgeWorker` и refunds  
+- [x] `closeSpDeal` в `TBankAcquiringClient`  
+- [x] `orders.provider_deal_closed_at` (FinalPayout success или closeSpDeal)  
+- [x] `DealMaintenanceWorker`: sync Initiated → retry Failed/Skipped → closeSpDeal по `dealTermDays`  
+- [x] `PendingOrdersPurgeWorker` — только Pending/Authorized; Paid/Deal не трогает  
+- [x] Возвраты после close: банк ограничивает Cancel по закрытой сделке — учитывать в D5 / ops  
+
+**Выход:** зависшие A2C догоняются; просроченные сделки без успешной выплаты закрываются с остатком площадке.  
+
 
 ### P5 — Ops + фискализация
 

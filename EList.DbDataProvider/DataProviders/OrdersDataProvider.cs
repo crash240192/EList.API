@@ -88,6 +88,13 @@ namespace EList.DbDataProvider.DataProviders
                 .UpdateAsync();
         }
 
+        public async Task SetProviderDealClosedAtAsync(Guid orderId, DateTimeOffset closedAt)
+        {
+            await _connection.Orders.Where(i => i.Id == orderId && i.ProviderDealClosedAt == null)
+                .Set(i => i.ProviderDealClosedAt, closedAt)
+                .UpdateAsync();
+        }
+
         public async Task<List<OrderDto>> GetOrdersByBuyerAsync(Guid buyerAccountId)
         {
             var result = await _connection.Orders
@@ -346,6 +353,37 @@ namespace EList.DbDataProvider.DataProviders
         {
             item.UpdatedAt = DateTimeOffset.Now.ToUniversalTime();
             await _connection.UpdateAsync(item);
+        }
+
+        public async Task<List<OrderPayoutDto>> GetOrderPayoutsByStatusAsync(OrderPayoutStatus status, int limit)
+        {
+            if (limit <= 0)
+                limit = 50;
+
+            return await _connection.OrderPayouts
+                .Where(i => i.Status == status)
+                .OrderBy(i => i.UpdatedAt)
+                .Take(limit)
+                .ToListAsync();
+        }
+
+        public async Task<List<OrderDto>> GetPaidOrdersWithOpenDealAsync(
+            DateTimeOffset paidBefore,
+            int limit)
+        {
+            if (limit <= 0)
+                limit = 50;
+
+            return await _connection.Orders
+                .Where(o => o.Status == OrderStatus.Paid
+                    && o.ProviderDealId != null
+                    && o.ProviderDealId != ""
+                    && o.ProviderDealClosedAt == null
+                    && o.PaidAt != null
+                    && o.PaidAt < paidBefore)
+                .OrderBy(o => o.PaidAt)
+                .Take(limit)
+                .ToListAsync();
         }
         #endregion
     }
