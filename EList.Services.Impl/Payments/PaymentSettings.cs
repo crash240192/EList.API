@@ -121,6 +121,15 @@ namespace EList.Services.Impl.Payments
         /// </summary>
         public bool AllowTicketsWithoutShopCode { get; set; }
 
+        /// <summary>Base URL A2C (<c>.../e2c/v2</c>). Пусто — вычисляется из <see cref="ApiBaseUrl"/>.</summary>
+        public string? E2cApiBaseUrl { get; set; }
+
+        /// <summary>
+        /// После CONFIRMED билетного заказа сразу слать A2C продавцу (FinalPayout).
+        /// Default true; выключить для ручных выплат / отладки.
+        /// </summary>
+        public bool AutoPayoutOnPaid { get; set; } = true;
+
         /// <summary>Целевой онбординг точек: acqapi OAuth + /sm-register/register.</summary>
         public TBankAcqApiSettings AcqApi { get; set; } = new();
 
@@ -139,6 +148,7 @@ namespace EList.Services.Impl.Payments
                 SuccessUrl = ReadNullable("payments:tbank:successUrl"),
                 FailUrl = ReadNullable("payments:tbank:failUrl"),
                 ManualShopCode = ReadNullable("payments:tbank:manualShopCode"),
+                E2cApiBaseUrl = ReadNullable("payments:tbank:e2cApiBaseUrl"),
                 AcqApi = new TBankAcqApiSettings
                 {
                     BaseUrl = Read("payments:tbank:acqApi:baseUrl", DefaultAcqApiBaseUrl),
@@ -172,8 +182,27 @@ namespace EList.Services.Impl.Payments
             settings.AllowTicketsWithoutShopCode = ReadBool(
                 "payments:tbank:allowTicketsWithoutShopCode",
                 defaultValue: isTestHost);
+            settings.AutoPayoutOnPaid = ReadBool(
+                "payments:tbank:autoPayoutOnPaid",
+                defaultValue: true);
 
             return settings;
+        }
+
+        /// <summary>Базовый URL e2c API (<c>.../e2c/v2</c>).</summary>
+        public string ResolveE2cApiBaseUrl()
+        {
+            if (!string.IsNullOrWhiteSpace(E2cApiBaseUrl))
+                return E2cApiBaseUrl.Trim().TrimEnd('/');
+
+            var api = (ApiBaseUrl ?? string.Empty).Trim().TrimEnd('/');
+            if (api.Contains("rest-api-test", StringComparison.OrdinalIgnoreCase))
+                return "https://rest-api-test.tinkoff.ru/e2c/v2";
+            if (api.Contains("securepay", StringComparison.OrdinalIgnoreCase))
+                return "https://securepay.tinkoff.ru/e2c/v2";
+            if (api.EndsWith("/v2", StringComparison.OrdinalIgnoreCase))
+                return api[..^3] + "/e2c/v2";
+            return api + "/e2c/v2";
         }
 
         private static bool ReadBool(string key, bool defaultValue)

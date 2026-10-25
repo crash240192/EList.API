@@ -72,6 +72,7 @@ namespace EList.DbDataProvider.DataConnections
         public ITable<OrganizationPayoutDto> OrganizationPayout => this.GetTable<OrganizationPayoutDto>();
 
         public ITable<OrderDto> Orders => this.GetTable<OrderDto>();
+        public ITable<OrderPayoutDto> OrderPayouts => this.GetTable<OrderPayoutDto>();
         public ITable<TicketDto> Tickets => this.GetTable<TicketDto>();
         public ITable<EventTicketTypeDto> EventTicketTypes => this.GetTable<EventTicketTypeDto>();
         public ITable<EventTicketStaffDto> EventTicketStaff => this.GetTable<EventTicketStaffDto>();
