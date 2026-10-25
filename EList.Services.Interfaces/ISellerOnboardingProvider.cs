@@ -23,6 +23,7 @@ namespace EList.Services.Interfaces
         public Guid OrganizationId { get; set; }
         public string? Inn { get; set; }
         public string? Ogrn { get; set; }
+        public string? Kpp { get; set; }
         public string? LegalName { get; set; }
         public string? LegalAddress { get; set; }
         public string? HeadName { get; set; }

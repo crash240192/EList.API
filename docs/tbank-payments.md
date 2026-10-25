@@ -75,13 +75,16 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 
 | Ключ | Смысл |
 |------|--------|
-| `payments__tbank__smRegister__username` / `password` | SM-Register → ShopCode |
-| `payments__tbank__manualShopCode` | DEMO/стенд: ShopCode без SM-Register |
+| `payments__tbank__acqApi__username` / `password` | **Целевой** онбординг точки (acqapi OAuth → shopCode) |
+| `payments__tbank__acqApi__baseUrl` | Default test `https://acqapi-test.tinkoff.ru`; prod `https://acqapi.tinkoff.ru` |
+| `payments__tbank__acqApi__clientCertificatePath` | Опционально mTLS (.pfx) на prod |
+| `payments__tbank__smRegister__username` / `password` | Legacy fallback → ShopCode |
+| `payments__tbank__manualShopCode` | DEMO/стенд: ShopCode без bank API |
 | `payments__tbank__allowTicketsWithoutShopCode` | Init **без** `Shops[]` (сумма на терминал площадки). По умолчанию **true** на `rest-api-test`, **false** на `securepay` |
 | `payments__provider` | `tbank` \| `yookassaStub` — stub не требует ShopCode |
 | `features__ticketSalesEnabled` | kill-switch билетов (`true` на стенде) |
 
-**ShopCode** нужен только для marketplace-сплита (`Init.Shops[]`).  
+**ShopCode** сейчас для legacy `Init.Shops[]`; после P2/P3 — `PartnerId` для A2C из Deal.  
 Бесплатные билеты — без онбординга. Stub (`yookassaStub`) — достаточно `OnboardingStatus=Active` (без `ProviderSellerId`).  
 На test-host T-Bank платный заказ без ShopCode допускается (Init без сплита), если не выключить `allowTicketsWithoutShopCode`.
 

@@ -625,17 +625,28 @@ namespace EList.Services.Impl
             }
 
             var legal = await _organizationsRepository.GetLegalAsync(organizationId);
+            string? ownerEmail = null;
+            if (_accountDataHolder.AccountId is Guid ownerAccountId)
+            {
+                var owner = await _accountsRepository.GetAccountAsync(ownerAccountId);
+                var login = owner?.Login?.Trim();
+                if (!string.IsNullOrWhiteSpace(login) && login.Contains('@'))
+                    ownerEmail = login;
+            }
+
             var start = await _sellerOnboardingProvider.StartAsync(new SellerOnboardingRequest
             {
                 OrganizationId = organizationId,
                 Inn = legal?.Inn,
                 Ogrn = legal?.Ogrn,
+                Kpp = legal?.Kpp,
                 LegalName = organization.Name,
                 LegalAddress = legal?.LegalAddress,
                 HeadName = legal?.HeadName,
                 BankAccount = payout.BankAccount,
                 Bik = payout.Bik,
                 BankName = payout.BankName,
+                Email = ownerEmail,
                 ReturnUrl = request?.ReturnUrl
             });
 

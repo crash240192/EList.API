@@ -2,6 +2,8 @@
 
 > Актуально: 25 октября 2026  
 > Решение: целевая модель сплита — **Мультирасчёты Deal NN** по PDF в [`docs/мультирасчеты/`](./мультирасчеты/) (подтверждено менеджером Т‑Банка).  
+> Оплата покупателя: **одностадийка** (`PayType=O` / настройка терминала) — без холда/`Confirm`; Deal + A2C для сплита.  
+
 > Источники банка:
 >
 > - `multisplit.pdf` — описание продукта v1.5  
@@ -17,8 +19,8 @@
 
 | Было в коде / SERVICE (ошибочно для нашего терминала) | Стало (по PDF + менеджер) |
 |-------------------------------------------------------|---------------------------|
-| `Init` + `Shops[{ShopCode, Amount, Fee}]`, `PayType=O` | `Init` + `CreateDealWithType=NN` → **Сделка** (`DealId` / `SpAccumulationId`) |
-| Сплит «сразу при CONFIRMED» | Холд → **Confirm** (списание) → отдельно **A2C-выплата** продавцу → закрытие сделки |
+| `Init` + `Shops[{ShopCode, Amount, Fee}]`, `PayType=O` | `Init` + `CreateDealWithType=NN` + одностадийка → **Сделка** (`DealId` / `SpAccumulationId`), статус `CONFIRMED` |
+| Сплит «сразу при CONFIRMED» через Shops | Деньги в Deal у банка → **A2C-выплата** продавцу → закрытие / FinalPayout (комиссия площадке). **Не** через р/с сайта |
 | Онбординг только `register.tinkoff.ru/v1` | Регистрация точек через **`acqapi(.tinkoff).ru`** (OAuth, часто mTLS + WL IP) |
 
 `yookassaStub` остаётся для локалки без банка.
@@ -32,14 +34,13 @@
 Канон из `multisplit.pdf` §6.1:
 
 ```
-1. Init (/v2/Init) + CreateDealWithType=NN  → PaymentURL
-2. Покупатель платит на форме банка        → холд; webhook со SpAccumulationId (= DealId)
-3. Confirm (/v2/Confirm)                   → списание с покупателя (после «оказания услуги»)
-4. e2c Init (/e2c/v2/Init) + DealId + сумма продавца
+1. Init (/v2/Init) + CreateDealWithType=NN + PayType=O  → PaymentURL
+2. Покупатель платит на форме банка  → CONFIRMED; webhook со SpAccumulationId (= DealId)
+3. e2c Init (/e2c/v2/Init) + DealId + сумма продавца
    [+ FinalPayout=true если последняя выплата]
-5. e2c Payment (/e2c/v2/Payment) + PaymentId из п.4
-6. Повтор 4–5 при частичных выплатах (пока нет FinalPayout / closeSpDeal)
-7. closeSpDeal ИЛИ FinalPayout=true        → сделка закрыта
+4. e2c Payment (/e2c/v2/Payment) + PaymentId из п.3
+5. Повтор 3–4 при частичных выплатах (пока нет FinalPayout / closeSpDeal)
+6. closeSpDeal ИЛИ FinalPayout=true        → сделка закрыта
 ```
 
 Ограничения банка (кратко):
@@ -47,7 +48,7 @@
 - Выплата только по существующей сделке и только после списания; сумма ≤ остаток сделки.
 - После `FinalPayout=true` или `closeSpDeal` сделка закрыта; возвраты покупателю после закрытия — нельзя.
 - Срок жизни сделки (договор с банком): без выплат → отмена оплат; была ≥1 выплата → остаток уходит **площадке**.
-- Банк может **авто-Confirm холда через ~4 суток** (учесть в политике Confirm).
+- Двухстадийка (`PayType=T` / Confirm) **не используем** для билетов, пока продукт не потребует эскроу до события.
 
 ---
 
@@ -67,54 +68,52 @@
 
 | # | Вопрос | Варианты | Черновая рекомендация для билетов |
 |---|--------|----------|-----------------------------------|
-| D1 | Когда **выдавать билеты**? | На холде (AUTHORIZED) / только после Confirm | После успешного холда (AUTHORIZED): UX как «оплачено»; Confirm — отдельный бэкенд-шаг |
-| D2 | Когда звать **Confirm**? | Сразу после холда / в день события / после check-in / вручную | **Сразу после AUTHORIZED** (или чуть с задержкой), иначе банк сам подтвердит через ~4 дня; «эскроу до события» — только если банк/юристы явно ок с двухстадийкой и сроком сделки |
-| D3 | Когда **выплата org**? | Сразу после Confirm / после события / после check-in / по кнопке | После Confirm + успешно выданные билеты; либо отложенный job «T+N после start_time» — выбрать с юр. |
+| D1 | Когда **выдавать билеты**? | После `CONFIRMED` | **После `CONFIRMED`** (одностадийка) |
+| D2 | Двухстадийка / Confirm? | `PayType=T` vs `O` | **`O` (одностадийка)** — Confirm не зовём |
+| D3 | Когда **выплата org**? | Сразу после оплаты / после события / после check-in / по кнопке | После `CONFIRMED` + выданные билеты; либо отложенный job «T+N после start_time» — выбрать с юр. |
 | D4 | Как забирать **комиссию**? | `FinalPayout` остатка площадке / `closeSpDeal` | После выплаты `amount_seller` — `FinalPayout=true` на остаток **или** closeSpDeal с политикой «остаток площадке» |
-| D5 | Возврат билета | Cancel до Confirm / Cancel после Confirm до payout / после payout | Матрица статусов сделки + запрет Cancel после close |
+| D5 | Возврат билета | Cancel до payout / после payout / после close | Матрица статусов сделки + запрет Cancel после close |
 
 ---
 
 ## 4. Волны внедрения
 
-### P0 — Контракт и docs (эта волна)
+### P0 — Контракт и docs
 
 - [x] Решение: строим под PDF Мультирасчёты Deal NN  
-- [ ] Закрыть D1–D5 письменно (продукт + юр.)  
-- [ ] Узнать у банка: max deal term, нужен ли mTLS на acqapi, test TerminalKey именно Мультирасчётов, e2c TerminalKey тот же или отдельный  
-- [ ] Пометить в [tbank-payments.md](./tbank-payments.md) / SERVICE: `Shops/Fee` = устаревшая гипотеза; runtime пока legacy до P2  
+- [x] Одностадийка (`PayType=O`); D1/D2 зафиксированы  
+- [ ] D3–D5 с юр. (когда payout / комиссия / возвраты)  
+- [ ] Узнать у банка: max deal term, нужен ли mTLS на acqapi test, e2c TerminalKey тот же или отдельный  
+- [x] SERVICE / tbank-payments: `Shops/Fee` = legacy до P2  
 
-### P1 — Онбординг точки (acqapi)
-
-Заменить/дополнить `TBankSmRegisterClient` под PDF «Регистрация…»:
+### P1 — Онбординг точки (acqapi) — **в коде**
 
 | Шаг | API |
 |-----|-----|
-| OAuth | `POST https://acqapi-test.tinkoff.ru/oauth/token` (prod: `acqapi.tinkoff.ru`) |
+| OAuth | `POST …/oauth/token` (Basic `partner:partner` + password grant) |
 | Register | `POST …/sm-register/register` |
-| Get / Update | `GET/PUT …/sm-register/register/shop/{shopCode}` и update partner |
+| Get / Update | `GET …/sm-register/register/shop/{shopCode}`, `PATCH …/sm-register/register/{shopCode}` |
 
-- mTLS + WL IP (ops)  
-- Маппинг полей org (ИНН, ОГРН, CEO, bankAccount.*) строго по обязательности PDF v1.11  
-- Хранить: `shopCode`, статус точки, при необходимости `PaymentRecipientId` / телефон для BasicFieldKey  
-- DEMO: сохранить `manualShopCode` / stub  
+- [x] `TBankAcqApiClient` + настройки `payments:tbank:acqApi`  
+- [x] Provider: acqapi → legacy SM-Register → `manualShopCode`  
+- [x] Маппинг org → register payload (ИНН/ОГРН/КПП/CEO/bankAccount); email с login владельца при наличии  
+- [ ] Ops: WL IP + mTLS cert на стенде/prod (конфиг `clientCertificatePath` готов)  
+- DEMO: `manualShopCode` / stub  
 
-**Выход:** org с Active onboarding даёт валидный получатель для A2C.
+**Выход:** org с Active onboarding даёт `shopCode` (= PartnerId для A2C).
 
 ### P2 — Оплата EACQ Deal (замена Shops)
 
 Переписать `TBankPaymentProvider` / `TBankInitRequest`:
 
 - Убрать `Shops[]` / `Fee` из Init билетов  
-- Добавить `CreateDealWithType = "NN"` (без `DealId` при новой сделке)  
-- Двухстадийность под холд→Confirm (уточнить `PayType` с банком; не оставлять слепой `O`, если Confirm обязателен)  
-- Миграция БД: `orders.provider_deal_id` (string/number as string), статусы deal (`Opened` / `Authorized` / `Captured` / `PartiallyPaidOut` / `Closed` / `Expired`)  
-- Webhook: парсить `SpAccumulationId`, сохранять DealId; маппинг AUTHORIZED vs CONFIRMED  
-- `Confirm` API-клиент + вызов по политике D2  
-- `Cancel` до/после Confirm по матрице D5  
+- Добавить `CreateDealWithType = "NN"` + `PayType=O` (без `DealId` при новой сделке)  
+- Миграция БД: `orders.provider_deal_id`, статусы deal (`Opened` / `Captured` / `PartiallyPaidOut` / `Closed` / `Expired`)  
+- Webhook: парсить `SpAccumulationId`, сохранять DealId; успех = `CONFIRMED`  
+- `Cancel` по матрице D5  
 - Кошелёк: Init **без** Deal (как сейчас без Shops)  
 
-**Выход:** покупка билета создаёт сделку; poll/webhook стабильны; билеты по D1.
+**Выход:** покупка билета создаёт сделку; poll/webhook стабильны; билеты после `CONFIRMED`.
 
 ### P3 — Выплаты A2C_V2
 
@@ -146,9 +145,9 @@
 
 | Компонент | Действие |
 |-----------|----------|
-| `TBankModels` / `TBankAcquiringClient` | + Confirm; Init fields Deal; − Shops для билетов |
+| `TBankModels` / `TBankAcquiringClient` | Init fields Deal + PayType=O; − Shops для билетов |
 | `TBankPaymentProvider` | Deal lifecycle вместо Shops/Fee |
-| `TBankSmRegisterClient` → `TBankAcqApiClient` | OAuth + acqapi URLs + mTLS hook |
+| `TBankAcqApiClient` (+ legacy SmRegister) | ✅ P1: OAuth + register/get/patch + mTLS hook |
 | `TBankA2cClient` (новый) | e2c Init/Payment |
 | `OrdersService` + webhook | DealId, Confirm trigger, payout trigger |
 | DB migration | `provider_deal_id`, payout journal, deal status |
@@ -171,8 +170,8 @@
 
 ## 7. Порядок работ в git
 
-1. Этот документ + правка ссылок в SERVICE / tbank-payments (**сейчас**).  
-2. Ветка `cursor/tbank-multisplit-onboarding-0318` — P1.  
+1. План + SERVICE / tbank-payments — ✅  
+2. Ветка `cursor/tbank-multisplit-onboarding-0318` — P1 (**эта**).  
 3. `cursor/tbank-multisplit-eacq-deal-0318` — P2.  
 4. `cursor/tbank-multisplit-a2c-payout-0318` — P3.  
-5. P4/P5 по мере готовности стенда и юр. D1–D5.
+5. P4/P5 по мере готовности стенда и юр. D3–D5.

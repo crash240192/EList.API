@@ -93,6 +93,16 @@ namespace EList.Services.Impl.Payments
 
         public const string DefaultSmRegisterBaseUrl = "https://register.tinkoff.ru/v1";
 
+        /// <summary>Тестовый host регистрации точек Мультирасчётов (PDF «Регистрация…»).</summary>
+        public const string DefaultAcqApiBaseUrl = "https://acqapi-test.tinkoff.ru";
+
+        /// <summary>Боевой host acqapi (часто с mTLS + WL IP).</summary>
+        public const string ProductionAcqApiBaseUrl = "https://acqapi.tinkoff.ru";
+
+        /// <summary>Basic client id/secret по PDF (постоянные partner:partner на test и prod).</summary>
+        public const string DefaultAcqApiClientId = "partner";
+        public const string DefaultAcqApiClientSecret = "partner";
+
         public string TerminalKey { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
         public string ApiBaseUrl { get; set; } = TestApiBaseUrl;
@@ -101,7 +111,7 @@ namespace EList.Services.Impl.Payments
         public string? FailUrl { get; set; }
 
         /// <summary>
-        /// Ручной ShopCode для DEMO/локальных тестов Init без SM-Register.
+        /// Ручной ShopCode для DEMO/локальных тестов без acqapi / SM-Register.
         /// </summary>
         public string? ManualShopCode { get; set; }
 
@@ -111,6 +121,10 @@ namespace EList.Services.Impl.Payments
         /// </summary>
         public bool AllowTicketsWithoutShopCode { get; set; }
 
+        /// <summary>Целевой онбординг точек: acqapi OAuth + /sm-register/register.</summary>
+        public TBankAcqApiSettings AcqApi { get; set; } = new();
+
+        /// <summary>Legacy SM-Register (register.tinkoff.ru/v1) — fallback, если acqApi не настроен.</summary>
         public TBankSmRegisterSettings SmRegister { get; set; } = new();
 
         public static TBankPaymentSettings Load()
@@ -125,6 +139,16 @@ namespace EList.Services.Impl.Payments
                 SuccessUrl = ReadNullable("payments:tbank:successUrl"),
                 FailUrl = ReadNullable("payments:tbank:failUrl"),
                 ManualShopCode = ReadNullable("payments:tbank:manualShopCode"),
+                AcqApi = new TBankAcqApiSettings
+                {
+                    BaseUrl = Read("payments:tbank:acqApi:baseUrl", DefaultAcqApiBaseUrl),
+                    ClientId = Read("payments:tbank:acqApi:clientId", DefaultAcqApiClientId),
+                    ClientSecret = Read("payments:tbank:acqApi:clientSecret", DefaultAcqApiClientSecret),
+                    Username = Read("payments:tbank:acqApi:username"),
+                    Password = Read("payments:tbank:acqApi:password"),
+                    ClientCertificatePath = ReadNullable("payments:tbank:acqApi:clientCertificatePath"),
+                    ClientCertificatePassword = ReadNullable("payments:tbank:acqApi:clientCertificatePassword")
+                },
                 SmRegister = new TBankSmRegisterSettings
                 {
                     Username = Read("payments:tbank:smRegister:username"),
@@ -135,9 +159,14 @@ namespace EList.Services.Impl.Payments
 
             if (string.IsNullOrWhiteSpace(settings.ApiBaseUrl))
                 settings.ApiBaseUrl = TestApiBaseUrl;
+            if (string.IsNullOrWhiteSpace(settings.AcqApi.BaseUrl))
+                settings.AcqApi.BaseUrl = DefaultAcqApiBaseUrl;
+            if (string.IsNullOrWhiteSpace(settings.AcqApi.ClientId))
+                settings.AcqApi.ClientId = DefaultAcqApiClientId;
+            if (string.IsNullOrWhiteSpace(settings.AcqApi.ClientSecret))
+                settings.AcqApi.ClientSecret = DefaultAcqApiClientSecret;
             if (string.IsNullOrWhiteSpace(settings.SmRegister.BaseUrl))
                 settings.SmRegister.BaseUrl = DefaultSmRegisterBaseUrl;
-
             var isTestHost = settings.ApiBaseUrl.Contains("rest-api-test", StringComparison.OrdinalIgnoreCase)
                 || settings.ApiBaseUrl.Contains("DEMO", StringComparison.OrdinalIgnoreCase);
             settings.AllowTicketsWithoutShopCode = ReadBool(
@@ -186,6 +215,24 @@ namespace EList.Services.Impl.Payments
 
             return null;
         }
+    }
+
+    /// <summary>
+    /// Настройки acqapi для регистрации точек Мультирасчётов.
+    /// Ops: WL IP; на prod часто mTLS (clientCertificatePath).
+    /// </summary>
+    public class TBankAcqApiSettings
+    {
+        public string BaseUrl { get; set; } = TBankPaymentSettings.DefaultAcqApiBaseUrl;
+        public string ClientId { get; set; } = TBankPaymentSettings.DefaultAcqApiClientId;
+        public string ClientSecret { get; set; } = TBankPaymentSettings.DefaultAcqApiClientSecret;
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string? ClientCertificatePath { get; set; }
+        public string? ClientCertificatePassword { get; set; }
+
+        public bool IsConfigured()
+            => !string.IsNullOrWhiteSpace(Username) && !string.IsNullOrWhiteSpace(Password);
     }
 
     public class TBankSmRegisterSettings
