@@ -136,13 +136,14 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 
 Согласуется с Пользовательским соглашением (§6) и Соглашением для организаций (§2.4): сервис не продавец.
 
-### Технический статус (25.10.2026)
+### Технический статус (26.10.2026)
 
 | Слой | Статус |
 |------|--------|
 | Orders / tickets / stub payment / webhook path / check-in / transfer / refunds | API есть |
 | Учёт `AmountTotal` / `AmountSeller` / `AmountCommission` в заказе | Есть |
-| **Целевое:** Мультирасчёты Deal NN (Init NN + A2C/close; одностадийка) | P2–P4 ✅ (Init Deal, A2C, DealMaintenanceWorker); план [tbank-multisplit-plan.md](./tbank-multisplit-plan.md) |
+| **Целевое:** Мультирасчёты Deal NN (Init NN + A2C/close; одностадийка) | P2–P5 ✅ (Init Deal, A2C, DealMaintenance, ops/fiscal scaffold); план [tbank-multisplit-plan.md](./tbank-multisplit-plan.md), [ops-checklist](./tbank-multisplit-ops-checklist.md) |
+| Фискализация 54‑ФЗ (CloudKassir) | Каркас ✅ (`IFiscalReceiptProvider`, default off); полный W4 — отдельно |
 | Legacy Shops/Fee | ❌ убран из Init билетов (P2) |
 | Онбординг продавца acqapi OAuth (`/sm-register/register`) | ✅ P1 (`TBankAcqApiClient`); legacy SM-Register — fallback; нужен WL/mTLS на стенде |
 | Webhook Т-Банка `POST /eList/api/payments/tbank/webhook` (тело `OK`) | ✅ заказы + пополнения (`OrderId` = `wallet:{guid}`); доработать DealId/`SpAccumulationId` |
@@ -157,6 +158,7 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 | Gate `TicketingAgreement` + Active onboarding на `CanSellTickets` / создание заказа | ✅ |
 
 План Мультирасчётов: [tbank-multisplit-plan.md](./tbank-multisplit-plan.md).  
+Ops / smoke стенда: [tbank-multisplit-ops-checklist.md](./tbank-multisplit-ops-checklist.md).  
 Операционный гайд (текущий runtime): [tbank-payments.md](./tbank-payments.md).  
 Юр. разбор: [legal-ticketing-review.md](./legal-ticketing-review.md).  
 Пошаговый UI↔API флоу: [tickets workflow.txt](./tickets%20workflow.txt).
@@ -182,7 +184,7 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
   - `N > 0` → EXISTS активный тип с `price ≤ N`, **или** без билетов `cost ≤ N` (null допускается как «без цены»).
 - Шаблоны событий: `eventParameters.ticketTypes` в snapshot CreateEventRequest.
 - План типов: [ticket-types-plan.md](./ticket-types-plan.md).
-- Следующее (W6): роль билетёра, desk на входе, статистика, PDF — [tickets-door-admin-plan.md](./tickets-door-admin-plan.md). W4 (чеки) на паузе.
+- Следующее (W6): роль билетёра, desk на входе, статистика, PDF — [tickets-door-admin-plan.md](./tickets-door-admin-plan.md). W4 (чеки): каркас CloudKassir в P5, полный контур — позже.
 
 ---
 
@@ -262,6 +264,7 @@ Env для Т-Банка (секреты не коммитить) — полны
 | [production-readiness-checklist.md](./production-readiness-checklist.md) | Статус готовности и бэклог |
 | [tbank-payments.md](./tbank-payments.md) | Т-Банк: текущий runtime-флоу, env |
 | [tbank-multisplit-plan.md](./tbank-multisplit-plan.md) | Целевые Мультирасчёты Deal NN — план внедрения |
+| [tbank-multisplit-ops-checklist.md](./tbank-multisplit-ops-checklist.md) | Ops / smoke стенда Мультирасчётов + CloudKassir |
 | [мультирасчеты/](./мультирасчеты/) | PDF протоколов банка (EACQ / A2C / регистрация) |
 | [legal-ticketing-review.md](./legal-ticketing-review.md) | Юр. модель билетов vs код |
 | [ui-handoff-checklist-and-tickets.md](./ui-handoff-checklist-and-tickets.md) | Handoff для фронта |

@@ -1,6 +1,6 @@
 # Билеты — сценарии и пробелы
 
-> Актуально: 9 октября 2026  
+> Актуально: 26 октября 2026  
 > Код: API orders/tickets + UI BuyTicket / MyTickets / return / check-in  
 > Интеграция: `cursor/tickets-integration-0b40` / `cursor/tickets-integration-ui-0b40` (от `develop`)  
 > Связано: [tickets workflow.txt](./tickets%20workflow.txt), [tbank-payments.md](./tbank-payments.md), [SERVICE.md](./SERVICE.md) §7, [tickets-door-admin-plan.md](./tickets-door-admin-plan.md)
@@ -30,7 +30,7 @@
 | F1 | Org CanSellTickets + agreement | ✅ | ✅ | Готово | |
 | F2 | Global `ticketSalesEnabled` | ✅ | ✅ | Готово | `GET /api/features` + EventPage |
 | F3 | Invite при TicketsEnabled | ✅ | ✅ | Готово | |
-| G1 | 54-ФЗ Receipt / AgentSign | ❌ | — | Отложено | касса/инструкции API ещё не готовы |
+| G1 | 54-ФЗ Receipt / AgentSign | ⚠️ scaffold | — | P5 каркас | CloudKassir `kkt/receipt` default off; полный W4 позже |
 | G2 | Типы билетов | ✅ A+B+C | ✅ D + W5 polish | Готово | в integration-ветках от develop |
 | G2b | PDF / печатная форма | ❌ | — | W6 | print/PDF; Wallet pass — позже |
 | H1 | Роль билетёра + desk на входе | ❌ | ❌ | W6 | см. [tickets-door-admin-plan.md](./tickets-door-admin-plan.md) |
@@ -53,10 +53,11 @@
 3. QR check-in камерой у организатора (`TicketCheckInPanel` + `QrScanner`).
 4. Adult gate на покупку — отложено (ageLimit уже на доступе к событию).
 
-### W4 — фискализация (пауза)
-1. Receipt в Init (AgentSign / SupplierInfo) — ждать онлайн-кассу и инструкции API.
-2. Обязательные поля org для чека (телефон и т.д.).
-3. Закрыть §6.2 агентского договора.
+### W4 — фискализация (частично: P5 scaffold)
+1. ✅ Каркас `IFiscalReceiptProvider` / CloudKassir `kkt/receipt` после Paid (soft-fail); `fiscal:enabled=false` по умолчанию. Чеки ≠ сплит Deal/A2C ([tbank-payments.md](./tbank-payments.md) §5.1).
+2. ☐ Чек возврата IncomeReturn + идемпотентный журнал чеков.
+3. ☐ Обязательные поля org для чека (телефон поставщика и т.д.).
+4. ✅ §6.2 агентского договора (разделённая фискализация); §§4.2 / 5.1 обновлены под Deal NN.
 
 ### W5 — типы билетов ✅
 См. [ticket-types-plan.md](./ticket-types-plan.md).  

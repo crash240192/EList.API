@@ -152,10 +152,11 @@
 - [x] Tickets API (issue / validate / used / transfer) — runtime stub
 - [x] Refunds API (stub provider)
 - [x] TicketingAgreement gate на `CanSellTickets` + capacity с учётом pending заказов
-- [ ] 54-ФЗ / онлайн-касса (разделённая фискализация зафиксирована в черновике агентского договора)
-- [ ] Prod TerminalKey + публичный NotificationURL на стенде/проде (ops, не код)
-- [ ] Organization SM-Register credentials / ShopCode на prod-оргах
-- [ ] ~~Organization payment-provider onboarding / реальный YooKassa split~~ — целевой путь Т-Банк (см. [tbank-payments.md](./tbank-payments.md))
+- [x] 54-ФЗ каркас CloudKassir (`IFiscalReceiptProvider`, default off) + §§4.2/5.1/6.2 агентского договора (Deal NN + разделённая фискализация)
+- [ ] Прод-креды кассы + `fiscal:enabled=true` + чек возврата (полный W4)
+- [ ] Prod TerminalKey + публичный NotificationURL на стенде/проде (ops, не код) — см. [tbank-multisplit-ops-checklist.md](./tbank-multisplit-ops-checklist.md)
+- [ ] Organization acqapi OAuth / ShopCode на prod-оргах
+- [ ] ~~Organization payment-provider onboarding / реальный YooKassa split~~ — целевой путь Т-Банк Мультирасчёты Deal NN (см. [tbank-multisplit-plan.md](./tbank-multisplit-plan.md))
 
 ### Compliance (P1)
 

@@ -1,25 +1,27 @@
 # Т-Банк: эквайринг и пополнение кошелька
 
-> Актуально: 25 октября 2026  
-> Код: API `cursor/tbank-marketplace-acquiring-0b40`, UI `cursor/tbank-payment-return-poll-0b40`  
+> Актуально: 26 октября 2026  
+> Код: API ветки Мультирасчётов P1–P5 (`cursor/tbank-multisplit-*-0318`), UI return-poll  
 > Продуктовая модель: [SERVICE.md §7](./SERVICE.md)
 
 Документ для **сборки / staging / prod**: что **сейчас** в runtime-коде, какие env нужны, как устроен флоу.
 
-> **Важно (25.10.2026):** целевой продукт сплита — **Мультирасчёты Deal NN**  
-> ([`docs/мультирасчеты/`](./мультирасчеты/), план: [tbank-multisplit-plan.md](./tbank-multisplit-plan.md)).  
-> Таблица ниже и Init с `Shops[]`/`Fee` — **legacy runtime** до миграции P2; не проектировать новые фичи на Shops.
+> **Важно (26.10.2026):** целевой продукт сплита — **Мультирасчёты Deal NN**  
+> ([`docs/мультирасчеты/`](./мультирасчеты/), план: [tbank-multisplit-plan.md](./tbank-multisplit-plan.md),  
+> ops: [tbank-multisplit-ops-checklist.md](./tbank-multisplit-ops-checklist.md)).  
+> Билеты: Init `CreateDealWithType=NN` + A2C; кошелёк — Init без Deal.
 
 ---
 
-## 1. Модель (кратко) — legacy runtime
+## 1. Модель (кратко) — runtime Deal NN
 
-| | Билеты (legacy) | Кошелёк (тариф) |
+| | Билеты (Deal NN) | Кошелёк (тариф) |
 |--|--------|-----------------|
 | Провайдер | `payments.provider=tbank` | тот же |
-| Init | `PayType=O`, `Shops[]` + `Fee` при ShopCode org | без `Shops` (деньги площадки) — **останется** и после Мультирасчётов |
+| Init | `PayType=O`, `CreateDealWithType=NN` (без `Shops[]`) | без Deal (деньги площадки) |
+| После CONFIRMED | fulfill билетов → A2C продавцу (`PartnerId`=shopCode, `FinalPayout`) | кредит кошелька |
 | OrderId в банке | GUID заказа | `wallet:{depositId}` |
-| Успех | webhook CONFIRMED → билеты + Participate | webhook CONFIRMED → кредит кошелька |
+| Успех | webhook CONFIRMED → Paid + Issued + payout | webhook CONFIRMED → кредит |
 | Fallback | GET order → GetState (~2s gate) | GET deposit → GetState |
 | UI return | `/payments/return?orderId=…` | `/payments/return?depositId=…&walletId=…` |
 
@@ -129,7 +131,19 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 Документация [API кассы CloudKassir](https://developers.cloudkassir.ru/#api-kassy) описывает **только фискализацию** (`kkt/receipt`, AgentSign / SupplierInfo для 54‑ФЗ).  
 Там **нет** сплита денег — это зона **эквайринга Т‑Банка (Мультирасчёты Deal NN / A2C)**.
 
-Сплит в чеке (агент/поставщик) и сплит денег по сделке — разные механизмы; W4 (касса) не заменяет Deal/выплаты. См. [tbank-multisplit-plan.md](./tbank-multisplit-plan.md).
+Сплит в чеке (агент/поставщик) и сплит денег по сделке — разные механизмы; касса не заменяет Deal/выплаты. См. [tbank-multisplit-plan.md](./tbank-multisplit-plan.md).
+
+### Env фискализации (P5 scaffold, default off)
+
+| Ключ | Смысл |
+|------|--------|
+| `fiscal__provider` | `none` (default) \| `cloudKassir` |
+| `fiscal__enabled` | `true` только вместе с кредами кассы |
+| `fiscal__cloudKassir__publicId` / `apiSecret` | Basic auth CloudKassir (не коммитить) |
+| `fiscal__cloudKassir__apiBaseUrl` | Default `https://api.cloudpayments.ru` |
+| `fiscal__cloudKassir__taxationSystem` / `vat` / `agentSign` | Параметры чека |
+
+После Paid `OrdersService` зовёт `IssueIncomeForOrderAsync` (soft-fail). Чек возврата — следующая итерация W4.
 
 ---
 

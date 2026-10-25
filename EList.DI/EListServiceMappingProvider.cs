@@ -13,6 +13,7 @@ using EList.Services.Impl.AbuseProtection;
 using EList.Services.Impl.Notifications;
 using EList.Services.Impl.OrganizationRegistry;
 using EList.Services.Impl.Payments;
+using EList.Services.Impl.Payments.CloudKassir;
 using EList.Services.Impl.Payments.TBank;
 using EList.Services.Interfaces;
 using EList.Sms;
@@ -103,6 +104,13 @@ namespace EList.DI
                 mapper.AddSingleton<ISellerOnboardingProvider, YooKassaStubSellerOnboardingProvider>();
                 mapper.AddScoped<IOrderDealPayoutService, NoOpOrderDealPayoutService>();
             }
+
+            // Фискализация 54‑ФЗ (CloudKassir) — независимо от сплита Deal/A2C; default off.
+            var fiscalSettings = FiscalSettings.Load();
+            if (fiscalSettings.IsCloudKassir())
+                mapper.AddScoped<IFiscalReceiptProvider, CloudKassirReceiptProvider>();
+            else
+                mapper.AddScoped<IFiscalReceiptProvider, NoOpFiscalReceiptProvider>();
 
             //Repositories
             mapper.AddScoped<IAgreementRepository, AgreementRepository>();

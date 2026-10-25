@@ -43,6 +43,7 @@ namespace EList.Services.Impl
         private readonly IEventAccessValidator _eventAccessValidator;
         private readonly IPaymentProvider _paymentProvider;
         private readonly IOrderDealPayoutService _orderDealPayoutService;
+        private readonly IFiscalReceiptProvider _fiscalReceiptProvider;
         private readonly IAccountsRepository _accountsRepository;
         private readonly IWalletsService _walletsService;
         private readonly IMapper _mapper;
@@ -64,6 +65,7 @@ namespace EList.Services.Impl
             IEventAccessValidator eventAccessValidator,
             IPaymentProvider paymentProvider,
             IOrderDealPayoutService orderDealPayoutService,
+            IFiscalReceiptProvider fiscalReceiptProvider,
             IAccountsRepository accountsRepository,
             IWalletsService walletsService,
             IMapper mapper)
@@ -84,6 +86,7 @@ namespace EList.Services.Impl
             _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
             _paymentProvider = paymentProvider ?? throw new ArgumentNullException(nameof(paymentProvider));
             _orderDealPayoutService = orderDealPayoutService ?? throw new ArgumentNullException(nameof(orderDealPayoutService));
+            _fiscalReceiptProvider = fiscalReceiptProvider ?? throw new ArgumentNullException(nameof(fiscalReceiptProvider));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _walletsService = walletsService ?? throw new ArgumentNullException(nameof(walletsService));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
@@ -2262,6 +2265,61 @@ namespace EList.Services.Impl
 
             // P3: A2C продавцу из Deal (идемпотентно; ошибки только в журнале order_payouts).
             await _orderDealPayoutService.TryPayoutSellerAfterPaidAsync(orderId);
+
+            // P5/W4: фискализация (CloudKassir) — soft-fail, не откатывает билеты.
+            await TryIssueFiscalIncomeAsync(existing);
+        }
+
+        private async Task TryIssueFiscalIncomeAsync(Order order)
+        {
+            if (!_fiscalReceiptProvider.IsEnabled || order.AmountTotal <= 0)
+                return;
+
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(TryIssueFiscalIncomeAsync)}";
+
+            try
+            {
+                var legal = await _organizationsRepository.GetLegalAsync(order.SellerOrganizationId);
+                var org = await _organizationsRepository.GetOrganizationAsync(order.SellerOrganizationId);
+                string? buyerEmail = null;
+                var buyer = await _accountsRepository.GetAccountAsync(order.BuyerAccountId);
+                var login = buyer?.Login?.Trim();
+                if (!string.IsNullOrWhiteSpace(login) && login.Contains('@'))
+                    buyerEmail = login;
+
+                var result = await _fiscalReceiptProvider.IssueIncomeForOrderAsync(new FiscalIncomeReceiptRequest
+                {
+                    OrderId = order.Id,
+                    BuyerAccountId = order.BuyerAccountId,
+                    SellerOrganizationId = order.SellerOrganizationId,
+                    AmountTotal = order.AmountTotal,
+                    AmountSeller = order.AmountSeller,
+                    AmountCommission = order.AmountCommission,
+                    Currency = order.Currency,
+                    Description = $"Билеты заказ {order.Id:D}",
+                    BuyerEmail = buyerEmail,
+                    SupplierInn = legal?.Inn,
+                    SupplierName = org?.Name ?? legal?.HeadName,
+                    SupplierPhone = null
+                });
+
+                if (!result.Success)
+                {
+                    logger.Warn(correlationId, null, methodName,
+                        $"Fiscal receipt failed order={order.Id:D}: {result.ErrorMessage}", null);
+                }
+                else if (!result.Skipped)
+                {
+                    logger.Debug(correlationId, null, methodName,
+                        $"Fiscal receipt OK order={order.Id:D} id={result.ProviderReceiptId}", null);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(correlationId, null, methodName,
+                    $"Fiscal receipt exception order={order.Id:D}: {ex.Message}", null);
+            }
         }
 
         private async Task<CommandResult?> AssertCanBuyTicketAsync(Event eventItem)
