@@ -80,6 +80,8 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 | `payments__tbank__acqApi__clientCertificatePath` | Опционально mTLS (.pfx) на prod |
 | `payments__tbank__e2cApiBaseUrl` | A2C base (`…/e2c/v2`); пусто = из `apiBaseUrl` |
 | `payments__tbank__autoPayoutOnPaid` | После CONFIRMED сразу A2C продавцу (default true) |
+| `payments__tbank__dealTermDays` | TTL сделки для `DealMaintenanceWorker` / closeSpDeal (default 7) |
+| `dealMaintenance:*` | Воркер: sync Initiated, retry payout, closeSpDeal |
 | `payments__tbank__smRegister__username` / `password` | Legacy fallback → ShopCode |
 | `payments__tbank__manualShopCode` | DEMO/стенд: ShopCode без bank API |
 | `payments__tbank__allowTicketsWithoutShopCode` | Init **без** `Shops[]` (сумма на терминал площадки). По умолчанию **true** на `rest-api-test`, **false** на `securepay` |

@@ -81,6 +81,11 @@ namespace EList.Models.Orders
         public string? ProviderDealId { get; set; }
 
         /// <summary>
+        /// Когда сделка закрыта у банка (FinalPayout или closeSpDeal)
+        /// </summary>
+        public DateTimeOffset? ProviderDealClosedAt { get; set; }
+
+        /// <summary>
         /// Ключ идемпотентности
         /// </summary>
         public string? IdempotencyKey { get; set; }

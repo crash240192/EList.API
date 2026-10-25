@@ -16,6 +16,7 @@ namespace EList.DbDataProvider.Interfaces
         Task SetProviderPaymentAsync(Guid orderId, PaymentProvider provider, string providerPaymentId);
 
         Task SetProviderDealIdAsync(Guid orderId, string providerDealId);
+        Task SetProviderDealClosedAtAsync(Guid orderId, DateTimeOffset closedAt);
         Task<List<OrderDto>> GetOrdersByBuyerAsync(Guid buyerAccountId);
         Task<List<OrderDto>> GetOrdersBySellerOrganizationAsync(Guid organizationId);
         Task<List<OrderDto>> GetOrdersByEventAsync(Guid eventId);
@@ -61,6 +62,9 @@ namespace EList.DbDataProvider.Interfaces
         Task<Guid> CreateOrderPayoutAsync(OrderPayoutDto item);
         Task<OrderPayoutDto?> GetOrderPayoutAsync(Guid orderId, OrderPayoutKind kind);
         Task UpdateOrderPayoutAsync(OrderPayoutDto item);
+        Task<List<OrderPayoutDto>> GetOrderPayoutsByStatusAsync(OrderPayoutStatus status, int limit);
+        /// <summary>Paid + DealId, сделка ещё не закрыта локально, paid_at &lt; paidBefore.</summary>
+        Task<List<OrderDto>> GetPaidOrdersWithOpenDealAsync(DateTimeOffset paidBefore, int limit);
         #endregion
     }
 }

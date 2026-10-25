@@ -78,6 +78,11 @@ namespace EList.Repositories.Impl
             await _ordersDataProvider.SetProviderDealIdAsync(orderId, providerDealId);
         }
 
+        public async Task SetProviderDealClosedAtAsync(Guid orderId, DateTimeOffset closedAt)
+        {
+            await _ordersDataProvider.SetProviderDealClosedAtAsync(orderId, closedAt);
+        }
+
         public async Task<Guid> CreateOrderPayoutAsync(OrderPayout item)
         {
             var mapped = _mapper.Map<OrderPayoutDto>(item);
@@ -95,6 +100,21 @@ namespace EList.Repositories.Impl
         {
             var mapped = _mapper.Map<OrderPayoutDto>(item);
             await _ordersDataProvider.UpdateOrderPayoutAsync(mapped);
+        }
+
+        public async Task<List<OrderPayout>> GetOrderPayoutsByStatusAsync(OrderPayoutStatus status, int limit)
+        {
+            var mappedStatus = _mapper.Map<DbDataProvider.Models.Enums.OrderPayoutStatus>(status);
+            var items = await _ordersDataProvider.GetOrderPayoutsByStatusAsync(mappedStatus, limit);
+            return _mapper.Map<List<OrderPayout>>(items) ?? new List<OrderPayout>();
+        }
+
+        public async Task<List<Order>> GetPaidOrdersWithOpenDealAsync(
+            DateTimeOffset paidBefore,
+            int limit)
+        {
+            var items = await _ordersDataProvider.GetPaidOrdersWithOpenDealAsync(paidBefore, limit);
+            return _mapper.Map<List<Order>>(items) ?? new List<Order>();
         }
 
         public async Task<List<Order>> GetOrdersByBuyerAsync(Guid buyerAccountId)

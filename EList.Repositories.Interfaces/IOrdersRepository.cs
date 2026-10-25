@@ -16,10 +16,13 @@ namespace EList.Repositories.Interfaces
         Task SetProviderPaymentAsync(Guid orderId, PaymentProvider provider, string providerPaymentId);
 
         Task SetProviderDealIdAsync(Guid orderId, string providerDealId);
+        Task SetProviderDealClosedAtAsync(Guid orderId, DateTimeOffset closedAt);
 
         Task<Guid> CreateOrderPayoutAsync(OrderPayout item);
         Task<OrderPayout?> GetOrderPayoutAsync(Guid orderId, OrderPayoutKind kind);
         Task UpdateOrderPayoutAsync(OrderPayout item);
+        Task<List<OrderPayout>> GetOrderPayoutsByStatusAsync(OrderPayoutStatus status, int limit);
+        Task<List<Order>> GetPaidOrdersWithOpenDealAsync(DateTimeOffset paidBefore, int limit);
         Task<List<Order>> GetOrdersByBuyerAsync(Guid buyerAccountId);
         Task<List<Order>> GetOrdersBySellerOrganizationAsync(Guid organizationId);
         Task<List<Order>> GetOrdersByEventAsync(Guid eventId);

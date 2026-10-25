@@ -11,6 +11,7 @@ namespace EList.Services.Impl.BackgroundWorkers
     /// <summary>
     /// TTL неоплаченных заказов: Pending/Authorized старше N минут → Cancel у провайдера + Canceled.
     /// Освобождает soft-hold мест при брошенной оплате.
+    /// Не обрабатывает Paid / открытые Deal (см. <see cref="DealMaintenanceWorker"/>) и не делает refunds.
     /// </summary>
     public class PendingOrdersPurgeWorker : PeriodicBackgroundWorkerBase
     {

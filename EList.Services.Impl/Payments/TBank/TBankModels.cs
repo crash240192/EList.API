@@ -79,6 +79,19 @@ namespace EList.Services.Impl.Payments.TBank
         public string Token { get; set; } = string.Empty;
     }
 
+    /// <summary>Закрытие сделки Мультирасчётов (остаток → вознаграждение площадки).</summary>
+    public class TBankCloseSpDealRequest
+    {
+        [JsonProperty("TerminalKey")]
+        public string TerminalKey { get; set; } = string.Empty;
+
+        [JsonProperty("SpAccumulationId")]
+        public string SpAccumulationId { get; set; } = string.Empty;
+
+        [JsonProperty("Token")]
+        public string Token { get; set; } = string.Empty;
+    }
+
     public class TBankApiResponse
     {
         [JsonProperty("Success")]
