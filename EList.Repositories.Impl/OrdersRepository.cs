@@ -78,6 +78,25 @@ namespace EList.Repositories.Impl
             await _ordersDataProvider.SetProviderDealIdAsync(orderId, providerDealId);
         }
 
+        public async Task<Guid> CreateOrderPayoutAsync(OrderPayout item)
+        {
+            var mapped = _mapper.Map<OrderPayoutDto>(item);
+            return await _ordersDataProvider.CreateOrderPayoutAsync(mapped);
+        }
+
+        public async Task<OrderPayout?> GetOrderPayoutAsync(Guid orderId, OrderPayoutKind kind)
+        {
+            var mappedKind = _mapper.Map<DbDataProvider.Models.Enums.OrderPayoutKind>(kind);
+            var item = await _ordersDataProvider.GetOrderPayoutAsync(orderId, mappedKind);
+            return _mapper.Map<OrderPayout>(item);
+        }
+
+        public async Task UpdateOrderPayoutAsync(OrderPayout item)
+        {
+            var mapped = _mapper.Map<OrderPayoutDto>(item);
+            await _ordersDataProvider.UpdateOrderPayoutAsync(mapped);
+        }
+
         public async Task<List<Order>> GetOrdersByBuyerAsync(Guid buyerAccountId)
         {
             var items = await _ordersDataProvider.GetOrdersByBuyerAsync(buyerAccountId);

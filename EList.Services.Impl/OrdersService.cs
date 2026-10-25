@@ -42,6 +42,7 @@ namespace EList.Services.Impl
         private readonly INotificationsService _notificationsService;
         private readonly IEventAccessValidator _eventAccessValidator;
         private readonly IPaymentProvider _paymentProvider;
+        private readonly IOrderDealPayoutService _orderDealPayoutService;
         private readonly IAccountsRepository _accountsRepository;
         private readonly IWalletsService _walletsService;
         private readonly IMapper _mapper;
@@ -62,6 +63,7 @@ namespace EList.Services.Impl
             INotificationsService notificationsService,
             IEventAccessValidator eventAccessValidator,
             IPaymentProvider paymentProvider,
+            IOrderDealPayoutService orderDealPayoutService,
             IAccountsRepository accountsRepository,
             IWalletsService walletsService,
             IMapper mapper)
@@ -81,6 +83,7 @@ namespace EList.Services.Impl
             _notificationsService = notificationsService ?? throw new ArgumentNullException(nameof(notificationsService));
             _eventAccessValidator = eventAccessValidator ?? throw new ArgumentNullException(nameof(eventAccessValidator));
             _paymentProvider = paymentProvider ?? throw new ArgumentNullException(nameof(paymentProvider));
+            _orderDealPayoutService = orderDealPayoutService ?? throw new ArgumentNullException(nameof(orderDealPayoutService));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
             _walletsService = walletsService ?? throw new ArgumentNullException(nameof(walletsService));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
@@ -2256,6 +2259,9 @@ namespace EList.Services.Impl
 
                 await _notificationsService.NotifyParticipatedAsync(eventId, buyerAccountId);
             }
+
+            // P3: A2C продавцу из Deal (идемпотентно; ошибки только в журнале order_payouts).
+            await _orderDealPayoutService.TryPayoutSellerAfterPaidAsync(orderId);
         }
 
         private async Task<CommandResult?> AssertCanBuyTicketAsync(Event eventItem)

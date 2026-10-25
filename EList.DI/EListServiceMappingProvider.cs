@@ -95,11 +95,13 @@ namespace EList.DI
             {
                 mapper.AddSingleton<IPaymentProvider, TBankPaymentProvider>();
                 mapper.AddSingleton<ISellerOnboardingProvider, TBankSellerOnboardingProvider>();
+                mapper.AddScoped<IOrderDealPayoutService, TBankDealPayoutService>();
             }
             else
             {
                 mapper.AddSingleton<IPaymentProvider, YooKassaStubPaymentProvider>();
                 mapper.AddSingleton<ISellerOnboardingProvider, YooKassaStubSellerOnboardingProvider>();
+                mapper.AddScoped<IOrderDealPayoutService, NoOpOrderDealPayoutService>();
             }
 
             //Repositories

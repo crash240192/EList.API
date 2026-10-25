@@ -56,5 +56,11 @@ namespace EList.DbDataProvider.Interfaces
         Task MarkWebhookProcessedAsync(Guid webhookEventId, Guid? orderId = null);
         Task<List<PaymentWebhookEventDto>> GetUnprocessedWebhookEventsAsync(int limit = 100);
         #endregion
+
+        #region payouts
+        Task<Guid> CreateOrderPayoutAsync(OrderPayoutDto item);
+        Task<OrderPayoutDto?> GetOrderPayoutAsync(Guid orderId, OrderPayoutKind kind);
+        Task UpdateOrderPayoutAsync(OrderPayoutDto item);
+        #endregion
     }
 }

@@ -114,17 +114,16 @@
 
 **Выход:** покупка билета создаёт сделку; DealId сохраняется; билеты после `CONFIRMED`. A2C — P3.
 
-### P3 — Выплаты A2C_V2
+### P3 — Выплаты A2C_V2 — **в коде (MVP)**
 
-Новый клиент `TBankA2cClient` (`/e2c/v2/Init`, `/e2c/v2/Payment`, GetState, CancelPayment, GetSbpMembers при СБП):
+- [x] `TBankA2cClient` (`/e2c/v2/Init`, `/Payment`, `/GetState`)  
+- [x] После `CONFIRMED` + fulfill: A2C на `amount_seller`, `PartnerId` = shopCode, **`FinalPayout=true`** (остаток = комиссия площадке)  
+- [x] Журнал `order_payouts` (unique order+kind, статусы)  
+- [x] `payments:tbank:autoPayoutOnPaid` (default true); soft-fail без кредов/DealId  
+- [ ] Ретраи / GetState worker для `Initiated` — P4  
+- [ ] CancelPayment / GetSbpMembers — по необходимости  
 
-- После D3: Init e2c на `amount_seller` + `DealId`  
-- Payment e2c  
-- Таблица/журнал `order_payouts` (idempotent, status, provider ids)  
-- Комиссия: FinalPayout / close на остаток `amount_commission`  
-- Ретраи, алерты при fail  
-
-**Выход:** деньги org и комиссия площадки проходят через сделку end-to-end на стенде.
+**Выход:** после оплаты на стенде с e2c-доступом org получает долю; комиссия остаётся площадке при закрытии сделки.
 
 ### P4 — Закрытие, TTL, воркеры
 

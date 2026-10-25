@@ -142,7 +142,7 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 |------|--------|
 | Orders / tickets / stub payment / webhook path / check-in / transfer / refunds | API есть |
 | Учёт `AmountTotal` / `AmountSeller` / `AmountCommission` в заказе | Есть |
-| **Целевое:** Мультирасчёты Deal NN (Init NN + A2C/close; одностадийка) | Init Deal NN ✅ P2; A2C — P3; план [tbank-multisplit-plan.md](./tbank-multisplit-plan.md) |
+| **Целевое:** Мультирасчёты Deal NN (Init NN + A2C/close; одностадийка) | Init Deal NN ✅ P2; A2C seller+FinalPayout ✅ P3; план [tbank-multisplit-plan.md](./tbank-multisplit-plan.md) |
 | Legacy Shops/Fee | ❌ убран из Init билетов (P2) |
 | Онбординг продавца acqapi OAuth (`/sm-register/register`) | ✅ P1 (`TBankAcqApiClient`); legacy SM-Register — fallback; нужен WL/mTLS на стенде |
 | Webhook Т-Банка `POST /eList/api/payments/tbank/webhook` (тело `OK`) | ✅ заказы + пополнения (`OrderId` = `wallet:{guid}`); доработать DealId/`SpAccumulationId` |

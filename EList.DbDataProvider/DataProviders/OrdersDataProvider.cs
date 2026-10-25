@@ -321,5 +321,32 @@ namespace EList.DbDataProvider.DataProviders
             return result;
         }
         #endregion
+
+        #region payouts
+        public async Task<Guid> CreateOrderPayoutAsync(OrderPayoutDto item)
+        {
+            if (item.Id == Guid.Empty)
+                item.Id = Guid.NewGuid();
+            var now = DateTimeOffset.Now.ToUniversalTime();
+            item.CreateDate = now;
+            item.UpdatedAt = now;
+            if (string.IsNullOrWhiteSpace(item.Currency))
+                item.Currency = "RUB";
+            await _connection.InsertAsync(item);
+            return item.Id;
+        }
+
+        public async Task<OrderPayoutDto?> GetOrderPayoutAsync(Guid orderId, OrderPayoutKind kind)
+        {
+            return await _connection.OrderPayouts
+                .FirstOrDefaultAsync(i => i.OrderId == orderId && i.Kind == kind);
+        }
+
+        public async Task UpdateOrderPayoutAsync(OrderPayoutDto item)
+        {
+            item.UpdatedAt = DateTimeOffset.Now.ToUniversalTime();
+            await _connection.UpdateAsync(item);
+        }
+        #endregion
     }
 }
