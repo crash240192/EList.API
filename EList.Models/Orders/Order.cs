@@ -76,6 +76,11 @@ namespace EList.Models.Orders
         public string? ProviderPaymentId { get; set; }
 
         /// <summary>
+        /// Идентификатор сделки Мультирасчётов (DealId / SpAccumulationId)
+        /// </summary>
+        public string? ProviderDealId { get; set; }
+
+        /// <summary>
         /// Ключ идемпотентности
         /// </summary>
         public string? IdempotencyKey { get; set; }

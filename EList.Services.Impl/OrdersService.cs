@@ -266,6 +266,9 @@ namespace EList.Services.Impl
                 _paymentProvider.Kind,
                 payment.ProviderPaymentId);
 
+            if (!string.IsNullOrWhiteSpace(payment.ProviderDealId))
+                await _ordersRepository.SetProviderDealIdAsync(order.Id, payment.ProviderDealId);
+
             var pending = await _ordersRepository.GetOrderFullAsync(order.Id) ?? order;
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return new CommandResult<CreateOrderResponse>(await ToCreateResponseAsync(
@@ -603,6 +606,16 @@ namespace EList.Services.Impl
             {
                 await _ordersRepository.SetProviderPaymentAsync(
                     order.Id, PaymentProvider.Tbank, providerPaymentId);
+            }
+
+            var dealId = notification.ResolveDealId()
+                ?? TBankApiResponse.FormatDealId(payload["SpAccumulationId"])
+                ?? TBankApiResponse.FormatDealId(payload["DealId"]);
+            if (!string.IsNullOrWhiteSpace(dealId)
+                && string.IsNullOrWhiteSpace(order.ProviderDealId))
+            {
+                await _ordersRepository.SetProviderDealIdAsync(order.Id, dealId);
+                order.ProviderDealId = dealId;
             }
 
             if (status == "CONFIRMED")
@@ -1339,6 +1352,13 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName,
                 $"GetState sync payment={order.ProviderPaymentId} status={statusInfo.Status}", null);
+
+            if (!string.IsNullOrWhiteSpace(statusInfo.ProviderDealId)
+                && string.IsNullOrWhiteSpace(order.ProviderDealId))
+            {
+                await _ordersRepository.SetProviderDealIdAsync(order.Id, statusInfo.ProviderDealId);
+                order.ProviderDealId = statusInfo.ProviderDealId;
+            }
 
             if (statusInfo.Status == PaymentProviderStatus.Succeeded)
             {

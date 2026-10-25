@@ -73,6 +73,11 @@ namespace EList.Repositories.Impl
             await _ordersDataProvider.SetProviderPaymentAsync(orderId, mappedProvider, providerPaymentId);
         }
 
+        public async Task SetProviderDealIdAsync(Guid orderId, string providerDealId)
+        {
+            await _ordersDataProvider.SetProviderDealIdAsync(orderId, providerDealId);
+        }
+
         public async Task<List<Order>> GetOrdersByBuyerAsync(Guid buyerAccountId)
         {
             var items = await _ordersDataProvider.GetOrdersByBuyerAsync(buyerAccountId);
