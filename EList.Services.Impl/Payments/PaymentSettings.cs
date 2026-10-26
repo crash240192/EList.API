@@ -317,7 +317,7 @@ namespace EList.Services.Impl.Payments
 
     /// <summary>
     /// Init.Receipt: чек через кассу, подключённую к терминалу Т‑Банка.
-    /// Не путать с прямым CloudKassir <c>kkt/receipt</c> (fiscal:*).
+    /// Не путать с <c>cloudKassir:directFiscalization</c> (прямой kkt/receipt).
     /// </summary>
     public class TBankReceiptSettings
     {

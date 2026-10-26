@@ -105,9 +105,10 @@ namespace EList.DI
                 mapper.AddScoped<IOrderDealPayoutService, NoOpOrderDealPayoutService>();
             }
 
-            // Фискализация 54‑ФЗ (CloudKassir) — независимо от сплита Deal/A2C; default off.
+            // Прямой CloudKassir kkt/receipt (запасной контур). Default off —
+            // на проде с кассой на терминале Т‑Банка используется Init.Receipt.
             var fiscalSettings = FiscalSettings.Load();
-            if (fiscalSettings.IsCloudKassir())
+            if (fiscalSettings.IsDirectFiscalizationEnabled())
                 mapper.AddScoped<IFiscalReceiptProvider, CloudKassirReceiptProvider>();
             else
                 mapper.AddScoped<IFiscalReceiptProvider, NoOpFiscalReceiptProvider>();

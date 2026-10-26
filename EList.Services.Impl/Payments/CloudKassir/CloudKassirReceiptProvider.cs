@@ -11,7 +11,8 @@ using NLog;
 namespace EList.Services.Impl.Payments.CloudKassir
 {
     /// <summary>
-    /// CloudKassir <c>kkt/receipt</c> (54‑ФЗ). Включается через fiscal:enabled + cloudKassir creds.
+    /// CloudKassir <c>kkt/receipt</c> — прямая фискализация (в обход Init.Receipt Т‑Банка).
+    /// Включается <c>cloudKassir:directFiscalization:enabled</c> + креды. Default off.
     /// Сплит денег — не здесь (Т‑Банк Deal/A2C).
     /// Docs: docs/Тестирование онлайн-чека – CloudKassir for Developers.html
     /// </summary>
@@ -54,7 +55,7 @@ namespace EList.Services.Impl.Payments.CloudKassir
 
         public string ProviderName => "cloudKassir";
 
-        public bool IsEnabled => _settings.IsCloudKassir();
+        public bool IsEnabled => _settings.IsDirectFiscalizationEnabled();
 
         public Task<FiscalReceiptResult> IssueIncomeForOrderAsync(FiscalIncomeReceiptRequest request)
             => SendReceiptAsync(request, isRefund: false);
@@ -89,14 +90,14 @@ namespace EList.Services.Impl.Payments.CloudKassir
                 return FiscalReceiptStatusResult.Fail("providerReceiptId empty");
 
             if (!IsEnabled)
-                return FiscalReceiptStatusResult.Fail("fiscal disabled");
+                return FiscalReceiptStatusResult.Fail("cloudKassir directFiscalization disabled");
 
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(GetReceiptStatusAsync)}";
 
             try
             {
-                var ck = _settings.CloudKassir;
+                var ck = _settings.DirectFiscalization;
                 var body = new JObject { ["Id"] = providerReceiptId.Trim() };
                 using var httpRequest = new HttpRequestMessage(
                     HttpMethod.Post,
@@ -137,7 +138,7 @@ namespace EList.Services.Impl.Payments.CloudKassir
             if (!IsEnabled || string.IsNullOrEmpty(rawBody))
                 return false;
 
-            var secret = _settings.CloudKassir.ApiSecret;
+            var secret = _settings.DirectFiscalization.ApiSecret;
             if (string.IsNullOrWhiteSpace(secret))
                 return false;
 
@@ -164,14 +165,14 @@ namespace EList.Services.Impl.Payments.CloudKassir
             var methodName = $"{LOGGER_NAME}{nameof(SendReceiptAsync)}";
 
             if (!IsEnabled)
-                return FiscalReceiptResult.Skip("fiscal disabled or cloudKassir not configured");
+                return FiscalReceiptResult.Skip("cloudKassir directFiscalization disabled or not configured");
 
             try
             {
-                var ck = _settings.CloudKassir;
+                var ck = _settings.DirectFiscalization;
                 var platformInn = DigitsOnly(ck.Inn);
                 if (string.IsNullOrWhiteSpace(platformInn))
-                    return FiscalReceiptResult.Fail("fiscal:cloudKassir:inn is required (KKT owner)");
+                    return FiscalReceiptResult.Fail("cloudKassir:directFiscalization:inn is required (KKT owner)");
 
                 var invoiceId = !string.IsNullOrWhiteSpace(request.InvoiceId)
                     ? request.InvoiceId.Trim()
@@ -263,7 +264,7 @@ namespace EList.Services.Impl.Payments.CloudKassir
             }
         }
 
-        private static void ApplyBasicAuth(HttpRequestMessage httpRequest, CloudKassirSettings ck)
+        private static void ApplyBasicAuth(HttpRequestMessage httpRequest, CloudKassirDirectFiscalizationSettings ck)
         {
             var basic = Convert.ToBase64String(
                 Encoding.UTF8.GetBytes($"{ck.PublicId}:{ck.ApiSecret}"));

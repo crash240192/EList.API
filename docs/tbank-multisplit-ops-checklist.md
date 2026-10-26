@@ -85,8 +85,8 @@
 
 | # | Что | Статус |
 |---|-----|--------|
-| 6.1 | Креды CloudKassir (PublicId / ApiSecret) + `fiscal__cloudKassir__inn` | ☐ |
-| 6.2 | Включить `fiscal:provider=cloudKassir` + `fiscal:enabled=true` | код готов, default off |
+| 6.1 | Креды CloudKassir (если прямой контур) + `cloudKassir__directFiscalization__inn` | ☐ запас |
+| 6.2 | `cloudKassir__directFiscalization__enabled=true` | код готов, **default off**; на проде — Init.Receipt |
 | 6.3 | Чек Income после Paid (platform Inn + PurveyorData) | ✅ + журнал |
 | 6.4 | Чек возврата IncomeReturn | ✅ |
 | 6.5 | Webhook Receipt URL в ЛК → `/eList/api/payments/cloudkassir/receipt` | ☐ ops |

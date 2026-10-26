@@ -54,7 +54,7 @@
 4. Adult gate на покупку — отложено (ageLimit уже на доступе к событию).
 
 ### W4 — фискализация (в работе)
-1. ✅ CloudKassir `kkt/receipt` после Paid; `X-Request-ID`; platform Inn + PurveyorData продавца; default off.
+1. ✅ Прямой CloudKassir `kkt/receipt` (запас): `cloudKassir:directFiscalization` default off; Init.Receipt — прод при кассе на терминале.
 2. ✅ Чек возврата IncomeReturn из `FulfillRefund`; журнал `order_fiscal_receipts`.
 3. ✅ Webhook Receipt `POST /api/payments/cloudkassir/receipt` (HMAC SHA256).
 4. ⚠️ Телефон поставщика — из org contacts (если есть); gate «обязателен телефон» — позже.

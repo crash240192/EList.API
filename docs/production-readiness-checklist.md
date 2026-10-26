@@ -153,7 +153,8 @@
 - [x] Refunds API (stub provider)
 - [x] TicketingAgreement gate на `CanSellTickets` + capacity с учётом pending заказов
 - [x] 54-ФЗ CloudKassir: Income/Return, журнал `order_fiscal_receipts`, webhook Receipt (HMAC), default off + §§4.2/5.1/6.2 договора
-- [ ] Прод-креды кассы + `fiscal:enabled=true` + Inn ККТ + URL Receipt в ЛК
+- [ ] Прод: касса на терминале → Init.Receipt (СНО/НДС); прямой `cloudKassir__directFiscalization` держать off
+- [ ] (Запас) креды CloudKassir + `directFiscalization__enabled` только если уйдёте с кассы банка
 - [ ] Dual-чеки §6.2 (билет + комиссия) вместо одного agent-scheme чека — по необходимости
 - [ ] Prod TerminalKey + публичный NotificationURL на стенде/проде (ops, не код) — см. [tbank-multisplit-ops-checklist.md](./tbank-multisplit-ops-checklist.md)
 - [ ] Organization acqapi OAuth / ShopCode на prod-оргах

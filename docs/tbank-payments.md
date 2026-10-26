@@ -136,20 +136,21 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 
 Сплит в чеке (агент/поставщик) и сплит денег по сделке — разные механизмы; касса не заменяет Deal/выплаты. См. [tbank-multisplit-plan.md](./tbank-multisplit-plan.md).
 
-### Env фискализации (P5 scaffold, default off)
+### Env: прямой CloudKassir (запасной контур, default off)
+
+Сейчас на проде чеки идут через **Init.Receipt** (касса на терминале).  
+Прямой `kkt/receipt` — код готов, выключен; включать только если уйдёте с кассы банка.
 
 | Ключ | Смысл |
 |------|--------|
-| `fiscal__provider` | `none` (default) \| `cloudKassir` |
-| `fiscal__enabled` | `true` только вместе с кредами кассы |
-| `fiscal__cloudKassir__publicId` / `apiSecret` | Basic auth CloudKassir (не коммитить) |
-| `fiscal__cloudKassir__inn` | ИНН владельца ККТ (площадка / агент) |
-| `fiscal__cloudKassir__apiBaseUrl` | Default `https://api.cloudpayments.ru` |
-| `fiscal__cloudKassir__taxationSystem` / `vat` / `agentSign` | Параметры чека (`agentSign=6` = «Агент») |
+| `cloudKassir__directFiscalization__enabled` | `true` — слать чеки сами в CloudKassir API |
+| `cloudKassir__directFiscalization__publicId` / `apiSecret` | Basic auth (не коммитить) |
+| `cloudKassir__directFiscalization__inn` | ИНН владельца ККТ |
+| `cloudKassir__directFiscalization__apiBaseUrl` | Default `https://api.cloudpayments.ru` |
+| `cloudKassir__directFiscalization__taxationSystem` / `vat` / `agentSign` | Параметры чека |
 
-Флоу: Paid → `kkt/receipt` Income (soft-fail) → журнал `order_fiscal_receipts` (Queued) → webhook `POST /eList/api/payments/cloudkassir/receipt` (HMAC) → Processed.  
-Возврат: `FulfillRefund` → IncomeReturn. Идемпотентность: `X-Request-ID` = `InvoiceId` (`order:{guid}` / `refund:{guid}`).  
-Дока API: [Тестирование онлайн-чека – CloudKassir for Developers.html](./Тестирование%20онлайн-чека%20–%20CloudKassir%20for%20Developers.html).
+Флоу (если enabled): Paid → `kkt/receipt` → журнал → webhook `/eList/api/payments/cloudkassir/receipt`.  
+Дока: [CloudKassir HTML](./Тестирование%20онлайн-чека%20–%20CloudKassir%20for%20Developers.html).
 
 ---
 
@@ -160,7 +161,7 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 К терминалу подключена онлайн-касса, а в `Init` не был передан `Receipt`.  
 Код шлёт `Receipt` при `payments__tbank__receipt__enabled=true` (default). Нужен Email или Phone покупателя (login с `@` или `defaultEmail`).
 
-**Не включать одновременно** Init.Receipt (касса банка) и `fiscal:enabled=true` (прямой CloudKassir) — будет два чека на одну оплату. Выберите один контур.
+**Не включать одновременно** `payments__tbank__receipt__enabled` и `cloudKassir__directFiscalization__enabled` — два чека на одну оплату.
 
 ### HTTP 403 Forbidden на `rest-api-test.tinkoff.ru/v2/Init`
 

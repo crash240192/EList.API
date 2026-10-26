@@ -3,48 +3,44 @@ using EList.Common.Configuration;
 namespace EList.Services.Impl.Payments
 {
     /// <summary>
-    /// Настройки фискализации (CloudKassir). Default: выключено.
+    /// Прямая фискализация через CloudKassir API (<c>kkt/receipt</c>), в обход Init.Receipt Т‑Банка.
+    /// Default: выключено. На проде с кассой на терминале использовать Init.Receipt, не этот контур.
+    /// Config: <c>cloudKassir:directFiscalization:*</c>
     /// </summary>
     public class FiscalSettings
     {
         public const string DefaultCloudKassirApiBaseUrl = "https://api.cloudpayments.ru";
 
-        /// <summary><c>none</c> \| <c>cloudKassir</c></summary>
-        public string Provider { get; set; } = "none";
-
-        public bool Enabled { get; set; }
-
-        public CloudKassirSettings CloudKassir { get; set; } = new();
+        public CloudKassirDirectFiscalizationSettings DirectFiscalization { get; set; } = new();
 
         public static FiscalSettings Load()
         {
+            const string prefix = "cloudKassir:directFiscalization:";
             var settings = new FiscalSettings
             {
-                Provider = Read("fiscal:provider", "none"),
-                Enabled = ReadBool("fiscal:enabled", defaultValue: false),
-                CloudKassir = new CloudKassirSettings
+                DirectFiscalization = new CloudKassirDirectFiscalizationSettings
                 {
-                    PublicId = Read("fiscal:cloudKassir:publicId"),
-                    ApiSecret = Read("fiscal:cloudKassir:apiSecret"),
-                    ApiBaseUrl = Read("fiscal:cloudKassir:apiBaseUrl", DefaultCloudKassirApiBaseUrl),
+                    Enabled = ReadBool($"{prefix}enabled", defaultValue: false),
+                    PublicId = Read($"{prefix}publicId"),
+                    ApiSecret = Read($"{prefix}apiSecret"),
+                    ApiBaseUrl = Read($"{prefix}apiBaseUrl", DefaultCloudKassirApiBaseUrl),
                     // ИНН владельца ККТ (площадка / агент), не ИНН продавца билета.
-                    Inn = Read("fiscal:cloudKassir:inn"),
-                    TaxationSystem = ReadInt("fiscal:cloudKassir:taxationSystem", defaultValue: 0, min: 0, max: 5),
-                    Vat = Read("fiscal:cloudKassir:vat", "null"),
-                    AgentSign = ReadInt("fiscal:cloudKassir:agentSign", defaultValue: 6, min: 0, max: 6)
+                    Inn = Read($"{prefix}inn"),
+                    TaxationSystem = ReadInt($"{prefix}taxationSystem", defaultValue: 0, min: 0, max: 5),
+                    Vat = Read($"{prefix}vat", "null"),
+                    AgentSign = ReadInt($"{prefix}agentSign", defaultValue: 6, min: 0, max: 6)
                 }
             };
 
-            if (string.IsNullOrWhiteSpace(settings.CloudKassir.ApiBaseUrl))
-                settings.CloudKassir.ApiBaseUrl = DefaultCloudKassirApiBaseUrl;
+            if (string.IsNullOrWhiteSpace(settings.DirectFiscalization.ApiBaseUrl))
+                settings.DirectFiscalization.ApiBaseUrl = DefaultCloudKassirApiBaseUrl;
 
             return settings;
         }
 
-        public bool IsCloudKassir()
-            => Enabled
-               && string.Equals(Provider, "cloudKassir", StringComparison.OrdinalIgnoreCase)
-               && CloudKassir.IsConfigured();
+        /// <summary>Прямой CloudKassir включён и сконфигурирован.</summary>
+        public bool IsDirectFiscalizationEnabled()
+            => DirectFiscalization.Enabled && DirectFiscalization.IsConfigured();
 
         private static string Read(string key, string defaultValue = "")
         {
@@ -83,8 +79,10 @@ namespace EList.Services.Impl.Payments
         }
     }
 
-    public class CloudKassirSettings
+    public class CloudKassirDirectFiscalizationSettings
     {
+        public bool Enabled { get; set; }
+
         public string PublicId { get; set; } = string.Empty;
         public string ApiSecret { get; set; } = string.Empty;
         public string ApiBaseUrl { get; set; } = FiscalSettings.DefaultCloudKassirApiBaseUrl;

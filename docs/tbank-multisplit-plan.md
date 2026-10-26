@@ -140,7 +140,8 @@
 ### P5 — Ops + фискализация ✅
 
 - [x] Чеклист стенда: [tbank-multisplit-ops-checklist.md](./tbank-multisplit-ops-checklist.md) (WL, NotificationURL, e2c, smoke)  
-- [x] Каркас CloudKassir: `IFiscalReceiptProvider` + `CloudKassirReceiptProvider` (`kkt/receipt`); default `fiscal:enabled=false`  
+- [x] Каркас CloudKassir: `IFiscalReceiptProvider` + `CloudKassirReceiptProvider` (`kkt/receipt`); default `cloudKassir:directFiscalization:enabled=false`  
+- [x] Init.Receipt для кассы на терминале Т‑Банка (прод-контур) 
 - [x] Soft-fail чек Income после fulfill/A2C в `OrdersService` (не откатывает билеты)  
 - [x] Агентский договор §§4.2 / 5.1 — Deal + A2C / FinalPayout вместо «удержания при расчёте»  
 - [ ] Полный W4: чек возврата, обязательные поля org, прод-креды кассы — следующая итерация  
