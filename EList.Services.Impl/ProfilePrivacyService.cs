@@ -298,6 +298,7 @@ namespace EList.Services.Impl
             if (!await HasPersonalDataDistributionConsentAsync(account.Id))
             {
                 account.AvatarId = null;
+                ClearHeader(account);
                 return account;
             }
 
@@ -307,9 +308,20 @@ namespace EList.Services.Impl
                 account.ProfileCity = ProfileCityResolver.ResolveNearestCityName(lat, lng);
 
             if (!await CanViewerSeeProfilePhotosAsync(account.Id, viewerAccountId))
+            {
                 account.AvatarId = null;
+                ClearHeader(account);
+            }
 
             return account;
+        }
+
+        private static void ClearHeader(Account account)
+        {
+            account.HeaderImageId = null;
+            account.HeaderFocusX = null;
+            account.HeaderFocusY = null;
+            account.HeaderBlur = false;
         }
 
         public async Task ApplyAccountPublicDataViewPolicyAsync(
@@ -342,14 +354,18 @@ namespace EList.Services.Impl
 
         private async Task SyncAccountAvatarFilesVisibilityAsync(Guid accountId, bool isPrivate)
         {
-            var avatarIds = await _mediaRepository.GetAccountAvatarsAsync(accountId) ?? new List<Guid>();
-            if (avatarIds.Count == 0)
+            var fileIds = await _mediaRepository.GetAccountAvatarsAsync(accountId) ?? new List<Guid>();
+            var account = await _accountsRepository.GetAccountAsync(accountId);
+            if (account?.HeaderImageId != null && account.HeaderImageId != Guid.Empty)
+                fileIds.Add(account.HeaderImageId.Value);
+
+            if (fileIds.Count == 0)
                 return;
 
             var visibility = isPrivate ? FileVisibility.Private : FileVisibility.Public;
             try
             {
-                await _filestorageClient.SetFilesVisibilityAsync(avatarIds, visibility);
+                await _filestorageClient.SetFilesVisibilityAsync(fileIds, visibility);
             }
             catch (Exception ex)
             {
@@ -358,7 +374,7 @@ namespace EList.Services.Impl
                     correlationId,
                     null,
                     $"{LOGGER_NAME}{nameof(SyncAccountAvatarFilesVisibilityAsync)}",
-                    $"Не удалось обновить visibility ({visibility}) для {avatarIds.Count} аватаров аккаунта {accountId}: {ex.Message}");
+                    $"Не удалось обновить visibility ({visibility}) для {fileIds.Count} фото профиля аккаунта {accountId}: {ex.Message}");
             }
         }
 

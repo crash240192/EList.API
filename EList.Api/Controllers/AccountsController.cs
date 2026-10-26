@@ -6,6 +6,7 @@ using EList.Common.Models;
 using EList.Common.Support;
 using EList.DbDataProvider.Interfaces;
 using EList.Models.Accounts;
+using EList.Models.Events;
 using EList.Models.Location;
 using EList.Models.Privacy;
 using EList.Services.Interfaces;
@@ -388,6 +389,91 @@ namespace EList.Api.Controllers
             }
             catch (Exception ex)
             {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Установить / сбросить фото шапки профиля (imageId, focusX/Y 0…100, blur).
+        /// imageId = null — сброс шапки.
+        /// </summary>
+        [HttpPut("header")]
+        public async Task<CommandResult<Account?>> SetAccountHeaderAsync([FromBody] AccountHeaderRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SetAccountHeaderAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _accountsService.SetAccountHeaderAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Список закрепов «Мои мероприятия» (сверху вниз).
+        /// </summary>
+        [HttpGet("myEventPins")]
+        public async Task<CommandResult<MyEventPinsResponse>> GetMyEventPinsAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetMyEventPinsAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _accountsService.GetMyEventPinsAsync();
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Полная замена списка закрепов «Мои мероприятия» (порядок = сверху вниз).
+        /// </summary>
+        [HttpPut("myEventPins")]
+        public async Task<CommandResult<MyEventPinsResponse>> SetMyEventPinsAsync([FromBody] MyEventPinsRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SetMyEventPinsAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _accountsService.SetMyEventPinsAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
                 ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }

@@ -1,5 +1,6 @@
 ﻿using EList.Common.Models;
 using EList.Models.Accounts;
+using EList.Models.Events;
 
 namespace EList.Services.Interfaces
 {
@@ -22,5 +23,11 @@ namespace EList.Services.Interfaces
         Task<CommandResult> UpdateLoginAsync(string newLogin);
         Task<CommandResult> DeleteMyAccountAsync();
         Task<CommandResult<AccountDataExport>> ExportMyDataAsync();
+
+        /// <summary>Установить / сбросить фото шапки профиля (focus + blur).</summary>
+        Task<CommandResult<Account?>> SetAccountHeaderAsync(AccountHeaderRequest request);
+
+        Task<CommandResult<MyEventPinsResponse>> GetMyEventPinsAsync();
+        Task<CommandResult<MyEventPinsResponse>> SetMyEventPinsAsync(MyEventPinsRequest request);
     }
 }

@@ -27,6 +27,7 @@
     <None Remove="Migrations\M202610252236_order_payouts.sql" />
     <None Remove="Migrations\M202610252251_order_deal_closed_at.sql" />
     <None Remove="Migrations\M202610261050_order_fiscal_receipts.sql" />
+    <None Remove="Migrations\M202610261900_profile_header_album_views_event_pins.sql" />
   </ItemGroup>
 
   <ItemGroup>
@@ -50,6 +51,7 @@
     <EmbeddedResource Include="Migrations\M202610252236_order_payouts.sql" />
     <EmbeddedResource Include="Migrations\M202610252251_order_deal_closed_at.sql" />
     <EmbeddedResource Include="Migrations\M202610261050_order_fiscal_receipts.sql" />
+    <EmbeddedResource Include="Migrations\M202610261900_profile_header_album_views_event_pins.sql" />
   </ItemGroup>
 
   <ItemGroup>

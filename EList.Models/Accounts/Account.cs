@@ -62,6 +62,18 @@ namespace EList.Models.Accounts
         /// </summary>
         public Guid? AvatarId { get; set; }
 
+        /// <summary>Фото шапки профиля (как cover события).</summary>
+        public Guid? HeaderImageId { get; set; }
+
+        /// <summary>Фокус шапки 0…100 (object-position X).</summary>
+        public double? HeaderFocusX { get; set; }
+
+        /// <summary>Фокус шапки 0…100 (object-position Y).</summary>
+        public double? HeaderFocusY { get; set; }
+
+        /// <summary>Блюр фона шапки вкл/выкл.</summary>
+        public bool HeaderBlur { get; set; }
+
         /// <summary>
         /// Ближайший город по координатам (вычисляется при отдаче, не хранится в БД).
         /// </summary>

@@ -16,6 +16,7 @@ using EList.Repositories.Interfaces;
 using EList.Services.Interfaces;
 using EList.Validators.Interfaces;
 using NLog;
+using FileVisibility = EList.FilestorageClient.FileVisibility;
 
 namespace EList.Services.Impl
 {
@@ -375,6 +376,103 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
+        public async Task<CommandResult<Account?>> SetAccountHeaderAsync(AccountHeaderRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SetAccountHeaderAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<Account?>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            request ??= new AccountHeaderRequest();
+            var accountId = _accountDataHolder.AccountId.Value;
+            var imageId = request.ImageId == Guid.Empty ? null : request.ImageId;
+
+            double? focusX = null;
+            double? focusY = null;
+            var blur = false;
+            if (imageId != null)
+            {
+                focusX = ClampFocus(request.FocusX ?? 50);
+                focusY = ClampFocus(request.FocusY ?? 50);
+                blur = request.Blur;
+            }
+
+            await _accountsRepository.SetAccountHeaderAsync(accountId, imageId, focusX, focusY, blur);
+
+            if (imageId != null)
+            {
+                var settings = await _profilePrivacyService.GetOrDefaultAsync(accountId);
+                var hasConsent = await _profilePrivacyService.HasPersonalDataDistributionConsentAsync(accountId);
+                var isPrivate = !hasConsent || settings.ProfilePhotosVisibility == PrivacyAudience.Nobody;
+                try
+                {
+                    await _filestorageClient.SetFilesVisibilityAsync(
+                        new List<Guid> { imageId.Value },
+                        isPrivate ? FileVisibility.Private : FileVisibility.Public);
+                }
+                catch (Exception ex)
+                {
+                    logger.Warn(correlationId, null, methodName,
+                        $"Не удалось обновить visibility шапки {imageId}: {ex.Message}");
+                }
+            }
+
+            var account = await _accountsRepository.GetAccountAsync(accountId);
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<Account?>(account);
+        }
+
+        public async Task<CommandResult<MyEventPinsResponse>> GetMyEventPinsAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetMyEventPinsAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<MyEventPinsResponse>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var ids = await _accountsRepository.GetEventPinIdsAsync(_accountDataHolder.AccountId.Value);
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<MyEventPinsResponse>(new MyEventPinsResponse { EventIds = ids });
+        }
+
+        public async Task<CommandResult<MyEventPinsResponse>> SetMyEventPinsAsync(MyEventPinsRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SetMyEventPinsAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult<MyEventPinsResponse>.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var eventIds = request?.EventIds ?? new List<Guid>();
+            // Ограничение на разумный размер списка закрепов.
+            if (eventIds.Count > 100)
+                return CommandResult<MyEventPinsResponse>.Fail(ErrorCode.InvalidValue, "Не более 100 закрепов");
+
+            await _accountsRepository.ReplaceEventPinsAsync(_accountDataHolder.AccountId.Value, eventIds);
+            var ids = await _accountsRepository.GetEventPinIdsAsync(_accountDataHolder.AccountId.Value);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return new CommandResult<MyEventPinsResponse>(new MyEventPinsResponse { EventIds = ids });
+        }
+
+        private static double ClampFocus(double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+                return 50;
+            if (value < 0)
+                return 0;
+            if (value > 100)
+                return 100;
+            return value;
+        }
+
         public async Task<CommandResult> UpdateLoginAsync(string newLogin)
         {
             var correlationId = _correlationIdProvider.Get();
@@ -480,6 +578,25 @@ namespace EList.Services.Impl
                         }
                     }
                     await _mediaRepository.DeleteAvatarAsync(avatarId);
+                }
+
+                var accountBeforeClear = await _accountsRepository.GetAccountAsync(accountId);
+                if (accountBeforeClear?.HeaderImageId != null
+                    && _accountDataHolder.Token != null
+                    && !string.IsNullOrEmpty(_accountDataHolder.Jwt))
+                {
+                    try
+                    {
+                        await _filestorageClient.DeleteFileAsync(
+                            accountBeforeClear.HeaderImageId.Value,
+                            _accountDataHolder.Token.Value,
+                            _accountDataHolder.Jwt);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Warn(correlationId, null, methodName,
+                            $"Не удалось удалить шапку профиля из filestorage: {ex.Message}");
+                    }
                 }
             }
             catch (Exception ex)

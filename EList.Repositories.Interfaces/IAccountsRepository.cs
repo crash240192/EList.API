@@ -15,5 +15,9 @@ namespace EList.Repositories.Interfaces
         Task SetAccountWalletAsync(Guid accountId, Guid walletId);
         Task SetAccountActiveAsync(Guid accountId, bool active);
         Task ClearSensitiveDataAsync(Guid accountId);
+
+        Task SetAccountHeaderAsync(Guid accountId, Guid? imageId, double? focusX, double? focusY, bool blur);
+        Task<List<Guid>> GetEventPinIdsAsync(Guid accountId);
+        Task ReplaceEventPinsAsync(Guid accountId, IReadOnlyList<Guid> eventIds);
     }
 }

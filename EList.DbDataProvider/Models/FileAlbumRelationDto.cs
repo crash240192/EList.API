@@ -23,6 +23,9 @@ namespace EList.DbDataProvider.Models
         [Column("hidden_by")]
         public Guid? HiddenBy { get; set; }
 
+        [Column("create_date")]
+        public DateTimeOffset CreateDate { get; set; }
+
         [Association(ThisKey = nameof(AlbumId), OtherKey = nameof(MediaAlbumDto.Id))]
         public MediaAlbumDto AlbumDto { get; set; }
     }
