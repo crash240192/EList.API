@@ -13,6 +13,7 @@ using EList.Services.Impl.AbuseProtection;
 using EList.Services.Impl.Notifications;
 using EList.Services.Impl.OrganizationRegistry;
 using EList.Services.Impl.Payments;
+using EList.Services.Impl.Payments.CloudKassir;
 using EList.Services.Impl.Payments.TBank;
 using EList.Services.Interfaces;
 using EList.Sms;
@@ -103,6 +104,14 @@ namespace EList.DI
                 mapper.AddSingleton<ISellerOnboardingProvider, YooKassaStubSellerOnboardingProvider>();
                 mapper.AddScoped<IOrderDealPayoutService, NoOpOrderDealPayoutService>();
             }
+
+            // Прямой CloudKassir kkt/receipt (запасной контур). Default off —
+            // на проде с кассой на терминале Т‑Банка используется Init.Receipt.
+            var fiscalSettings = FiscalSettings.Load();
+            if (fiscalSettings.IsDirectFiscalizationEnabled())
+                mapper.AddScoped<IFiscalReceiptProvider, CloudKassirReceiptProvider>();
+            else
+                mapper.AddScoped<IFiscalReceiptProvider, NoOpFiscalReceiptProvider>();
 
             //Repositories
             mapper.AddScoped<IAgreementRepository, AgreementRepository>();

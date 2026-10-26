@@ -1,6 +1,6 @@
 # Билеты — сценарии и пробелы
 
-> Актуально: 9 октября 2026  
+> Актуально: 26 октября 2026  
 > Код: API orders/tickets + UI BuyTicket / MyTickets / return / check-in  
 > Интеграция: `cursor/tickets-integration-0b40` / `cursor/tickets-integration-ui-0b40` (от `develop`)  
 > Связано: [tickets workflow.txt](./tickets%20workflow.txt), [tbank-payments.md](./tbank-payments.md), [SERVICE.md](./SERVICE.md) §7, [tickets-door-admin-plan.md](./tickets-door-admin-plan.md)
@@ -30,7 +30,7 @@
 | F1 | Org CanSellTickets + agreement | ✅ | ✅ | Готово | |
 | F2 | Global `ticketSalesEnabled` | ✅ | ✅ | Готово | `GET /api/features` + EventPage |
 | F3 | Invite при TicketsEnabled | ✅ | ✅ | Готово | |
-| G1 | 54-ФЗ Receipt / AgentSign | ❌ | — | Отложено | касса/инструкции API ещё не готовы |
+| G1 | 54-ФЗ Receipt / AgentSign | ⚠️ | — | W4 в работе | Income+Return+журнал+webhook; default off; §6.2 dual later |
 | G2 | Типы билетов | ✅ A+B+C | ✅ D + W5 polish | Готово | в integration-ветках от develop |
 | G2b | PDF / печатная форма | ❌ | — | W6 | print/PDF; Wallet pass — позже |
 | H1 | Роль билетёра + desk на входе | ❌ | ❌ | W6 | см. [tickets-door-admin-plan.md](./tickets-door-admin-plan.md) |
@@ -53,10 +53,13 @@
 3. QR check-in камерой у организатора (`TicketCheckInPanel` + `QrScanner`).
 4. Adult gate на покупку — отложено (ageLimit уже на доступе к событию).
 
-### W4 — фискализация (пауза)
-1. Receipt в Init (AgentSign / SupplierInfo) — ждать онлайн-кассу и инструкции API.
-2. Обязательные поля org для чека (телефон и т.д.).
-3. Закрыть §6.2 агентского договора.
+### W4 — фискализация (в работе)
+1. ✅ Прямой CloudKassir `kkt/receipt` (запас): `cloudKassir:directFiscalization` default off; Init.Receipt — прод при кассе на терминале.
+2. ✅ Чек возврата IncomeReturn из `FulfillRefund`; журнал `order_fiscal_receipts`.
+3. ✅ Webhook Receipt `POST /api/payments/cloudkassir/receipt` (HMAC SHA256).
+4. ⚠️ Телефон поставщика — из org contacts (если есть); gate «обязателен телефон» — позже.
+5. ☐ Разделённые чеки §6.2 (билет Принципала + комиссия Агента) — отдельно от agent-scheme.
+6. Дока: [CloudKassir HTML](./Тестирование%20онлайн-чека%20–%20CloudKassir%20for%20Developers.html).
 
 ### W5 — типы билетов ✅
 См. [ticket-types-plan.md](./ticket-types-plan.md).  

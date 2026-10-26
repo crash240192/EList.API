@@ -23,6 +23,13 @@ namespace EList.Repositories.Interfaces
         Task UpdateOrderPayoutAsync(OrderPayout item);
         Task<List<OrderPayout>> GetOrderPayoutsByStatusAsync(OrderPayoutStatus status, int limit);
         Task<List<Order>> GetPaidOrdersWithOpenDealAsync(DateTimeOffset paidBefore, int limit);
+
+        Task<Guid> CreateOrderFiscalReceiptAsync(OrderFiscalReceipt item);
+        Task UpdateOrderFiscalReceiptAsync(OrderFiscalReceipt item);
+        Task<OrderFiscalReceipt?> GetOrderFiscalReceiptByInvoiceIdAsync(string invoiceId);
+        Task<OrderFiscalReceipt?> GetOrderFiscalReceiptByOrderKindAsync(Guid orderId, FiscalReceiptKind kind);
+        Task<OrderFiscalReceipt?> GetOrderFiscalReceiptByRefundIdAsync(Guid refundId);
+        Task<OrderFiscalReceipt?> GetOrderFiscalReceiptByProviderReceiptIdAsync(string providerReceiptId);
         Task<List<Order>> GetOrdersByBuyerAsync(Guid buyerAccountId);
         Task<List<Order>> GetOrdersBySellerOrganizationAsync(Guid organizationId);
         Task<List<Order>> GetOrdersByEventAsync(Guid eventId);

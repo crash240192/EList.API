@@ -367,6 +367,61 @@ namespace EList.DbDataProvider.DataProviders
                 .ToListAsync();
         }
 
+        #endregion
+
+        #region fiscal receipts
+        public async Task<Guid> CreateOrderFiscalReceiptAsync(OrderFiscalReceiptDto item)
+        {
+            if (item.Id == Guid.Empty)
+                item.Id = Guid.NewGuid();
+            var now = DateTimeOffset.Now.ToUniversalTime();
+            item.CreateDate = now;
+            item.UpdatedAt = now;
+            if (string.IsNullOrWhiteSpace(item.Currency))
+                item.Currency = "RUB";
+            if (string.IsNullOrWhiteSpace(item.Provider))
+                item.Provider = "cloudKassir";
+            await _connection.InsertAsync(item);
+            return item.Id;
+        }
+
+        public async Task UpdateOrderFiscalReceiptAsync(OrderFiscalReceiptDto item)
+        {
+            item.UpdatedAt = DateTimeOffset.Now.ToUniversalTime();
+            await _connection.UpdateAsync(item);
+        }
+
+        public async Task<OrderFiscalReceiptDto?> GetOrderFiscalReceiptByInvoiceIdAsync(string invoiceId)
+        {
+            if (string.IsNullOrWhiteSpace(invoiceId))
+                return null;
+            return await _connection.OrderFiscalReceipts
+                .FirstOrDefaultAsync(i => i.InvoiceId == invoiceId);
+        }
+
+        public async Task<OrderFiscalReceiptDto?> GetOrderFiscalReceiptByOrderKindAsync(
+            Guid orderId,
+            FiscalReceiptKind kind)
+        {
+            return await _connection.OrderFiscalReceipts
+                .FirstOrDefaultAsync(i => i.OrderId == orderId && i.Kind == kind);
+        }
+
+        public async Task<OrderFiscalReceiptDto?> GetOrderFiscalReceiptByRefundIdAsync(Guid refundId)
+        {
+            return await _connection.OrderFiscalReceipts
+                .FirstOrDefaultAsync(i => i.RefundId == refundId && i.Kind == FiscalReceiptKind.IncomeReturn);
+        }
+
+        public async Task<OrderFiscalReceiptDto?> GetOrderFiscalReceiptByProviderReceiptIdAsync(string providerReceiptId)
+        {
+            if (string.IsNullOrWhiteSpace(providerReceiptId))
+                return null;
+            return await _connection.OrderFiscalReceipts
+                .FirstOrDefaultAsync(i => i.ProviderReceiptId == providerReceiptId);
+        }
+        #endregion
+
         public async Task<List<OrderDto>> GetPaidOrdersWithOpenDealAsync(
             DateTimeOffset paidBefore,
             int limit)
@@ -385,6 +440,5 @@ namespace EList.DbDataProvider.DataProviders
                 .Take(limit)
                 .ToListAsync();
         }
-        #endregion
     }
 }

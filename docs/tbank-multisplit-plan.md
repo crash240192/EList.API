@@ -1,8 +1,9 @@
 # Т-Банк Мультирасчёты (Deal NN) — план внедрения
 
-> Актуально: 25 октября 2026  
+> Актуально: 26 октября 2026  
 > Решение: целевая модель сплита — **Мультирасчёты Deal NN** по PDF в [`docs/мультирасчеты/`](./мультирасчеты/) (подтверждено менеджером Т‑Банка).  
 > Оплата покупателя: **одностадийка** (`PayType=O` / настройка терминала) — без холда/`Confirm`; Deal + A2C для сплита.  
+> P1–P5 в коде (онбординг → Init Deal → A2C → maintenance → ops/fiscal scaffold). 
 
 > Источники банка:
 >
@@ -136,11 +137,16 @@
 **Выход:** зависшие A2C догоняются; просроченные сделки без успешной выплаты закрываются с остатком площадке.  
 
 
-### P5 — Ops + фискализация
+### P5 — Ops + фискализация ✅
 
-- Чеклист стенда: WL, NotificationURL, test cards, e2c  
-- W4 CloudKassir параллельно (чеки ≠ сплит; см. tickets-scenarios G1)  
-- Обновить агентский договор при смене момента выплаты vs «удержание при расчёте»  
+- [x] Чеклист стенда: [tbank-multisplit-ops-checklist.md](./tbank-multisplit-ops-checklist.md) (WL, NotificationURL, e2c, smoke)  
+- [x] Каркас CloudKassir: `IFiscalReceiptProvider` + `CloudKassirReceiptProvider` (`kkt/receipt`); default `cloudKassir:directFiscalization:enabled=false`  
+- [x] Init.Receipt для кассы на терминале Т‑Банка (прод-контур) 
+- [x] Soft-fail чек Income после fulfill/A2C в `OrdersService` (не откатывает билеты)  
+- [x] Агентский договор §§4.2 / 5.1 — Deal + A2C / FinalPayout вместо «удержания при расчёте»  
+- [ ] Полный W4: чек возврата, обязательные поля org, прод-креды кассы — следующая итерация  
+
+**Выход:** ops-чеклист готов; фискализация включается конфигом без смены модели сплита.
 
 ---
 
@@ -177,4 +183,6 @@
 2. Ветка `cursor/tbank-multisplit-onboarding-0318` — P1 (**эта**).  
 3. `cursor/tbank-multisplit-eacq-deal-0318` — P2.  
 4. `cursor/tbank-multisplit-a2c-payout-0318` — P3.  
-5. P4/P5 по мере готовности стенда и юр. D3–D5.
+5. P4 ✅ `cursor/tbank-multisplit-deal-maintenance-0318`.  
+6. P5 ✅ `cursor/tbank-multisplit-ops-fiscal-0318` (ops + CloudKassir scaffold).  
+7. Стенд: WL / OAuth / mTLS + smoke по [ops-checklist](./tbank-multisplit-ops-checklist.md); юр. D3–D5.

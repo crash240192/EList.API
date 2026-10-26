@@ -84,8 +84,11 @@ namespace EList.Services.Impl.Payments.TBank
             if (useDeal)
                 init.CreateDealWithType = "NN";
 
+            if (_settings.Receipt?.Enabled == true)
+                init.Receipt = BuildReceipt(request, amountKopecks);
+
             logger.Debug(correlationId, null, methodName,
-                $"Init OrderId={orderId} Amount={amountKopecks} Deal={(useDeal ? "NN" : "no")}",
+                $"Init OrderId={orderId} Amount={amountKopecks} Deal={(useDeal ? "NN" : "no")} Receipt={(_settings.Receipt?.Enabled == true)}",
                 null);
 
             var response = await _client.InitAsync(init);
@@ -232,6 +235,70 @@ namespace EList.Services.Impl.Payments.TBank
 
             var separator = root.Contains('?', StringComparison.Ordinal) ? '&' : '?';
             return $"{root}{separator}{query}";
+        }
+
+        private TBankReceiptDto BuildReceipt(PaymentCreationRequest request, long amountKopecks)
+        {
+            var cfg = _settings.Receipt ?? new TBankReceiptSettings();
+            var email = FirstNonEmpty(request.BuyerEmail, cfg.DefaultEmail);
+            var phone = NormalizePhone(request.BuyerPhone);
+
+            if (string.IsNullOrWhiteSpace(email) && string.IsNullOrWhiteSpace(phone))
+            {
+                throw new InvalidOperationException(
+                    "Т-Банк Init.Receipt: нужен Email или Phone покупателя "
+                    + "(login с @, BuyerPhone, или payments__tbank__receipt__defaultEmail). "
+                    + "Либо отключите кассу на терминале / payments__tbank__receipt__enabled=false.");
+            }
+
+            var name = Truncate(request.Description, 128) ?? "Оплата EList";
+            return new TBankReceiptDto
+            {
+                Email = email,
+                Phone = phone,
+                Taxation = string.IsNullOrWhiteSpace(cfg.Taxation) ? "usn_income" : cfg.Taxation.Trim(),
+                Items = new List<TBankReceiptItemDto>
+                {
+                    new()
+                    {
+                        Name = name,
+                        Price = amountKopecks,
+                        Quantity = 1,
+                        Amount = amountKopecks,
+                        Tax = string.IsNullOrWhiteSpace(cfg.Tax) ? "none" : cfg.Tax.Trim(),
+                        PaymentMethod = "full_payment",
+                        PaymentObject = string.IsNullOrWhiteSpace(cfg.PaymentObject)
+                            ? "service"
+                            : cfg.PaymentObject.Trim()
+                    }
+                }
+            };
+        }
+
+        private static string? FirstNonEmpty(params string?[] values)
+        {
+            foreach (var value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    return value.Trim();
+            }
+            return null;
+        }
+
+        private static string? NormalizePhone(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+            var digits = new string(value.Where(char.IsDigit).ToArray());
+            if (digits.Length == 0)
+                return null;
+            if (digits.Length == 11 && digits.StartsWith('8'))
+                digits = "7" + digits[1..];
+            if (digits.StartsWith('7') && digits.Length == 11)
+                return "+" + digits;
+            if (digits.Length >= 10)
+                return "+" + digits;
+            return null;
         }
 
         private static string? Truncate(string? value, int max)

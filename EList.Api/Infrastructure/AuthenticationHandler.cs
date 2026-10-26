@@ -79,7 +79,8 @@ namespace EList.Api.Infrastructure
             "/api/agreements/age/anonymous/get",
 
             "/api/payments/yookassa/webhook",
-            "/api/payments/tbank/webhook"
+            "/api/payments/tbank/webhook",
+            "/api/payments/cloudkassir/receipt"
         };
 
         private readonly Logger _currentLogger = LogManager.GetCurrentClassLogger();

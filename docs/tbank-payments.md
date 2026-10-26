@@ -1,25 +1,27 @@
 # Т-Банк: эквайринг и пополнение кошелька
 
-> Актуально: 25 октября 2026  
-> Код: API `cursor/tbank-marketplace-acquiring-0b40`, UI `cursor/tbank-payment-return-poll-0b40`  
+> Актуально: 26 октября 2026  
+> Код: API ветки Мультирасчётов P1–P5 (`cursor/tbank-multisplit-*-0318`), UI return-poll  
 > Продуктовая модель: [SERVICE.md §7](./SERVICE.md)
 
 Документ для **сборки / staging / prod**: что **сейчас** в runtime-коде, какие env нужны, как устроен флоу.
 
-> **Важно (25.10.2026):** целевой продукт сплита — **Мультирасчёты Deal NN**  
-> ([`docs/мультирасчеты/`](./мультирасчеты/), план: [tbank-multisplit-plan.md](./tbank-multisplit-plan.md)).  
-> Таблица ниже и Init с `Shops[]`/`Fee` — **legacy runtime** до миграции P2; не проектировать новые фичи на Shops.
+> **Важно (26.10.2026):** целевой продукт сплита — **Мультирасчёты Deal NN**  
+> ([`docs/мультирасчеты/`](./мультирасчеты/), план: [tbank-multisplit-plan.md](./tbank-multisplit-plan.md),  
+> ops: [tbank-multisplit-ops-checklist.md](./tbank-multisplit-ops-checklist.md)).  
+> Билеты: Init `CreateDealWithType=NN` + A2C; кошелёк — Init без Deal.
 
 ---
 
-## 1. Модель (кратко) — legacy runtime
+## 1. Модель (кратко) — runtime Deal NN
 
-| | Билеты (legacy) | Кошелёк (тариф) |
+| | Билеты (Deal NN) | Кошелёк (тариф) |
 |--|--------|-----------------|
 | Провайдер | `payments.provider=tbank` | тот же |
-| Init | `PayType=O`, `Shops[]` + `Fee` при ShopCode org | без `Shops` (деньги площадки) — **останется** и после Мультирасчётов |
+| Init | `PayType=O`, `CreateDealWithType=NN` (без `Shops[]`) | без Deal (деньги площадки) |
+| После CONFIRMED | fulfill билетов → A2C продавцу (`PartnerId`=shopCode, `FinalPayout`) | кредит кошелька |
 | OrderId в банке | GUID заказа | `wallet:{depositId}` |
-| Успех | webhook CONFIRMED → билеты + Participate | webhook CONFIRMED → кредит кошелька |
+| Успех | webhook CONFIRMED → Paid + Issued + payout | webhook CONFIRMED → кредит |
 | Fallback | GET order → GetState (~2s gate) | GET deposit → GetState |
 | UI return | `/payments/return?orderId=…` | `/payments/return?depositId=…&walletId=…` |
 
@@ -81,6 +83,9 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 | `payments__tbank__e2cApiBaseUrl` | A2C base (`…/e2c/v2`); пусто = из `apiBaseUrl` |
 | `payments__tbank__autoPayoutOnPaid` | После CONFIRMED сразу A2C продавцу (default true) |
 | `payments__tbank__dealTermDays` | TTL сделки для `DealMaintenanceWorker` / closeSpDeal (default 7) |
+| `payments__tbank__receipt__enabled` | Init.Receipt (default **true**). Без него при кассе на терминале → **309** `expected.receipt` |
+| `payments__tbank__receipt__taxation` / `tax` | СНО / НДС чека (`usn_income` / `none` …) |
+| `payments__tbank__receipt__defaultEmail` | Fallback email, если login покупателя не email |
 | `dealMaintenance:*` | Воркер: sync Initiated, retry payout, closeSpDeal |
 | `payments__tbank__smRegister__username` / `password` | Legacy fallback → ShopCode |
 | `payments__tbank__manualShopCode` | DEMO/стенд: ShopCode без bank API |
@@ -129,11 +134,34 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 Документация [API кассы CloudKassir](https://developers.cloudkassir.ru/#api-kassy) описывает **только фискализацию** (`kkt/receipt`, AgentSign / SupplierInfo для 54‑ФЗ).  
 Там **нет** сплита денег — это зона **эквайринга Т‑Банка (Мультирасчёты Deal NN / A2C)**.
 
-Сплит в чеке (агент/поставщик) и сплит денег по сделке — разные механизмы; W4 (касса) не заменяет Deal/выплаты. См. [tbank-multisplit-plan.md](./tbank-multisplit-plan.md).
+Сплит в чеке (агент/поставщик) и сплит денег по сделке — разные механизмы; касса не заменяет Deal/выплаты. См. [tbank-multisplit-plan.md](./tbank-multisplit-plan.md).
+
+### Env: прямой CloudKassir (запасной контур, default off)
+
+Сейчас на проде чеки идут через **Init.Receipt** (касса на терминале).  
+Прямой `kkt/receipt` — код готов, выключен; включать только если уйдёте с кассы банка.
+
+| Ключ | Смысл |
+|------|--------|
+| `cloudKassir__directFiscalization__enabled` | `true` — слать чеки сами в CloudKassir API |
+| `cloudKassir__directFiscalization__publicId` / `apiSecret` | Basic auth (не коммитить) |
+| `cloudKassir__directFiscalization__inn` | ИНН владельца ККТ |
+| `cloudKassir__directFiscalization__apiBaseUrl` | Default `https://api.cloudpayments.ru` |
+| `cloudKassir__directFiscalization__taxationSystem` / `vat` / `agentSign` | Параметры чека |
+
+Флоу (если enabled): Paid → `kkt/receipt` → журнал → webhook `/eList/api/payments/cloudkassir/receipt`.  
+Дока: [CloudKassir HTML](./Тестирование%20онлайн-чека%20–%20CloudKassir%20for%20Developers.html).
 
 ---
 
 ## 6. Troubleshooting
+
+### ErrorCode 309 — `{request.validate.expected.receipt}`
+
+К терминалу подключена онлайн-касса, а в `Init` не был передан `Receipt`.  
+Код шлёт `Receipt` при `payments__tbank__receipt__enabled=true` (default). Нужен Email или Phone покупателя (login с `@` или `defaultEmail`).
+
+**Не включать одновременно** `payments__tbank__receipt__enabled` и `cloudKassir__directFiscalization__enabled` — два чека на одну оплату.
 
 ### HTTP 403 Forbidden на `rest-api-test.tinkoff.ru/v2/Init`
 

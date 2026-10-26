@@ -109,6 +109,45 @@ namespace EList.Repositories.Impl
             return _mapper.Map<List<OrderPayout>>(items) ?? new List<OrderPayout>();
         }
 
+        public async Task<Guid> CreateOrderFiscalReceiptAsync(OrderFiscalReceipt item)
+        {
+            var mapped = _mapper.Map<OrderFiscalReceiptDto>(item);
+            return await _ordersDataProvider.CreateOrderFiscalReceiptAsync(mapped);
+        }
+
+        public async Task UpdateOrderFiscalReceiptAsync(OrderFiscalReceipt item)
+        {
+            var mapped = _mapper.Map<OrderFiscalReceiptDto>(item);
+            await _ordersDataProvider.UpdateOrderFiscalReceiptAsync(mapped);
+        }
+
+        public async Task<OrderFiscalReceipt?> GetOrderFiscalReceiptByInvoiceIdAsync(string invoiceId)
+        {
+            var item = await _ordersDataProvider.GetOrderFiscalReceiptByInvoiceIdAsync(invoiceId);
+            return _mapper.Map<OrderFiscalReceipt>(item);
+        }
+
+        public async Task<OrderFiscalReceipt?> GetOrderFiscalReceiptByOrderKindAsync(
+            Guid orderId,
+            FiscalReceiptKind kind)
+        {
+            var mappedKind = _mapper.Map<DbDataProvider.Models.Enums.FiscalReceiptKind>(kind);
+            var item = await _ordersDataProvider.GetOrderFiscalReceiptByOrderKindAsync(orderId, mappedKind);
+            return _mapper.Map<OrderFiscalReceipt>(item);
+        }
+
+        public async Task<OrderFiscalReceipt?> GetOrderFiscalReceiptByRefundIdAsync(Guid refundId)
+        {
+            var item = await _ordersDataProvider.GetOrderFiscalReceiptByRefundIdAsync(refundId);
+            return _mapper.Map<OrderFiscalReceipt>(item);
+        }
+
+        public async Task<OrderFiscalReceipt?> GetOrderFiscalReceiptByProviderReceiptIdAsync(string providerReceiptId)
+        {
+            var item = await _ordersDataProvider.GetOrderFiscalReceiptByProviderReceiptIdAsync(providerReceiptId);
+            return _mapper.Map<OrderFiscalReceipt>(item);
+        }
+
         public async Task<List<Order>> GetPaidOrdersWithOpenDealAsync(
             DateTimeOffset paidBefore,
             int limit)

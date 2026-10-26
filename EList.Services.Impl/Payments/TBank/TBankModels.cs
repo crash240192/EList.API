@@ -60,8 +60,54 @@ namespace EList.Services.Impl.Payments.TBank
         [JsonProperty("Shops", NullValueHandling = NullValueHandling.Ignore)]
         public List<TBankShopDto>? Shops { get; set; }
 
+        /// <summary>
+        /// Чек 54‑ФЗ. Обязателен, если к терминалу подключена онлайн-касса
+        /// (иначе Init → ErrorCode 309 / request.validate.expected.receipt).
+        /// </summary>
+        [JsonProperty("Receipt", NullValueHandling = NullValueHandling.Ignore)]
+        public TBankReceiptDto? Receipt { get; set; }
+
         [JsonProperty("Token")]
         public string Token { get; set; } = string.Empty;
+    }
+
+    public class TBankReceiptDto
+    {
+        [JsonProperty("Email", NullValueHandling = NullValueHandling.Ignore)]
+        public string? Email { get; set; }
+
+        [JsonProperty("Phone", NullValueHandling = NullValueHandling.Ignore)]
+        public string? Phone { get; set; }
+
+        [JsonProperty("Taxation")]
+        public string Taxation { get; set; } = "usn_income";
+
+        [JsonProperty("Items")]
+        public List<TBankReceiptItemDto> Items { get; set; } = new();
+    }
+
+    public class TBankReceiptItemDto
+    {
+        [JsonProperty("Name")]
+        public string Name { get; set; } = string.Empty;
+
+        [JsonProperty("Price")]
+        public long Price { get; set; }
+
+        [JsonProperty("Quantity")]
+        public decimal Quantity { get; set; } = 1;
+
+        [JsonProperty("Amount")]
+        public long Amount { get; set; }
+
+        [JsonProperty("Tax")]
+        public string Tax { get; set; } = "none";
+
+        [JsonProperty("PaymentMethod", NullValueHandling = NullValueHandling.Ignore)]
+        public string? PaymentMethod { get; set; } = "full_payment";
+
+        [JsonProperty("PaymentObject", NullValueHandling = NullValueHandling.Ignore)]
+        public string? PaymentObject { get; set; } = "service";
     }
 
     public class TBankPaymentIdRequest

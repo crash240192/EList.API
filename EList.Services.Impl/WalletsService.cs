@@ -531,6 +531,9 @@ namespace EList.Services.Impl
             };
             deposit.Id = await _walletsRepository.CreateWalletDepositAsync(deposit);
 
+            var buyerAccountId = _accountDataHolder.AccountId!.Value;
+            var buyerEmail = await ResolveBuyerEmailAsync(buyerAccountId);
+
             var payment = await _paymentProvider.CreatePaymentAsync(new PaymentCreationRequest
             {
                 OrderId = Guid.Empty,
@@ -540,8 +543,9 @@ namespace EList.Services.Impl
                 Description = "Пополнение тарифа EList",
                 ReturnUrl = request.ReturnUrl,
                 IdempotencyKey = deposit.IdempotencyKey,
-                BuyerAccountId = _accountDataHolder.AccountId.Value,
-                EventId = Guid.Empty
+                BuyerAccountId = buyerAccountId,
+                EventId = Guid.Empty,
+                BuyerEmail = buyerEmail
             });
 
             await _walletsRepository.UpdateWalletDepositAsync(
@@ -1008,6 +1012,15 @@ namespace EList.Services.Impl
                 return CommandResult.OK;
 
             return CommandResult.Fail(ErrorCode.AccessError, "Нет доступа к кошельку");
+        }
+
+        private async Task<string?> ResolveBuyerEmailAsync(Guid accountId)
+        {
+            var account = await _accountsRepository.GetAccountAsync(accountId);
+            var login = account?.Login?.Trim();
+            if (!string.IsNullOrWhiteSpace(login) && login.Contains('@'))
+                return login;
+            return null;
         }
     }
 }
