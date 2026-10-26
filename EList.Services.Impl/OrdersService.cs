@@ -4,6 +4,7 @@ using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
+using EList.Models.ContactData;
 using EList.Models.Enums;
 using EList.Models.Events;
 using EList.Models.Events.EventMetadata;
@@ -45,6 +46,7 @@ namespace EList.Services.Impl
         private readonly IOrderDealPayoutService _orderDealPayoutService;
         private readonly IFiscalReceiptProvider _fiscalReceiptProvider;
         private readonly IAccountsRepository _accountsRepository;
+        private readonly IContactsRepository _contactsRepository;
         private readonly IWalletsService _walletsService;
         private readonly IMapper _mapper;
 
@@ -67,6 +69,7 @@ namespace EList.Services.Impl
             IOrderDealPayoutService orderDealPayoutService,
             IFiscalReceiptProvider fiscalReceiptProvider,
             IAccountsRepository accountsRepository,
+            IContactsRepository contactsRepository,
             IWalletsService walletsService,
             IMapper mapper)
         {
@@ -88,6 +91,7 @@ namespace EList.Services.Impl
             _orderDealPayoutService = orderDealPayoutService ?? throw new ArgumentNullException(nameof(orderDealPayoutService));
             _fiscalReceiptProvider = fiscalReceiptProvider ?? throw new ArgumentNullException(nameof(fiscalReceiptProvider));
             _accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
+            _contactsRepository = contactsRepository ?? throw new ArgumentNullException(nameof(contactsRepository));
             _walletsService = walletsService ?? throw new ArgumentNullException(nameof(walletsService));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
@@ -1120,6 +1124,9 @@ namespace EList.Services.Impl
 
             await RefreshOrderRefundStatusAsync(refund.OrderId);
             await CleanupParticipationForTicketsAsync(affected);
+
+            // W4: чек возврата прихода (soft-fail).
+            await TryIssueFiscalIncomeReturnAsync(refund);
         }
 
         /// <summary>
@@ -2277,16 +2284,36 @@ namespace EList.Services.Impl
 
             var correlationId = _correlationIdProvider.Get();
             var methodName = $"{LOGGER_NAME}{nameof(TryIssueFiscalIncomeAsync)}";
+            var invoiceId = $"order:{order.Id:N}";
 
             try
             {
-                var legal = await _organizationsRepository.GetLegalAsync(order.SellerOrganizationId);
-                var org = await _organizationsRepository.GetOrganizationAsync(order.SellerOrganizationId);
+                var existing = await _ordersRepository.GetOrderFiscalReceiptByOrderKindAsync(
+                    order.Id, FiscalReceiptKind.Income);
+                if (existing?.Status is FiscalReceiptStatus.Processed or FiscalReceiptStatus.Queued)
+                    return;
+
+                var supplier = await ResolveSupplierFiscalAsync(order.SellerOrganizationId);
                 string? buyerEmail = null;
                 var buyer = await _accountsRepository.GetAccountAsync(order.BuyerAccountId);
                 var login = buyer?.Login?.Trim();
                 if (!string.IsNullOrWhiteSpace(login) && login.Contains('@'))
                     buyerEmail = login;
+
+                var journal = existing ?? new OrderFiscalReceipt
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    Kind = FiscalReceiptKind.Income,
+                    Provider = _fiscalReceiptProvider.ProviderName,
+                    InvoiceId = invoiceId,
+                    Status = FiscalReceiptStatus.Pending,
+                    Amount = order.AmountTotal,
+                    Currency = order.Currency ?? "RUB"
+                };
+
+                if (existing == null)
+                    journal.Id = await _ordersRepository.CreateOrderFiscalReceiptAsync(journal);
 
                 var result = await _fiscalReceiptProvider.IssueIncomeForOrderAsync(new FiscalIncomeReceiptRequest
                 {
@@ -2299,21 +2326,13 @@ namespace EList.Services.Impl
                     Currency = order.Currency,
                     Description = $"Билеты заказ {order.Id:D}",
                     BuyerEmail = buyerEmail,
-                    SupplierInn = legal?.Inn,
-                    SupplierName = org?.Name ?? legal?.HeadName,
-                    SupplierPhone = null
+                    SupplierInn = supplier.Inn,
+                    SupplierName = supplier.Name,
+                    SupplierPhone = supplier.Phone,
+                    InvoiceId = invoiceId
                 });
 
-                if (!result.Success)
-                {
-                    logger.Warn(correlationId, null, methodName,
-                        $"Fiscal receipt failed order={order.Id:D}: {result.ErrorMessage}", null);
-                }
-                else if (!result.Skipped)
-                {
-                    logger.Debug(correlationId, null, methodName,
-                        $"Fiscal receipt OK order={order.Id:D} id={result.ProviderReceiptId}", null);
-                }
+                await ApplyFiscalIssueResultAsync(journal, result, methodName);
             }
             catch (Exception ex)
             {
@@ -2321,6 +2340,246 @@ namespace EList.Services.Impl
                     $"Fiscal receipt exception order={order.Id:D}: {ex.Message}", null);
             }
         }
+
+        private async Task TryIssueFiscalIncomeReturnAsync(Refund refund)
+        {
+            if (!_fiscalReceiptProvider.IsEnabled || refund.Amount <= 0)
+                return;
+
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(TryIssueFiscalIncomeReturnAsync)}";
+            var invoiceId = $"refund:{refund.Id:N}";
+
+            try
+            {
+                var existing = await _ordersRepository.GetOrderFiscalReceiptByRefundIdAsync(refund.Id);
+                if (existing?.Status is FiscalReceiptStatus.Processed or FiscalReceiptStatus.Queued)
+                    return;
+
+                var order = await _ordersRepository.GetOrderAsync(refund.OrderId);
+                if (order == null)
+                    return;
+
+                var supplier = await ResolveSupplierFiscalAsync(order.SellerOrganizationId);
+                string? buyerEmail = null;
+                var buyer = await _accountsRepository.GetAccountAsync(order.BuyerAccountId);
+                var login = buyer?.Login?.Trim();
+                if (!string.IsNullOrWhiteSpace(login) && login.Contains('@'))
+                    buyerEmail = login;
+
+                var journal = existing ?? new OrderFiscalReceipt
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    RefundId = refund.Id,
+                    Kind = FiscalReceiptKind.IncomeReturn,
+                    Provider = _fiscalReceiptProvider.ProviderName,
+                    InvoiceId = invoiceId,
+                    Status = FiscalReceiptStatus.Pending,
+                    Amount = refund.Amount,
+                    Currency = order.Currency ?? "RUB"
+                };
+
+                if (existing == null)
+                    journal.Id = await _ordersRepository.CreateOrderFiscalReceiptAsync(journal);
+
+                var result = await _fiscalReceiptProvider.IssueIncomeReturnForRefundAsync(
+                    new FiscalRefundReceiptRequest
+                    {
+                        OrderId = order.Id,
+                        RefundId = refund.Id,
+                        BuyerAccountId = order.BuyerAccountId,
+                        Amount = refund.Amount,
+                        Currency = order.Currency,
+                        Description = $"Возврат заказа {order.Id:D}",
+                        BuyerEmail = buyerEmail,
+                        SupplierInn = supplier.Inn,
+                        SupplierName = supplier.Name,
+                        SupplierPhone = supplier.Phone,
+                        InvoiceId = invoiceId
+                    });
+
+                await ApplyFiscalIssueResultAsync(journal, result, methodName);
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(correlationId, null, methodName,
+                    $"Fiscal return exception refund={refund.Id:D}: {ex.Message}", null);
+            }
+        }
+
+        private async Task ApplyFiscalIssueResultAsync(
+            OrderFiscalReceipt journal,
+            FiscalReceiptResult result,
+            string methodName)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var now = DateTimeOffset.UtcNow;
+
+            if (result.Skipped)
+            {
+                journal.Status = FiscalReceiptStatus.Skipped;
+                journal.ErrorMessage = TruncateFiscal(result.ErrorMessage, 500);
+                journal.CompletedAt = now;
+                await _ordersRepository.UpdateOrderFiscalReceiptAsync(journal);
+                return;
+            }
+
+            if (!result.Success)
+            {
+                journal.Status = FiscalReceiptStatus.Failed;
+                journal.ErrorMessage = TruncateFiscal(result.ErrorMessage, 500);
+                journal.CompletedAt = now;
+                await _ordersRepository.UpdateOrderFiscalReceiptAsync(journal);
+                logger.Warn(correlationId, null, methodName,
+                    $"Fiscal receipt failed order={journal.OrderId:D}: {result.ErrorMessage}", null);
+                return;
+            }
+
+            journal.ProviderReceiptId = result.ProviderReceiptId;
+            journal.InvoiceId = result.InvoiceId ?? journal.InvoiceId;
+            journal.Status = FiscalReceiptStatus.Queued;
+            journal.ErrorMessage = null;
+            await _ordersRepository.UpdateOrderFiscalReceiptAsync(journal);
+            logger.Debug(correlationId, null, methodName,
+                $"Fiscal receipt queued order={journal.OrderId:D} id={result.ProviderReceiptId}", null);
+        }
+
+        private async Task<(string? Inn, string? Name, string? Phone)> ResolveSupplierFiscalAsync(
+            Guid organizationId)
+        {
+            var legal = await _organizationsRepository.GetLegalAsync(organizationId);
+            var org = await _organizationsRepository.GetOrganizationAsync(organizationId);
+            string? phone = null;
+            try
+            {
+                var contacts = await _contactsRepository.GetOrganizationContactsAsync(organizationId)
+                    ?? new List<ContactDataItem>();
+                phone = contacts
+                    .Where(c => !string.IsNullOrWhiteSpace(c.Value))
+                    .Where(c =>
+                    {
+                        var name = c.ContactType?.Name ?? string.Empty;
+                        var mask = c.ContactType?.Mask ?? string.Empty;
+                        return name.Contains("елефон", StringComparison.OrdinalIgnoreCase)
+                               || mask.Contains("+7", StringComparison.Ordinal);
+                    })
+                    .Select(c => c.Value)
+                    .FirstOrDefault();
+            }
+            catch
+            {
+                // soft: телефон поставщика желателен, но не блокирует чек
+            }
+
+            return (legal?.Inn, org?.Name ?? legal?.HeadName, phone);
+        }
+
+        private static string? TruncateFiscal(string? value, int max)
+        {
+            if (string.IsNullOrEmpty(value))
+                return value;
+            return value.Length <= max ? value : value[..max];
+        }
+
+        /// <summary>
+        /// CloudKassir Receipt notification: HMAC + обновление журнала. Ответ контроллера — {"code":0}.
+        /// </summary>
+        public async Task<CommandResult> ProcessCloudKassirReceiptWebhookAsync(
+            string rawBody,
+            string? contentHmac,
+            string? xContentHmac)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(ProcessCloudKassirReceiptWebhookAsync)}";
+
+            if (!_fiscalReceiptProvider.IsEnabled)
+                return CommandResult.OK;
+
+            if (!_fiscalReceiptProvider.VerifyWebhookHmac(rawBody, contentHmac, xContentHmac))
+            {
+                logger.Warn(correlationId, null, methodName, "CloudKassir Receipt HMAC mismatch", null);
+                return CommandResult.Fail(ErrorCode.AccessError, "Invalid HMAC");
+            }
+
+            var fields = ParseFormBody(rawBody);
+            var receiptId = GetForm(fields, "Id");
+            var invoiceId = GetForm(fields, "InvoiceId");
+            var url = GetForm(fields, "Url");
+            var qr = GetForm(fields, "QrCodeUrl");
+
+            OrderFiscalReceipt? journal = null;
+            if (!string.IsNullOrWhiteSpace(invoiceId))
+                journal = await _ordersRepository.GetOrderFiscalReceiptByInvoiceIdAsync(invoiceId);
+            if (journal == null && !string.IsNullOrWhiteSpace(receiptId))
+                journal = await _ordersRepository.GetOrderFiscalReceiptByProviderReceiptIdAsync(receiptId);
+
+            if (journal == null)
+            {
+                logger.Warn(correlationId, null, methodName,
+                    $"Fiscal receipt webhook: journal not found invoice={invoiceId} id={receiptId}", null);
+                return CommandResult.OK;
+            }
+
+            if (journal.Status == FiscalReceiptStatus.Processed)
+                return CommandResult.OK;
+
+            journal.ProviderReceiptId = receiptId ?? journal.ProviderReceiptId;
+            journal.ReceiptUrl = url ?? journal.ReceiptUrl;
+            journal.QrCodeUrl = qr ?? journal.QrCodeUrl;
+            journal.Status = FiscalReceiptStatus.Processed;
+            journal.ErrorMessage = null;
+            journal.CompletedAt = DateTimeOffset.UtcNow;
+            await _ordersRepository.UpdateOrderFiscalReceiptAsync(journal);
+
+            logger.Debug(correlationId, null, methodName,
+                $"Fiscal receipt processed order={journal.OrderId:D} id={journal.ProviderReceiptId}", null);
+            return CommandResult.OK;
+        }
+
+        private static Dictionary<string, string> ParseFormBody(string rawBody)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(rawBody))
+                return result;
+
+            // JSON fallback (если кабинет шлёт JSON)
+            var trimmed = rawBody.TrimStart();
+            if (trimmed.StartsWith('{'))
+            {
+                try
+                {
+                    var obj = JObject.Parse(rawBody);
+                    foreach (var prop in obj.Properties())
+                    {
+                        if (prop.Value.Type != JTokenType.Object && prop.Value.Type != JTokenType.Array)
+                            result[prop.Name] = prop.Value?.ToString() ?? string.Empty;
+                    }
+                    return result;
+                }
+                catch
+                {
+                    // fall through to form
+                }
+            }
+
+            foreach (var pair in rawBody.Split('&', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var idx = pair.IndexOf('=');
+                if (idx <= 0)
+                    continue;
+                var key = Uri.UnescapeDataString(pair[..idx].Replace('+', ' '));
+                var value = Uri.UnescapeDataString(pair[(idx + 1)..].Replace('+', ' '));
+                if (!string.IsNullOrEmpty(key))
+                    result[key] = value;
+            }
+            return result;
+        }
+
+        private static string? GetForm(Dictionary<string, string> fields, string key)
+            => fields.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+                ? value.Trim()
+                : null;
 
         private async Task<CommandResult?> AssertCanBuyTicketAsync(Event eventItem)
         {

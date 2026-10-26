@@ -27,6 +27,8 @@ namespace EList.Services.Impl.Payments
                     PublicId = Read("fiscal:cloudKassir:publicId"),
                     ApiSecret = Read("fiscal:cloudKassir:apiSecret"),
                     ApiBaseUrl = Read("fiscal:cloudKassir:apiBaseUrl", DefaultCloudKassirApiBaseUrl),
+                    // ИНН владельца ККТ (площадка / агент), не ИНН продавца билета.
+                    Inn = Read("fiscal:cloudKassir:inn"),
                     TaxationSystem = ReadInt("fiscal:cloudKassir:taxationSystem", defaultValue: 0, min: 0, max: 5),
                     Vat = Read("fiscal:cloudKassir:vat", "null"),
                     AgentSign = ReadInt("fiscal:cloudKassir:agentSign", defaultValue: 6, min: 0, max: 6)
@@ -87,16 +89,21 @@ namespace EList.Services.Impl.Payments
         public string ApiSecret { get; set; } = string.Empty;
         public string ApiBaseUrl { get; set; } = FiscalSettings.DefaultCloudKassirApiBaseUrl;
 
+        /// <summary>ИНН организации/ИП, на который зарегистрирована ККТ (владелец кассы).</summary>
+        public string Inn { get; set; } = string.Empty;
+
         /// <summary>Система налогообложения (0–5), см. CloudKassir docs.</summary>
         public int TaxationSystem { get; set; }
 
         /// <summary>Ставка НДС: null / 0 / 10 / 20 / 110 / 120 …</summary>
         public string Vat { get; set; } = "null";
 
-        /// <summary>Признак агента (6 = another agent / уточнить по кассе).</summary>
+        /// <summary>Признак агента по предмету расчёта (6 = «Агент»).</summary>
         public int AgentSign { get; set; } = 6;
 
         public bool IsConfigured()
-            => !string.IsNullOrWhiteSpace(PublicId) && !string.IsNullOrWhiteSpace(ApiSecret);
+            => !string.IsNullOrWhiteSpace(PublicId)
+               && !string.IsNullOrWhiteSpace(ApiSecret)
+               && !string.IsNullOrWhiteSpace(Inn);
     }
 }

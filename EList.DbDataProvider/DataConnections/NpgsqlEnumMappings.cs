@@ -60,6 +60,18 @@ namespace EList.DbDataProvider.DataConnections
                 NpgsqlConnection.GlobalTypeMapper.MapEnum<MessageVoteValue>(
                     "public.message_vote_value",
                     translator);
+                NpgsqlConnection.GlobalTypeMapper.MapEnum<OrderPayoutKind>(
+                    "public.order_payout_kind",
+                    translator);
+                NpgsqlConnection.GlobalTypeMapper.MapEnum<OrderPayoutStatus>(
+                    "public.order_payout_status",
+                    translator);
+                NpgsqlConnection.GlobalTypeMapper.MapEnum<FiscalReceiptKind>(
+                    "public.fiscal_receipt_kind",
+                    translator);
+                NpgsqlConnection.GlobalTypeMapper.MapEnum<FiscalReceiptStatus>(
+                    "public.fiscal_receipt_status",
+                    translator);
 #pragma warning restore CS0618
 
                 _registered = true;

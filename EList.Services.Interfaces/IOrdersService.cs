@@ -22,6 +22,14 @@ namespace EList.Services.Interfaces
         /// </summary>
         Task<CommandResult> ProcessTBankWebhookAsync(string rawPayload);
 
+        /// <summary>
+        /// CloudKassir Receipt notification. HMAC (API Secret). Ответ контроллера — JSON {"code":0}.
+        /// </summary>
+        Task<CommandResult> ProcessCloudKassirReceiptWebhookAsync(
+            string rawBody,
+            string? contentHmac,
+            string? xContentHmac);
+
         Task<CommandResult<OrderResponse>> GetOrderAsync(Guid orderId);
 
         /// <summary>

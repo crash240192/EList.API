@@ -170,6 +170,7 @@ namespace EList.AutoMapperProfile
 
             CreateMap<OrderDto, Order>().ReverseMap();
             CreateMap<OrderPayoutDto, OrderPayout>().ReverseMap();
+            CreateMap<OrderFiscalReceiptDto, OrderFiscalReceipt>().ReverseMap();
             CreateMap<TicketDto, Ticket>().ReverseMap();
             CreateMap<RefundDto, Refund>()
                 .ForMember(dest => dest.TicketIds, opt => opt.MapFrom(src => DeserializeGuidList(src.TicketIdsJson)));
@@ -247,6 +248,8 @@ namespace EList.AutoMapperProfile
             CreateMap<Models.Enums.OrderStatus, DbDataProvider.Models.Enums.OrderStatus>().ReverseMap();
             CreateMap<Models.Enums.OrderPayoutKind, DbDataProvider.Models.Enums.OrderPayoutKind>().ReverseMap();
             CreateMap<Models.Enums.OrderPayoutStatus, DbDataProvider.Models.Enums.OrderPayoutStatus>().ReverseMap();
+            CreateMap<Models.Enums.FiscalReceiptKind, DbDataProvider.Models.Enums.FiscalReceiptKind>().ReverseMap();
+            CreateMap<Models.Enums.FiscalReceiptStatus, DbDataProvider.Models.Enums.FiscalReceiptStatus>().ReverseMap();
             CreateMap<Models.Enums.TicketStatus, DbDataProvider.Models.Enums.TicketStatus>().ReverseMap();
             CreateMap<Models.Enums.RefundStatus, DbDataProvider.Models.Enums.RefundStatus>().ReverseMap();
             CreateMap<Models.Enums.ProviderOnboardingStatus, DbDataProvider.Models.Enums.ProviderOnboardingStatus>().ReverseMap();

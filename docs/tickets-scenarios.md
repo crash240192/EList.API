@@ -30,7 +30,7 @@
 | F1 | Org CanSellTickets + agreement | ✅ | ✅ | Готово | |
 | F2 | Global `ticketSalesEnabled` | ✅ | ✅ | Готово | `GET /api/features` + EventPage |
 | F3 | Invite при TicketsEnabled | ✅ | ✅ | Готово | |
-| G1 | 54-ФЗ Receipt / AgentSign | ⚠️ scaffold | — | P5 каркас | CloudKassir `kkt/receipt` default off; полный W4 позже |
+| G1 | 54-ФЗ Receipt / AgentSign | ⚠️ | — | W4 в работе | Income+Return+журнал+webhook; default off; §6.2 dual later |
 | G2 | Типы билетов | ✅ A+B+C | ✅ D + W5 polish | Готово | в integration-ветках от develop |
 | G2b | PDF / печатная форма | ❌ | — | W6 | print/PDF; Wallet pass — позже |
 | H1 | Роль билетёра + desk на входе | ❌ | ❌ | W6 | см. [tickets-door-admin-plan.md](./tickets-door-admin-plan.md) |
@@ -53,11 +53,13 @@
 3. QR check-in камерой у организатора (`TicketCheckInPanel` + `QrScanner`).
 4. Adult gate на покупку — отложено (ageLimit уже на доступе к событию).
 
-### W4 — фискализация (частично: P5 scaffold)
-1. ✅ Каркас `IFiscalReceiptProvider` / CloudKassir `kkt/receipt` после Paid (soft-fail); `fiscal:enabled=false` по умолчанию. Чеки ≠ сплит Deal/A2C ([tbank-payments.md](./tbank-payments.md) §5.1).
-2. ☐ Чек возврата IncomeReturn + идемпотентный журнал чеков.
-3. ☐ Обязательные поля org для чека (телефон поставщика и т.д.).
-4. ✅ §6.2 агентского договора (разделённая фискализация); §§4.2 / 5.1 обновлены под Deal NN.
+### W4 — фискализация (в работе)
+1. ✅ CloudKassir `kkt/receipt` после Paid; `X-Request-ID`; platform Inn + PurveyorData продавца; default off.
+2. ✅ Чек возврата IncomeReturn из `FulfillRefund`; журнал `order_fiscal_receipts`.
+3. ✅ Webhook Receipt `POST /api/payments/cloudkassir/receipt` (HMAC SHA256).
+4. ⚠️ Телефон поставщика — из org contacts (если есть); gate «обязателен телефон» — позже.
+5. ☐ Разделённые чеки §6.2 (билет Принципала + комиссия Агента) — отдельно от agent-scheme.
+6. Дока: [CloudKassir HTML](./Тестирование%20онлайн-чека%20–%20CloudKassir%20for%20Developers.html).
 
 ### W5 — типы билетов ✅
 См. [ticket-types-plan.md](./ticket-types-plan.md).  

@@ -66,5 +66,14 @@ namespace EList.DbDataProvider.Interfaces
         /// <summary>Paid + DealId, сделка ещё не закрыта локально, paid_at &lt; paidBefore.</summary>
         Task<List<OrderDto>> GetPaidOrdersWithOpenDealAsync(DateTimeOffset paidBefore, int limit);
         #endregion
+
+        #region fiscal receipts
+        Task<Guid> CreateOrderFiscalReceiptAsync(OrderFiscalReceiptDto item);
+        Task UpdateOrderFiscalReceiptAsync(OrderFiscalReceiptDto item);
+        Task<OrderFiscalReceiptDto?> GetOrderFiscalReceiptByInvoiceIdAsync(string invoiceId);
+        Task<OrderFiscalReceiptDto?> GetOrderFiscalReceiptByOrderKindAsync(Guid orderId, FiscalReceiptKind kind);
+        Task<OrderFiscalReceiptDto?> GetOrderFiscalReceiptByRefundIdAsync(Guid refundId);
+        Task<OrderFiscalReceiptDto?> GetOrderFiscalReceiptByProviderReceiptIdAsync(string providerReceiptId);
+        #endregion
     }
 }

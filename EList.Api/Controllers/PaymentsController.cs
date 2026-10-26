@@ -118,6 +118,50 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// CloudKassir Receipt notification. HMAC (API Secret). Ответ — {"code":0}.
+        /// </summary>
+        [AllowAnonymous]
+        [HttpPost("/api/payments/cloudkassir/receipt")]
+        public async Task<IActionResult> CloudKassirReceiptWebhookAsync()
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CloudKassirReceiptWebhookAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                string rawPayload;
+                using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
+                    rawPayload = await reader.ReadToEndAsync();
+
+                Request.Headers.TryGetValue("Content-HMAC", out var contentHmac);
+                Request.Headers.TryGetValue("X-Content-HMAC", out var xContentHmac);
+
+                var result = await _ordersService.ProcessCloudKassirReceiptWebhookAsync(
+                    rawPayload,
+                    contentHmac.ToString(),
+                    xContentHmac.ToString());
+                if (!result.Success)
+                {
+                    await _connectionProvider.RollbackTransactionAsync();
+                    return BadRequest(result);
+                }
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return Content("{\"code\":0}", "application/json", Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Отладка stub: имитировать payment.succeeded webhook (тот же путь, что у реальной ЮKassa).
         /// </summary>
         [Authorize]

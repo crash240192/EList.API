@@ -85,10 +85,11 @@
 
 | # | Что | Статус |
 |---|-----|--------|
-| 6.1 | Креды CloudKassir (PublicId / ApiSecret) | ☐ |
+| 6.1 | Креды CloudKassir (PublicId / ApiSecret) + `fiscal__cloudKassir__inn` | ☐ |
 | 6.2 | Включить `fiscal:provider=cloudKassir` + `fiscal:enabled=true` | код готов, default off |
-| 6.3 | Чек Income после Paid (агент/поставщик в Receipt) | каркас `IFiscalReceiptProvider` |
-| 6.4 | Чек возврата | ☐ следующая итерация W4 |
-| 6.5 | §6.2 агентского договора = разделённая фискализация | ✅ зафиксировано в Agreements |
+| 6.3 | Чек Income после Paid (platform Inn + PurveyorData) | ✅ + журнал |
+| 6.4 | Чек возврата IncomeReturn | ✅ |
+| 6.5 | Webhook Receipt URL в ЛК → `/eList/api/payments/cloudkassir/receipt` | ☐ ops |
+| 6.6 | §6.2 агентского договора = разделённая фискализация | ✅ юр.; dual-чек в коде — later |
 
 Деньги (Deal/A2C) и чеки (касса) **независимы**: касса не заменяет PartnerId/выплату.

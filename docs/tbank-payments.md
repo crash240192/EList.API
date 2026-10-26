@@ -140,10 +140,13 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 | `fiscal__provider` | `none` (default) \| `cloudKassir` |
 | `fiscal__enabled` | `true` только вместе с кредами кассы |
 | `fiscal__cloudKassir__publicId` / `apiSecret` | Basic auth CloudKassir (не коммитить) |
+| `fiscal__cloudKassir__inn` | ИНН владельца ККТ (площадка / агент) |
 | `fiscal__cloudKassir__apiBaseUrl` | Default `https://api.cloudpayments.ru` |
-| `fiscal__cloudKassir__taxationSystem` / `vat` / `agentSign` | Параметры чека |
+| `fiscal__cloudKassir__taxationSystem` / `vat` / `agentSign` | Параметры чека (`agentSign=6` = «Агент») |
 
-После Paid `OrdersService` зовёт `IssueIncomeForOrderAsync` (soft-fail). Чек возврата — следующая итерация W4.
+Флоу: Paid → `kkt/receipt` Income (soft-fail) → журнал `order_fiscal_receipts` (Queued) → webhook `POST /eList/api/payments/cloudkassir/receipt` (HMAC) → Processed.  
+Возврат: `FulfillRefund` → IncomeReturn. Идемпотентность: `X-Request-ID` = `InvoiceId` (`order:{guid}` / `refund:{guid}`).  
+Дока API: [Тестирование онлайн-чека – CloudKassir for Developers.html](./Тестирование%20онлайн-чека%20–%20CloudKassir%20for%20Developers.html).
 
 ---
 
