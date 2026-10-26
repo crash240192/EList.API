@@ -41,6 +41,22 @@ namespace EList.DbDataProvider.Models
         [Column("balance_after")]
         public double? BalanceAfter { get; set; }
 
+        [Column("tariff_id")]
+        public Guid? TariffId { get; set; }
+
+        /// <summary>0=TopUp, 1=Purchase, 2=Extend, 3=Upgrade.</summary>
+        [Column("purchase_kind")]
+        public short PurchaseKind { get; set; }
+
+        [Column("credit_applied")]
+        public decimal CreditApplied { get; set; }
+
+        [Column("period_start")]
+        public DateTimeOffset? PeriodStart { get; set; }
+
+        [Column("period_end")]
+        public DateTimeOffset? PeriodEnd { get; set; }
+
         [Association(ThisKey = nameof(WalletId), OtherKey = nameof(WalletDto.Id))]
         public WalletDto Wallet { get; set; }
     }

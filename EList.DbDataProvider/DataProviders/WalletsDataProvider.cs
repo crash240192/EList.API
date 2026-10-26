@@ -305,6 +305,25 @@ namespace EList.DbDataProvider.DataProviders
                 .UpdateAsync();
         }
 
+        public async Task ApplyPeriodEntitlementAsync(
+            Guid walletId,
+            Guid tariffId,
+            DateTimeOffset periodStart,
+            DateTimeOffset periodEnd,
+            double? balanceAfter = null)
+        {
+            var query = _connection.Wallets.Where(i => i.Id == walletId)
+                .Set(i => i.TariffId, tariffId)
+                .Set(i => i.LastChargeDate, periodStart)
+                .Set(i => i.PaidDate, periodStart)
+                .Set(i => i.NextChargeAt, periodEnd);
+
+            if (balanceAfter != null)
+                query = query.Set(i => i.Balance, balanceAfter.Value);
+
+            await query.UpdateAsync();
+        }
+
         public async Task<List<WalletTariffChargeDto>> GetWalletTariffChargesAsync(Guid walletId)
         {
             return await _connection.WalletTariffCharges

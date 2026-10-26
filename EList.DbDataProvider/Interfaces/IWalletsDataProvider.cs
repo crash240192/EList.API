@@ -55,6 +55,13 @@ namespace EList.DbDataProvider.Interfaces
         Task<List<WalletDepositDto>> GetWalletDepositsAsync(Guid walletId);
 
         Task ClearNextChargeAtAsync(Guid walletId);
+        /// <summary>Назначить entitlement периода (PeriodPurchase): tariff + даты + опционально новый баланс.</summary>
+        Task ApplyPeriodEntitlementAsync(
+            Guid walletId,
+            Guid tariffId,
+            DateTimeOffset periodStart,
+            DateTimeOffset periodEnd,
+            double? balanceAfter = null);
         Task<List<WalletTariffChargeDto>> GetWalletTariffChargesAsync(Guid walletId);
 
         /// <summary>Аккаунт, к которому привязан кошелёк (если есть).</summary>

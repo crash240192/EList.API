@@ -45,6 +45,12 @@ namespace EList.Repositories.Interfaces
             double? balanceAfter = null);
         Task<List<WalletDeposit>> GetWalletDepositsAsync(Guid walletId);
         Task ClearNextChargeAtAsync(Guid walletId);
+        Task ApplyPeriodEntitlementAsync(
+            Guid walletId,
+            Guid tariffId,
+            DateTimeOffset periodStart,
+            DateTimeOffset periodEnd,
+            double? balanceAfter = null);
         Task<List<WalletTariffCharge>> GetWalletTariffChargesAsync(Guid walletId);
         Task<Guid?> FindAccountIdByWalletAsync(Guid walletId);
         Task<Guid?> FindOrganizationIdByWalletAsync(Guid walletId);
