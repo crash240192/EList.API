@@ -2,7 +2,7 @@ using FluentMigrator;
 
 namespace EList.Database
 {
-    [Migration(16, "profile-header-album-views-event-pins")]
+    [Migration(20, "profile-header-album-views-event-pins")]
     public class M202610261900_ProfileHeaderAlbumViewsEventPins : Migration
     {
         public override void Down() { }
