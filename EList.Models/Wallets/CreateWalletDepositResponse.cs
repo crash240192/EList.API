@@ -28,5 +28,11 @@ namespace EList.Models.Wallets
         public DateTimeOffset? PaidAt { get; set; }
         /// <summary>Баланс сразу после зачисления (до возможного автосписания тарифа).</summary>
         public double? BalanceAfter { get; set; }
+
+        public Guid? TariffId { get; set; }
+        public WalletTariffPurchaseKind PurchaseKind { get; set; }
+        public decimal CreditApplied { get; set; }
+        public DateTimeOffset? PeriodStart { get; set; }
+        public DateTimeOffset? PeriodEnd { get; set; }
     }
 }

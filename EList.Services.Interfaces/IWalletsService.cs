@@ -61,5 +61,11 @@ namespace EList.Services.Interfaces
         Task<CommandResult<List<WalletDepositResponse>>> GetWalletDepositsAsync(Guid walletId);
 
         Task<CommandResult<List<WalletTariffChargeResponse>>> GetWalletTariffChargesAsync(Guid walletId);
+
+        /// <summary>Предварительный расчёт покупки/продления/upgrade (PeriodPurchase).</summary>
+        Task<CommandResult<TariffPurchaseQuoteResponse>> QuoteTariffPurchaseAsync(TariffPurchaseQuoteRequest request);
+
+        /// <summary>Создать оплату периода тарифа (или активировать сразу при AmountDue=0 / free).</summary>
+        Task<CommandResult<CreateTariffPurchaseResponse>> CreateTariffPurchaseAsync(TariffPurchaseRequest request);
     }
 }

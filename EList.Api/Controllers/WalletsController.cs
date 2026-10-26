@@ -507,7 +507,64 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
-        /// Пополнение тарифного кошелька (stub/ЮKassa). Не билетный контур и не сплит.
+        /// Предварительный расчёт покупки / продления / upgrade тарифа (PeriodPurchase).
+        /// </summary>
+        [HttpPost("tariffPurchases/quote")]
+        public async Task<CommandResult<TariffPurchaseQuoteResponse>> QuoteTariffPurchaseAsync(
+            [FromBody] TariffPurchaseQuoteRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(QuoteTariffPurchaseAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _walletsService.QuoteTariffPurchaseAsync(request);
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Купить / продлить / повысить тариф на период (PeriodPurchase).
+        /// При AmountDue=0 активирует сразу; иначе — confirmationUrl эквайринга.
+        /// </summary>
+        [HttpPost("tariffPurchases")]
+        public async Task<CommandResult<CreateTariffPurchaseResponse>> CreateTariffPurchaseAsync(
+            [FromBody] TariffPurchaseRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CreateTariffPurchaseAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _walletsService.CreateTariffPurchaseAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Пополнение тарифного кошелька (legacy WalletAutoRenew). В PeriodPurchase отключено.
         /// </summary>
         [HttpPost("deposits")]
         public async Task<CommandResult<CreateWalletDepositResponse>> CreateWalletDepositAsync(

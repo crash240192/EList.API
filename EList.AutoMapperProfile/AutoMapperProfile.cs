@@ -148,10 +148,15 @@ namespace EList.AutoMapperProfile
             CreateMap<WalletDto, Wallet>()
                 .ForMember(d => d.EffectiveTariffId, o => o.Ignore())
                 .ForMember(d => d.IsSelectedTariffActive, o => o.Ignore())
-                .ForMember(d => d.TariffBillingStatus, o => o.Ignore());
+                .ForMember(d => d.TariffBillingStatus, o => o.Ignore())
+                .ForMember(d => d.BillingMode, o => o.Ignore())
+                .ForMember(d => d.ActiveUntil, o => o.Ignore());
             CreateMap<Wallet, WalletDto>()
                 .ForMember(d => d.Tariff, o => o.Ignore());
-            CreateMap<WalletDepositDto, WalletDeposit>().ReverseMap();
+            CreateMap<WalletDepositDto, WalletDeposit>()
+                .ForMember(d => d.PurchaseKind, o => o.MapFrom(s => (Models.Enums.WalletTariffPurchaseKind)s.PurchaseKind));
+            CreateMap<WalletDeposit, WalletDepositDto>()
+                .ForMember(d => d.PurchaseKind, o => o.MapFrom(s => (short)s.PurchaseKind));
             CreateMap<WalletDeposit, WalletDepositResponse>();
             CreateMap<WalletTariffChargeDto, WalletTariffCharge>().ReverseMap();
             CreateMap<WalletTariffCharge, WalletTariffChargeResponse>();

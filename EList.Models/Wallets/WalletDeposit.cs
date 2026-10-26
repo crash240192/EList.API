@@ -3,7 +3,8 @@ using EList.Models.Enums;
 namespace EList.Models.Wallets
 {
     /// <summary>
-    /// Пополнение тарифного кошелька (не билетные деньги, не сплит).
+    /// Платёж тарифного контура: TopUp (legacy) или покупка/продление/upgrade периода.
+    /// Не билетные деньги, не сплит.
     /// </summary>
     public class WalletDeposit
     {
@@ -19,5 +20,16 @@ namespace EList.Models.Wallets
         public DateTimeOffset? PaidAt { get; set; }
         /// <summary>Баланс сразу после зачисления (до возможного автосписания тарифа).</summary>
         public double? BalanceAfter { get; set; }
+
+        /// <summary>Тариф покупки (null для legacy TopUp).</summary>
+        public Guid? TariffId { get; set; }
+
+        public WalletTariffPurchaseKind PurchaseKind { get; set; } = WalletTariffPurchaseKind.TopUp;
+
+        /// <summary>Учтённый credit (остаток периода + баланс) при Purchase/Upgrade.</summary>
+        public decimal CreditApplied { get; set; }
+
+        public DateTimeOffset? PeriodStart { get; set; }
+        public DateTimeOffset? PeriodEnd { get; set; }
     }
 }

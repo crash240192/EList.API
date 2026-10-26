@@ -215,6 +215,15 @@ namespace EList.Repositories.Impl
         public Task ClearNextChargeAtAsync(Guid walletId)
             => _walletsDataProvider.ClearNextChargeAtAsync(walletId);
 
+        public Task ApplyPeriodEntitlementAsync(
+            Guid walletId,
+            Guid tariffId,
+            DateTimeOffset periodStart,
+            DateTimeOffset periodEnd,
+            double? balanceAfter = null)
+            => _walletsDataProvider.ApplyPeriodEntitlementAsync(
+                walletId, tariffId, periodStart, periodEnd, balanceAfter);
+
         public async Task<List<WalletTariffCharge>> GetWalletTariffChargesAsync(Guid walletId)
         {
             var list = await _walletsDataProvider.GetWalletTariffChargesAsync(walletId);

@@ -6,6 +6,7 @@ using EList.Common.Support;
 using EList.Models.Enums;
 using EList.Models.Wallets;
 using EList.Repositories.Interfaces;
+using EList.Services.Impl.Payments;
 using EList.Services.Interfaces;
 using NLog;
 using System.Diagnostics;
@@ -283,9 +284,40 @@ namespace EList.Services.Impl
                     "Этот тариф предназначен для личного аккаунта");
             }
 
+            if (BillingSettings.IsPeriodPurchase)
+            {
+                // Платные — только через CreateTariffPurchase. Free — если нет активного платного периода.
+                if (tariff.Cost > 0)
+                {
+                    return CommandResult.Fail(
+                        ErrorCode.InvalidValue,
+                        "В режиме PeriodPurchase платный тариф покупается через POST /api/Wallets/tariffPurchases");
+                }
+
+                var now = DateTimeOffset.UtcNow;
+                if (wallet.TariffId != null)
+                {
+                    var current = await _walletsRepository.GetTariffAsync(wallet.TariffId.Value);
+                    if (current != null
+                        && current.Cost > 0
+                        && wallet.NextChargeAt != null
+                        && wallet.NextChargeAt > now)
+                    {
+                        return CommandResult.Fail(
+                            ErrorCode.InvalidValue,
+                            $"Платный тариф «{current.Name}» активен до {wallet.NextChargeAt:dd.MM.yyyy HH:mm} (UTC). " +
+                            "Понижение доступно после окончания оплаченного периода.");
+                    }
+                }
+
+                await _walletsRepository.SetWalletTariffAsync(walletId, tariffId);
+                await _walletsRepository.ClearNextChargeAtAsync(walletId);
+                logger.Debug(correlationId, null, methodName, $"Method finished (free switch)", null, execTime.Elapsed);
+                return CommandResult.OK;
+            }
+
             await _walletsRepository.SetWalletTariffAsync(walletId, tariffId);
-            // Смена тарифа: текущий период не переносим — пробуем списать новый сразу.
-            // Выбранный тариф сохраняется даже если списания не хватило денег (тогда действует free default).
+            // Legacy WalletAutoRenew: текущий период не переносим — пробуем списать новый сразу.
             await _walletsRepository.ClearNextChargeAtAsync(walletId);
             var charged = await _walletsRepository.ChargeByTariffAsync(walletId);
 
@@ -466,6 +498,13 @@ namespace EList.Services.Impl
             var methodName = $"{LOGGER_NAME}{nameof(CreateWalletDepositAsync)}";
             var execTime = Stopwatch.StartNew();
             logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (BillingSettings.IsPeriodPurchase)
+            {
+                return CommandResult<CreateWalletDepositResponse>.Fail(
+                    ErrorCode.InvalidValue,
+                    "Пополнение баланса отключено. Купите тариф на период: POST /api/Wallets/tariffPurchases");
+            }
 
             if (_accountDataHolder.AccountId == null)
             {
@@ -855,6 +894,15 @@ namespace EList.Services.Impl
             if (deposit.Status == WalletDepositStatus.Succeeded)
                 return;
 
+            if (deposit.PurchaseKind != WalletTariffPurchaseKind.TopUp
+                && deposit.TariffId != null
+                && deposit.PeriodStart != null
+                && deposit.PeriodEnd != null)
+            {
+                await FulfillTariffPeriodPurchaseAsync(deposit);
+                return;
+            }
+
             var credit = (double)deposit.Amount;
             await _walletsRepository.DepositeAsync(deposit.WalletId, credit);
 
@@ -872,9 +920,39 @@ namespace EList.Services.Impl
             deposit.BalanceAfter = balanceAfter;
             deposit.PaidAt = DateTimeOffset.UtcNow;
 
-            // Если период истёк / не был активен и денег хватило — списание сразу, период от now.
-            // Выбранный платный тариф снова активируется автоматически.
+            // Legacy: если период истёк и денег хватило — списание сразу.
             await _walletsRepository.ChargeByTariffAsync(deposit.WalletId);
+        }
+
+        private async Task FulfillTariffPeriodPurchaseAsync(WalletDeposit deposit)
+        {
+            var wallet = await _walletsRepository.GetWalletAsync(deposit.WalletId);
+            if (wallet == null || deposit.TariffId == null
+                || deposit.PeriodStart == null || deposit.PeriodEnd == null)
+                return;
+
+            // Credit уже заложен в Amount (к оплате). Списываем с баланса ту часть credit,
+            // которая бралась из legacy Balance (остаток периода в баланс не кладём).
+            var balanceCredit = Math.Min(wallet.Balance, (double)deposit.CreditApplied);
+            var newBalance = Math.Max(0, wallet.Balance - balanceCredit);
+
+            await _walletsRepository.ApplyPeriodEntitlementAsync(
+                deposit.WalletId,
+                deposit.TariffId.Value,
+                deposit.PeriodStart.Value,
+                deposit.PeriodEnd.Value,
+                newBalance);
+
+            await _walletsRepository.UpdateWalletDepositAsync(
+                deposit.Id,
+                WalletDepositStatus.Succeeded,
+                deposit.ProviderPaymentId,
+                DateTimeOffset.UtcNow,
+                newBalance);
+
+            deposit.Status = WalletDepositStatus.Succeeded;
+            deposit.BalanceAfter = newBalance;
+            deposit.PaidAt = DateTimeOffset.UtcNow;
         }
 
         public async Task<CommandResult<List<WalletTariffChargeResponse>>> GetWalletTariffChargesAsync(Guid walletId)
@@ -896,7 +974,8 @@ namespace EList.Services.Impl
         }
 
         /// <summary>
-        /// Назначить free default при отсутствии тарифа, попробовать списание due, обогатить статус.
+        /// Назначить free default при отсутствии тарифа; в legacy — due charge; обогатить статус.
+        /// PeriodPurchase: истёкший платный → переключить на free (без лимбо).
         /// </summary>
         private async Task<Wallet?> LoadWalletWithBillingAsync(Guid walletId)
         {
@@ -906,20 +985,44 @@ namespace EList.Services.Impl
 
             var orgId = await _walletsRepository.FindOrganizationIdByWalletAsync(walletId);
             var forOrganization = orgId != null;
+            var free = await _walletsRepository.GetDefaultFreeTariffAsync(forOrganization);
+            var now = DateTimeOffset.UtcNow;
 
-            if (wallet.TariffId == null)
+            if (BillingSettings.IsPeriodPurchase)
             {
-                var free = await _walletsRepository.GetDefaultFreeTariffAsync(forOrganization);
-                if (free != null)
+                if (wallet.TariffId == null && free != null)
                 {
                     await _walletsRepository.SetWalletTariffAsync(walletId, free.Id);
-                    await _walletsRepository.ChargeByTariffAsync(walletId);
+                    await _walletsRepository.ClearNextChargeAtAsync(walletId);
+                }
+                else if (wallet.TariffId != null)
+                {
+                    var current = await _walletsRepository.GetTariffAsync(wallet.TariffId.Value);
+                    var expiredPaid = current != null
+                        && current.Cost > 0
+                        && (wallet.NextChargeAt == null || wallet.NextChargeAt <= now);
+                    if (expiredPaid && free != null)
+                    {
+                        // Нет лимбо: entitlement сгорел → free.
+                        await _walletsRepository.SetWalletTariffAsync(walletId, free.Id);
+                        await _walletsRepository.ClearNextChargeAtAsync(walletId);
+                    }
                 }
             }
             else
             {
-                // Повторное списание при просмотре кошелька (даже если DebtCollector ещё не успел).
-                await _walletsRepository.ChargeByTariffAsync(walletId);
+                if (wallet.TariffId == null)
+                {
+                    if (free != null)
+                    {
+                        await _walletsRepository.SetWalletTariffAsync(walletId, free.Id);
+                        await _walletsRepository.ChargeByTariffAsync(walletId);
+                    }
+                }
+                else
+                {
+                    await _walletsRepository.ChargeByTariffAsync(walletId);
+                }
             }
 
             wallet = await _walletsRepository.GetWalletAsync(walletId);
@@ -932,6 +1035,8 @@ namespace EList.Services.Impl
 
         private async Task EnrichWalletBillingAsync(Wallet wallet, bool forOrganization)
         {
+            wallet.BillingMode = BillingSettings.Mode;
+
             Tariff? selected = null;
             if (wallet.TariffId != null)
                 selected = await _walletsRepository.GetTariffAsync(wallet.TariffId.Value);
@@ -963,8 +1068,17 @@ namespace EList.Services.Impl
 
             if (selectedActive)
             {
-                wallet.TariffBillingStatus =
-                    $"Тариф «{selected.Name}» активен до {wallet.NextChargeAt:dd.MM.yyyy HH:mm} (UTC) · следующее списание";
+                wallet.TariffBillingStatus = BillingSettings.IsPeriodPurchase
+                    ? $"Тариф «{selected.Name}» активен до {wallet.NextChargeAt:dd.MM.yyyy HH:mm} (UTC)"
+                    : $"Тариф «{selected.Name}» активен до {wallet.NextChargeAt:dd.MM.yyyy HH:mm} (UTC) · следующее списание";
+                return;
+            }
+
+            if (BillingSettings.IsPeriodPurchase)
+            {
+                wallet.TariffBillingStatus = free != null
+                    ? $"Период истёк. Действует бесплатный тариф «{free.Name}»"
+                    : "Период тарифа истёк";
                 return;
             }
 
@@ -974,6 +1088,369 @@ namespace EList.Services.Impl
                 $"Выбран тариф «{selected.Name}», но период не активен: недостаточно средств" +
                 (shortfall > 0 ? $" (нужно ещё {shortfall:0.##} ₽)" : "") +
                 ". Действует бесплатный тариф по умолчанию. После пополнения выбранный тариф активируется автоматически.";
+        }
+
+        public async Task<CommandResult<TariffPurchaseQuoteResponse>> QuoteTariffPurchaseAsync(
+            TariffPurchaseQuoteRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(QuoteTariffPurchaseAsync)}";
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (!BillingSettings.IsPeriodPurchase)
+            {
+                return CommandResult<TariffPurchaseQuoteResponse>.Fail(
+                    ErrorCode.InvalidValue,
+                    "Покупка периода доступна только при billing.mode=PeriodPurchase");
+            }
+
+            if (_accountDataHolder.AccountId == null)
+            {
+                return CommandResult<TariffPurchaseQuoteResponse>.Fail(
+                    ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+            }
+
+            if (request == null || request.WalletId == Guid.Empty || request.TariffId == Guid.Empty)
+            {
+                return CommandResult<TariffPurchaseQuoteResponse>.Fail(
+                    ErrorCode.InvalidValue, "Укажите walletId и tariffId");
+            }
+
+            var access = await AssertCanManageWalletAsync(request.WalletId);
+            if (!access.Success)
+                return CommandResult<TariffPurchaseQuoteResponse>.Fail(access.ErrorCode, access.Message);
+
+            var built = await BuildTariffPurchaseQuoteAsync(request.WalletId, request.TariffId);
+            if (!built.Success)
+                return CommandResult<TariffPurchaseQuoteResponse>.Fail(built.ErrorCode, built.Message);
+
+            return new CommandResult<TariffPurchaseQuoteResponse>(built.Result!);
+        }
+
+        public async Task<CommandResult<CreateTariffPurchaseResponse>> CreateTariffPurchaseAsync(
+            TariffPurchaseRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(CreateTariffPurchaseAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (!BillingSettings.IsPeriodPurchase)
+            {
+                return CommandResult<CreateTariffPurchaseResponse>.Fail(
+                    ErrorCode.InvalidValue,
+                    "Покупка периода доступна только при billing.mode=PeriodPurchase");
+            }
+
+            if (_accountDataHolder.AccountId == null)
+            {
+                return CommandResult<CreateTariffPurchaseResponse>.Fail(
+                    ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+            }
+
+            if (request == null || request.WalletId == Guid.Empty || request.TariffId == Guid.Empty)
+            {
+                return CommandResult<CreateTariffPurchaseResponse>.Fail(
+                    ErrorCode.InvalidValue, "Укажите walletId и tariffId");
+            }
+
+            var access = await AssertCanManageWalletAsync(request.WalletId);
+            if (!access.Success)
+                return CommandResult<CreateTariffPurchaseResponse>.Fail(access.ErrorCode, access.Message);
+
+            if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
+            {
+                var existing = await _walletsRepository.GetWalletDepositByIdempotencyAsync(
+                    request.WalletId, request.IdempotencyKey.Trim());
+                if (existing != null)
+                {
+                    Wallet? w = null;
+                    if (existing.Status == WalletDepositStatus.Succeeded)
+                        w = await LoadWalletWithBillingAsync(request.WalletId);
+                    return new CommandResult<CreateTariffPurchaseResponse>(new CreateTariffPurchaseResponse
+                    {
+                        Deposit = _mapper.Map<WalletDepositResponse>(existing),
+                        PaidImmediately = existing.Status == WalletDepositStatus.Succeeded,
+                        Wallet = w
+                    });
+                }
+            }
+
+            var quoteResult = await BuildTariffPurchaseQuoteAsync(request.WalletId, request.TariffId);
+            if (!quoteResult.Success || quoteResult.Result == null)
+            {
+                return CommandResult<CreateTariffPurchaseResponse>.Fail(
+                    quoteResult.ErrorCode, quoteResult.Message);
+            }
+
+            var quote = quoteResult.Result;
+            if (string.Equals(quote.Kind, "Free", StringComparison.OrdinalIgnoreCase))
+            {
+                var set = await SetWalletTariffAsync(request.WalletId, request.TariffId);
+                if (!set.Success)
+                    return CommandResult<CreateTariffPurchaseResponse>.Fail(set.ErrorCode, set.Message);
+
+                var wallet = await LoadWalletWithBillingAsync(request.WalletId);
+                return new CommandResult<CreateTariffPurchaseResponse>(new CreateTariffPurchaseResponse
+                {
+                    Deposit = new WalletDepositResponse
+                    {
+                        Id = Guid.Empty,
+                        WalletId = request.WalletId,
+                        Amount = 0,
+                        Currency = "RUB",
+                        Status = WalletDepositStatus.Succeeded,
+                        PurchaseKind = WalletTariffPurchaseKind.Purchase,
+                        CreateDate = DateTimeOffset.UtcNow,
+                        PaidAt = DateTimeOffset.UtcNow,
+                        TariffId = request.TariffId
+                    },
+                    PaidImmediately = true,
+                    Wallet = wallet
+                });
+            }
+
+            var kind = quote.Kind switch
+            {
+                "Extend" => WalletTariffPurchaseKind.Extend,
+                "Upgrade" => WalletTariffPurchaseKind.Upgrade,
+                _ => WalletTariffPurchaseKind.Purchase
+            };
+
+            // Extend: сохраняем LastChargeDate; Purchase/Upgrade: период с now.
+            var walletNow = await _walletsRepository.GetWalletAsync(request.WalletId);
+            var entitlementStart = kind == WalletTariffPurchaseKind.Extend
+                && walletNow?.LastChargeDate != null
+                    ? walletNow.LastChargeDate.Value
+                    : DateTimeOffset.UtcNow;
+
+            var deposit = new WalletDeposit
+            {
+                WalletId = request.WalletId,
+                Amount = Math.Round(quote.AmountDue, 2, MidpointRounding.AwayFromZero),
+                Currency = "RUB",
+                Status = WalletDepositStatus.Pending,
+                Provider = _paymentProvider.Kind,
+                IdempotencyKey = string.IsNullOrWhiteSpace(request.IdempotencyKey)
+                    ? null
+                    : request.IdempotencyKey.Trim(),
+                CreateDate = DateTimeOffset.UtcNow,
+                TariffId = request.TariffId,
+                PurchaseKind = kind,
+                CreditApplied = Math.Round(quote.Credit, 2, MidpointRounding.AwayFromZero),
+                PeriodStart = entitlementStart,
+                PeriodEnd = quote.NewActiveUntil
+            };
+            deposit.Id = await _walletsRepository.CreateWalletDepositAsync(deposit);
+
+            if (deposit.Amount <= 0)
+            {
+                await FulfillTariffPeriodPurchaseAsync(deposit);
+                var doneZero = await _walletsRepository.GetWalletDepositAsync(deposit.Id) ?? deposit;
+                var walletZero = await LoadWalletWithBillingAsync(request.WalletId);
+                logger.Debug(correlationId, null, methodName, "Method finished (credit covers)", null, execTime.Elapsed);
+                return new CommandResult<CreateTariffPurchaseResponse>(new CreateTariffPurchaseResponse
+                {
+                    Deposit = _mapper.Map<WalletDepositResponse>(doneZero),
+                    PaidImmediately = true,
+                    Wallet = walletZero
+                });
+            }
+
+            var buyerAccountId = _accountDataHolder.AccountId!.Value;
+            var buyerEmail = await ResolveBuyerEmailAsync(buyerAccountId);
+            var payment = await _paymentProvider.CreatePaymentAsync(new PaymentCreationRequest
+            {
+                OrderId = Guid.Empty,
+                WalletDepositId = deposit.Id,
+                Amount = deposit.Amount,
+                Currency = deposit.Currency,
+                Description = $"Тариф «{quote.TariffName}» на {quote.PeriodDays} дн.",
+                ReturnUrl = request.ReturnUrl,
+                IdempotencyKey = deposit.IdempotencyKey,
+                BuyerAccountId = buyerAccountId,
+                EventId = Guid.Empty,
+                BuyerEmail = buyerEmail
+            });
+
+            await _walletsRepository.UpdateWalletDepositAsync(
+                deposit.Id,
+                WalletDepositStatus.Pending,
+                payment.ProviderPaymentId,
+                paidAt: null);
+            deposit.ProviderPaymentId = payment.ProviderPaymentId;
+
+            var paidImmediately = payment.Status == PaymentProviderStatus.Succeeded;
+            if (paidImmediately)
+                await FulfillTariffPeriodPurchaseAsync(deposit);
+
+            var done = await _walletsRepository.GetWalletDepositAsync(deposit.Id) ?? deposit;
+            Wallet? walletAfter = null;
+            if (done.Status == WalletDepositStatus.Succeeded)
+                walletAfter = await LoadWalletWithBillingAsync(request.WalletId);
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<CreateTariffPurchaseResponse>(new CreateTariffPurchaseResponse
+            {
+                Deposit = _mapper.Map<WalletDepositResponse>(done),
+                ConfirmationUrl = payment.ConfirmationUrl,
+                ProviderPaymentId = payment.ProviderPaymentId,
+                PaidImmediately = paidImmediately || done.Status == WalletDepositStatus.Succeeded,
+                Wallet = walletAfter
+            });
+        }
+
+        private async Task<CommandResult<TariffPurchaseQuoteResponse>> BuildTariffPurchaseQuoteAsync(
+            Guid walletId,
+            Guid tariffId)
+        {
+            var wallet = await _walletsRepository.GetWalletAsync(walletId);
+            if (wallet == null)
+            {
+                return CommandResult<TariffPurchaseQuoteResponse>.Fail(
+                    ErrorCode.WalletNotFound, $"Кошелёк с id='{walletId}' не найден");
+            }
+
+            var target = await _walletsRepository.GetTariffAsync(tariffId);
+            if (target == null)
+            {
+                return CommandResult<TariffPurchaseQuoteResponse>.Fail(
+                    ErrorCode.TariffNotFound, $"Тариф с id='{tariffId}' не найден");
+            }
+
+            var orgId = await _walletsRepository.FindOrganizationIdByWalletAsync(walletId);
+            if (target.ForOrganization && orgId == null)
+            {
+                return CommandResult<TariffPurchaseQuoteResponse>.Fail(
+                    ErrorCode.InvalidValue, "Этот тариф предназначен для организации");
+            }
+            if (!target.ForOrganization && orgId != null)
+            {
+                return CommandResult<TariffPurchaseQuoteResponse>.Fail(
+                    ErrorCode.InvalidValue, "Этот тариф предназначен для личного аккаунта");
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            Tariff? current = null;
+            if (wallet.TariffId != null)
+                current = await _walletsRepository.GetTariffAsync(wallet.TariffId.Value);
+
+            var currentActive = current != null && (
+                current.Cost <= 0
+                || (wallet.NextChargeAt != null && wallet.NextChargeAt > now));
+
+            var period = target.Period <= TimeSpan.Zero ? TimeSpan.FromDays(30) : target.Period;
+            var balanceCredit = (decimal)Math.Max(0, wallet.Balance);
+
+            if (target.Cost <= 0)
+            {
+                if (currentActive && current != null && current.Cost > 0)
+                {
+                    return CommandResult<TariffPurchaseQuoteResponse>.Fail(
+                        ErrorCode.InvalidValue,
+                        $"Платный тариф «{current.Name}» активен до {wallet.NextChargeAt:dd.MM.yyyy HH:mm} (UTC). " +
+                        "Переход на бесплатный — после окончания периода.");
+                }
+
+                return new CommandResult<TariffPurchaseQuoteResponse>(new TariffPurchaseQuoteResponse
+                {
+                    WalletId = walletId,
+                    TariffId = target.Id,
+                    TariffName = target.Name,
+                    Kind = "Free",
+                    ListPrice = 0,
+                    Credit = 0,
+                    AmountDue = 0,
+                    PeriodDays = target.PeriodDays,
+                    CurrentActiveUntil = wallet.NextChargeAt,
+                    NewActiveUntil = now,
+                    Message = "Бесплатный тариф без оплаты"
+                });
+            }
+
+            if (currentActive && current != null && current.Id == target.Id)
+            {
+                var baseUntil = wallet.NextChargeAt != null && wallet.NextChargeAt > now
+                    ? wallet.NextChargeAt.Value
+                    : now;
+                var listPrice = (decimal)target.Cost;
+                var credit = Math.Min(balanceCredit, listPrice);
+                var amountDue = Math.Max(0, Math.Round(listPrice - credit, 2, MidpointRounding.AwayFromZero));
+                return new CommandResult<TariffPurchaseQuoteResponse>(new TariffPurchaseQuoteResponse
+                {
+                    WalletId = walletId,
+                    TariffId = target.Id,
+                    TariffName = target.Name,
+                    Kind = "Extend",
+                    ListPrice = listPrice,
+                    Credit = Math.Round(credit, 2, MidpointRounding.AwayFromZero),
+                    AmountDue = amountDue,
+                    PeriodDays = target.PeriodDays,
+                    CurrentActiveUntil = wallet.NextChargeAt,
+                    NewActiveUntil = baseUntil + period,
+                    Message = credit > 0
+                        ? $"Продление: учтён остаток баланса {credit:0.##} ₽"
+                        : "Продление текущего тарифа"
+                });
+            }
+
+            if (currentActive && current != null && current.Cost > 0)
+            {
+                if (target.Cost <= current.Cost)
+                {
+                    return CommandResult<TariffPurchaseQuoteResponse>.Fail(
+                        ErrorCode.InvalidValue,
+                        $"Сейчас активен «{current.Name}» до {wallet.NextChargeAt:dd.MM.yyyy HH:mm} (UTC). " +
+                        "Понижение тарифа — после окончания периода; повышение — через upgrade.");
+                }
+
+                var remaining = (wallet.NextChargeAt!.Value - now).TotalDays;
+                if (remaining < 0)
+                    remaining = 0;
+                var curPeriodDays = Math.Max(1, current.PeriodDays);
+                var periodCredit = (decimal)(current.Cost * (remaining / curPeriodDays));
+                var credit = periodCredit + balanceCredit;
+                var listPrice = (decimal)target.Cost;
+                var amountDue = Math.Max(0, Math.Round(listPrice - credit, 2, MidpointRounding.AwayFromZero));
+                return new CommandResult<TariffPurchaseQuoteResponse>(new TariffPurchaseQuoteResponse
+                {
+                    WalletId = walletId,
+                    TariffId = target.Id,
+                    TariffName = target.Name,
+                    Kind = "Upgrade",
+                    ListPrice = listPrice,
+                    Credit = Math.Round(credit, 2, MidpointRounding.AwayFromZero),
+                    AmountDue = amountDue,
+                    PeriodDays = target.PeriodDays,
+                    CurrentActiveUntil = wallet.NextChargeAt,
+                    NewActiveUntil = now + period,
+                    Message =
+                        $"Upgrade: скидка {credit:0.##} ₽ (остаток «{current.Name}» ≈ {remaining:0.#} дн." +
+                        (balanceCredit > 0 ? $" + баланс {balanceCredit:0.##} ₽" : "") + ")"
+                });
+            }
+
+            {
+                var listPrice = (decimal)target.Cost;
+                var credit = Math.Min(balanceCredit, listPrice);
+                var amountDue = Math.Max(0, Math.Round(listPrice - credit, 2, MidpointRounding.AwayFromZero));
+                return new CommandResult<TariffPurchaseQuoteResponse>(new TariffPurchaseQuoteResponse
+                {
+                    WalletId = walletId,
+                    TariffId = target.Id,
+                    TariffName = target.Name,
+                    Kind = "Purchase",
+                    ListPrice = listPrice,
+                    Credit = Math.Round(credit, 2, MidpointRounding.AwayFromZero),
+                    AmountDue = amountDue,
+                    PeriodDays = target.PeriodDays,
+                    CurrentActiveUntil = wallet.NextChargeAt,
+                    NewActiveUntil = now + period,
+                    Message = credit > 0
+                        ? $"Покупка: учтён остаток баланса {credit:0.##} ₽"
+                        : "Покупка тарифа на период"
+                });
+            }
         }
 
         private async Task<CommandResult> AssertUniqueFreeTariffAsync(

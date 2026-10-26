@@ -1,6 +1,7 @@
 using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Repositories.Interfaces;
+using EList.Services.Impl.Payments;
 using EList.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using NLog;
@@ -43,6 +44,13 @@ namespace EList.Services.Impl.BackgroundWorkers
             var methodName = $"{LOGGER_NAME}{nameof(ExecuteIterationAsync)}";
             var correlationId = scopedServices.GetRequiredService<ICorrelationIdProvider>().Get();
             var logger = new NLogLoggerWrapper(log);
+
+            if (BillingSettings.IsPeriodPurchase)
+            {
+                logger.Debug(correlationId, null, methodName,
+                    "Skipped: billing.mode=PeriodPurchase (no auto-renew)", null);
+                return;
+            }
 
             var walletsRepository = scopedServices.GetRequiredService<IWalletsRepository>();
             var walletsService = scopedServices.GetRequiredService<IWalletsService>();
