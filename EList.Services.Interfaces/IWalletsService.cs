@@ -67,5 +67,14 @@ namespace EList.Services.Interfaces
 
         /// <summary>Создать оплату периода тарифа (или активировать сразу при AmountDue=0 / free).</summary>
         Task<CommandResult<CreateTariffPurchaseResponse>> CreateTariffPurchaseAsync(TariffPurchaseRequest request);
+
+        /// <summary>Расчёт отмены тарифа и возврата за неиспользованные дни (PeriodPurchase).</summary>
+        Task<CommandResult<TariffCancelQuoteResponse>> QuoteTariffCancelAsync(TariffCancelQuoteRequest request);
+
+        /// <summary>Отменить платный тариф, перейти на free, вернуть деньги за остаток периода.</summary>
+        Task<CommandResult<CreateTariffCancelResponse>> CancelTariffPurchaseAsync(TariffCancelRequest request);
+
+        /// <summary>История возвратов по тарифу кошелька.</summary>
+        Task<CommandResult<List<WalletTariffRefundResponse>>> GetWalletTariffRefundsAsync(Guid walletId);
     }
 }

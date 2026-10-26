@@ -564,6 +564,85 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
+        /// Расчёт отмены тарифа и возврата за неиспользованные дни (PeriodPurchase).
+        /// </summary>
+        [HttpPost("tariffPurchases/cancel/quote")]
+        public async Task<CommandResult<TariffCancelQuoteResponse>> QuoteTariffCancelAsync(
+            [FromBody] TariffCancelQuoteRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(QuoteTariffCancelAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _walletsService.QuoteTariffCancelAsync(request);
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Отменить платный тариф: переход на free + пропорциональный возврат на карту.
+        /// </summary>
+        [HttpPost("tariffPurchases/cancel")]
+        public async Task<CommandResult<CreateTariffCancelResponse>> CancelTariffPurchaseAsync(
+            [FromBody] TariffCancelRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(CancelTariffPurchaseAsync)}";
+
+            try
+            {
+                await _connectionProvider.StartNewTransactionAsync();
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+
+                var result = await _walletsService.CancelTariffPurchaseAsync(request);
+                if (!result.Success)
+                    await _connectionProvider.RollbackTransactionAsync();
+
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _connectionProvider.RollbackTransactionAsync();
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>История возвратов по тарифу кошелька.</summary>
+        [HttpGet("{walletId}/tariffRefunds")]
+        public async Task<CommandResult<List<WalletTariffRefundResponse>>> GetWalletTariffRefundsAsync(
+            Guid walletId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(GetWalletTariffRefundsAsync)}";
+
+            try
+            {
+                logger.Debug(correlationId, null, methodName, "Method started", null);
+                var result = await _walletsService.GetWalletTariffRefundsAsync(walletId);
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Пополнение тарифного кошелька (legacy WalletAutoRenew). В PeriodPurchase отключено.
         /// </summary>
         [HttpPost("deposits")]

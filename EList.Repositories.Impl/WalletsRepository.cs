@@ -212,6 +212,49 @@ namespace EList.Repositories.Impl
             return _mapper.Map<List<WalletDeposit>>(list);
         }
 
+        public async Task<Guid> CreateWalletTariffRefundAsync(WalletTariffRefund item)
+        {
+            var mapped = _mapper.Map<WalletTariffRefundDto>(item);
+            return await _walletsDataProvider.CreateWalletTariffRefundAsync(mapped);
+        }
+
+        public async Task<WalletTariffRefund?> GetWalletTariffRefundAsync(Guid refundId)
+        {
+            var dto = await _walletsDataProvider.GetWalletTariffRefundAsync(refundId);
+            return _mapper.Map<WalletTariffRefund>(dto);
+        }
+
+        public async Task<WalletTariffRefund?> GetWalletTariffRefundByIdempotencyAsync(
+            Guid walletId, string idempotencyKey)
+        {
+            var dto = await _walletsDataProvider.GetWalletTariffRefundByIdempotencyAsync(
+                walletId, idempotencyKey);
+            return _mapper.Map<WalletTariffRefund>(dto);
+        }
+
+        public async Task<List<WalletTariffRefund>> GetWalletTariffRefundsAsync(Guid walletId)
+        {
+            var list = await _walletsDataProvider.GetWalletTariffRefundsAsync(walletId);
+            return _mapper.Map<List<WalletTariffRefund>>(list);
+        }
+
+        public async Task<List<WalletTariffRefund>> GetWalletTariffRefundsByDepositAsync(Guid depositId)
+        {
+            var list = await _walletsDataProvider.GetWalletTariffRefundsByDepositAsync(depositId);
+            return _mapper.Map<List<WalletTariffRefund>>(list);
+        }
+
+        public async Task UpdateWalletTariffRefundAsync(
+            Guid refundId,
+            Models.Enums.RefundStatus status,
+            string? providerRefundId,
+            DateTimeOffset? succeededAt)
+        {
+            var mappedStatus = _mapper.Map<DbDataProvider.Models.Enums.RefundStatus>(status);
+            await _walletsDataProvider.UpdateWalletTariffRefundAsync(
+                refundId, mappedStatus, providerRefundId, succeededAt);
+        }
+
         public Task ClearNextChargeAtAsync(Guid walletId)
             => _walletsDataProvider.ClearNextChargeAtAsync(walletId);
 

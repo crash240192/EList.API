@@ -54,6 +54,17 @@ namespace EList.DbDataProvider.Interfaces
             double? balanceAfter = null);
         Task<List<WalletDepositDto>> GetWalletDepositsAsync(Guid walletId);
 
+        Task<Guid> CreateWalletTariffRefundAsync(WalletTariffRefundDto item);
+        Task<WalletTariffRefundDto?> GetWalletTariffRefundAsync(Guid refundId);
+        Task<WalletTariffRefundDto?> GetWalletTariffRefundByIdempotencyAsync(Guid walletId, string idempotencyKey);
+        Task<List<WalletTariffRefundDto>> GetWalletTariffRefundsAsync(Guid walletId);
+        Task<List<WalletTariffRefundDto>> GetWalletTariffRefundsByDepositAsync(Guid depositId);
+        Task UpdateWalletTariffRefundAsync(
+            Guid refundId,
+            RefundStatus status,
+            string? providerRefundId,
+            DateTimeOffset? succeededAt);
+
         Task ClearNextChargeAtAsync(Guid walletId);
         /// <summary>Назначить entitlement периода (PeriodPurchase): tariff + даты + опционально новый баланс.</summary>
         Task ApplyPeriodEntitlementAsync(

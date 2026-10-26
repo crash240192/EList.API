@@ -44,6 +44,18 @@ namespace EList.Repositories.Interfaces
             DateTimeOffset? paidAt,
             double? balanceAfter = null);
         Task<List<WalletDeposit>> GetWalletDepositsAsync(Guid walletId);
+
+        Task<Guid> CreateWalletTariffRefundAsync(WalletTariffRefund item);
+        Task<WalletTariffRefund?> GetWalletTariffRefundAsync(Guid refundId);
+        Task<WalletTariffRefund?> GetWalletTariffRefundByIdempotencyAsync(Guid walletId, string idempotencyKey);
+        Task<List<WalletTariffRefund>> GetWalletTariffRefundsAsync(Guid walletId);
+        Task<List<WalletTariffRefund>> GetWalletTariffRefundsByDepositAsync(Guid depositId);
+        Task UpdateWalletTariffRefundAsync(
+            Guid refundId,
+            Models.Enums.RefundStatus status,
+            string? providerRefundId,
+            DateTimeOffset? succeededAt);
+
         Task ClearNextChargeAtAsync(Guid walletId);
         Task ApplyPeriodEntitlementAsync(
             Guid walletId,

@@ -103,6 +103,11 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 - Default: бесплатный тариф. Платный — `POST /api/Wallets/tariffPurchases` (сначала `…/quote`).
 - **Purchase** — с free/после истечения; **Extend** — тот же тариф, `activeUntil = max(now, activeUntil) + Period`; **Upgrade** — доплата `Cost_new − credit` (credit = остаток дней текущего × Cost_old/Period_old + legacy balance).
 - Downgrade mid-period запрещён; права платного действуют до `activeUntil`.
+- **Cancel** — `POST /api/Wallets/tariffPurchases/cancel` (сначала `…/cancel/quote`): снятие entitlement → free + пропорциональный возврат на карту за неиспользованные дни.
+  - База возврата — **cash paid** последнего entitlement-депозита (`deposit.Amount − alreadyRefunded`), не list price.
+  - Формула: `refund = round(refundable × remainingDays / PeriodDays, 2)`, cap по `refundable`.
+  - Entitlement снимается сразу при принятии заявки; деньги — через `IPaymentProvider.CreateRefundAsync` (T-Bank Cancel с amount) / stub complete.
+  - Журнал: `wallet_tariff_refunds`; webhook `REFUNDED`/`PARTIAL_REFUNDED` закрывает pending.
 - `PUT setTariff` — только на free (если нет активного платного). `POST deposits` (top-up) — отключён.
 - Webhook/GetState те же (`OrderId = wallet:{depositId}`), fulfill выставляет entitlement.
 

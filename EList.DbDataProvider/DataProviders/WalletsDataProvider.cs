@@ -387,6 +387,57 @@ namespace EList.DbDataProvider.DataProviders
                 .ToListAsync();
         }
 
+        public async Task<Guid> CreateWalletTariffRefundAsync(WalletTariffRefundDto item)
+        {
+            return (Guid)await _connection.InsertWithIdentityAsync(item);
+        }
+
+        public async Task<WalletTariffRefundDto?> GetWalletTariffRefundAsync(Guid refundId)
+        {
+            return await _connection.WalletTariffRefunds.FirstOrDefaultAsync(i => i.Id == refundId);
+        }
+
+        public async Task<WalletTariffRefundDto?> GetWalletTariffRefundByIdempotencyAsync(
+            Guid walletId, string idempotencyKey)
+        {
+            return await _connection.WalletTariffRefunds.FirstOrDefaultAsync(i =>
+                i.WalletId == walletId && i.IdempotencyKey == idempotencyKey);
+        }
+
+        public async Task<List<WalletTariffRefundDto>> GetWalletTariffRefundsAsync(Guid walletId)
+        {
+            return await _connection.WalletTariffRefunds
+                .Where(i => i.WalletId == walletId)
+                .OrderByDescending(i => i.CreateDate)
+                .ToListAsync();
+        }
+
+        public async Task<List<WalletTariffRefundDto>> GetWalletTariffRefundsByDepositAsync(Guid depositId)
+        {
+            return await _connection.WalletTariffRefunds
+                .Where(i => i.DepositId == depositId)
+                .OrderByDescending(i => i.CreateDate)
+                .ToListAsync();
+        }
+
+        public async Task UpdateWalletTariffRefundAsync(
+            Guid refundId,
+            RefundStatus status,
+            string? providerRefundId,
+            DateTimeOffset? succeededAt)
+        {
+            var query = _connection.WalletTariffRefunds.Where(i => i.Id == refundId)
+                .Set(i => i.Status, status);
+
+            if (providerRefundId != null)
+                query = query.Set(i => i.ProviderRefundId, providerRefundId);
+
+            if (succeededAt != null)
+                query = query.Set(i => i.SucceededAt, succeededAt);
+
+            await query.UpdateAsync();
+        }
+
         public async Task<Guid?> FindAccountIdByWalletAsync(Guid walletId)
         {
             return await _connection.Accounts

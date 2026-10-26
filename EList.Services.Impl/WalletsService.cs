@@ -771,6 +771,11 @@ namespace EList.Services.Impl
                         paidAt: null);
                 }
             }
+            else if (normalizedStatus is "REFUNDED" or "PARTIAL_REFUNDED")
+            {
+                // Возврат по PeriodPurchase: закрываем pending wallet_tariff_refunds.
+                await FulfillPendingTariffRefundsForDepositAsync(deposit.Id);
+            }
 
             logger.Debug(correlationId, null, methodName,
                 $"Method finished deposit={deposit.Id} status={normalizedStatus}", null, execTime.Elapsed);
@@ -1349,7 +1354,8 @@ namespace EList.Services.Impl
                     return CommandResult<TariffPurchaseQuoteResponse>.Fail(
                         ErrorCode.InvalidValue,
                         $"Платный тариф «{current.Name}» активен до {wallet.NextChargeAt:dd.MM.yyyy HH:mm} (UTC). " +
-                        "Переход на бесплатный — после окончания периода.");
+                        "Переход на бесплатный — через отмену (POST /api/Wallets/tariffPurchases/cancel) " +
+                        "с возвратом за неиспользованные дни, либо после окончания периода.");
                 }
 
                 return new CommandResult<TariffPurchaseQuoteResponse>(new TariffPurchaseQuoteResponse
@@ -1450,6 +1456,423 @@ namespace EList.Services.Impl
                         ? $"Покупка: учтён остаток баланса {credit:0.##} ₽"
                         : "Покупка тарифа на период"
                 });
+            }
+        }
+
+        public async Task<CommandResult<TariffCancelQuoteResponse>> QuoteTariffCancelAsync(
+            TariffCancelQuoteRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(QuoteTariffCancelAsync)}";
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (!BillingSettings.IsPeriodPurchase)
+            {
+                return CommandResult<TariffCancelQuoteResponse>.Fail(
+                    ErrorCode.InvalidValue,
+                    "Отмена тарифа доступна только при billing.mode=PeriodPurchase");
+            }
+
+            if (_accountDataHolder.AccountId == null)
+            {
+                return CommandResult<TariffCancelQuoteResponse>.Fail(
+                    ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+            }
+
+            if (request == null || request.WalletId == Guid.Empty)
+            {
+                return CommandResult<TariffCancelQuoteResponse>.Fail(
+                    ErrorCode.InvalidValue, "Укажите walletId");
+            }
+
+            var access = await AssertCanManageWalletAsync(request.WalletId);
+            if (!access.Success)
+                return CommandResult<TariffCancelQuoteResponse>.Fail(access.ErrorCode, access.Message);
+
+            var built = await BuildTariffCancelQuoteAsync(request.WalletId);
+            if (!built.Success)
+                return CommandResult<TariffCancelQuoteResponse>.Fail(built.ErrorCode, built.Message);
+
+            return new CommandResult<TariffCancelQuoteResponse>(built.Result!);
+        }
+
+        public async Task<CommandResult<CreateTariffCancelResponse>> CancelTariffPurchaseAsync(
+            TariffCancelRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var methodName = $"{LOGGER_NAME}{nameof(CancelTariffPurchaseAsync)}";
+            var execTime = Stopwatch.StartNew();
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (!BillingSettings.IsPeriodPurchase)
+            {
+                return CommandResult<CreateTariffCancelResponse>.Fail(
+                    ErrorCode.InvalidValue,
+                    "Отмена тарифа доступна только при billing.mode=PeriodPurchase");
+            }
+
+            if (_accountDataHolder.AccountId == null)
+            {
+                return CommandResult<CreateTariffCancelResponse>.Fail(
+                    ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+            }
+
+            if (request == null || request.WalletId == Guid.Empty)
+            {
+                return CommandResult<CreateTariffCancelResponse>.Fail(
+                    ErrorCode.InvalidValue, "Укажите walletId");
+            }
+
+            var access = await AssertCanManageWalletAsync(request.WalletId);
+            if (!access.Success)
+                return CommandResult<CreateTariffCancelResponse>.Fail(access.ErrorCode, access.Message);
+
+            if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
+            {
+                var existing = await _walletsRepository.GetWalletTariffRefundByIdempotencyAsync(
+                    request.WalletId, request.IdempotencyKey.Trim());
+                if (existing != null)
+                {
+                    var w = await LoadWalletWithBillingAsync(request.WalletId);
+                    return new CommandResult<CreateTariffCancelResponse>(new CreateTariffCancelResponse
+                    {
+                        Refund = _mapper.Map<WalletTariffRefundResponse>(existing),
+                        RefundAmount = existing.Amount,
+                        PaidImmediately = existing.Status == RefundStatus.Succeeded,
+                        Wallet = w,
+                        Message = existing.Status == RefundStatus.Succeeded
+                            ? "Тариф уже отменён"
+                            : "Заявка на возврат уже создана"
+                    });
+                }
+            }
+
+            var pendingDeposits = (await _walletsRepository.GetWalletDepositsAsync(request.WalletId)
+                ?? new List<WalletDeposit>())
+                .Where(d => d.Status == WalletDepositStatus.Pending
+                    && d.PurchaseKind != WalletTariffPurchaseKind.TopUp)
+                .ToList();
+            if (pendingDeposits.Count > 0)
+            {
+                return CommandResult<CreateTariffCancelResponse>.Fail(
+                    ErrorCode.InvalidValue,
+                    "Есть незавершённая оплата тарифа. Дождитесь подтверждения или отмените платёж у банка.");
+            }
+
+            var quoteResult = await BuildTariffCancelQuoteAsync(request.WalletId);
+            if (!quoteResult.Success || quoteResult.Result == null)
+            {
+                return CommandResult<CreateTariffCancelResponse>.Fail(
+                    quoteResult.ErrorCode, quoteResult.Message);
+            }
+
+            var quote = quoteResult.Result;
+            if (request.ConfirmRefundAmount != null
+                && Math.Abs(request.ConfirmRefundAmount.Value - quote.RefundAmount) > 0.01m)
+            {
+                return CommandResult<CreateTariffCancelResponse>.Fail(
+                    ErrorCode.InvalidValue,
+                    $"Сумма возврата изменилась: сейчас {quote.RefundAmount:0.##} ₽. Обновите расчёт.");
+            }
+
+            // Сразу снимаем entitlement → free (как RefundPending у билетов).
+            if (quote.FallbackTariffId == null || quote.FallbackTariffId == Guid.Empty)
+            {
+                return CommandResult<CreateTariffCancelResponse>.Fail(
+                    ErrorCode.InvalidValue,
+                    "Не найден бесплатный тариф для перехода после отмены");
+            }
+
+            await _walletsRepository.SetWalletTariffAsync(request.WalletId, quote.FallbackTariffId.Value);
+            await _walletsRepository.ClearNextChargeAtAsync(request.WalletId);
+
+            if (quote.DepositId == null || quote.DepositId == Guid.Empty || quote.RefundAmount <= 0)
+            {
+                var walletOnly = await LoadWalletWithBillingAsync(request.WalletId);
+                var emptyRefund = new WalletTariffRefundResponse
+                {
+                    Id = Guid.Empty,
+                    WalletId = request.WalletId,
+                    DepositId = quote.DepositId ?? Guid.Empty,
+                    Amount = 0,
+                    Currency = quote.Currency,
+                    Status = RefundStatus.Succeeded,
+                    Reason = request.Reason ?? "cancel_no_refund",
+                    RemainingDays = quote.RemainingDays,
+                    PeriodDays = quote.PeriodDays,
+                    CreateDate = DateTimeOffset.UtcNow,
+                    SucceededAt = DateTimeOffset.UtcNow
+                };
+                logger.Debug(correlationId, null, methodName, "Method finished (no cash refund)", null, execTime.Elapsed);
+                return new CommandResult<CreateTariffCancelResponse>(new CreateTariffCancelResponse
+                {
+                    Refund = emptyRefund,
+                    RefundAmount = 0,
+                    PaidImmediately = true,
+                    Wallet = walletOnly,
+                    Message = "Тариф отменён. К возврату 0 ₽."
+                });
+            }
+
+            var deposit = await _walletsRepository.GetWalletDepositAsync(quote.DepositId.Value);
+            if (deposit == null)
+            {
+                return CommandResult<CreateTariffCancelResponse>.Fail(
+                    ErrorCode.InvalidValue, "Депозит для возврата не найден");
+            }
+
+            var refund = new WalletTariffRefund
+            {
+                WalletId = request.WalletId,
+                DepositId = deposit.Id,
+                Amount = quote.RefundAmount,
+                Currency = quote.Currency,
+                Status = RefundStatus.Pending,
+                Reason = string.IsNullOrWhiteSpace(request.Reason)
+                    ? "tariff_cancel_unused_days"
+                    : request.Reason.Trim(),
+                IdempotencyKey = string.IsNullOrWhiteSpace(request.IdempotencyKey)
+                    ? null
+                    : request.IdempotencyKey.Trim(),
+                RemainingDays = quote.RemainingDays,
+                PeriodDays = quote.PeriodDays,
+                CreateDate = DateTimeOffset.UtcNow
+            };
+            refund.Id = await _walletsRepository.CreateWalletTariffRefundAsync(refund);
+
+            if (string.IsNullOrWhiteSpace(deposit.ProviderPaymentId))
+            {
+                await MarkTariffRefundSucceededAsync(refund.Id, providerRefundId: null);
+                var local = await _walletsRepository.GetWalletTariffRefundAsync(refund.Id) ?? refund;
+                var walletLocal = await LoadWalletWithBillingAsync(request.WalletId);
+                logger.Debug(correlationId, null, methodName, "Method finished (local)", null, execTime.Elapsed);
+                return new CommandResult<CreateTariffCancelResponse>(new CreateTariffCancelResponse
+                {
+                    Refund = _mapper.Map<WalletTariffRefundResponse>(local),
+                    RefundAmount = local.Amount,
+                    PaidImmediately = true,
+                    Wallet = walletLocal,
+                    Message = $"Тариф отменён. Возврат {local.Amount:0.##} ₽."
+                });
+            }
+
+            var providerRefund = await _paymentProvider.CreateRefundAsync(new RefundCreationRequest
+            {
+                RefundId = refund.Id,
+                OrderId = Guid.Empty,
+                WalletDepositId = deposit.Id,
+                ProviderPaymentId = deposit.ProviderPaymentId.Trim(),
+                Amount = refund.Amount,
+                Currency = refund.Currency,
+                Reason = refund.Reason
+            });
+
+            await _walletsRepository.UpdateWalletTariffRefundAsync(
+                refund.Id,
+                RefundStatus.Pending,
+                providerRefund.ProviderRefundId,
+                succeededAt: null);
+            refund.ProviderRefundId = providerRefund.ProviderRefundId;
+
+            var paidImmediately = providerRefund.Status == PaymentProviderStatus.Succeeded;
+            if (!paidImmediately
+                && _paymentProvider.SupportsManualComplete
+                && !string.IsNullOrWhiteSpace(providerRefund.ProviderRefundId))
+            {
+                await _paymentProvider.CompleteRefundManuallyAsync(providerRefund.ProviderRefundId);
+                paidImmediately = true;
+            }
+
+            if (paidImmediately)
+                await MarkTariffRefundSucceededAsync(refund.Id, providerRefund.ProviderRefundId);
+
+            var done = await _walletsRepository.GetWalletTariffRefundAsync(refund.Id) ?? refund;
+            var walletAfter = await LoadWalletWithBillingAsync(request.WalletId);
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<CreateTariffCancelResponse>(new CreateTariffCancelResponse
+            {
+                Refund = _mapper.Map<WalletTariffRefundResponse>(done),
+                RefundAmount = done.Amount,
+                PaidImmediately = done.Status == RefundStatus.Succeeded,
+                Wallet = walletAfter,
+                Message = done.Status == RefundStatus.Succeeded
+                    ? $"Тариф отменён. Возврат {done.Amount:0.##} ₽ выполнен."
+                    : $"Тариф отменён. Возврат {done.Amount:0.##} ₽ в обработке у банка."
+            });
+        }
+
+        public async Task<CommandResult<List<WalletTariffRefundResponse>>> GetWalletTariffRefundsAsync(
+            Guid walletId)
+        {
+            if (_accountDataHolder.AccountId == null)
+            {
+                return CommandResult<List<WalletTariffRefundResponse>>.Fail(
+                    ErrorCode.UserMustBeAuthorized, "Пользователь не авторизован");
+            }
+
+            var access = await AssertCanManageWalletAsync(walletId);
+            if (!access.Success)
+                return CommandResult<List<WalletTariffRefundResponse>>.Fail(access.ErrorCode, access.Message);
+
+            var list = await _walletsRepository.GetWalletTariffRefundsAsync(walletId)
+                ?? new List<WalletTariffRefund>();
+            return new CommandResult<List<WalletTariffRefundResponse>>(
+                list.Select(r => _mapper.Map<WalletTariffRefundResponse>(r)).ToList());
+        }
+
+        private async Task<CommandResult<TariffCancelQuoteResponse>> BuildTariffCancelQuoteAsync(
+            Guid walletId)
+        {
+            var wallet = await _walletsRepository.GetWalletAsync(walletId);
+            if (wallet == null)
+            {
+                return CommandResult<TariffCancelQuoteResponse>.Fail(
+                    ErrorCode.WalletNotFound, $"Кошелёк с id='{walletId}' не найден");
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            if (wallet.TariffId == null)
+            {
+                return CommandResult<TariffCancelQuoteResponse>.Fail(
+                    ErrorCode.InvalidValue, "На кошельке нет активного тарифа");
+            }
+
+            var tariff = await _walletsRepository.GetTariffAsync(wallet.TariffId.Value);
+            if (tariff == null)
+            {
+                return CommandResult<TariffCancelQuoteResponse>.Fail(
+                    ErrorCode.TariffNotFound, "Тариф кошелька не найден");
+            }
+
+            if (tariff.Cost <= 0)
+            {
+                return CommandResult<TariffCancelQuoteResponse>.Fail(
+                    ErrorCode.InvalidValue, "Бесплатный тариф отменять не нужно");
+            }
+
+            if (wallet.NextChargeAt == null || wallet.NextChargeAt <= now)
+            {
+                return CommandResult<TariffCancelQuoteResponse>.Fail(
+                    ErrorCode.InvalidValue,
+                    "Платный период уже истёк — действует (или скоро будет) бесплатный тариф");
+            }
+
+            var pendingRefunds = (await _walletsRepository.GetWalletTariffRefundsAsync(walletId)
+                ?? new List<WalletTariffRefund>())
+                .Where(r => r.Status == RefundStatus.Pending)
+                .ToList();
+            if (pendingRefunds.Count > 0)
+            {
+                return CommandResult<TariffCancelQuoteResponse>.Fail(
+                    ErrorCode.InvalidValue,
+                    "Уже есть заявка на возврат тарифа в статусе pending");
+            }
+
+            var orgId = await _walletsRepository.FindOrganizationIdByWalletAsync(walletId);
+            var free = await _walletsRepository.GetDefaultFreeTariffAsync(orgId != null);
+
+            var remaining = (decimal)(wallet.NextChargeAt.Value - now).TotalDays;
+            if (remaining < 0) remaining = 0;
+
+            var periodDays = Math.Max(1, tariff.PeriodDays);
+            var deposit = await FindEntitlementDepositAsync(wallet, tariff.Id);
+            decimal amountPaid = 0;
+            decimal alreadyRefunded = 0;
+            decimal refundAmount = 0;
+            Guid? depositId = null;
+
+            if (deposit != null)
+            {
+                depositId = deposit.Id;
+                amountPaid = deposit.Amount;
+                var prior = await _walletsRepository.GetWalletTariffRefundsByDepositAsync(deposit.Id)
+                    ?? new List<WalletTariffRefund>();
+                alreadyRefunded = prior
+                    .Where(r => r.Status is RefundStatus.Pending or RefundStatus.Succeeded)
+                    .Sum(r => r.Amount);
+                var refundable = Math.Max(0, amountPaid - alreadyRefunded);
+                // Пропорция как у upgrade-credit, но от фактически оплаченной суммы депозита.
+                var ratio = Math.Min(1m, remaining / periodDays);
+                refundAmount = Math.Round(refundable * ratio, 2, MidpointRounding.AwayFromZero);
+                if (refundAmount < 0.01m)
+                    refundAmount = 0;
+                if (refundAmount > refundable)
+                    refundAmount = refundable;
+            }
+
+            return new CommandResult<TariffCancelQuoteResponse>(new TariffCancelQuoteResponse
+            {
+                WalletId = walletId,
+                TariffId = tariff.Id,
+                TariffName = tariff.Name,
+                ActiveUntil = wallet.NextChargeAt,
+                RemainingDays = Math.Round(remaining, 4, MidpointRounding.AwayFromZero),
+                PeriodDays = periodDays,
+                DepositId = depositId,
+                AmountPaid = amountPaid,
+                AlreadyRefunded = alreadyRefunded,
+                RefundAmount = refundAmount,
+                Currency = deposit?.Currency ?? "RUB",
+                FallbackTariffId = free?.Id,
+                FallbackTariffName = free?.Name,
+                Message = refundAmount > 0
+                    ? $"Возврат ≈ {refundAmount:0.##} ₽ за ~{remaining:0.#} дн. неиспользованного периода; переход на «{free?.Name ?? "бесплатный"}»"
+                    : $"Отмена без возврата на карту; переход на «{free?.Name ?? "бесплатный"}»"
+            });
+        }
+
+        /// <summary>
+        /// Депозит текущего entitlement: последний Succeeded Purchase/Extend/Upgrade
+        /// с тем же tariff_id и period_end ≈ activeUntil.
+        /// </summary>
+        private async Task<WalletDeposit?> FindEntitlementDepositAsync(Wallet wallet, Guid tariffId)
+        {
+            var deposits = await _walletsRepository.GetWalletDepositsAsync(wallet.Id)
+                ?? new List<WalletDeposit>();
+            var activeUntil = wallet.NextChargeAt;
+
+            var candidates = deposits
+                .Where(d => d.Status == WalletDepositStatus.Succeeded
+                    && d.TariffId == tariffId
+                    && d.PurchaseKind is WalletTariffPurchaseKind.Purchase
+                        or WalletTariffPurchaseKind.Extend
+                        or WalletTariffPurchaseKind.Upgrade)
+                .OrderByDescending(d => d.PaidAt ?? d.CreateDate)
+                .ToList();
+
+            if (activeUntil != null)
+            {
+                var exact = candidates.FirstOrDefault(d =>
+                    d.PeriodEnd != null
+                    && Math.Abs((d.PeriodEnd.Value - activeUntil.Value).TotalMinutes) < 2);
+                if (exact != null)
+                    return exact;
+
+                var covering = candidates.FirstOrDefault(d =>
+                    d.PeriodEnd != null && d.PeriodEnd >= activeUntil.Value.AddMinutes(-1));
+                if (covering != null)
+                    return covering;
+            }
+
+            return candidates.FirstOrDefault();
+        }
+
+        private async Task MarkTariffRefundSucceededAsync(Guid refundId, string? providerRefundId)
+        {
+            await _walletsRepository.UpdateWalletTariffRefundAsync(
+                refundId,
+                RefundStatus.Succeeded,
+                providerRefundId,
+                DateTimeOffset.UtcNow);
+        }
+
+        private async Task FulfillPendingTariffRefundsForDepositAsync(Guid depositId)
+        {
+            var list = await _walletsRepository.GetWalletTariffRefundsByDepositAsync(depositId)
+                ?? new List<WalletTariffRefund>();
+            foreach (var refund in list.Where(r => r.Status == RefundStatus.Pending))
+            {
+                await MarkTariffRefundSucceededAsync(refund.Id, refund.ProviderRefundId);
             }
         }
 

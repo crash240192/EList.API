@@ -87,7 +87,10 @@ namespace EList.Services.Interfaces
     public class RefundCreationRequest
     {
         public Guid RefundId { get; set; }
+        /// <summary>Заказ билетов (если возврат по order).</summary>
         public Guid OrderId { get; set; }
+        /// <summary>Депозит тарифа (если возврат PeriodPurchase).</summary>
+        public Guid? WalletDepositId { get; set; }
         public string ProviderPaymentId { get; set; }
         public decimal Amount { get; set; }
         public string Currency { get; set; } = "RUB";
