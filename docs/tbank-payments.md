@@ -83,6 +83,9 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 | `payments__tbank__e2cApiBaseUrl` | A2C base (`…/e2c/v2`); пусто = из `apiBaseUrl` |
 | `payments__tbank__autoPayoutOnPaid` | После CONFIRMED сразу A2C продавцу (default true) |
 | `payments__tbank__dealTermDays` | TTL сделки для `DealMaintenanceWorker` / closeSpDeal (default 7) |
+| `payments__tbank__receipt__enabled` | Init.Receipt (default **true**). Без него при кассе на терминале → **309** `expected.receipt` |
+| `payments__tbank__receipt__taxation` / `tax` | СНО / НДС чека (`usn_income` / `none` …) |
+| `payments__tbank__receipt__defaultEmail` | Fallback email, если login покупателя не email |
 | `dealMaintenance:*` | Воркер: sync Initiated, retry payout, closeSpDeal |
 | `payments__tbank__smRegister__username` / `password` | Legacy fallback → ShopCode |
 | `payments__tbank__manualShopCode` | DEMO/стенд: ShopCode без bank API |
@@ -151,6 +154,13 @@ Stub (`yookassaStub`) остаётся для локалки без банка: 
 ---
 
 ## 6. Troubleshooting
+
+### ErrorCode 309 — `{request.validate.expected.receipt}`
+
+К терминалу подключена онлайн-касса, а в `Init` не был передан `Receipt`.  
+Код шлёт `Receipt` при `payments__tbank__receipt__enabled=true` (default). Нужен Email или Phone покупателя (login с `@` или `defaultEmail`).
+
+**Не включать одновременно** Init.Receipt (касса банка) и `fiscal:enabled=true` (прямой CloudKassir) — будет два чека на одну оплату. Выберите один контур.
 
 ### HTTP 403 Forbidden на `rest-api-test.tinkoff.ru/v2/Init`
 

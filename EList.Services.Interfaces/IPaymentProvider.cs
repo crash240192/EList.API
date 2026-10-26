@@ -43,6 +43,12 @@ namespace EList.Services.Interfaces
         public Guid BuyerAccountId { get; set; }
         public Guid EventId { get; set; }
 
+        /// <summary>Email покупателя для Init.Receipt (обязателен Email или Phone при кассе на терминале).</summary>
+        public string? BuyerEmail { get; set; }
+
+        /// <summary>Телефон покупателя для Init.Receipt (+7…).</summary>
+        public string? BuyerPhone { get; set; }
+
         /// <summary>Организация-продавец (билеты). Null для пополнения кошелька.</summary>
         public Guid? SellerOrganizationId { get; set; }
 

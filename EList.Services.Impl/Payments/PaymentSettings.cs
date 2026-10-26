@@ -136,6 +136,12 @@ namespace EList.Services.Impl.Payments
         /// </summary>
         public int DealTermDays { get; set; } = 7;
 
+        /// <summary>
+        /// Init.Receipt для онлайн-кассы на терминале Т‑Банка.
+        /// Default true: без Receipt прод с подключённой кассой отвечает 309.
+        /// </summary>
+        public TBankReceiptSettings Receipt { get; set; } = new();
+
         /// <summary>Целевой онбординг точек: acqapi OAuth + /sm-register/register.</summary>
         public TBankAcqApiSettings AcqApi { get; set; } = new();
 
@@ -170,6 +176,14 @@ namespace EList.Services.Impl.Payments
                     Username = Read("payments:tbank:smRegister:username"),
                     Password = Read("payments:tbank:smRegister:password"),
                     BaseUrl = Read("payments:tbank:smRegister:baseUrl", DefaultSmRegisterBaseUrl)
+                },
+                Receipt = new TBankReceiptSettings
+                {
+                    Enabled = ReadBool("payments:tbank:receipt:enabled", defaultValue: true),
+                    Taxation = Read("payments:tbank:receipt:taxation", "usn_income"),
+                    Tax = Read("payments:tbank:receipt:tax", "none"),
+                    PaymentObject = Read("payments:tbank:receipt:paymentObject", "service"),
+                    DefaultEmail = ReadNullable("payments:tbank:receipt:defaultEmail")
                 }
             };
 
@@ -299,5 +313,26 @@ namespace EList.Services.Impl.Payments
 
         public bool IsConfigured()
             => !string.IsNullOrWhiteSpace(Username) && !string.IsNullOrWhiteSpace(Password);
+    }
+
+    /// <summary>
+    /// Init.Receipt: чек через кассу, подключённую к терминалу Т‑Банка.
+    /// Не путать с прямым CloudKassir <c>kkt/receipt</c> (fiscal:*).
+    /// </summary>
+    public class TBankReceiptSettings
+    {
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>osn | usn_income | usn_income_outcome | esn | patent</summary>
+        public string Taxation { get; set; } = "usn_income";
+
+        /// <summary>none | vat0 | vat5 | vat7 | vat10 | vat22 | …</summary>
+        public string Tax { get; set; } = "none";
+
+        /// <summary>commodity | service | …</summary>
+        public string PaymentObject { get; set; } = "service";
+
+        /// <summary>Fallback email, если у покупателя нет login-email.</summary>
+        public string? DefaultEmail { get; set; }
     }
 }

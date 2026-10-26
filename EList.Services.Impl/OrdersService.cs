@@ -255,6 +255,12 @@ namespace EList.Services.Impl
                     await ToCreateResponseAsync(paid, null, null, paidImmediately: true));
             }
 
+            string? buyerEmail = null;
+            var buyerAccount = await _accountsRepository.GetAccountAsync(buyerId);
+            var buyerLogin = buyerAccount?.Login?.Trim();
+            if (!string.IsNullOrWhiteSpace(buyerLogin) && buyerLogin.Contains('@'))
+                buyerEmail = buyerLogin;
+
             var payment = await _paymentProvider.CreatePaymentAsync(new PaymentCreationRequest
             {
                 OrderId = order.Id,
@@ -268,7 +274,8 @@ namespace EList.Services.Impl
                 SellerOrganizationId = sellerOrgId.Value,
                 SellerShopCode = sellerShopCode,
                 AmountSeller = amountSeller,
-                AmountCommission = amountCommission
+                AmountCommission = amountCommission,
+                BuyerEmail = buyerEmail
             });
 
             await _ordersRepository.SetProviderPaymentAsync(
