@@ -1229,13 +1229,16 @@ namespace EList.Services.Impl
                     ? walletNow.LastChargeDate.Value
                     : DateTimeOffset.UtcNow;
 
+            // AmountDue=0 — credit полностью покрыл оплату (Extend/Upgrade).
+            // Депозит с amount=0 пишем для аудита entitlement (CHECK amount >= 0).
+            var amountDue = Math.Max(0, Math.Round(quote.AmountDue, 2, MidpointRounding.AwayFromZero));
             var deposit = new WalletDeposit
             {
                 WalletId = request.WalletId,
-                Amount = Math.Round(quote.AmountDue, 2, MidpointRounding.AwayFromZero),
+                Amount = amountDue,
                 Currency = "RUB",
                 Status = WalletDepositStatus.Pending,
-                Provider = _paymentProvider.Kind,
+                Provider = amountDue > 0 ? _paymentProvider.Kind : null,
                 IdempotencyKey = string.IsNullOrWhiteSpace(request.IdempotencyKey)
                     ? null
                     : request.IdempotencyKey.Trim(),

@@ -102,6 +102,7 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 
 - Default: бесплатный тариф. Платный — `POST /api/Wallets/tariffPurchases` (сначала `…/quote`).
 - **Purchase** — с free/после истечения; **Extend** — тот же тариф, `activeUntil = max(now, activeUntil) + Period`; **Upgrade** — доплата `Cost_new − credit` (credit = остаток дней текущего × Cost_old/Period_old + legacy balance).
+- При `AmountDue=0` (credit покрыл) создаётся `wallet_deposits` с `amount=0` и сразу fulfill (без эквайринга); CHECK `amount >= 0`.
 - Downgrade mid-period запрещён; права платного действуют до `activeUntil`.
 - **Cancel** — `POST /api/Wallets/tariffPurchases/cancel` (сначала `…/cancel/quote`): снятие entitlement → free + пропорциональный возврат на карту за неиспользованные дни.
   - База возврата — **cash paid** последнего entitlement-депозита (`deposit.Amount − alreadyRefunded`), не list price.

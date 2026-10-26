@@ -30,6 +30,7 @@
     <None Remove="Migrations\M202610261900_profile_header_album_views_event_pins.sql" />
     <None Remove="Migrations\M202610262200_tariff_period_purchase.sql" />
     <None Remove="Migrations\M202610270100_wallet_tariff_refunds.sql" />
+    <None Remove="Migrations\M202610270200_wallet_deposits_amount_nonnegative.sql" />
   </ItemGroup>
 
   <ItemGroup>
@@ -56,6 +57,7 @@
     <EmbeddedResource Include="Migrations\M202610261900_profile_header_album_views_event_pins.sql" />
     <EmbeddedResource Include="Migrations\M202610262200_tariff_period_purchase.sql" />
     <EmbeddedResource Include="Migrations\M202610270100_wallet_tariff_refunds.sql" />
+    <EmbeddedResource Include="Migrations\M202610270200_wallet_deposits_amount_nonnegative.sql" />
   </ItemGroup>
 
   <ItemGroup>
