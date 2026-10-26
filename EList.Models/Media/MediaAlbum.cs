@@ -54,5 +54,14 @@
         /// Параметры доступа к персональному альбому
         /// </summary>
         public AccountAlbumParameters AccountParameters { get; set; }
+
+        /// <summary>Макс. create_date видимых файлов в альбоме (для «есть новое»).</summary>
+        public DateTimeOffset? LastContentAt { get; set; }
+
+        /// <summary>Когда текущий пользователь последний раз открывал альбом. null — ещё не смотрел.</summary>
+        public DateTimeOffset? LastViewedAt { get; set; }
+
+        /// <summary>Есть файлы новее LastViewedAt (или альбом не открывали при наличии контента).</summary>
+        public bool HasNewContent { get; set; }
     }
 }

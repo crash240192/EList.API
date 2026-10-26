@@ -35,6 +35,18 @@ namespace EList.DbDataProvider.Models
         [Column("wallet_id")]
         public Guid? WalletId { get; set; }
 
+        [Column("header_image_id")]
+        public Guid? HeaderImageId { get; set; }
+
+        [Column("header_focus_x")]
+        public double? HeaderFocusX { get; set; }
+
+        [Column("header_focus_y")]
+        public double? HeaderFocusY { get; set; }
+
+        [Column("header_blur")]
+        public bool HeaderBlur { get; set; }
+
         [Association(ThisKey = nameof(Id), OtherKey = nameof(ContactAccountRelationDto.AccountId))]
         public List<ContactAccountRelationDto> ContactRelation { get; set; }
 

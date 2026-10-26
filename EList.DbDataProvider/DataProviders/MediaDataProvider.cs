@@ -63,6 +63,7 @@ namespace EList.DbDataProvider.DataProviders
                 .ToListAsync();
             var existingSet = new HashSet<Guid>(existing);
 
+            var now = DateTimeOffset.Now.ToUniversalTime();
             var files = fileIds
                 .Where(id => !existingSet.Contains(id))
                 .Distinct()
@@ -70,12 +71,19 @@ namespace EList.DbDataProvider.DataProviders
                 {
                     Id = Guid.NewGuid(),
                     AlbumId = albumId,
-                    FileId = i
+                    FileId = i,
+                    CreateDate = now
                 })
                 .ToList();
 
             if (files.Count > 0)
+            {
                 await _connection.BulkCopyAsync(files);
+                await _connection.Albums
+                    .Where(a => a.Id == albumId)
+                    .Set(a => a.UpdateDate, now)
+                    .UpdateAsync();
+            }
         }
 
         public async Task RemoveFilesFromAlbumAsync(Guid albumId, List<Guid> fileIds)
@@ -505,6 +513,11 @@ namespace EList.DbDataProvider.DataProviders
                 .Select(i => i.CoverImageId!.Value).Distinct().ToListAsync())
                 referenced.Add(id);
 
+            foreach (var id in await _connection.Accounts
+                .Where(i => i.HeaderImageId != null && ids.Contains(i.HeaderImageId.Value))
+                .Select(i => i.HeaderImageId!.Value).Distinct().ToListAsync())
+                referenced.Add(id);
+
             foreach (var id in await _connection.BugReportFiles
                 .Where(i => ids.Contains(i.FileId)).Select(i => i.FileId).Distinct().ToListAsync())
                 referenced.Add(id);
@@ -618,6 +631,72 @@ namespace EList.DbDataProvider.DataProviders
         {
             await _connection.OrganizationAvatars.Where(i => i.PhotoId == fileId)
                 .DeleteAsync();
+        }
+        #endregion
+
+        #region album views
+        public async Task UpsertAlbumViewAsync(Guid accountId, Guid albumId, DateTimeOffset viewedAt)
+        {
+            var existing = await _connection.MediaAlbumViews
+                .FirstOrDefaultAsync(i => i.AccountId == accountId && i.AlbumId == albumId);
+            if (existing == null)
+            {
+                await _connection.InsertAsync(new MediaAlbumViewDto
+                {
+                    AccountId = accountId,
+                    AlbumId = albumId,
+                    LastViewedAt = viewedAt
+                });
+                return;
+            }
+
+            await _connection.MediaAlbumViews
+                .Where(i => i.AccountId == accountId && i.AlbumId == albumId)
+                .Set(i => i.LastViewedAt, viewedAt)
+                .UpdateAsync();
+        }
+
+        public async Task<DateTimeOffset?> GetAlbumLastViewedAtAsync(Guid accountId, Guid albumId)
+        {
+            return await _connection.MediaAlbumViews
+                .Where(i => i.AccountId == accountId && i.AlbumId == albumId)
+                .Select(i => (DateTimeOffset?)i.LastViewedAt)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<Dictionary<Guid, DateTimeOffset>> GetAlbumLastViewedAtAsync(
+            Guid accountId,
+            IReadOnlyList<Guid> albumIds)
+        {
+            if (albumIds == null || albumIds.Count == 0)
+                return new Dictionary<Guid, DateTimeOffset>();
+
+            var rows = await _connection.MediaAlbumViews
+                .Where(i => i.AccountId == accountId && albumIds.Contains(i.AlbumId))
+                .ToListAsync();
+            return rows.ToDictionary(i => i.AlbumId, i => i.LastViewedAt);
+        }
+
+        public async Task<DateTimeOffset?> GetAlbumLastContentAtAsync(Guid albumId)
+        {
+            return await _connection.AlbumFiles
+                .Where(i => i.AlbumId == albumId && !i.Hidden)
+                .OrderByDescending(i => i.CreateDate)
+                .Select(i => (DateTimeOffset?)i.CreateDate)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<Dictionary<Guid, DateTimeOffset>> GetAlbumLastContentAtAsync(IReadOnlyList<Guid> albumIds)
+        {
+            if (albumIds == null || albumIds.Count == 0)
+                return new Dictionary<Guid, DateTimeOffset>();
+
+            var rows = await _connection.AlbumFiles
+                .Where(i => albumIds.Contains(i.AlbumId) && !i.Hidden)
+                .GroupBy(i => i.AlbumId)
+                .Select(g => new { AlbumId = g.Key, Last = g.Max(x => x.CreateDate) })
+                .ToListAsync();
+            return rows.ToDictionary(i => i.AlbumId, i => i.Last);
         }
         #endregion
     }

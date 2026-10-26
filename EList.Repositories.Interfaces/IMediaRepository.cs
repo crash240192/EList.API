@@ -40,5 +40,9 @@ namespace EList.Repositories.Interfaces
         Task<List<Guid>?> GetOrganizationAvatarsAsync(Guid organizationId);
         Task<Guid?> GetLastOrganizationAvatarAsync(Guid organizationId);
         Task DeleteOrganizationAvatarAsync(Guid fileId);
+
+        Task UpsertAlbumViewAsync(Guid accountId, Guid albumId, DateTimeOffset viewedAt);
+        Task EnrichAlbumsWithViewStateAsync(Guid? viewerAccountId, IList<MediaAlbum> albums);
+        Task EnrichAlbumWithViewStateAsync(Guid? viewerAccountId, MediaAlbum album);
     }
 }

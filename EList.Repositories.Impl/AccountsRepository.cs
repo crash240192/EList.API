@@ -70,6 +70,25 @@ namespace EList.Repositories.Impl
             await _accountsDataProvider.ClearSensitiveDataAsync(accountId);
         }
 
+        public async Task SetAccountHeaderAsync(
+            Guid accountId,
+            Guid? imageId,
+            double? focusX,
+            double? focusY,
+            bool blur)
+        {
+            await _accountsDataProvider.SetAccountHeaderAsync(accountId, imageId, focusX, focusY, blur);
+        }
+
+        public async Task<List<Guid>> GetEventPinIdsAsync(Guid accountId)
+        {
+            return await _accountsDataProvider.GetEventPinIdsAsync(accountId);
+        }
+
+        public async Task ReplaceEventPinsAsync(Guid accountId, IReadOnlyList<Guid> eventIds)
+        {
+            await _accountsDataProvider.ReplaceEventPinsAsync(accountId, eventIds);
+        }
 
         #region locations
         public async Task UpdateLocationAsync(Guid accountId, double latitude, double longitude)

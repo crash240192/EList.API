@@ -37,5 +37,8 @@ namespace EList.Services.Interfaces
 
         /// <summary>Re-sync filestorage visibility for files in one album.</summary>
         Task SyncAlbumVisibilityAsync(Guid albumId);
+
+        /// <summary>Отметить альбом просмотренным текущим пользователем (для HasNewContent).</summary>
+        Task<CommandResult> MarkAlbumViewedAsync(Guid albumId);
     }
 }

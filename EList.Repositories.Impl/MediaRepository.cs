@@ -258,5 +258,50 @@ namespace EList.Repositories.Impl
             await _mediaDataProvider.DeleteOrganizationAvatarAsync(fileId);
         }
         #endregion
+
+        #region album views
+        public async Task UpsertAlbumViewAsync(Guid accountId, Guid albumId, DateTimeOffset viewedAt)
+        {
+            await _mediaDataProvider.UpsertAlbumViewAsync(accountId, albumId, viewedAt);
+        }
+
+        public async Task EnrichAlbumWithViewStateAsync(Guid? viewerAccountId, MediaAlbum album)
+        {
+            if (album == null)
+                return;
+            await EnrichAlbumsWithViewStateAsync(viewerAccountId, new List<MediaAlbum> { album });
+        }
+
+        public async Task EnrichAlbumsWithViewStateAsync(Guid? viewerAccountId, IList<MediaAlbum> albums)
+        {
+            if (albums == null || albums.Count == 0)
+                return;
+
+            var albumIds = albums.Select(a => a.Id).Where(id => id != Guid.Empty).Distinct().ToList();
+            if (albumIds.Count == 0)
+                return;
+
+            var lastContent = await _mediaDataProvider.GetAlbumLastContentAtAsync(albumIds);
+            Dictionary<Guid, DateTimeOffset> lastViewed = new();
+            if (viewerAccountId != null && viewerAccountId != Guid.Empty)
+                lastViewed = await _mediaDataProvider.GetAlbumLastViewedAtAsync(viewerAccountId.Value, albumIds);
+
+            foreach (var album in albums)
+            {
+                if (lastContent.TryGetValue(album.Id, out var contentAt))
+                    album.LastContentAt = contentAt;
+                else
+                    album.LastContentAt = null;
+
+                if (lastViewed.TryGetValue(album.Id, out var viewedAt))
+                    album.LastViewedAt = viewedAt;
+                else
+                    album.LastViewedAt = null;
+
+                album.HasNewContent = album.LastContentAt != null
+                    && (album.LastViewedAt == null || album.LastContentAt > album.LastViewedAt);
+            }
+        }
+        #endregion
     }
 }

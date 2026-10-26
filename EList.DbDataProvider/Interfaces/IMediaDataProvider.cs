@@ -41,5 +41,11 @@ namespace EList.DbDataProvider.Interfaces
         Task<List<Guid>?> GetOrganizationAvatarsAsync(Guid organizationId);
         Task<Guid?> GetLastOrganizationAvatarAsync(Guid organizationId);
         Task DeleteOrganizationAvatarAsync(Guid fileId);
+
+        Task UpsertAlbumViewAsync(Guid accountId, Guid albumId, DateTimeOffset viewedAt);
+        Task<DateTimeOffset?> GetAlbumLastViewedAtAsync(Guid accountId, Guid albumId);
+        Task<Dictionary<Guid, DateTimeOffset>> GetAlbumLastViewedAtAsync(Guid accountId, IReadOnlyList<Guid> albumIds);
+        Task<DateTimeOffset?> GetAlbumLastContentAtAsync(Guid albumId);
+        Task<Dictionary<Guid, DateTimeOffset>> GetAlbumLastContentAtAsync(IReadOnlyList<Guid> albumIds);
     }
 }

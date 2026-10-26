@@ -227,6 +227,8 @@ namespace EList.Services.Impl
                     result, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
             }
 
+            await _mediaRepository.EnrichAlbumsWithViewStateAsync(_accountDataHolder.AccountId, result);
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<MediaAlbum>>(result);
         }
@@ -247,6 +249,8 @@ namespace EList.Services.Impl
             if (!accessError.Success)
                 return CommandResult<MediaAlbum>.Fail(accessError.ErrorCode, accessError.Message);
 
+            await _mediaRepository.EnrichAlbumWithViewStateAsync(_accountDataHolder.AccountId, result);
+
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<MediaAlbum>(result);
         }
@@ -262,6 +266,7 @@ namespace EList.Services.Impl
             result = await _albumAccessValidator.FilterViewableAlbumsAsync(
                 result, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
             result = await FilterEmptySystemAlbumsAsync(result);
+            await _mediaRepository.EnrichAlbumsWithViewStateAsync(_accountDataHolder.AccountId, result);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<MediaAlbum>>(result);
@@ -282,11 +287,40 @@ namespace EList.Services.Impl
                     if (container.Albums == null)
                         continue;
                     container.Albums = await FilterEmptySystemAlbumsAsync(container.Albums);
+                    await _mediaRepository.EnrichAlbumsWithViewStateAsync(_accountDataHolder.AccountId, container.Albums);
                 }
             }
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<EventAlbumsContainer>>(result);
+        }
+
+        public async Task<CommandResult> MarkAlbumViewedAsync(Guid albumId)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(MarkAlbumViewedAsync)}";
+            logger.Debug(correlationId, null, methodName, $"Method started", null);
+
+            if (_accountDataHolder.AccountId == null)
+                return CommandResult.Fail(ErrorCode.AccessError, "Необходимо авторизоваться");
+
+            var album = await _mediaRepository.GetAlbumAsync(albumId);
+            if (album == null)
+                return CommandResult.Fail(ErrorCode.AlbumNotFound, "Альбом не найден");
+
+            var accessError = await _albumAccessValidator.AssertCanViewAlbumAsync(
+                album, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
+            if (!accessError.Success)
+                return accessError;
+
+            await _mediaRepository.UpsertAlbumViewAsync(
+                _accountDataHolder.AccountId.Value,
+                albumId,
+                DateTimeOffset.UtcNow);
+
+            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
         }
 
 
