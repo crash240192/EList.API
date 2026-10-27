@@ -244,6 +244,20 @@ namespace EList.DbDataProvider.DataProviders
                 .ToListAsync();
         }
 
+        public async Task<List<WalletDto>> GetExpiredPeriodPurchaseWalletsAsync()
+        {
+            var now = DateTimeOffset.UtcNow;
+            // Только платные тарифы: free с NextChargeAt=null не тащим каждый тик.
+            return await (
+                from w in _connection.Wallets
+                from t in _connection.Tariffs.InnerJoin(t => t.Id == w.TariffId)
+                where w.TariffId != null
+                    && t.Cost > 0
+                    && (w.NextChargeAt == null || w.NextChargeAt <= now)
+                select w
+            ).ToListAsync();
+        }
+
         public async Task DepositeAsync(Guid walletId, double value)
         {
             // Только инкремент баланса. Период тарифа (NextChargeAt) не трогаем.

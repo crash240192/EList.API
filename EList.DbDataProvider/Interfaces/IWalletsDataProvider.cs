@@ -34,6 +34,11 @@ namespace EList.DbDataProvider.Interfaces
         Task<WalletDto?> GetOrganizationWalletAsync(Guid organizationId);
 
         Task<List<WalletDto>> GetOverdueWalletsAsync();
+        /// <summary>
+        /// PeriodPurchase: платный entitlement с истёкшим (или пустым) activeUntil.
+        /// Без бесплатных тарифов (у них NextChargeAt обычно null).
+        /// </summary>
+        Task<List<WalletDto>> GetExpiredPeriodPurchaseWalletsAsync();
         /// <summary>Только +balance. Период тарифа не сдвигается.</summary>
         Task DepositeAsync(Guid walletId, double value);
         /// <summary>

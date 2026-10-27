@@ -30,6 +30,7 @@ namespace EList.Repositories.Interfaces
         Task<Wallet?> GetOrganizationWalletAsync(Guid organizationId);
 
         Task<List<Wallet>> GetOverdueWalletsAsync();
+        Task<List<Wallet>> GetExpiredPeriodPurchaseWalletsAsync();
         Task DepositeAsync(Guid walletId, double value);
         Task<bool> ChargeByTariffAsync(Guid walletId);
 

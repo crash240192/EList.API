@@ -9,7 +9,12 @@ using NLog;
 namespace EList.Services.Impl.BackgroundWorkers
 {
     /// <summary>
-    /// Фоновый сборщик задолженности по тарифам кошельков.
+    /// Фоновый воркер тарифного контура:
+    /// <list type="bullet">
+    /// <item><see cref="BillingSettings.ModeWalletAutoRenew"/> — автосписание с баланса (legacy).</item>
+    /// <item><see cref="BillingSettings.ModePeriodPurchase"/> — сброс истёкших платных entitlement → free
+    /// (тот же переход, что при чтении кошелька в <c>LoadWalletWithBillingAsync</c>).</item>
+    /// </list>
     /// </summary>
     public class DebtCollectorWorker : PeriodicBackgroundWorkerBase, IDebtCollectorUtility
     {
@@ -45,15 +50,44 @@ namespace EList.Services.Impl.BackgroundWorkers
             var correlationId = scopedServices.GetRequiredService<ICorrelationIdProvider>().Get();
             var logger = new NLogLoggerWrapper(log);
 
+            var walletsRepository = scopedServices.GetRequiredService<IWalletsRepository>();
+            var walletsService = scopedServices.GetRequiredService<IWalletsService>();
+
             if (BillingSettings.IsPeriodPurchase)
             {
-                logger.Debug(correlationId, null, methodName,
-                    "Skipped: billing.mode=PeriodPurchase (no auto-renew)", null);
+                // Не ChargeByTariff: период уже оплачен, автопродления нет.
+                // Сбрасываем просроченные платные entitlement → free (как при GET wallet).
+                var expired = await walletsRepository.GetExpiredPeriodPurchaseWalletsAsync();
+                if (expired == null || expired.Count == 0)
+                {
+                    logger.Debug(correlationId, null, methodName,
+                        "PeriodPurchase: no expired paid entitlements", null);
+                    return;
+                }
+
+                logger.Info(correlationId, null, methodName,
+                    $"PeriodPurchase: expiring {expired.Count} wallet(s)", null);
+
+                foreach (var wallet in expired)
+                {
+                    stoppingToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        // GetWalletAsync → LoadWalletWithBillingAsync: paid+due → free.
+                        await walletsService.GetWalletAsync(wallet.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Error(correlationId, null, methodName,
+                            $"Failed to expire wallet '{wallet.Id}': {ex.Message}", null, ex);
+                    }
+
+                    await DelayBetweenItemsAsync(stoppingToken);
+                }
+
                 return;
             }
 
-            var walletsRepository = scopedServices.GetRequiredService<IWalletsRepository>();
-            var walletsService = scopedServices.GetRequiredService<IWalletsService>();
             var wallets = await walletsRepository.GetOverdueWalletsAsync();
             if (wallets == null || wallets.Count == 0)
             {

@@ -156,6 +156,12 @@ namespace EList.Repositories.Impl
             return result;
         }
 
+        public async Task<List<Wallet>> GetExpiredPeriodPurchaseWalletsAsync()
+        {
+            var list = await _walletsDataProvider.GetExpiredPeriodPurchaseWalletsAsync();
+            return _mapper.Map<List<Wallet>>(list);
+        }
+
         public async Task DepositeAsync(Guid walletId, double value)
         {
             await _walletsDataProvider.DepositeAsync(walletId, value);
