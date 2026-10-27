@@ -1347,7 +1347,7 @@ namespace EList.Services.Impl
                 current.Cost <= 0
                 || (wallet.NextChargeAt != null && wallet.NextChargeAt > now));
 
-            var period = target.Period <= TimeSpan.Zero ? TimeSpan.FromDays(30) : target.Period;
+            var period = target.EffectivePeriod;
             var balanceCredit = (decimal)Math.Max(0, wallet.Balance);
 
             if (target.Cost <= 0)
@@ -1370,7 +1370,7 @@ namespace EList.Services.Impl
                     ListPrice = 0,
                     Credit = 0,
                     AmountDue = 0,
-                    PeriodDays = target.PeriodDays,
+                    PeriodDays = PeriodDaysForResponse(period),
                     CurrentActiveUntil = wallet.NextChargeAt,
                     NewActiveUntil = now,
                     Message = "Бесплатный тариф без оплаты"
@@ -1394,7 +1394,7 @@ namespace EList.Services.Impl
                     ListPrice = listPrice,
                     Credit = Math.Round(credit, 2, MidpointRounding.AwayFromZero),
                     AmountDue = amountDue,
-                    PeriodDays = target.PeriodDays,
+                    PeriodDays = PeriodDaysForResponse(period),
                     CurrentActiveUntil = wallet.NextChargeAt,
                     NewActiveUntil = baseUntil + period,
                     Message = credit > 0
@@ -1416,7 +1416,7 @@ namespace EList.Services.Impl
                 var remaining = (wallet.NextChargeAt!.Value - now).TotalDays;
                 if (remaining < 0)
                     remaining = 0;
-                var curPeriodDays = Math.Max(1, current.PeriodDays);
+                var curPeriodDays = current.PeriodTotalDays;
                 var periodCredit = (decimal)(current.Cost * (remaining / curPeriodDays));
                 var credit = periodCredit + balanceCredit;
                 var listPrice = (decimal)target.Cost;
@@ -1430,7 +1430,7 @@ namespace EList.Services.Impl
                     ListPrice = listPrice,
                     Credit = Math.Round(credit, 2, MidpointRounding.AwayFromZero),
                     AmountDue = amountDue,
-                    PeriodDays = target.PeriodDays,
+                    PeriodDays = PeriodDaysForResponse(period),
                     CurrentActiveUntil = wallet.NextChargeAt,
                     NewActiveUntil = now + period,
                     Message =
@@ -1452,7 +1452,7 @@ namespace EList.Services.Impl
                     ListPrice = listPrice,
                     Credit = Math.Round(credit, 2, MidpointRounding.AwayFromZero),
                     AmountDue = amountDue,
-                    PeriodDays = target.PeriodDays,
+                    PeriodDays = PeriodDaysForResponse(period),
                     CurrentActiveUntil = wallet.NextChargeAt,
                     NewActiveUntil = now + period,
                     Message = credit > 0
@@ -1777,7 +1777,7 @@ namespace EList.Services.Impl
             var remaining = (decimal)(wallet.NextChargeAt.Value - now).TotalDays;
             if (remaining < 0) remaining = 0;
 
-            var periodDays = Math.Max(1, tariff.PeriodDays);
+            var periodLengthDays = (decimal)tariff.PeriodTotalDays;
             var deposit = await FindEntitlementDepositAsync(wallet, tariff.Id);
             decimal amountPaid = 0;
             decimal alreadyRefunded = 0;
@@ -1795,7 +1795,7 @@ namespace EList.Services.Impl
                     .Sum(r => r.Amount);
                 var refundable = Math.Max(0, amountPaid - alreadyRefunded);
                 // Пропорция как у upgrade-credit, но от фактически оплаченной суммы депозита.
-                var ratio = Math.Min(1m, remaining / periodDays);
+                var ratio = Math.Min(1m, remaining / periodLengthDays);
                 refundAmount = Math.Round(refundable * ratio, 2, MidpointRounding.AwayFromZero);
                 if (refundAmount < 0.01m)
                     refundAmount = 0;
@@ -1810,7 +1810,7 @@ namespace EList.Services.Impl
                 TariffName = tariff.Name,
                 ActiveUntil = wallet.NextChargeAt,
                 RemainingDays = Math.Round(remaining, 4, MidpointRounding.AwayFromZero),
-                PeriodDays = periodDays,
+                PeriodDays = PeriodDaysForResponse(tariff.EffectivePeriod),
                 DepositId = depositId,
                 AmountPaid = amountPaid,
                 AlreadyRefunded = alreadyRefunded,
@@ -1858,6 +1858,13 @@ namespace EList.Services.Impl
             }
 
             return candidates.FirstOrDefault();
+        }
+
+        private static int PeriodDaysForResponse(TimeSpan period)
+        {
+            if (period <= TimeSpan.Zero)
+                return 30;
+            return Math.Max(1, (int)Math.Ceiling(period.TotalDays));
         }
 
         private async Task MarkTariffRefundSucceededAsync(Guid refundId, string? providerRefundId)

@@ -23,22 +23,28 @@ namespace EList.Models.Wallets
         public double Cost { get; set; }
 
         /// <summary>
-        /// Период списания 
+        /// Полный период действия (из БД <c>interval</c>). Сохраняет минуты/часы.
         /// </summary>
-        public int PeriodDays { get; set; }
+        public TimeSpan Period { get; set; }
 
-        [JsonIgnore]
-        public TimeSpan Period 
-        { 
-            get 
+        /// <summary>
+        /// Целые дни периода (для админки / обратной совместимости JSON).
+        /// Sub-day периоды дают 0 — клиент смотрит <see cref="Period"/>.
+        /// При set перезаписывает <see cref="Period"/> целиком из дней.
+        /// </summary>
+        public int PeriodDays
+        {
+            get
             {
-                return TimeSpan.FromDays(PeriodDays);
+                if (Period <= TimeSpan.Zero)
+                    return 0;
+                return (int)Math.Floor(Period.TotalDays);
             }
             set
             {
-                PeriodDays = value.Days;
+                Period = value > 0 ? TimeSpan.FromDays(value) : TimeSpan.Zero;
             }
-        } 
+        }
 
         /// <summary>
         /// Идентификатор валидатора тарифа
@@ -54,5 +60,15 @@ namespace EList.Models.Wallets
         /// Тариф для организаций
         /// </summary>
         public bool ForOrganization { get; set; } = false;
+
+        /// <summary>Период для начислений; пустой → 30 дней.</summary>
+        [JsonIgnore]
+        public TimeSpan EffectivePeriod =>
+            Period > TimeSpan.Zero ? Period : TimeSpan.FromDays(30);
+
+        /// <summary>Длина периода в днях (дробная), минимум 1 минута.</summary>
+        [JsonIgnore]
+        public double PeriodTotalDays =>
+            Math.Max(EffectivePeriod.TotalDays, 1.0 / (24 * 60));
     }
 }

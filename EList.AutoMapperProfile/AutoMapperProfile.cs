@@ -143,7 +143,12 @@ namespace EList.AutoMapperProfile
                 .ForMember(dest => dest.AccountParameters, opt => opt.MapFrom(src => src.AccountParameters));
             CreateMap<FileAlbumRelationDto, AlbumFile>().ReverseMap();
 
-            CreateMap<TariffDto, Tariff>().ReverseMap();
+            // Period — полный TimeSpan из БД; PeriodDays — вычисляемое/админское поле (не мапить обратно в DTO).
+            CreateMap<TariffDto, Tariff>()
+                .ForMember(d => d.PeriodDays, opt => opt.Ignore());
+            CreateMap<Tariff, TariffDto>()
+                .ForMember(d => d.Period, opt => opt.MapFrom(s =>
+                    s.Period > TimeSpan.Zero ? s.Period : TimeSpan.FromDays(Math.Max(0, s.PeriodDays))));
             CreateMap<TariffValidatorDto, TariffValidator>().ReverseMap();
             CreateMap<WalletDto, Wallet>()
                 .ForMember(d => d.EffectiveTariffId, o => o.Ignore())
