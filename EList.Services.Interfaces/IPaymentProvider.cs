@@ -35,6 +35,13 @@ namespace EList.Services.Interfaces
     {
         public Guid OrderId { get; set; }
         public Guid? WalletDepositId { get; set; }
+
+        /// <summary>
+        /// OrderId в банке. Для тарифа: <c>tariff:A7K9M2X3</c>.
+        /// Если задан — имеет приоритет над автогенерацией <c>wallet:{depositId}</c>.
+        /// </summary>
+        public string? ClientOrderId { get; set; }
+
         public decimal Amount { get; set; }
         public string Currency { get; set; } = "RUB";
         public string Description { get; set; }

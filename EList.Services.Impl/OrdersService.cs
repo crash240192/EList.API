@@ -10,6 +10,7 @@ using EList.Models.Events;
 using EList.Models.Events.EventMetadata;
 using EList.Models.Invitations;
 using EList.Models.Orders;
+using EList.Models.Wallets;
 using EList.Repositories.Interfaces;
 using EList.Services.Impl.Payments;
 using EList.Services.Impl.Payments.TBank;
@@ -564,8 +565,7 @@ namespace EList.Services.Impl
                 });
             }
 
-            var isWalletOrderId = !string.IsNullOrWhiteSpace(notification.OrderId)
-                && notification.OrderId.Trim().StartsWith("wallet:", StringComparison.OrdinalIgnoreCase);
+            var isWalletOrderId = WalletDepositOrderIds.IsWalletContourOrderId(notification.OrderId);
 
             if (isWalletOrderId)
             {

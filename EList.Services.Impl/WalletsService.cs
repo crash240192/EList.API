@@ -714,12 +714,14 @@ namespace EList.Services.Impl
 
             WalletDeposit? deposit = null;
 
-            if (!string.IsNullOrWhiteSpace(orderIdFromProvider)
-                && orderIdFromProvider.Trim().StartsWith("wallet:", StringComparison.OrdinalIgnoreCase))
+            if (WalletDepositOrderIds.IsTariffOrderId(orderIdFromProvider))
             {
-                var rawId = orderIdFromProvider.Trim().Substring("wallet:".Length).Trim();
-                if (Guid.TryParse(rawId, out var depositId))
-                    deposit = await _walletsRepository.GetWalletDepositAsync(depositId);
+                deposit = await _walletsRepository.GetWalletDepositByProviderOrderIdAsync(
+                    orderIdFromProvider.Trim());
+            }
+            else if (WalletDepositOrderIds.TryParseLegacyDepositId(orderIdFromProvider, out var legacyDepositId))
+            {
+                deposit = await _walletsRepository.GetWalletDepositAsync(legacyDepositId);
             }
 
             if (deposit == null)
@@ -1232,6 +1234,14 @@ namespace EList.Services.Impl
             // AmountDue=0 — credit полностью покрыл оплату (Extend/Upgrade).
             // Депозит с amount=0 пишем для аудита entitlement (CHECK amount >= 0).
             var amountDue = Math.Max(0, Math.Round(quote.AmountDue, 2, MidpointRounding.AwayFromZero));
+            var providerOrderId = amountDue > 0 ? WalletDepositOrderIds.NewTariffOrderId() : null;
+            var periodLabel = string.IsNullOrWhiteSpace(quote.PeriodLabel)
+                ? TariffPeriodFormat.FormatLabel(TimeSpan.FromDays(Math.Max(1, quote.PeriodDays)))
+                : quote.PeriodLabel.Trim();
+            var receiptDescription = string.IsNullOrWhiteSpace(quote.TariffName)
+                ? $"Покупка тарифа на {periodLabel}"
+                : $"Покупка тарифа «{quote.TariffName}» на {periodLabel}";
+
             var deposit = new WalletDeposit
             {
                 WalletId = request.WalletId,
@@ -1239,6 +1249,7 @@ namespace EList.Services.Impl
                 Currency = "RUB",
                 Status = WalletDepositStatus.Pending,
                 Provider = amountDue > 0 ? _paymentProvider.Kind : null,
+                ProviderOrderId = providerOrderId,
                 IdempotencyKey = string.IsNullOrWhiteSpace(request.IdempotencyKey)
                     ? null
                     : request.IdempotencyKey.Trim(),
@@ -1249,7 +1260,22 @@ namespace EList.Services.Impl
                 PeriodStart = entitlementStart,
                 PeriodEnd = quote.NewActiveUntil
             };
-            deposit.Id = await _walletsRepository.CreateWalletDepositAsync(deposit);
+
+            // Уникальный provider_order_id: при коллизии генерируем ещё раз.
+            const int orderIdAttempts = 5;
+            for (var attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    deposit.Id = await _walletsRepository.CreateWalletDepositAsync(deposit);
+                    break;
+                }
+                catch (Exception) when (providerOrderId != null && attempt < orderIdAttempts - 1)
+                {
+                    providerOrderId = WalletDepositOrderIds.NewTariffOrderId();
+                    deposit.ProviderOrderId = providerOrderId;
+                }
+            }
 
             if (deposit.Amount <= 0)
             {
@@ -1271,9 +1297,10 @@ namespace EList.Services.Impl
             {
                 OrderId = Guid.Empty,
                 WalletDepositId = deposit.Id,
+                ClientOrderId = providerOrderId,
                 Amount = deposit.Amount,
                 Currency = deposit.Currency,
-                Description = $"Тариф «{quote.TariffName}» на {quote.PeriodDays} дн.",
+                Description = receiptDescription,
                 ReturnUrl = request.ReturnUrl,
                 IdempotencyKey = deposit.IdempotencyKey,
                 BuyerAccountId = buyerAccountId,
@@ -1370,7 +1397,8 @@ namespace EList.Services.Impl
                     ListPrice = 0,
                     Credit = 0,
                     AmountDue = 0,
-                    PeriodDays = PeriodDaysForResponse(period),
+                    PeriodDays = TariffPeriodFormat.PeriodDaysForResponse(period),
+                    PeriodLabel = TariffPeriodFormat.FormatLabel(period),
                     CurrentActiveUntil = wallet.NextChargeAt,
                     NewActiveUntil = now,
                     Message = "Бесплатный тариф без оплаты"
@@ -1394,7 +1422,8 @@ namespace EList.Services.Impl
                     ListPrice = listPrice,
                     Credit = Math.Round(credit, 2, MidpointRounding.AwayFromZero),
                     AmountDue = amountDue,
-                    PeriodDays = PeriodDaysForResponse(period),
+                    PeriodDays = TariffPeriodFormat.PeriodDaysForResponse(period),
+                    PeriodLabel = TariffPeriodFormat.FormatLabel(period),
                     CurrentActiveUntil = wallet.NextChargeAt,
                     NewActiveUntil = baseUntil + period,
                     Message = credit > 0
@@ -1430,7 +1459,8 @@ namespace EList.Services.Impl
                     ListPrice = listPrice,
                     Credit = Math.Round(credit, 2, MidpointRounding.AwayFromZero),
                     AmountDue = amountDue,
-                    PeriodDays = PeriodDaysForResponse(period),
+                    PeriodDays = TariffPeriodFormat.PeriodDaysForResponse(period),
+                    PeriodLabel = TariffPeriodFormat.FormatLabel(period),
                     CurrentActiveUntil = wallet.NextChargeAt,
                     NewActiveUntil = now + period,
                     Message =
@@ -1452,7 +1482,8 @@ namespace EList.Services.Impl
                     ListPrice = listPrice,
                     Credit = Math.Round(credit, 2, MidpointRounding.AwayFromZero),
                     AmountDue = amountDue,
-                    PeriodDays = PeriodDaysForResponse(period),
+                    PeriodDays = TariffPeriodFormat.PeriodDaysForResponse(period),
+                    PeriodLabel = TariffPeriodFormat.FormatLabel(period),
                     CurrentActiveUntil = wallet.NextChargeAt,
                     NewActiveUntil = now + period,
                     Message = credit > 0
@@ -1810,7 +1841,7 @@ namespace EList.Services.Impl
                 TariffName = tariff.Name,
                 ActiveUntil = wallet.NextChargeAt,
                 RemainingDays = Math.Round(remaining, 4, MidpointRounding.AwayFromZero),
-                PeriodDays = PeriodDaysForResponse(tariff.EffectivePeriod),
+                PeriodDays = TariffPeriodFormat.PeriodDaysForResponse(tariff.EffectivePeriod),
                 DepositId = depositId,
                 AmountPaid = amountPaid,
                 AlreadyRefunded = alreadyRefunded,
@@ -1858,13 +1889,6 @@ namespace EList.Services.Impl
             }
 
             return candidates.FirstOrDefault();
-        }
-
-        private static int PeriodDaysForResponse(TimeSpan period)
-        {
-            if (period <= TimeSpan.Zero)
-                return 30;
-            return Math.Max(1, (int)Math.Ceiling(period.TotalDays));
         }
 
         private async Task MarkTariffRefundSucceededAsync(Guid refundId, string? providerRefundId)

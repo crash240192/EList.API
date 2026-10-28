@@ -113,7 +113,7 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
   - Entitlement снимается сразу при принятии заявки; деньги — через `IPaymentProvider.CreateRefundAsync` (T-Bank Cancel с amount) / stub complete.
   - Журнал: `wallet_tariff_refunds`; webhook `REFUNDED`/`PARTIAL_REFUNDED` закрывает pending.
 - `PUT setTariff` — только на free (если нет активного платного). `POST deposits` (top-up) — отключён.
-- Webhook/GetState те же (`OrderId = wallet:{depositId}`), fulfill выставляет entitlement.
+- Webhook/GetState те же (`OrderId = tariff:{code}`, legacy `wallet:{depositId}`), fulfill выставляет entitlement.
 
 ### Legacy WalletAutoRenew
 
@@ -163,7 +163,7 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 | Фискализация 54‑ФЗ | Прод: Init.Receipt (касса на терминале). Запас: `cloudKassir.directFiscalization` (default off) |
 | Legacy Shops/Fee | ❌ убран из Init билетов (P2) |
 | Онбординг продавца acqapi OAuth (`/sm-register/register`) | ✅ P1 (`TBankAcqApiClient`); legacy SM-Register — fallback; нужен WL/mTLS на стенде |
-| Webhook Т-Банка `POST /eList/api/payments/tbank/webhook` (тело `OK`) | ✅ заказы + пополнения (`OrderId` = `wallet:{guid}`); доработать DealId/`SpAccumulationId` |
+| Webhook Т-Банка `POST /eList/api/payments/tbank/webhook` (тело `OK`) | ✅ заказы + пополнения (`OrderId` = `tariff:{code}` / legacy `wallet:{guid}`); доработать DealId/`SpAccumulationId` |
 | GetState sync-on-read на GET pending order/deposit (fallback без webhook) | ✅ gate ~2s |
 | Success/Fail URL с query (`orderId` / `depositId` / `walletId`) | ✅ |
 | UI `/payments/return` poll (без manual complete для T-Bank) | ✅ |

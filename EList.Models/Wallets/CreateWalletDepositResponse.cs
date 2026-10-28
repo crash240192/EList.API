@@ -24,6 +24,8 @@ namespace EList.Models.Wallets
         public WalletDepositStatus Status { get; set; }
         public PaymentProvider? Provider { get; set; }
         public string? ProviderPaymentId { get; set; }
+        /// <summary>Номер заказа у банка / в чеке (напр. tariff:A7K9M2X3).</summary>
+        public string? ProviderOrderId { get; set; }
         public DateTimeOffset CreateDate { get; set; }
         public DateTimeOffset? PaidAt { get; set; }
         /// <summary>Баланс сразу после зачисления (до возможного автосписания тарифа).</summary>

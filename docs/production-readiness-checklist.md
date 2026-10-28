@@ -132,7 +132,7 @@
 - [ ] Invitations: заполнить `result.Event`
 - [ ] Premium-параметры событий по тарифу
 - [x] Wallets Deposit API + stub payment (тарифный контур, не билеты) / DebtCollector
-- [x] Wallets deposit через T-Bank (webhook `wallet:{id}` + GetState sync-on-read)
+- [x] Wallets deposit через T-Bank (webhook `tariff:{code}` / legacy `wallet:{id}` + GetState sync-on-read)
 - [x] Wallets NextChargeAt + `wallet_tariff_charges` ledger (списание только при достаточном балансе)
 - [x] Free default tariff (unique cost=0 per scope) + fallback when paid period inactive; debtCollector on
 - [ ] Auto-invitations

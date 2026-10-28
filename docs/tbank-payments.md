@@ -20,7 +20,7 @@
 | Провайдер | `payments.provider=tbank` | тот же |
 | Init | `PayType=O`, `CreateDealWithType=NN` (без `Shops[]`) | без Deal (деньги площадки) |
 | После CONFIRMED | fulfill билетов → A2C продавцу (`PartnerId`=shopCode, `FinalPayout`) | кредит кошелька |
-| OrderId в банке | GUID заказа | `wallet:{depositId}` |
+| OrderId в банке | GUID заказа | `tariff:{code}` (legacy `wallet:{depositId}`) |
 | Успех | webhook CONFIRMED → Paid + Issued + payout | webhook CONFIRMED → кредит |
 | Fallback | GET order → GetState (~2s gate) | GET deposit → GetState |
 | UI return | `/payments/return?orderId=…` | `/payments/return?depositId=…&walletId=…` |

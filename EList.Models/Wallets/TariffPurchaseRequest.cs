@@ -38,6 +38,9 @@ namespace EList.Models.Wallets
 
         public int PeriodDays { get; set; }
 
+        /// <summary>Человекочитаемый период: «2 мин.», «3 ч.», «30 дн.».</summary>
+        public string PeriodLabel { get; set; } = string.Empty;
+
         public DateTimeOffset? CurrentActiveUntil { get; set; }
 
         /// <summary>activeUntil после успешной оплаты / бесплатной активации.</summary>

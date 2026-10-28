@@ -28,6 +28,10 @@ namespace EList.DbDataProvider.Models
         [Column("provider_payment_id")]
         public string? ProviderPaymentId { get; set; }
 
+        /// <summary>OrderId в банке, напр. tariff:A7K9M2X3 (для webhook lookup).</summary>
+        [Column("provider_order_id")]
+        public string? ProviderOrderId { get; set; }
+
         [Column("idempotency_key")]
         public string? IdempotencyKey { get; set; }
 

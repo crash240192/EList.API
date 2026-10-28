@@ -45,7 +45,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult<WalletDepositResponse>> CompleteWalletDepositAsync(CompleteWalletDepositRequest request);
 
         /// <summary>
-        /// Webhook провайдера: найти пополнение по OrderId <c>wallet:{guid}</c> или по
+        /// Webhook провайдера: найти пополнение по OrderId <c>tariff:A7K9M2X3</c> / legacy <c>wallet:{guid}</c> или по
         /// <paramref name="providerPaymentId"/> и применить статус (CONFIRMED → зачисление).
         /// Без пользовательской авторизации. Result = null, если это не wallet-депозит.
         /// </summary>

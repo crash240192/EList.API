@@ -371,6 +371,15 @@ namespace EList.DbDataProvider.DataProviders
                 i.WalletId == walletId && i.IdempotencyKey == idempotencyKey);
         }
 
+        public async Task<WalletDepositDto?> GetWalletDepositByProviderOrderIdAsync(string providerOrderId)
+        {
+            if (string.IsNullOrWhiteSpace(providerOrderId))
+                return null;
+            var key = providerOrderId.Trim();
+            return await _connection.WalletDeposits.FirstOrDefaultAsync(i =>
+                i.ProviderOrderId == key);
+        }
+
         public async Task UpdateWalletDepositAsync(
             Guid depositId,
             WalletDepositStatus status,

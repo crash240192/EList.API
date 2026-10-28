@@ -46,9 +46,11 @@ namespace EList.Services.Impl.Payments.TBank
             _settings.EnsureAcquiringConfigured();
 
             var amountKopecks = TBankAcquiringClient.ToKopecks(request.Amount);
-            var orderId = request.WalletDepositId != null && request.WalletDepositId != Guid.Empty
-                ? $"wallet:{request.WalletDepositId:D}"
-                : request.OrderId.ToString("D");
+            var orderId = !string.IsNullOrWhiteSpace(request.ClientOrderId)
+                ? request.ClientOrderId.Trim()
+                : request.WalletDepositId != null && request.WalletDepositId != Guid.Empty
+                    ? $"wallet:{request.WalletDepositId:D}"
+                    : request.OrderId.ToString("D");
 
             var successBase = !string.IsNullOrWhiteSpace(_settings.SuccessUrl)
                 ? _settings.SuccessUrl

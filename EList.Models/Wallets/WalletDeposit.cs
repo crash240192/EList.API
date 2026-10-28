@@ -15,6 +15,8 @@ namespace EList.Models.Wallets
         public WalletDepositStatus Status { get; set; }
         public PaymentProvider? Provider { get; set; }
         public string? ProviderPaymentId { get; set; }
+        /// <summary>OrderId у провайдера (напр. <c>tariff:A7K9M2X3</c>).</summary>
+        public string? ProviderOrderId { get; set; }
         public string? IdempotencyKey { get; set; }
         public DateTimeOffset CreateDate { get; set; }
         public DateTimeOffset? PaidAt { get; set; }

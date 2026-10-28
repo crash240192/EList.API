@@ -200,6 +200,12 @@ namespace EList.Repositories.Impl
             return _mapper.Map<WalletDeposit>(dto);
         }
 
+        public async Task<WalletDeposit?> GetWalletDepositByProviderOrderIdAsync(string providerOrderId)
+        {
+            var dto = await _walletsDataProvider.GetWalletDepositByProviderOrderIdAsync(providerOrderId);
+            return _mapper.Map<WalletDeposit>(dto);
+        }
+
         public async Task UpdateWalletDepositAsync(
             Guid depositId,
             Models.Enums.WalletDepositStatus status,
