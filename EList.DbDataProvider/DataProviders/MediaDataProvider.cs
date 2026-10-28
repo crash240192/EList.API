@@ -124,26 +124,33 @@ namespace EList.DbDataProvider.DataProviders
             if (albumIds == null || albumIds.Count == 0 || limit <= 0)
                 return result;
 
-            // LIMIT на альбом через оконную функцию — без выгрузки всех файлов больших альбомов.
-            var ids = albumIds.Distinct().ToArray();
+            var ids = albumIds.Where(id => id != Guid.Empty).Distinct().ToList();
+            if (ids.Count == 0)
+                return result;
+
+            var safeLimit = Math.Max(1, Math.Min(limit, 8));
+
+            // Не используем ANY(@albumIds): linq2db/Npgsql не биндит Guid[] как uuid[]
+            // и Postgres воспринимает albumids как имя колонки (42703).
+            // GUID-литералы безопасны (типизированные Guid), один round-trip с ROW_NUMBER.
+            var inList = string.Join(", ", ids.Select(id => $"'{id:D}'::uuid"));
             var rows = await _connection.QueryToListAsync<AlbumCoverFileRow>(
-                @"
+                $@"
 SELECT album_id AS ""AlbumId"", file_id AS ""FileId""
 FROM (
   SELECT album_id, file_id,
          ROW_NUMBER() OVER (PARTITION BY album_id ORDER BY create_date ASC) AS rn
   FROM file_album_rls
-  WHERE album_id = ANY(@albumIds) AND NOT COALESCE(hidden, false)
+  WHERE album_id IN ({inList}) AND NOT COALESCE(hidden, false)
 ) t
-WHERE rn <= @limit
-ORDER BY album_id, rn",
-                new { albumIds = ids, limit });
+WHERE rn <= {safeLimit}
+ORDER BY album_id, rn");
 
             foreach (var row in rows)
             {
                 if (!result.TryGetValue(row.AlbumId, out var list))
                 {
-                    list = new List<Guid>(limit);
+                    list = new List<Guid>(safeLimit);
                     result[row.AlbumId] = list;
                 }
                 list.Add(row.FileId);
