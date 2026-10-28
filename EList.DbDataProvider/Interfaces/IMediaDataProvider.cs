@@ -12,6 +12,10 @@ namespace EList.DbDataProvider.Interfaces
         Task AddFilesToAlbumAsync(Guid albumId, List<Guid> fileIds);
         Task RemoveFilesFromAlbumAsync(Guid albumId, List<Guid> fileIds);
         Task<int> CountAlbumFilesAsync(Guid albumId);
+        /// <summary>Число видимых файлов по списку альбомов одним запросом.</summary>
+        Task<Dictionary<Guid, int>> CountAlbumFilesAsync(IReadOnlyList<Guid> albumIds);
+        /// <summary>Первые N видимых fileId по каждому альбому (ORDER BY create_date).</summary>
+        Task<Dictionary<Guid, List<Guid>>> GetFirstAlbumFileIdsAsync(IReadOnlyList<Guid> albumIds, int limit);
         Task<Guid?> FindEventSystemAlbumIdAsync(Guid eventId, short systemKind);
         Task RegisterEventSystemAlbumAsync(Guid eventId, short systemKind, Guid albumId);
         Task<MediaAlbumDto> GetAlbumAsync(Guid id);

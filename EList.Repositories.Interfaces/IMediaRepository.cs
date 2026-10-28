@@ -44,5 +44,7 @@ namespace EList.Repositories.Interfaces
         Task UpsertAlbumViewAsync(Guid accountId, Guid albumId, DateTimeOffset viewedAt);
         Task EnrichAlbumsWithViewStateAsync(Guid? viewerAccountId, IList<MediaAlbum> albums);
         Task EnrichAlbumWithViewStateAsync(Guid? viewerAccountId, MediaAlbum album);
+        /// <summary>PhotoCount + CoverFileIds для ленты/карточек без N+1 filesByAlbumId.</summary>
+        Task EnrichAlbumsWithCoverPreviewAsync(IList<MediaAlbum> albums, int coverLimit = 4);
     }
 }
