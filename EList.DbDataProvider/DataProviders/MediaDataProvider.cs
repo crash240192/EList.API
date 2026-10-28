@@ -103,6 +103,61 @@ namespace EList.DbDataProvider.DataProviders
                 .CountAsync();
         }
 
+        public async Task<Dictionary<Guid, int>> CountAlbumFilesAsync(IReadOnlyList<Guid> albumIds)
+        {
+            if (albumIds == null || albumIds.Count == 0)
+                return new Dictionary<Guid, int>();
+
+            var rows = await _connection.AlbumFiles
+                .Where(i => albumIds.Contains(i.AlbumId) && !i.Hidden)
+                .GroupBy(i => i.AlbumId)
+                .Select(g => new { AlbumId = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            return rows.ToDictionary(i => i.AlbumId, i => i.Count);
+        }
+
+        public async Task<Dictionary<Guid, List<Guid>>> GetFirstAlbumFileIdsAsync(
+            IReadOnlyList<Guid> albumIds, int limit)
+        {
+            var result = new Dictionary<Guid, List<Guid>>();
+            if (albumIds == null || albumIds.Count == 0 || limit <= 0)
+                return result;
+
+            // LIMIT на альбом через оконную функцию — без выгрузки всех файлов больших альбомов.
+            var ids = albumIds.Distinct().ToArray();
+            var rows = await _connection.QueryToListAsync<AlbumCoverFileRow>(
+                @"
+SELECT album_id AS ""AlbumId"", file_id AS ""FileId""
+FROM (
+  SELECT album_id, file_id,
+         ROW_NUMBER() OVER (PARTITION BY album_id ORDER BY create_date ASC) AS rn
+  FROM file_album_rls
+  WHERE album_id = ANY(@albumIds) AND NOT COALESCE(hidden, false)
+) t
+WHERE rn <= @limit
+ORDER BY album_id, rn",
+                new { albumIds = ids, limit });
+
+            foreach (var row in rows)
+            {
+                if (!result.TryGetValue(row.AlbumId, out var list))
+                {
+                    list = new List<Guid>(limit);
+                    result[row.AlbumId] = list;
+                }
+                list.Add(row.FileId);
+            }
+
+            return result;
+        }
+
+        private sealed class AlbumCoverFileRow
+        {
+            public Guid AlbumId { get; set; }
+            public Guid FileId { get; set; }
+        }
+
         public async Task<Guid?> FindEventSystemAlbumIdAsync(Guid eventId, short systemKind)
         {
             var row = await _connection.EventSystemAlbums

@@ -63,5 +63,11 @@
 
         /// <summary>Есть файлы новее LastViewedAt (или альбом не открывали при наличии контента).</summary>
         public bool HasNewContent { get; set; }
+
+        /// <summary>Число видимых фото (для ленты альбомов без N+1 filesByAlbumId).</summary>
+        public int? PhotoCount { get; set; }
+
+        /// <summary>Первые fileId для мозаики/обложки (до 4).</summary>
+        public List<Guid> CoverFileIds { get; set; }
     }
 }

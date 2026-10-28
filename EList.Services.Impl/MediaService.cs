@@ -265,8 +265,9 @@ namespace EList.Services.Impl
             var result = await _mediaRepository.GetEventAlbumsAsync(eventId);
             result = await _albumAccessValidator.FilterViewableAlbumsAsync(
                 result, _accountDataHolder.AccountId, _accountDataHolder.AdultConfirmed);
-            result = await FilterEmptySystemAlbumsAsync(result);
             await _mediaRepository.EnrichAlbumsWithViewStateAsync(_accountDataHolder.AccountId, result);
+            await _mediaRepository.EnrichAlbumsWithCoverPreviewAsync(result);
+            result = FilterEmptySystemAlbums(result);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<List<MediaAlbum>>(result);
@@ -286,8 +287,9 @@ namespace EList.Services.Impl
                 {
                     if (container.Albums == null)
                         continue;
-                    container.Albums = await FilterEmptySystemAlbumsAsync(container.Albums);
                     await _mediaRepository.EnrichAlbumsWithViewStateAsync(_accountDataHolder.AccountId, container.Albums);
+                    await _mediaRepository.EnrichAlbumsWithCoverPreviewAsync(container.Albums);
+                    container.Albums = FilterEmptySystemAlbums(container.Albums);
                 }
             }
 
@@ -411,7 +413,8 @@ namespace EList.Services.Impl
             if (!accessError.Success)
                 return CommandResult<PagedList<AlbumFile>>.Fail(accessError.ErrorCode, accessError.Message);
 
-            var result = await _mediaRepository.GetAlbumFilesAsync(albumId);
+            // pageIndex 0-based (как byEvents); pageSize без pageIndex — все файлы (legacy).
+            var result = await _mediaRepository.GetAlbumFilesAsync(albumId, pageIndex, pageSize);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<PagedList<AlbumFile>>(result);
@@ -666,7 +669,10 @@ namespace EList.Services.Impl
             await Task.WhenAll(tasks);
         }
 
-        private async Task<List<MediaAlbum>> FilterEmptySystemAlbumsAsync(List<MediaAlbum> albums)
+        /// <summary>
+        /// Системные альбомы без фото скрываем. PhotoCount уже заполнен EnrichAlbumsWithCoverPreviewAsync.
+        /// </summary>
+        private static List<MediaAlbum> FilterEmptySystemAlbums(List<MediaAlbum> albums)
         {
             if (albums == null || albums.Count == 0)
                 return albums ?? new List<MediaAlbum>();
@@ -675,14 +681,7 @@ namespace EList.Services.Impl
             foreach (var album in albums)
             {
                 var isSystem = album.Parameters?.SystemKind != null;
-                if (!isSystem)
-                {
-                    result.Add(album);
-                    continue;
-                }
-
-                var count = await _mediaRepository.CountAlbumFilesAsync(album.Id);
-                if (count > 0)
+                if (!isSystem || (album.PhotoCount ?? 0) > 0)
                     result.Add(album);
             }
 

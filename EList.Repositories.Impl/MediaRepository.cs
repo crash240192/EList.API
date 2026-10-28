@@ -160,7 +160,7 @@ namespace EList.Repositories.Impl
         {
             var files = await _mediaDataProvider.GetAlbumFilesAsync(albumId, pageIndex, pageSize);
             var result = _mapper.Map<List<AlbumFile>>(files.Items);
-            return new PagedList<AlbumFile>(files.TotalCount, result, pageIndex ?? 1, pageSize ?? files.TotalCount);
+            return new PagedList<AlbumFile>(files.TotalCount, result, pageIndex ?? 0, pageSize ?? files.TotalCount);
         }
 
         public async Task<AlbumFile> GetFileAsync(Guid fileId, Guid albumId)
@@ -300,6 +300,43 @@ namespace EList.Repositories.Impl
 
                 album.HasNewContent = album.LastContentAt != null
                     && (album.LastViewedAt == null || album.LastContentAt > album.LastViewedAt);
+            }
+        }
+
+        public async Task EnrichAlbumsWithCoverPreviewAsync(IList<MediaAlbum> albums, int coverLimit = 4)
+        {
+            if (albums == null || albums.Count == 0)
+                return;
+
+            var safeLimit = coverLimit <= 0 ? 4 : Math.Min(coverLimit, 8);
+            var albumIds = albums.Select(a => a.Id).Where(id => id != Guid.Empty).Distinct().ToList();
+            if (albumIds.Count == 0)
+                return;
+
+            var counts = await _mediaDataProvider.CountAlbumFilesAsync(albumIds);
+            var covers = await _mediaDataProvider.GetFirstAlbumFileIdsAsync(albumIds, safeLimit);
+
+            foreach (var album in albums)
+            {
+                album.PhotoCount = counts.TryGetValue(album.Id, out var count) ? count : 0;
+
+                var ids = new List<Guid>(safeLimit);
+                if (album.WallpaperId != null && album.WallpaperId != Guid.Empty)
+                    ids.Add(album.WallpaperId.Value);
+
+                if (covers.TryGetValue(album.Id, out var fileIds))
+                {
+                    foreach (var fileId in fileIds)
+                    {
+                        if (ids.Contains(fileId))
+                            continue;
+                        ids.Add(fileId);
+                        if (ids.Count >= safeLimit)
+                            break;
+                    }
+                }
+
+                album.CoverFileIds = ids;
             }
         }
         #endregion
