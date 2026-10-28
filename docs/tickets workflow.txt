@@ -53,5 +53,5 @@ POST payments/complete после реального PaymentURL T-Bank - тол�
 Cost (event_parameters)  →  цена одной позиции
 quantity                 →  число билетов
 комиссия %               →  amountCommission / Fee в Init; amountSeller → ShopCode
-кошелёк/тариф платформы  →  другой контур (OrderId wallet:{depositId})
+кошелёк/тариф платформы  →  другой контур (OrderId tariff:{code}, legacy wallet:{depositId})
 Ценовые категории билетов ещё не в модели.
