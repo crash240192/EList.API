@@ -27,6 +27,13 @@ namespace EList.Services.Impl
         public static bool IsTicketsEnabled()
             => ReadBool("features:ticketsEnabled", defaultValue: false);
 
+        /// <summary>
+        /// Показ рекламных блоков (РСЯ и плейсхолдеры) в UI.
+        /// Default false — безопасный kill-switch.
+        /// </summary>
+        public static bool IsAdsEnabled()
+            => ReadBool("features:adsEnabled", defaultValue: false);
+
         private static bool ReadBool(string key, bool defaultValue)
         {
             if (!ConfigurationManager.AppSettings.Contains(key)

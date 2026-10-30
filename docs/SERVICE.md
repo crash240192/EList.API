@@ -169,9 +169,10 @@ elist.ui  ──REST──►  elist.api  ──► PostgreSQL (+ PostGIS)
 | UI `/payments/return` poll (без manual complete для T-Bank) | ✅ |
 | `yookassaStub` fallback | ✅ для локалки без банка |
 | `features.organizationsEnabled` | По умолчанию **`false`** |
+| `features.adsEnabled` | По умолчанию **`false`** (показ рекламы в UI) |
 | `features.ticketsEnabled` | По умолчанию **`false`** |
 | `features.ticketSalesEnabled` | По умолчанию **`false`** |
-| Публичный `GET /api/features` | `organizationsEnabled`, `ticketsEnabled`, `ticketSalesEnabled`, `ticketDeskRevealHolder` |
+| Публичный `GET /api/features` | `organizationsEnabled`, `adsEnabled`, `ticketsEnabled`, `ticketSalesEnabled`, `ticketDeskRevealHolder` |
 | Gate `TicketingAgreement` + Active onboarding на `CanSellTickets` / создание заказа | ✅ |
 
 План Мультирасчётов: [tbank-multisplit-plan.md](./tbank-multisplit-plan.md).  

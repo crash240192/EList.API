@@ -199,7 +199,8 @@ app.UseEndpoints(endpoints =>
             organizationsEnabled = EList.Services.Impl.FeatureFlags.IsOrganizationsEnabled(),
             ticketsEnabled = ticketsModule,
             ticketSalesEnabled = ticketSales,
-            ticketDeskRevealHolder = EList.Services.Impl.Payments.PaymentSettings.IsTicketDeskRevealHolderEnabled()
+            ticketDeskRevealHolder = EList.Services.Impl.Payments.PaymentSettings.IsTicketDeskRevealHolderEnabled(),
+            adsEnabled = EList.Services.Impl.FeatureFlags.IsAdsEnabled()
         });
     });
 });
