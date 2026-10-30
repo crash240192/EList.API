@@ -356,6 +356,7 @@ CREATE TABLE IF NOT EXISTS public.person_info(
 	patronymic text NULL,
 	gender gender NULL,
 	birthdate text NULL,
+	about text NULL,
 	CONSTRAINT persons_data_pk PRIMARY KEY (id),
 	constraint persons_data_account foreign key (account_id) references public.accounts (id)
 );

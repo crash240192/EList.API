@@ -31,6 +31,7 @@
     <None Remove="Migrations\M202610262200_tariff_period_purchase.sql" />
     <None Remove="Migrations\M202610270100_wallet_tariff_refunds.sql" />
     <None Remove="Migrations\M202610270200_wallet_deposits_amount_nonnegative.sql" />
+    <None Remove="Migrations\M202610302200_person_info_about.sql" />
   </ItemGroup>
 
   <ItemGroup>
@@ -58,6 +59,7 @@
     <EmbeddedResource Include="Migrations\M202610262200_tariff_period_purchase.sql" />
     <EmbeddedResource Include="Migrations\M202610270100_wallet_tariff_refunds.sql" />
     <EmbeddedResource Include="Migrations\M202610270200_wallet_deposits_amount_nonnegative.sql" />
+    <EmbeddedResource Include="Migrations\M202610302200_person_info_about.sql" />
   </ItemGroup>
 
   <ItemGroup>

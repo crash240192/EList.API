@@ -28,7 +28,8 @@ namespace EList.Repositories.Impl
                 LastName = request.LastName,
                 Birthdate = request.BirthDate?.ToString("o", CultureInfo.InvariantCulture),
                 Gender = _mapper.Map<Gender>(request.Gender),
-                Patronymic = request.Patronymic
+                Patronymic = request.Patronymic,
+                About = request.About
             };
 
             return await _personDataProvider.CreatePersonInfoAsync(mappedRequest);
@@ -49,7 +50,8 @@ namespace EList.Repositories.Impl
                 LastName = request.LastName,
                 Birthdate = request.BirthDate?.ToString("o", CultureInfo.InvariantCulture),
                 Gender = _mapper.Map<Gender>(request.Gender),
-                Patronymic = request.Patronymic
+                Patronymic = request.Patronymic,
+                About = request.About
             };
 
             await _personDataProvider.UpdatePersonInfoAsync(mappedRequest);

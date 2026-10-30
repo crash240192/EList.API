@@ -121,6 +121,7 @@ namespace EList.Services.Impl
             request.FirstName = request.FirstName?.Trim();
             request.LastName = request.LastName?.Trim();
             request.Patronymic = string.IsNullOrWhiteSpace(request.Patronymic) ? null : request.Patronymic.Trim();
+            request.About = string.IsNullOrWhiteSpace(request.About) ? null : request.About.Trim();
         }
     }
 }

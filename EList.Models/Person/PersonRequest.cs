@@ -28,5 +28,10 @@ namespace EList.Models.Person
         /// Дата рождения
         /// </summary>
         public DateTime? BirthDate { get; set; }
+
+        /// <summary>
+        /// Публичный текст «о себе»
+        /// </summary>
+        public string? About { get; set; }
     }
 }

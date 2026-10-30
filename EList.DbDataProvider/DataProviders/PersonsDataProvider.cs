@@ -47,6 +47,7 @@ namespace EList.DbDataProvider.DataProviders
                 .Set(i => i.Gender, item.Gender)
                 .Set(i => i.LastName, item.LastName)
                 .Set(i => i.Patronymic, item.Patronymic)
+                .Set(i => i.About, item.About)
                 .UpdateAsync();
         }
     }

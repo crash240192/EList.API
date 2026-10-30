@@ -53,6 +53,11 @@ namespace EList.Models.Person
         /// </summary>
         public bool? IsBirthdayToday { get; set; }
 
+        /// <summary>
+        /// Публичный текст «о себе».
+        /// </summary>
+        public string? About { get; set; }
+
         [JsonIgnore]
         public string FIO
         {

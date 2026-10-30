@@ -509,7 +509,8 @@ namespace EList.Services.Impl
                 LastName = "Пользователь",
                 Patronymic = string.Empty,
                 Gender = null,
-                BirthDate = null
+                BirthDate = null,
+                About = null
             });
 
             var contacts = await _contactsRepository.GetAccountContactsAsync(accountId) ?? new List<ContactDataItem>();

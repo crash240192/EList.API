@@ -29,6 +29,10 @@ namespace EList.DbDataProvider.Models
         [Column("birthdate")]
         public string? Birthdate { get; set; }
 
+        /// <summary>Публичный текст «о себе» (без шифрования).</summary>
+        [Column("about")]
+        public string? About { get; set; }
+
         [Association(ThisKey = nameof(AccountId), OtherKey = nameof(AccountDto.Id))]
         public AccountDto Account { get; set; }
     }

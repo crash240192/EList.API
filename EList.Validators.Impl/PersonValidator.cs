@@ -11,6 +11,7 @@ namespace EList.Validators.Impl
     public class PersonValidator : IPersonValidator
     {
         private const int MaxNameLength = 100;
+        private const int MaxAboutLength = 2000;
         /// <summary>Минимальный возраст для регистрации и хранения профиля в сервисе.</summary>
         public const int MinRegistrationAgeYears = 14;
         private static readonly DateTime MinBirthDate = DateTime.UtcNow.Date.AddYears(-120);
@@ -66,6 +67,11 @@ namespace EList.Validators.Impl
 
             if (!string.IsNullOrWhiteSpace(request.Patronymic) && request.Patronymic.Trim().Length > MaxNameLength)
                 return CommandResult.Fail(ErrorCode.InvalidValue, "Слишком длинное отчество");
+
+            var aboutError = ValidationCommon.ValidateOptionalTextLength(
+                request.About, MaxAboutLength, "Текст «о себе»");
+            if (!aboutError.Success)
+                return aboutError;
 
             if (request.Gender.HasValue && !Enum.IsDefined(typeof(Gender), request.Gender.Value))
                 return CommandResult.Fail(ErrorCode.InvalidValue, "Указан некорректный пол");
