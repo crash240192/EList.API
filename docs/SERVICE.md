@@ -253,6 +253,7 @@ Ops / smoke стенда: [tbank-multisplit-ops-checklist.md](./tbank-multisplit
 },
 "features": {
   "organizationsEnabled": false,
+  "adsEnabled": false,
   "ticketsEnabled": false,
   "ticketSalesEnabled": false,
   "reConsentEnforcementEnabled": true
