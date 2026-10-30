@@ -357,11 +357,12 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
-        /// Получить список альбомов по мероприятиям
+        /// Получить список альбомов по мероприятиям.
+        /// sort: date (StartTime ASC) | latestPhotos (max file create_date DESC) | name.
         /// </summary>
-        /// <returns></returns>
         [HttpGet("albums/byEvents")]
-        public async Task<CommandResult<PagedList<EventAlbumsContainer>>> GetEventsAlbumsAsync(Guid accountId, int? pageIndex = null, int? pageSize = null)
+        public async Task<CommandResult<PagedList<EventAlbumsContainer>>> GetEventsAlbumsAsync(
+            Guid accountId, int? pageIndex = null, int? pageSize = null, string? sort = null)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -371,7 +372,7 @@ namespace EList.Api.Controllers
             {
                 logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-                var result = await _mediaService.GetEventsAlbumsAsync(accountId, pageIndex, pageSize);
+                var result = await _mediaService.GetEventsAlbumsAsync(accountId, pageIndex, pageSize, sort);
 
                 logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 

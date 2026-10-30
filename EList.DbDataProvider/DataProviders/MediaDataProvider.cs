@@ -317,8 +317,10 @@ ORDER BY album_id, rn");
         }
 
         public async Task<ListResponse<EventAlbumsGroupDto>> GetEventsAlbumsAsync(
-            Guid accountId, Guid? curAccountId, int? pageIndex = null, int? pageSize = null)
+            Guid accountId, Guid? curAccountId, int? pageIndex = null, int? pageSize = null, string? sort = null)
         {
+            var sortKey = EventAlbumsSort.Normalize(sort);
+
             // Организации, в которых состоит владелец выборки (для «моих» мероприятий от имени орг.)
             var accountOrganizationIds = await _connection.OrganizationMembers
                 .Where(m => m.AccountId == accountId && m.Active)
@@ -341,7 +343,6 @@ ORDER BY album_id, rn");
                     || (accountOrganizationIds.Count > 0
                         && e.Organizators.Any(o => o.OrganizationId != null
                             && accountOrganizationIds.Contains(o.OrganizationId.Value))))
-                .OrderByDescending(i => i.StartTime)
                 .AsQueryable();
 
             if (curAccountId != null)
@@ -383,7 +384,43 @@ ORDER BY album_id, rn");
                         i.Parameters.Private != null && a.Album.Parameters.Private != true));
             }
 
-            eventsQuery = eventsQuery.OrderBy(e => e.StartTime);
+            // Сортировка до Skip/Take — иначе клиентская сортировка ломает пагинацию.
+            IQueryable<Guid> orderedEventIdsQuery;
+            if (sortKey == EventAlbumsSort.Name)
+            {
+                orderedEventIdsQuery = eventsQuery
+                    .OrderBy(e => e.Name)
+                    .ThenBy(e => e.StartTime)
+                    .Select(e => e.Id);
+            }
+            else if (sortKey == EventAlbumsSort.LatestPhotos)
+            {
+                // Max(create_date) по видимым файлам альбомов мероприятия; без фото — в конец.
+                var emptyEpoch = DateTimeOffset.MinValue;
+                orderedEventIdsQuery =
+                    from e in eventsQuery
+                    select new
+                    {
+                        e.Id,
+                        Last = (
+                            from rel in _connection.EventAlbums
+                            where rel.EventId == e.Id
+                            join f in _connection.AlbumFiles on rel.AlbumId equals f.AlbumId
+                            where !f.Hidden
+                            select (DateTimeOffset?)f.CreateDate
+                        ).Max() ?? emptyEpoch
+                    } into row
+                    orderby row.Last descending, row.Id
+                    select row.Id;
+            }
+            else
+            {
+                // date: сверху более ранняя дата мероприятия
+                orderedEventIdsQuery = eventsQuery
+                    .OrderBy(e => e.StartTime)
+                    .ThenBy(e => e.Id)
+                    .Select(e => e.Id);
+            }
 
             var totalCount = await eventsQuery.CountAsync();
 
@@ -392,8 +429,7 @@ ORDER BY album_id, rn");
             if (pageSz <= 0)
                 pageSz = totalCount;
 
-            var pagedEventIds = await eventsQuery
-                .Select(e => e.Id)
+            var pagedEventIds = await orderedEventIdsQuery
                 .Skip(pageIdx * pageSz)
                 .Take(pageSz)
                 .ToListAsync();
@@ -401,11 +437,18 @@ ORDER BY album_id, rn");
             if (!pagedEventIds.Any())
                 return new ListResponse<EventAlbumsGroupDto>(totalCount, new List<EventAlbumsGroupDto>());
 
-            var events = await _connection.Events
+            var eventsUnordered = await _connection.Events
                 .LoadWith(e => e.Types).ThenLoad(t => t.Type).ThenLoad(ty => ty.EventCategory)
                 .Where(e => pagedEventIds.Contains(e.Id))
-                .OrderBy(e => e.StartTime)
                 .ToListAsync();
+
+            // Сохраняем порядок pagedEventIds (не пересортировывать по StartTime).
+            var orderIndex = pagedEventIds
+                .Select((id, index) => (id, index))
+                .ToDictionary(x => x.id, x => x.index);
+            var events = eventsUnordered
+                .OrderBy(e => orderIndex[e.Id])
+                .ToList();
 
             var relations = new List<EventAlbumRelationDto>();
 
