@@ -303,11 +303,13 @@ namespace EList.DbDataProvider.DataProviders
 
         /// <summary>
         /// Сортировка поиска мероприятий.
-        /// Поддерживаемые поля: StartTime, EndTime, AgeLimit, Cost/Price, Name, CreateDate.
+        /// Поддерживаемые поля: StartTime, EndTime, AgeLimit, Cost/Price, Name, CreateDate, Rating.
+        /// Rating — средний балл актуального типа: Expectation до StartTime, иначе Summary
+        /// (как при голосовании). Без оценок → 0 (внизу при DESC).
         /// Прошедшие (только EndTime) по умолчанию — свежие сверху (EndTime DESC),
         /// иначе — ближайшие сверху (StartTime ASC).
         /// </summary>
-        private static IQueryable<EventDto> ApplyEventOrder(
+        private IQueryable<EventDto> ApplyEventOrder(
             IQueryable<EventDto> query,
             string? orderBy,
             DateTimeOffset? startTime,
@@ -337,6 +339,29 @@ namespace EList.DbDataProvider.DataProviders
                 return desc
                     ? query.OrderByDescending(i => i.CreateDate)
                     : query.OrderBy(i => i.CreateDate);
+
+            if (key.Contains("rating"))
+            {
+                var now = DateTimeOffset.UtcNow;
+                var ratings = _connection.EventsRating;
+                // Тот же выбор типа, что VoteAsync / UI RatingWidget: до старта — ожидание, после — итоговый.
+                if (desc)
+                {
+                    return query.OrderByDescending(e =>
+                        ratings
+                            .Where(r => r.EventId == e.Id
+                                && ((e.StartTime > now && r.RatingType == EventRatingType.Expectation)
+                                    || (e.StartTime <= now && r.RatingType == EventRatingType.Summary)))
+                            .Average(r => (double?)r.Value) ?? 0);
+                }
+
+                return query.OrderBy(e =>
+                    ratings
+                        .Where(r => r.EventId == e.Id
+                            && ((e.StartTime > now && r.RatingType == EventRatingType.Expectation)
+                                || (e.StartTime <= now && r.RatingType == EventRatingType.Summary)))
+                        .Average(r => (double?)r.Value) ?? 0);
+            }
 
             if (key.Contains("starttime") || key.Contains("start_time"))
                 return desc ? query.OrderByDescending(i => i.StartTime) : query.OrderBy(i => i.StartTime);
