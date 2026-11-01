@@ -303,6 +303,7 @@ namespace EList.DbDataProvider.DataProviders
 
         /// <summary>
         /// Сортировка поиска мероприятий.
+        /// Поддерживаемые поля: StartTime, EndTime, AgeLimit, Cost/Price, Name, CreateDate.
         /// Прошедшие (только EndTime) по умолчанию — свежие сверху (EndTime DESC),
         /// иначе — ближайшие сверху (StartTime ASC).
         /// </summary>
@@ -317,6 +318,25 @@ namespace EList.DbDataProvider.DataProviders
 
             if (key.Contains("endtime") || key.Contains("end_time"))
                 return desc ? query.OrderByDescending(i => i.EndTime) : query.OrderBy(i => i.EndTime);
+
+            if (key.Contains("agelimit") || key.Contains("age_limit"))
+                return desc
+                    ? query.OrderByDescending(i => i.Parameters.AgeLimit)
+                    : query.OrderBy(i => i.Parameters.AgeLimit);
+
+            // cost синхронизируется с MIN(ticket type) при ticketsEnabled — см. SERVICE.md
+            if (key.Contains("cost") || key.Contains("price"))
+                return desc
+                    ? query.OrderByDescending(i => i.Parameters.Cost ?? 0)
+                    : query.OrderBy(i => i.Parameters.Cost ?? 0);
+
+            if (key.Contains("name") || key.Contains("title"))
+                return desc ? query.OrderByDescending(i => i.Name) : query.OrderBy(i => i.Name);
+
+            if (key.Contains("createdate") || key.Contains("create_date") || key.Contains("created"))
+                return desc
+                    ? query.OrderByDescending(i => i.CreateDate)
+                    : query.OrderBy(i => i.CreateDate);
 
             if (key.Contains("starttime") || key.Contains("start_time"))
                 return desc ? query.OrderByDescending(i => i.StartTime) : query.OrderBy(i => i.StartTime);
