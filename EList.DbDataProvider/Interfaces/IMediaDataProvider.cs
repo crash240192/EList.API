@@ -22,8 +22,9 @@ namespace EList.DbDataProvider.Interfaces
         Task<List<MediaAlbumDto>> GetAccountAlbumsAsync(Guid accountId);
         Task<List<MediaAlbumDto>> GetEventAlbumsAsync(Guid eventId);
         /// <param name="sort">date | latestPhotos | name — см. <see cref="EList.Models.Media.EventAlbumsSort"/>.</param>
+        /// <param name="name">Подстрока: название мероприятия и/или альбома (и описание альбома).</param>
         Task<ListResponse<EventAlbumsGroupDto>> GetEventsAlbumsAsync(
-            Guid accountId, Guid? curAccountId, int? pageIndex = null, int? pageSize = null, string? sort = null);
+            Guid accountId, Guid? curAccountId, int? pageIndex = null, int? pageSize = null, string? sort = null, string? name = null);
         Task<ListResponse<FileAlbumRelationDto>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null);
         Task<FileAlbumRelationDto> GetFileAsync(Guid fileId, Guid albumId);
         Task<bool> CheckFileExistsAsync(List<Guid> fileIds);

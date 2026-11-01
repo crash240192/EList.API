@@ -274,7 +274,7 @@ namespace EList.Services.Impl
         }
 
         public async Task<CommandResult<PagedList<EventAlbumsContainer>>> GetEventsAlbumsAsync(
-            Guid accountId, int? pageIndex = null, int? pageSize = null, string? sort = null)
+            Guid accountId, int? pageIndex = null, int? pageSize = null, string? sort = null, string? name = null)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -282,7 +282,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _mediaRepository.GetEventsAlbumsAsync(
-                accountId, _accountDataHolder.AccountId, pageIndex, pageSize, sort);
+                accountId, _accountDataHolder.AccountId, pageIndex, pageSize, sort, name);
             if (result?.Result != null)
             {
                 foreach (var container in result.Result)

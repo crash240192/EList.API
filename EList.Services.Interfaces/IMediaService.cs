@@ -15,7 +15,7 @@ namespace EList.Services.Interfaces
         Task<CommandResult<List<MediaAlbum>>> GetAccountAlbumsAsync(Guid accountId);
         Task<CommandResult<List<MediaAlbum>>> GetEventAlbumsAsync(Guid eventId);
         Task<CommandResult<PagedList<EventAlbumsContainer>>> GetEventsAlbumsAsync(
-            Guid accountId, int? pageIndex = null, int? pageSize = null, string? sort = null);
+            Guid accountId, int? pageIndex = null, int? pageSize = null, string? sort = null, string? name = null);
         Task<CommandResult<PagedList<AlbumFile>>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null);
         //Task<CommandResult> SetEventAlbumParametersAsync(Guid token, EventAlbumParameters request);
         Task<CommandResult> AddFilesToAlbumAsync(AddFilesRequest request);

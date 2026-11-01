@@ -317,9 +317,12 @@ ORDER BY album_id, rn");
         }
 
         public async Task<ListResponse<EventAlbumsGroupDto>> GetEventsAlbumsAsync(
-            Guid accountId, Guid? curAccountId, int? pageIndex = null, int? pageSize = null, string? sort = null)
+            Guid accountId, Guid? curAccountId, int? pageIndex = null, int? pageSize = null, string? sort = null, string? name = null)
         {
             var sortKey = EventAlbumsSort.Normalize(sort);
+            var search = (name ?? string.Empty).Trim();
+            var searchLower = search.ToLowerInvariant();
+            var hasSearch = searchLower.Length > 0;
 
             // Организации, в которых состоит владелец выборки (для «моих» мероприятий от имени орг.)
             var accountOrganizationIds = await _connection.OrganizationMembers
@@ -382,6 +385,57 @@ ORDER BY album_id, rn");
                 eventsQuery = eventsQuery
                     .Where(i => i.Albums.Any(a =>
                         i.Parameters.Private != null && a.Album.Parameters.Private != true));
+            }
+
+            // Поиск: название мероприятия ИЛИ название/описание видимого альбома (как на UI).
+            if (hasSearch)
+            {
+                if (curAccountId != null)
+                {
+                    eventsQuery = eventsQuery.Where(e =>
+                        (e.Name != null && e.Name.ToLower().Contains(searchLower))
+                        || e.Albums.Any(rel =>
+                            ((rel.Album.Name != null && rel.Album.Name.ToLower().Contains(searchLower))
+                                || (rel.Album.Description != null && rel.Album.Description.ToLower().Contains(searchLower)))
+                            && (
+                                e.Organizators.Any(o => o.AccountId == curAccountId)
+                                || (curAccountOrganizationIds.Count > 0
+                                    && e.Organizators.Any(o => o.OrganizationId != null
+                                        && curAccountOrganizationIds.Contains(o.OrganizationId.Value)))
+                                || (
+                                    e.Parameters.Private == true
+                                    && (
+                                        e.WhiteList.Any(w => w.AccountId == curAccountId)
+                                        || (
+                                            !e.WhiteList.Any()
+                                            && (
+                                                e.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
+                                                || e.Participants.Any(p => p.AccountId == curAccountId)
+                                            )
+                                        )
+                                    )
+                                )
+                                || (
+                                    e.Parameters.Private != true
+                                    && !e.BlackList.Any(b => b.AccountId == curAccountId)
+                                    && (
+                                        e.Participants.Any(p => p.AccountId == curAccountId)
+                                        || e.Invitations.Any(inv => inv.InvitedAccountId == curAccountId)
+                                        || rel.Album.Parameters == null
+                                        || !rel.Album.Parameters.Private
+                                    )
+                                )
+                            )));
+                }
+                else
+                {
+                    eventsQuery = eventsQuery.Where(e =>
+                        (e.Name != null && e.Name.ToLower().Contains(searchLower))
+                        || e.Albums.Any(rel =>
+                            e.Parameters.Private != true
+                            && ((rel.Album.Name != null && rel.Album.Name.ToLower().Contains(searchLower))
+                                || (rel.Album.Description != null && rel.Album.Description.ToLower().Contains(searchLower)))));
+                }
             }
 
             // Сортировка до Skip/Take — иначе клиентская сортировка ломает пагинацию.
@@ -526,6 +580,26 @@ ORDER BY album_id, rn");
                 Event = e,
                 Albums = albumsByEventId.GetValueOrDefault(e.Id) ?? new List<MediaAlbumDto>()
             }).ToList();
+
+            // Совпадение по событию → все видимые альбомы; иначе только альбомы с name/description.
+            if (hasSearch)
+            {
+                result = result.Select(g =>
+                {
+                    var eventHit = g.Event?.Name != null
+                        && g.Event.Name.ToLower().Contains(searchLower);
+                    if (eventHit)
+                        return g;
+                    g.Albums = (g.Albums ?? new List<MediaAlbumDto>())
+                        .Where(a =>
+                            (a.Name != null && a.Name.ToLower().Contains(searchLower))
+                            || (a.Description != null && a.Description.ToLower().Contains(searchLower)))
+                        .ToList();
+                    return g;
+                })
+                .Where(g => g.Albums != null && g.Albums.Count > 0)
+                .ToList();
+            }
 
             return new ListResponse<EventAlbumsGroupDto>(totalCount, result);
         }
