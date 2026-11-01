@@ -115,11 +115,14 @@ namespace EList.Services.Impl
 
             if (!tokenSearchResult.Active)
             {
-                await _notificationService.NotifyUserByContactAsync(SystemNotificationType.Activation);
+                // Не шлём Activation повторно: код уже был в AccountCreated (регистрация)
+                // или в прошлых Activation / sendActivationCode. Ключ тот же, пока токен жив.
                 result.Token = tokenSearchResult.Token;
                 result.ActivationRequired = true;
 
-                commandResult.Message = $"Указанный клиент не активирован. Для активации клиента было выслано уведомление на {contact?.Value}";
+                commandResult.Message = contact?.Value != null
+                    ? $"Указанный клиент не активирован. Используйте код из уведомления на {contact.Value} или запросите новый код."
+                    : "Указанный клиент не активирован. Используйте код из уведомления или запросите новый код.";
                 return commandResult;
             }
 
@@ -251,8 +254,6 @@ namespace EList.Services.Impl
             }
 
             await _authorizationRepository.ActivateTokenAsync(existingToken.Token);
-
-            await _notificationService.NotifyUserByContactAsync(SystemNotificationType.Activation);
 
             await _filestorageClient.RegisterAuthDataAsync(existingToken.Token, existingToken.AccountId, existingToken.ClientHash);
 
