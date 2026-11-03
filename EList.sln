@@ -44,6 +44,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EList.Sms", "..\EList.Commo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EList.Smtp", "..\EList.Common\EList.Smtp\EList.Smtp.csproj", "{5E6208A6-5AF6-43CD-BA06-307DDBC6CB04}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EList.Cache", "..\EList.Common\EList.Cache\EList.Cache.csproj", "{6B753CCE-84FB-CAE6-17E5-BB6391B96661}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -118,6 +120,10 @@ Global
 		{5E6208A6-5AF6-43CD-BA06-307DDBC6CB04}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5E6208A6-5AF6-43CD-BA06-307DDBC6CB04}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5E6208A6-5AF6-43CD-BA06-307DDBC6CB04}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6B753CCE-84FB-CAE6-17E5-BB6391B96661}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6B753CCE-84FB-CAE6-17E5-BB6391B96661}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6B753CCE-84FB-CAE6-17E5-BB6391B96661}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6B753CCE-84FB-CAE6-17E5-BB6391B96661}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -128,6 +134,7 @@ Global
 		{1459ACA0-CB90-448C-A0D0-BCC71A910885} = {ABB8513C-1B9B-4E01-BBA7-785814F7628D}
 		{4C9B86E2-26C8-4F2C-9CCD-66ABBFE00D32} = {ABB8513C-1B9B-4E01-BBA7-785814F7628D}
 		{5E6208A6-5AF6-43CD-BA06-307DDBC6CB04} = {ABB8513C-1B9B-4E01-BBA7-785814F7628D}
+		{6B753CCE-84FB-CAE6-17E5-BB6391B96661} = {ABB8513C-1B9B-4E01-BBA7-785814F7628D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E2F6581F-A465-4C32-BEFF-B184170C6DC5}
