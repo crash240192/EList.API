@@ -1,4 +1,5 @@
-﻿using EList.Common.CorrelationId;
+﻿using EList.Cache.Memory;
+using EList.Common.CorrelationId;
 using EList.Common.DI;
 using EList.Common.Encryption;
 using EList.Common.TemplateParser;
@@ -170,6 +171,8 @@ namespace EList.DI
             mapper.AddSingleton<IFieldEncryptor, FieldEncryptor>();
             mapper.AddSingleton<AbuseProtectionOptions>();
             mapper.AddSingleton<IEventCreateRateLimiter, EventCreateRateLimiter>();
+            // In-process cache (Redis остаётся в EList.Cache, в DI пока не регистрируем)
+            mapper.AddSingleton<IMemoryCache, MemoryCache>();
             mapper.AddScoped<IAccountDataHolder, AccountDataHolder>();
             mapper.AddScoped<IOrganizationRegistryClient, OrganizationRegistryClientFacade>();
 

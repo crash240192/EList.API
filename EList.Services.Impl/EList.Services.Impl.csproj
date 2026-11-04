@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\EList.Common\EList.Cache\EList.Cache.csproj" />
     <ProjectReference Include="..\..\EList.Common\EList.FilestorageClient\EList.FilestorageClient.csproj" />
     <ProjectReference Include="..\..\EList.Common\EList.Localization\EList.Localization.csproj" />
     <ProjectReference Include="..\..\EList.Common\EList.Sms\EList.Sms.csproj" />

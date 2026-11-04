@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using AutoMapper;
+using EList.Cache.Base;
+using EList.Cache.Memory;
 using EList.Common.Configuration;
 using EList.Common.CorrelationId;
 using EList.Common.Extensions;
@@ -56,6 +58,11 @@ namespace EList.Services.Impl
         private readonly IPagingValidator _pagingValidator;
         private readonly IMediaService _mediaService;
         private readonly IFilestorageClient _filestorageClient;
+        private readonly IMemoryCache _memoryCache;
+
+        // Lazy: KeyBuilder читает cache:instanceKey из ConfigurationManager
+        private static string EventCategoriesCacheKey => KeyBuilder.Build("eventCategories", "all");
+        private static string EventTypesCacheKey => KeyBuilder.Build("eventTypes", "all");
 
         public EventsService(ICorrelationIdProvider correlationIdProvider,
             IEventsMetadataRepository eventsMetadataRepository,
@@ -80,7 +87,8 @@ namespace EList.Services.Impl
             IEventValidator eventValidator,
             IPagingValidator pagingValidator,
             IMediaService mediaService,
-            IFilestorageClient filestorageClient)
+            IFilestorageClient filestorageClient,
+            IMemoryCache memoryCache)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _eventsMetadataRepository = eventsMetadataRepository ?? throw new ArgumentNullException(nameof(eventsMetadataRepository));
@@ -106,6 +114,7 @@ namespace EList.Services.Impl
             _pagingValidator = pagingValidator ?? throw new ArgumentNullException(nameof(pagingValidator));
             _mediaService = mediaService ?? throw new ArgumentNullException(nameof(mediaService));
             _filestorageClient = filestorageClient ?? throw new ArgumentNullException(nameof(filestorageClient));
+            _memoryCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
         }
 
 
@@ -124,6 +133,7 @@ namespace EList.Services.Impl
                 return CommandResult<Guid?>.Fail(ErrorCode.EventCategoryNotFound, "Категория события не найдена");
 
             var result = await _eventsMetadataRepository.CreateEventTypeAsync(request);
+            _memoryCache.Invalidate(EventTypesCacheKey);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(result);
@@ -142,6 +152,7 @@ namespace EList.Services.Impl
                 return CommandResult<Guid>.Fail(ErrorCode.EventTypeNotFound, "Тип события не найден");
 
             await _eventsMetadataRepository.DeleteEventTypeAsync(id);
+            _memoryCache.Invalidate(EventTypesCacheKey);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -151,11 +162,19 @@ namespace EList.Services.Impl
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateEventTypeAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(GetAllEventTypesAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var result = await _eventsMetadataRepository.GetAllEventTypesAsync();
+            var cached = await _memoryCache.GetOrUpdateAsync(
+                EventTypesCacheKey,
+                async () =>
+                {
+                    var types = await _eventsMetadataRepository.GetAllEventTypesAsync() ?? new List<EventType>();
+                    return new CacheContent<List<EventType>>(DefaultCacheTimeouts.DictionariesTimeout, types);
+                });
 
+            // Клон до локализации — иначе мутируем объект в кэше
+            var result = cached.Select(CloneEventType).ToList();
             result.ForEach(i => i.Name = Localizator.GetProperty(i.LocalizationPath, i.Name));
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -223,6 +242,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             await _eventsMetadataRepository.UpdateEventTypeAsync(id, request);
+            _memoryCache.Invalidate(EventTypesCacheKey);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -270,6 +290,7 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             var result = await _eventsMetadataRepository.CreateEventCategoryAsync(request);
+            _memoryCache.Invalidate(EventCategoriesCacheKey);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return new CommandResult<Guid?>(result);
@@ -288,6 +309,9 @@ namespace EList.Services.Impl
                 return CommandResult<Guid>.Fail(ErrorCode.EventCategoryNotFound, "Категория события не найдена");
 
             await _eventsMetadataRepository.DeleteEventCategoryAsync(id);
+            // Soft-delete категории также деактивирует дочерние типы
+            _memoryCache.Invalidate(EventCategoriesCacheKey);
+            _memoryCache.Invalidate(EventTypesCacheKey);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
@@ -297,11 +321,19 @@ namespace EList.Services.Impl
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateEventTypeAsync)}";
+            var methodName = $"{LOGGER_NAME}{nameof(GetAllEventCategoriesAsync)}";
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
-            var result = await _eventsMetadataRepository.GetAllEventCategoriesAsync();
+            var cached = await _memoryCache.GetOrUpdateAsync(
+                EventCategoriesCacheKey,
+                async () =>
+                {
+                    var categories = await _eventsMetadataRepository.GetAllEventCategoriesAsync() ?? new List<EventCategory>();
+                    return new CacheContent<List<EventCategory>>(DefaultCacheTimeouts.DictionariesTimeout, categories);
+                });
 
+            // Клон до локализации — иначе мутируем объект в кэше
+            var result = cached.Select(CloneEventCategory).ToList();
             result.ForEach(i => i.Name = Localizator.GetProperty(i.LocalizationPath, i.Name));
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
@@ -334,9 +366,39 @@ namespace EList.Services.Impl
             logger.Debug(correlationId, null, methodName, $"Method started", null);
 
             await _eventsMetadataRepository.UpdateEventCategoryAsync(id, request);
+            _memoryCache.Invalidate(EventCategoriesCacheKey);
 
             logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return CommandResult.OK;
+        }
+
+        private static EventCategory CloneEventCategory(EventCategory source)
+        {
+            return new EventCategory
+            {
+                Id = source.Id,
+                Name = source.Name,
+                LocalizationPath = source.LocalizationPath,
+                Ico = source.Ico,
+                Description = source.Description,
+                Color = source.Color,
+                Active = source.Active
+            };
+        }
+
+        private static EventType CloneEventType(EventType source)
+        {
+            return new EventType
+            {
+                Id = source.Id,
+                Name = source.Name,
+                LocalizationPath = source.LocalizationPath,
+                Description = source.Description,
+                Ico = source.Ico,
+                EventCategoryId = source.EventCategoryId,
+                EventCategory = source.EventCategory == null ? null : CloneEventCategory(source.EventCategory),
+                Active = source.Active
+            };
         }
         #endregion
 
