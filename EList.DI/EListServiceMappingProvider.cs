@@ -31,7 +31,7 @@ namespace EList.DI
 
             //DataProviders
             mapper.AddScoped<IAgreementDataProvider, AgreementDataProvider>();
-            mapper.AddSingleton<ICorrelationIdProvider, Common.HttpRestClient.CorrelationIdProvider>();
+            mapper.AddSingleton<ICorrelationIdProvider, Common.HttpRestClient.HttpContextCorrelationIdProvider>();
             mapper.AddScoped<IPersonsDataProvider, PersonsDataProvider>();
             mapper.AddScoped<IContactsDataProvider, ContactsDataProvider>();
             mapper.AddScoped<IAuthorizationDataProvider, AuthorizationDataProvider>();

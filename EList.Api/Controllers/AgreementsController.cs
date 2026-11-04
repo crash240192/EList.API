@@ -11,7 +11,6 @@ using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NLog;
-using TM.Schedule.API.Attributes;
 
 namespace EList.Api.Controllers
 {

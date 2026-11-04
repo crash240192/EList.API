@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.Mvc;
 using NLog;
 using Org.BouncyCastle.Asn1.Ocsp;
 using System.Diagnostics;
-using TM.Schedule.API.Attributes;
 
 namespace EList.Api.Controllers
 {

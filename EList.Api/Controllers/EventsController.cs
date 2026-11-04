@@ -12,7 +12,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using NLog;
 using System.Diagnostics;
-using TM.Schedule.API.Attributes;
 
 namespace EList.Api.Controllers
 {

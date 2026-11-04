@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NLog;
 using System.Diagnostics;
-using TM.Schedule.API.Attributes;
 
 namespace EList.Api.Controllers.ContactData
 {

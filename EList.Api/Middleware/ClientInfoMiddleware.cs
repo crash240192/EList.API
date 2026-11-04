@@ -28,8 +28,9 @@ namespace EList.Api.Middleware
                 AppVersion = context.Request.Headers["X-App-Version"].FirstOrDefault() ?? "unknown",
                 Referer = context.Request.Headers["Referer"].FirstOrDefault(),
                 AcceptLanguage = context.Request.Headers["Accept-Language"].FirstOrDefault(),
-                CorrelationId = context.Request.Headers["X-Correlation-Id"].FirstOrDefault() ?? Guid.NewGuid().ToString(),
-                // ... заполните остальные поля
+                CorrelationId = context.Items.TryGetValue("correlationId", out var corr) && corr is string s && !string.IsNullOrWhiteSpace(s)
+                    ? s
+                    : (context.Request.Headers["X-Correlation-Id"].FirstOrDefault() ?? Guid.NewGuid().ToString()),
             };
 
             // Сохраните в HttpContext.Items для использования в контроллерах

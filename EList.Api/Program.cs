@@ -5,6 +5,7 @@ using EList.Api.Infrastructure;
 using EList.Api.Middleware;
 using EList.AutoMapperProfile;
 using EList.Common.DI;
+using EList.Common.Middleware;
 using EList.DbDataProvider.Interfaces;
 using EList.DI;
 using EList.Services.Impl.BackgroundWorkers;
@@ -14,6 +15,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json.Serialization;
 using ConfigurationManager = EList.Common.Configuration.ConfigurationManager;
+using ErrorHandlingMiddleware = EList.Common.Middleware.ErrorHandlingMiddleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -110,6 +112,7 @@ app.Use(async (context, next) =>
     await next();
 });
 
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseMiddleware<ClientInfoMiddleware>();
 app.UseMiddleware<WebSocketsTokenHandlerMiddleware>();
