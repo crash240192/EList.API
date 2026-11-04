@@ -28,31 +28,40 @@ namespace EList.Api.Controllers
         /// </summary>
         /// <param name="q">Строка запроса</param>
         /// <param name="lang">Язык ответа Яндекса (по умолчанию ru_RU)</param>
+        /// <param name="cacheOnly">Только MemoryCache, без Яндекса (для UI: peek → fallback)</param>
         [AllowAnonymous]
         [HttpGet]
         public async Task<CommandResult<GeocodedPlace?>> GeocodeAsync(
             [FromQuery] string q,
-            [FromQuery] string? lang = null)
+            [FromQuery] string? lang = null,
+            [FromQuery] bool cacheOnly = false)
         {
-            return await _geocodeService.GeocodeAsync(q, lang);
+            return await _geocodeService.GeocodeAsync(q, lang, cacheOnly);
         }
 
         /// <summary>
         /// Обратное геокодирование: координаты → адрес.
         /// </summary>
-        /// <param name="lat">Широта</param>
-        /// <param name="lng">Долгота</param>
-        /// <param name="kind">Опциональный kind Яндекса (например locality)</param>
-        /// <param name="lang">Язык ответа</param>
         [AllowAnonymous]
         [HttpGet("reverse")]
         public async Task<CommandResult<GeocodedPlace?>> ReverseGeocodeAsync(
             [FromQuery] double lat,
             [FromQuery] double lng,
             [FromQuery] string? kind = null,
-            [FromQuery] string? lang = null)
+            [FromQuery] string? lang = null,
+            [FromQuery] bool cacheOnly = false)
         {
-            return await _geocodeService.ReverseGeocodeAsync(lat, lng, kind, lang);
+            return await _geocodeService.ReverseGeocodeAsync(lat, lng, kind, lang, cacheOnly);
+        }
+
+        /// <summary>
+        /// Прогрев кэша результатом с клиента (после прямого вызова Яндекса).
+        /// </summary>
+        [AllowAnonymous]
+        [HttpPost("cache")]
+        public async Task<CommandResult> WarmCacheAsync([FromBody] GeocodeCacheWarmRequest request)
+        {
+            return await _geocodeService.WarmCacheAsync(request);
         }
     }
 }

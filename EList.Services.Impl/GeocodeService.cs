@@ -72,7 +72,8 @@ namespace EList.Services.Impl
             }
         }
 
-        public async Task<CommandResult<GeocodedPlace?>> GeocodeAsync(string query, string? lang = null)
+        public async Task<CommandResult<GeocodedPlace?>> GeocodeAsync(
+            string query, string? lang = null, bool cacheOnly = false)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -83,11 +84,18 @@ namespace EList.Services.Impl
             if (string.IsNullOrWhiteSpace(normalized))
                 return CommandResult<GeocodedPlace?>.Fail(ErrorCode.IsNullOrEmpty, "Пустой запрос геокодирования");
 
+            var effectiveLang = string.IsNullOrWhiteSpace(lang) ? DefaultLang : lang.Trim();
+            var cacheKey = BuildForwardCacheKey(effectiveLang, normalized);
+
+            if (cacheOnly)
+            {
+                var cached = await _memoryCache.GetAsync<GeocodedPlace>(cacheKey);
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return new CommandResult<GeocodedPlace?>(cached);
+            }
+
             if (string.IsNullOrWhiteSpace(_apiKey))
                 return CommandResult<GeocodedPlace?>.Fail(ErrorCode.InternalError, "Геокодер не настроен (yandexService:geocode:apiKey)");
-
-            var effectiveLang = string.IsNullOrWhiteSpace(lang) ? DefaultLang : lang.Trim();
-            var cacheKey = KeyBuilder.Build("geocode", $"fwd:{effectiveLang}:{normalized}");
 
             var place = await GetOrFetchAsync(
                 cacheKey,
@@ -98,7 +106,7 @@ namespace EList.Services.Impl
         }
 
         public async Task<CommandResult<GeocodedPlace?>> ReverseGeocodeAsync(
-            double lat, double lng, string? kind = null, string? lang = null)
+            double lat, double lng, string? kind = null, string? lang = null, bool cacheOnly = false)
         {
             var correlationId = _correlationIdProvider.Get();
             var execTime = Stopwatch.StartNew();
@@ -108,17 +116,23 @@ namespace EList.Services.Impl
             if (lat is < -90 or > 90 || lng is < -180 or > 180)
                 return CommandResult<GeocodedPlace?>.Fail(ErrorCode.InvalidValue, "Некорректные координаты");
 
+            var effectiveLang = string.IsNullOrWhiteSpace(lang) ? DefaultLang : lang.Trim();
+            var cacheKey = BuildReverseCacheKey(effectiveLang, lat, lng, kind);
+
+            if (cacheOnly)
+            {
+                var cached = await _memoryCache.GetAsync<GeocodedPlace>(cacheKey);
+                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+                return new CommandResult<GeocodedPlace?>(cached);
+            }
+
             if (string.IsNullOrWhiteSpace(_apiKey))
                 return CommandResult<GeocodedPlace?>.Fail(ErrorCode.InternalError, "Геокодер не настроен (yandexService:geocode:apiKey)");
 
-            var effectiveLang = string.IsNullOrWhiteSpace(lang) ? DefaultLang : lang.Trim();
             var roundedLat = Math.Round(lat, ReverseCoordDecimals, MidpointRounding.AwayFromZero);
             var roundedLng = Math.Round(lng, ReverseCoordDecimals, MidpointRounding.AwayFromZero);
-            var latStr = roundedLat.ToString(CultureInfo.InvariantCulture);
-            var lngStr = roundedLng.ToString(CultureInfo.InvariantCulture);
-            var kindPart = string.IsNullOrWhiteSpace(kind) ? string.Empty : $":{kind.Trim()}";
-            var cacheKey = KeyBuilder.Build("geocode", $"rev:{effectiveLang}:{latStr},{lngStr}{kindPart}");
-            var geocodeParam = $"{lngStr},{latStr}";
+            var geocodeParam =
+                $"{roundedLng.ToString(CultureInfo.InvariantCulture)},{roundedLat.ToString(CultureInfo.InvariantCulture)}";
 
             var place = await GetOrFetchAsync(
                 cacheKey,
@@ -126,6 +140,64 @@ namespace EList.Services.Impl
 
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return new CommandResult<GeocodedPlace?>(place);
+        }
+
+        public async Task<CommandResult> WarmCacheAsync(GeocodeCacheWarmRequest request)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(WarmCacheAsync)}";
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            if (request?.Place == null)
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Пустой Place для прогрева кэша");
+
+            if (double.IsNaN(request.Place.Lat) || double.IsNaN(request.Place.Lng))
+                return CommandResult.Fail(ErrorCode.InvalidValue, "Некорректные координаты Place");
+
+            var effectiveLang = string.IsNullOrWhiteSpace(request.Lang) ? DefaultLang : request.Lang.Trim();
+            string cacheKey;
+
+            var normalizedQuery = NormalizeQuery(request.Query);
+            if (!string.IsNullOrWhiteSpace(normalizedQuery))
+            {
+                cacheKey = BuildForwardCacheKey(effectiveLang, normalizedQuery);
+            }
+            else if (request.Lat != null && request.Lng != null)
+            {
+                cacheKey = BuildReverseCacheKey(effectiveLang, request.Lat.Value, request.Lng.Value, request.Kind);
+            }
+            else
+            {
+                return CommandResult.Fail(ErrorCode.IsNullOrEmpty, "Укажите Query или Lat/Lng для ключа кэша");
+            }
+
+            var toStore = new GeocodedPlace
+            {
+                Lat = request.Place.Lat,
+                Lng = request.Place.Lng,
+                Address = request.Place.Address ?? string.Empty
+            };
+
+            await _memoryCache.GetOrUpdateAsync(
+                cacheKey,
+                () => Task.FromResult(new CacheContent<GeocodedPlace>(_cacheTtl, toStore)));
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return CommandResult.OK;
+        }
+
+        private static string BuildForwardCacheKey(string lang, string normalizedQuery)
+            => KeyBuilder.Build("geocode", $"fwd:{lang}:{normalizedQuery}");
+
+        private static string BuildReverseCacheKey(string lang, double lat, double lng, string? kind)
+        {
+            var roundedLat = Math.Round(lat, ReverseCoordDecimals, MidpointRounding.AwayFromZero);
+            var roundedLng = Math.Round(lng, ReverseCoordDecimals, MidpointRounding.AwayFromZero);
+            var latStr = roundedLat.ToString(CultureInfo.InvariantCulture);
+            var lngStr = roundedLng.ToString(CultureInfo.InvariantCulture);
+            var kindPart = string.IsNullOrWhiteSpace(kind) ? string.Empty : $":{kind.Trim()}";
+            return KeyBuilder.Build("geocode", $"rev:{lang}:{latStr},{lngStr}{kindPart}");
         }
 
         /// <summary>
