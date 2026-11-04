@@ -2,7 +2,12 @@ name: Docker
 
 on:
   push:
-    branches: [develop, main]
+    branches:
+      - develop
+      - main
+      - "rc/**"
+    tags:
+      - "release_*"
   workflow_dispatch:
 
 env:
@@ -34,6 +39,10 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+            # rc/1.2.3 → rc-1.2.3 (в Docker tag нельзя /)
+            type=match,pattern=rc/(.*),group=1,prefix=rc-
+            # git tag release_1.2.3 → image tag release_1.2.3
+            type=ref,event=tag
             type=sha,prefix=sha-,format=short
 
       - name: Login to Docker Hub
