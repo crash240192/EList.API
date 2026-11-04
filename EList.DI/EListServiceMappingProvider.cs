@@ -70,6 +70,7 @@ namespace EList.DI
             mapper.AddScoped<ISubscriptionsService, SubscriptionsService>();
             mapper.AddScoped<IOrganizationSubscriptionsService, OrganizationSubscriptionsService>();
             mapper.AddScoped<IEventsService, EventsService>();
+            mapper.AddScoped<IGeocodeService, GeocodeService>();
             mapper.AddScoped<IParticipationsService, ParticipationsService>();
             mapper.AddScoped<IInvitationsService, InvitationsService>();
             mapper.AddScoped<IMediaService, MediaService>();
