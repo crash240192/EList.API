@@ -1,4 +1,3 @@
-using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
@@ -7,8 +6,6 @@ using EList.Models.PlatformRoles;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NLog;
-using System.Diagnostics;
 
 namespace EList.Api.Controllers
 {
@@ -18,23 +15,13 @@ namespace EList.Api.Controllers
     [LoggerHandlerWebApiFilter]
     public class PlatformRolesController : ControllerBase
     {
-        #region logger
-        private static readonly NLog.ILogger log = LogManager.GetCurrentClassLogger();
-        private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
-        private const string LOGGER_NAME = "EList.Api.Controllers.PlatformRolesController.";
-        #endregion
-
         private readonly IAccountPlatformRolesService _platformRolesService;
-        private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
 
         public PlatformRolesController(
-            IAccountPlatformRolesService platformRolesService,
-            ICorrelationIdProvider correlationIdProvider,
-            IDataConnectionProvider connectionProvider)
+            IAccountPlatformRolesService platformRolesService, IDataConnectionProvider connectionProvider)
         {
             _platformRolesService = platformRolesService;
-            _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
         }
 
@@ -44,22 +31,9 @@ namespace EList.Api.Controllers
         [HttpGet("my")]
         public async Task<CommandResult<AccountPlatformRole?>> GetMyRoleAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetMyRoleAsync)}";
+            var result = await _platformRolesService.GetMyRoleAsync();
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, "Method started", null);
-                var result = await _platformRolesService.GetMyRoleAsync();
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -70,22 +44,9 @@ namespace EList.Api.Controllers
             [FromQuery] PlatformRole? role = null,
             [FromQuery] bool onlyActive = true)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetAllAsync)}";
+            var result = await _platformRolesService.GetAllAsync(role, onlyActive);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, "Method started", null);
-                var result = await _platformRolesService.GetAllAsync(role, onlyActive);
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -94,22 +55,9 @@ namespace EList.Api.Controllers
         [HttpGet("byAccount/{accountId}")]
         public async Task<CommandResult<AccountPlatformRole?>> GetByAccountIdAsync(Guid accountId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetByAccountIdAsync)}";
+            var result = await _platformRolesService.GetByAccountIdAsync(accountId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, "Method started", null);
-                var result = await _platformRolesService.GetByAccountIdAsync(accountId);
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -118,26 +66,19 @@ namespace EList.Api.Controllers
         [HttpPost("assign")]
         public async Task<CommandResult<Guid?>> AssignRoleAsync([FromBody] AssignPlatformRoleRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(AssignRoleAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _platformRolesService.AssignRoleAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -148,26 +89,19 @@ namespace EList.Api.Controllers
         [HttpPut("setActive/{accountId}")]
         public async Task<CommandResult> SetActiveAsync(Guid accountId, [FromQuery] bool active)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SetActiveAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _platformRolesService.SetActiveAsync(accountId, active);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -178,26 +112,19 @@ namespace EList.Api.Controllers
         [HttpDelete("delete/{accountId}")]
         public async Task<CommandResult> DeleteRoleAsync(Guid accountId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeleteRoleAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _platformRolesService.DeleteRoleAsync(accountId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }

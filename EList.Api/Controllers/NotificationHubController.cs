@@ -1,5 +1,3 @@
-using System.Diagnostics;
-using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
@@ -9,7 +7,6 @@ using EList.Services.Impl;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NLog;
 
 namespace EList.Api.Controllers
 {
@@ -30,28 +27,19 @@ namespace EList.Api.Controllers
     [ApiController]
     [Route("/api/notifications")]
     [Authorize]
+    [LoggerHandlerWebApiFilter]
     public class NotificationHubController : ControllerBase
     {
-        #region logger
-        private static readonly NLog.ILogger log = LogManager.GetCurrentClassLogger();
-        private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
-        private const string LOGGER_NAME = "EList.Api.Controllers.NotificationHubController.";
-        #endregion
-
         private readonly INotificationsService _notificationService;
-        private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IAccountDataHolder _accountDataHolder;
         private readonly IDataConnectionProvider _connectionProvider;
 
         public NotificationHubController(
-            INotificationsService notificationService,
-            ICorrelationIdProvider correlationIdProvider,
-            IAccountDataHolder accountDataHolder,
+            INotificationsService notificationService, IAccountDataHolder accountDataHolder,
             INotificationsService notificationsService,
             IDataConnectionProvider connectionProvider)
         {
             _notificationService = notificationService;
-            _correlationIdProvider = correlationIdProvider;
             _accountDataHolder = accountDataHolder;
             _connectionProvider = connectionProvider;
         }
@@ -72,15 +60,8 @@ namespace EList.Api.Controllers
         [ApiExplorerSettings(IgnoreApi = true)]
         public async Task ConnectWebSocket()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(ConnectWebSocket)}";
-            var execTime = Stopwatch.StartNew();
-
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
             if (!HttpContext.WebSockets.IsWebSocketRequest)
             {
-                logger.Debug(correlationId, null, methodName, "Rejected non-WebSocket request", null);
                 HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
                 await HttpContext.Response.WriteAsync("Ожидается WebSocket-соединение");
                 return;
@@ -89,7 +70,6 @@ namespace EList.Api.Controllers
             var socket = await HttpContext.WebSockets.AcceptWebSocketAsync();
             await _notificationService.AddConnectionAsync(socket);
 
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
         }
 
         /// <summary>
@@ -100,17 +80,10 @@ namespace EList.Api.Controllers
         [HttpPost("send/{accountId}")]
         public async Task<CommandResult> SendToUserAsync(Guid accountId, Notification request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(SendToUserAsync)}";
-            var execTime = Stopwatch.StartNew();
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
             if (!_accountDataHolder.IsPlatformAdminOrAbove)
                 return CommandResult.Fail(EList.Common.Support.ErrorCode.AccessError, "Отправка уведомлений доступна только администраторам площадки");
 
             var result = await _notificationService.SendToUserAsync(accountId, request);
-
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
             return result;
         }
@@ -123,17 +96,10 @@ namespace EList.Api.Controllers
         [HttpPost("broadcast")]
         public async Task<CommandResult> BroadcastAsync(Notification request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(BroadcastAsync)}";
-            var execTime = Stopwatch.StartNew();
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
             if (!_accountDataHolder.IsPlatformAdminOrAbove)
                 return CommandResult.Fail(EList.Common.Support.ErrorCode.AccessError, "Broadcast уведомлений доступен только администраторам площадки");
             
             var result = await _notificationService.BroadcastAsync(request);
-
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
 
             return result;
         }
@@ -144,17 +110,11 @@ namespace EList.Api.Controllers
         [HttpGet("connections/stats")]
         public CommandResult<ConnectionStats> GetConnectionStats()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(GetConnectionStats)}";
-            var execTime = Stopwatch.StartNew();
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
             if (!_accountDataHolder.IsPlatformAdminOrAbove)
                 return CommandResult<ConnectionStats>.Fail(EList.Common.Support.ErrorCode.AccessError, "Статистика соединений доступна только администраторам площадки");
 
             var result = _notificationService.GetConnectionStats();
 
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return result;
         }
 
@@ -164,11 +124,6 @@ namespace EList.Api.Controllers
         [HttpGet("online")]
         public CommandResult<OnlineAccountsResponse> GetOnlineAccounts([FromQuery] string? ids = null)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(GetOnlineAccounts)}";
-            var execTime = Stopwatch.StartNew();
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
             var parsed = new List<Guid>();
             if (!string.IsNullOrWhiteSpace(ids))
             {
@@ -181,10 +136,8 @@ namespace EList.Api.Controllers
 
             var result = _notificationService.GetOnlineAccounts(parsed);
 
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return result;
         }
-
 
         /// <summary>
         /// История уведомлений текущего пользователя (входящие, включая замечания модерации)
@@ -196,11 +149,6 @@ namespace EList.Api.Controllers
             [FromQuery] int? pageIndex = 0,
             [FromQuery] int? pageSize = 20)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(GetMyNotificationsAsync)}";
-            var execTime = Stopwatch.StartNew();
-            logger.Debug(correlationId, null, methodName, "Method started", null);
-
             var result = await _notificationService.GetMyNotificationsAsync(new NotificationsSearchRequest
             {
                 Type = type,
@@ -209,7 +157,6 @@ namespace EList.Api.Controllers
                 PageSize = pageSize
             });
 
-            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return result;
         }
 
@@ -230,12 +177,8 @@ namespace EList.Api.Controllers
         [HttpGet("read/{notificationId}")]
         public async Task<CommandResult> ReadNotificationAsync(Guid notificationId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(ReadNotificationAsync)}";
-            var execTime = Stopwatch.StartNew();
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _notificationService.ReadNotificationAsync(notificationId);
@@ -244,13 +187,11 @@ namespace EList.Api.Controllers
                 else
                     await _connectionProvider.CommitTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -261,12 +202,8 @@ namespace EList.Api.Controllers
         [HttpGet("read/all")]
         public async Task<CommandResult> ReadAllUserNotificationsAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var methodName = $"{LOGGER_NAME}{nameof(ReadAllUserNotificationsAsync)}";
-            var execTime = Stopwatch.StartNew();
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _notificationService.ReadAllUserNotificationsAsync();
@@ -275,17 +212,14 @@ namespace EList.Api.Controllers
                 else
                     await _connectionProvider.CommitTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
-
 
         ///// <summary>
         ///// Отметить все оповещения пользователя как прочитанные
@@ -293,15 +227,10 @@ namespace EList.Api.Controllers
         //[HttpGet("read/all")]
         //public async Task<CommandResult<PagedList<Notification>>> ReadAllUserNotificationsAsync()
         //{
-        //    var correlationId = _correlationIdProvider.Get();
-        //    var methodName = $"{LOGGER_NAME}{nameof(ReadAllUserNotificationsAsync)}";
-        //    var execTime = Stopwatch.StartNew();
-        //    logger.Debug(correlationId, null, methodName, $"Method started", null);
-
+        //        //        //        //
         //    var result = await _notificationService.ReadAllUserNotificationsAsync();
 
-        //    logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-        //    return result;
+        //        //    return result;
         //}
     }
 }

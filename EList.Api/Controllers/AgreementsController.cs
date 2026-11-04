@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-using EList.Common.CorrelationId;
-using EList.Common.Logger;
+﻿using EList.Common.Logger;
 using EList.Common.Models;
 using EList.Common.Support;
 using EList.DbDataProvider.Interfaces;
@@ -10,7 +8,6 @@ using EList.Services.Impl;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NLog;
 
 namespace EList.Api.Controllers
 {
@@ -20,31 +17,20 @@ namespace EList.Api.Controllers
     [LoggerHandlerWebApiFilter]
     public class AgreementsController : Controller
     {
-        #region logger
-        private static readonly NLog.ILogger log = LogManager.GetCurrentClassLogger();
-        private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
-        private const string LOGGER_NAME = "EList.Api.Controllers.AgreementsController.";
-        #endregion
-
         private readonly IAgreementService _agreementService;
         private readonly IAccountsService _accountsService;
-        private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
         private readonly IAccountDataHolder _accountDataHolder;
 
         public AgreementsController(IAgreementService agreementService,
-            IAccountsService accountsService,
-            ICorrelationIdProvider correlationIdProvider,
-            IDataConnectionProvider connectionProvider,
+            IAccountsService accountsService, IDataConnectionProvider connectionProvider,
             IAccountDataHolder accountDataHolder)
         {
             _agreementService = agreementService;
             _accountsService = accountsService;
-            _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
             _accountDataHolder = accountDataHolder;
         }
-
 
         /// <summary>
         /// Соглашение что анонимному пользователю есть 18+
@@ -54,26 +40,19 @@ namespace EList.Api.Controllers
         [HttpGet("age/anonymous/agree")]
         public async Task<CommandResult> SaveAnonymousAgeAgreementAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SaveAnonymousAgeAgreementAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _agreementService.SaveAnonymousAgeAgreementAsync();
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -86,26 +65,9 @@ namespace EList.Api.Controllers
         [HttpGet("age/anonymous/get")]
         public async Task<CommandResult> GetAnonymousAgeAgreementAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetAnonymousAgeAgreementAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _agreementService.GetAnonymousAgeAgreementAsync();
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _agreementService.GetAnonymousAgeAgreementAsync();
+            return result;
         }
-
 
         /// <summary>
         /// Проверяет, подписал ли пользователь соглашение указанного типа
@@ -115,24 +77,9 @@ namespace EList.Api.Controllers
         [HttpGet("checkUserAgreement/{documentType}")]        
         public async Task<CommandResult> DoesUserAgreedWithLatestDocumentVersion(DocumentType documentType)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DoesUserAgreedWithLatestDocumentVersion)}";
+            var result = await _agreementService.DoesUserAgreedWithLatestDocumentVersion(documentType);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _agreementService.DoesUserAgreedWithLatestDocumentVersion(documentType);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -143,26 +90,10 @@ namespace EList.Api.Controllers
         [HttpGet("agree/{documentType}")]
         public async Task<CommandResult> SaveUserAgreementAsync(DocumentType documentType)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SaveUserAgreementAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _agreementService.SaveUserAgreementAsync(documentType);
-                if (!result.Success)
-                    await _connectionProvider.RollbackTransactionAsync();
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _agreementService.SaveUserAgreementAsync(documentType);
+            if (!result.Success)
+                await _connectionProvider.RollbackTransactionAsync();
+            return result;
         }
 
         /// <summary>
@@ -171,24 +102,9 @@ namespace EList.Api.Controllers
         [HttpGet("checkOrganizationAgreement/{organizationId}/{documentType}")]
         public async Task<CommandResult> DoesOrganizationAgreedWithLatestDocumentVersion(Guid organizationId, DocumentType documentType)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DoesOrganizationAgreedWithLatestDocumentVersion)}";
+            var result = await _agreementService.DoesOrganizationAgreedWithLatestDocumentVersion(organizationId, documentType);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _agreementService.DoesOrganizationAgreedWithLatestDocumentVersion(organizationId, documentType);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -197,26 +113,19 @@ namespace EList.Api.Controllers
         [HttpGet("agree/organization/{organizationId}/{documentType}")]
         public async Task<CommandResult> SaveOrganizationAgreementAsync(Guid organizationId, DocumentType documentType)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SaveOrganizationAgreementAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _agreementService.SaveOrganizationAgreementAsync(organizationId, documentType);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -224,29 +133,12 @@ namespace EList.Api.Controllers
         [HttpPost("documents/add")]
         public async Task<CommandResult> AddNewDocumentAsync(DocumentRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(AddNewDocumentAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                if (!_accountDataHolder.IsPlatformAdminOrAbove)
-                    return CommandResult.Fail(ErrorCode.AccessError, "Добавление юридических документов доступно только администраторам площадки");
-
-                var result = await _agreementService.AddNewDocumentAsync(request);
-                if (!result.Success)
-                    await _connectionProvider.RollbackTransactionAsync();
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            if (!_accountDataHolder.IsPlatformAdminOrAbove)
+                return CommandResult.Fail(ErrorCode.AccessError, "Добавление юридических документов доступно только администраторам площадки");
+            var result = await _agreementService.AddNewDocumentAsync(request);
+            if (!result.Success)
+                await _connectionProvider.RollbackTransactionAsync();
+            return result;
         }
 
         /// <summary>
@@ -257,15 +149,8 @@ namespace EList.Api.Controllers
         [HttpGet("documents/last")]
         public async Task<CommandResult<List<Document>>> GetLatestDocumentsAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetLatestDocumentsAsync)}";
-
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
             var result = await _agreementService.GetLatestDocumentsAsync();
             
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return result;
         }
 
@@ -278,15 +163,8 @@ namespace EList.Api.Controllers
         [HttpGet("documents/last/{documentType}")]
         public async Task<CommandResult<Document>> GetLatestDocumentAsync(DocumentType documentType)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetLatestDocumentAsync)}";
-
-            logger.Debug(correlationId, null, methodName, $"Method started", null);
-
             var result = await _agreementService.GetLatestDocumentAsync(documentType);
 
-            logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
             return result;
         }
 
@@ -296,14 +174,9 @@ namespace EList.Api.Controllers
         [HttpPost("withdraw")]
         public async Task<CommandResult> WithdrawConsentAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(WithdrawConsentAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _accountsService.DeleteMyAccountAsync();
                 if (!result.Success)
@@ -311,13 +184,11 @@ namespace EList.Api.Controllers
                 else
                     await _connectionProvider.CommitTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }

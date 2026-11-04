@@ -1,5 +1,4 @@
 ﻿using EList.Api.Extensions;
-using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
@@ -8,8 +7,6 @@ using EList.Models.Participation;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NLog;
-using System.Diagnostics;
 
 namespace EList.Api.Controllers
 {
@@ -19,22 +16,13 @@ namespace EList.Api.Controllers
     [LoggerHandlerWebApiFilter]
     public class ParticipationController : ControllerBase
     {
-        #region logger
-        private static readonly NLog.ILogger log = LogManager.GetCurrentClassLogger();
-        private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
-        private const string LOGGER_NAME = "EList.Api.Controllers.ParticipationController.";
-        #endregion
-
         private readonly IParticipationsService _participationService;
-        private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
 
-        public ParticipationController(ICorrelationIdProvider correlationIdProvider,
-            IDataConnectionProvider connectionProvider,
+        public ParticipationController(IDataConnectionProvider connectionProvider,
             IParticipationsService participationService)
         {
             _participationService = participationService;
-            _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
         }
 
@@ -46,27 +34,20 @@ namespace EList.Api.Controllers
         [HttpGet("participate/{id}")]
         public async Task<CommandResult> ParticipateAsync(Guid id)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(ParticipateAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _participationService.ParticipateAsync(id);
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -79,31 +60,23 @@ namespace EList.Api.Controllers
         [HttpGet("leave/{id}")]
         public async Task<CommandResult> LeaveEventAsync(Guid id)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(LeaveEventAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _participationService.LeaveEventAsync(id);
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
-
 
         /// <summary>
         /// Получить список участников события
@@ -113,26 +86,9 @@ namespace EList.Api.Controllers
         [HttpPost("eventParticipants")]
         public async Task<CommandResult<PagedList<Participant>>> GetEventParticipantsAsync(EventParticipantsSearchRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventParticipantsAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _participationService.GetEventParticipantsAsync(request);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _participationService.GetEventParticipantsAsync(request);
+            return result;
         }
-
 
         #region blackList
 
@@ -146,24 +102,9 @@ namespace EList.Api.Controllers
         [HttpGet("blackList/get/{eventId}")]
         public async Task<CommandResult<PagedList<ParticipantBlackListItem>>> GetEventBlackListAsync(Guid eventId, int? pageIndex, int? pageSize)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventBlackListAsync)}";
+            var result = await _participationService.GetEventBlackListAsync(eventId, pageIndex, pageSize);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _participationService.GetEventBlackListAsync(eventId, pageIndex, pageSize);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -176,24 +117,9 @@ namespace EList.Api.Controllers
         [HttpGet("whiteList/get/{eventId}")]
         public async Task<CommandResult<PagedList<ParticipantWhiteListItem>>> GetEventWhiteListAsync(Guid eventId, int? pageIndex, int? pageSize)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventWhiteListAsync)}";
+            var result = await _participationService.GetEventWhiteListAsync(eventId, pageIndex, pageSize);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _participationService.GetEventWhiteListAsync(eventId, pageIndex, pageSize);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -204,24 +130,9 @@ namespace EList.Api.Controllers
         [HttpGet("blackList/get/{eventId}/short")]
         public async Task<CommandResult<List<Guid>>> GetEventBlackListShortAsync(Guid eventId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventBlackListAsync)}";
+            var result = await _participationService.GetEventBlackListShortAsync(eventId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _participationService.GetEventBlackListShortAsync(eventId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -232,26 +143,10 @@ namespace EList.Api.Controllers
         [HttpGet("whiteList/get/{eventId}/short")]
         public async Task<CommandResult<List<Guid>>> GetEventWhiteListShortAsync(Guid eventId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventWhiteListShortAsync)}";
+            var result = await _participationService.GetEventWhiteListShortAsync(eventId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _participationService.GetEventWhiteListShortAsync(eventId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
-
 
         /// <summary>
         /// Добавить пользователя в чёрный список
@@ -261,13 +156,8 @@ namespace EList.Api.Controllers
         [HttpPost("blackList/addUsers")]
         public async Task<CommandResult> AddToBlackListAsync(AddUsersToBWListRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(AddToBlackListAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _participationService.AddToBlackListAsync(request);
@@ -275,13 +165,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -294,13 +182,8 @@ namespace EList.Api.Controllers
         [HttpPost("whiteList/addUsers")]
         public async Task<CommandResult> AddToWhiteListAsync(AddUsersToBWListRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(AddToWhiteListAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _participationService.AddToWhiteListAsync(request);
@@ -308,13 +191,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -328,13 +209,8 @@ namespace EList.Api.Controllers
         [HttpDelete("blackList/deleteUser")]
         public async Task<CommandResult> DeleteFromBlackListAsync(Guid eventId, Guid accountId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeleteFromBlackListAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _participationService.DeleteFromBlackListAsync(eventId, accountId);
@@ -342,13 +218,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -362,13 +236,8 @@ namespace EList.Api.Controllers
         [HttpDelete("whiteList/deleteUser")]
         public async Task<CommandResult> DeleteFromWhiteListAsync(Guid eventId, Guid accountId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeleteFromWhiteListAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _participationService.DeleteFromWhiteListAsync(eventId, accountId);
@@ -376,13 +245,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }

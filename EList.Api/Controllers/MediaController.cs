@@ -1,5 +1,4 @@
 ﻿using EList.Api.Extensions;
-using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
@@ -9,9 +8,7 @@ using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using NLog;
 using Org.BouncyCastle.Asn1.Ocsp;
-using System.Diagnostics;
 
 namespace EList.Api.Controllers
 {
@@ -21,22 +18,12 @@ namespace EList.Api.Controllers
     [LoggerHandlerWebApiFilter]
     public class MediaController : ControllerBase
     {
-        #region logger
-        private static readonly NLog.ILogger log = LogManager.GetCurrentClassLogger();
-        private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
-        private const string LOGGER_NAME = "EList.Api.Controllers.MediaController.";
-        #endregion
-
         private readonly IMediaService _mediaService;
-        private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
 
-        public MediaController(IMediaService mediaService,
-            ICorrelationIdProvider correlationIdProvider,
-            IDataConnectionProvider connectionProvider)
+        public MediaController(IMediaService mediaService, IDataConnectionProvider connectionProvider)
         {
             _mediaService = mediaService;
-            _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
         }
 
@@ -48,27 +35,19 @@ namespace EList.Api.Controllers
         [HttpPost("albums/create")]
         public async Task<CommandResult<Guid?>> CreateAlbumAsync(EventAlbumRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateAlbumAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _mediaService.CreateAlbumAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -81,27 +60,19 @@ namespace EList.Api.Controllers
         [HttpPut("albums/update")]
         public async Task<CommandResult> UpdateAlbumAsync(EventAlbumRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(UpdateAlbumAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _mediaService.UpdateAlbumAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -115,27 +86,19 @@ namespace EList.Api.Controllers
         [HttpGet("albums/assign/toEvent")]
         public async Task<CommandResult> AssignAlbumToEventAsync(Guid eventId, Guid albumId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(AssignAlbumToEventAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _mediaService.AssignAlbumToEventAsync(eventId, albumId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -149,27 +112,19 @@ namespace EList.Api.Controllers
         [HttpGet("albums/assign/toAccount")]
         public async Task<CommandResult> AssignAlbumToAccountAsync(Guid accountId, Guid albumId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(AssignAlbumToAccountAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _mediaService.AssignAlbumToAccountAsync(accountId, albumId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -182,25 +137,8 @@ namespace EList.Api.Controllers
         [HttpGet("albums/get/{id}")]
         public async Task<CommandResult<MediaAlbum>> GetAlbumAsync(Guid id)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetAlbumAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _mediaService.GetAlbumAsync(id);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _mediaService.GetAlbumAsync(id);
+            return result;
         }
 
         /// <summary>
@@ -211,25 +149,9 @@ namespace EList.Api.Controllers
         [HttpGet("albums/byAccount/{id}")]
         public async Task<CommandResult<List<MediaAlbum>>> GetAccountAlbumsAsync(Guid id)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetAccountAlbumsAsync)}";
+            var result = await _mediaService.GetAccountAlbumsAsync(id);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _mediaService.GetAccountAlbumsAsync(id);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -242,25 +164,9 @@ namespace EList.Api.Controllers
         [HttpGet("albums/filesByAlbumId/{albumId}")]
         public async Task<CommandResult<PagedList<AlbumFile>>> GetAlbumFilesAsync(Guid albumId, int? pageIndex = null, int? pageSize = null)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetAlbumFilesAsync)}";
+            var result = await _mediaService.GetAlbumFilesAsync(albumId, pageIndex, pageSize);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _mediaService.GetAlbumFilesAsync(albumId, pageIndex, pageSize);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -271,27 +177,19 @@ namespace EList.Api.Controllers
         [HttpPost("albums/addFiles")]
         public async Task<CommandResult> AddFilesToAlbumAsync(AddFilesRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(AddFilesToAlbumAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _mediaService.AddFilesToAlbumAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -302,26 +200,19 @@ namespace EList.Api.Controllers
         [HttpPost("albums/{albumId}/markViewed")]
         public async Task<CommandResult> MarkAlbumViewedAsync(Guid albumId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(MarkAlbumViewedAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _mediaService.MarkAlbumViewedAsync(albumId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -334,25 +225,8 @@ namespace EList.Api.Controllers
         [HttpGet("albums/byEvent/{id}")]
         public async Task<CommandResult<List<MediaAlbum>>> GetEventAlbumsAsync(Guid id)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventAlbumsAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _mediaService.GetEventAlbumsAsync(id);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _mediaService.GetEventAlbumsAsync(id);
+            return result;
         }
 
         /// <summary>
@@ -364,39 +238,19 @@ namespace EList.Api.Controllers
         public async Task<CommandResult<PagedList<EventAlbumsContainer>>> GetEventsAlbumsAsync(
             Guid accountId, int? pageIndex = null, int? pageSize = null, string? sort = null, string? name = null)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventAlbumsAsync)}";
+            var result = await _mediaService.GetEventsAlbumsAsync(accountId, pageIndex, pageSize, sort, name);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _mediaService.GetEventsAlbumsAsync(accountId, pageIndex, pageSize, sort, name);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         //[HttpPost("albums/setParameters")]
         //public async Task<CommandResult> SetEventAlbumParameters(EventAlbumParameters request)
         //{
-        //    var correlationId = _correlationIdProvider.Get();
-        //    var execTime = Stopwatch.StartNew();
-        //    var methodName = $"{LOGGER_NAME}{nameof(SetEventAlbumParameters)}";
-
+        //        //        //
         //    try
         //    {
         //        await _connectionProvider.StartNewTransactionAsync();
-        //        logger.Debug(correlationId, null, methodName, $"Method started", null);
-
+        //
         //        var result = await _mediaService.SetEventAlbumParametersAsync(request);
         //        if (!result.Success)
         //        {
@@ -406,14 +260,12 @@ namespace EList.Api.Controllers
 
         //        await _connectionProvider.CommitTransactionAsync();
 
-        //        logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
+        //
         //        return result;
         //    }
-        //    catch (Exception ex)
+        //    catch
         //    {
-        //        ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-        //        throw;
+        //        //        throw;
         //    }
         //}
 
@@ -425,27 +277,19 @@ namespace EList.Api.Controllers
         [HttpDelete("albums/{albumId}")]
         public async Task<CommandResult> DeleteAlbumAsync([FromRoute] Guid albumId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeleteAlbumAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _mediaService.DeleteAlbumAsync(albumId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -459,27 +303,19 @@ namespace EList.Api.Controllers
         [HttpDelete("albums/deleteFiles")]
         public async Task<CommandResult> DeleteFileAsync(DeleteFilesRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeleteFileAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _mediaService.DeleteFilesAsync(request.FileIds, request.AlbumId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -493,27 +329,20 @@ namespace EList.Api.Controllers
         [HttpGet("account/avatars/setNew/{photoId}")]
         public async Task<CommandResult> SetNewAccountAvatarAsync(Guid photoId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SetNewAccountAvatarAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _mediaService.SetNewAccountAvatarAsync(photoId);
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -526,24 +355,8 @@ namespace EList.Api.Controllers
         [HttpGet("account/avatars/getByAccountId/{accountId}")]
         public async Task<CommandResult<List<Guid>?>> GetAccountAvatarsAsync(Guid accountId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetAccountAvatarsAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _mediaService.GetAccountAvatarsAsync(accountId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _mediaService.GetAccountAvatarsAsync(accountId);
+            return result;
         }
 
         /// <summary>
@@ -553,24 +366,9 @@ namespace EList.Api.Controllers
         [HttpGet("account/avatars/get")]
         public async Task<CommandResult<List<Guid>?>> GetCurAccountAvatarsAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetCurAccountAvatarsAsync)}";
+            var result = await _mediaService.GetCurAccountAvatarsAsync();
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _mediaService.GetCurAccountAvatarsAsync();
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -581,24 +379,9 @@ namespace EList.Api.Controllers
         [HttpGet("account/avatar/getByAccountId/{accountId}")]
         public async Task<CommandResult<Guid?>> GetAccountAvatarAsync(Guid accountId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetAccountAvatarAsync)}";
+            var result = await _mediaService.GetAccountAvatarAsync(accountId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _mediaService.GetAccountAvatarAsync(accountId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -608,24 +391,9 @@ namespace EList.Api.Controllers
         [HttpGet("account/avatar/get")]
         public async Task<CommandResult<Guid?>> GetCurAccountAvatarAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetCurAccountAvatarAsync)}";
+            var result = await _mediaService.GetCurAccountAvatarAsync();
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _mediaService.GetCurAccountAvatarAsync();
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -636,27 +404,11 @@ namespace EList.Api.Controllers
         [HttpDelete("account/avatars/delete/{fileId}")]
         public async Task<CommandResult> DeleteAccountAvatarAsync(Guid fileId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeleteAccountAvatarAsync)}";
+            var result = await _mediaService.DeleteAvatarAsync(fileId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _mediaService.DeleteAvatarAsync(fileId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
         #endregion acccount avatars
-
 
         #region organization avatars
         /// <summary>
@@ -668,27 +420,20 @@ namespace EList.Api.Controllers
         [HttpGet("organization/avatars/setNew")]
         public async Task<CommandResult> SetNewOrganizationAvatarAsync(Guid organizationId, Guid photoId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SetNewOrganizationAvatarAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _mediaService.SetNewOrganizationAvatarAsync(organizationId, photoId);
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -701,24 +446,8 @@ namespace EList.Api.Controllers
         [HttpGet("organization/avatars/getByOrganizationId/{organizationId}")]
         public async Task<CommandResult<List<Guid>?>> GetOrganizationAvatarsAsync(Guid organizationId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetOrganizationAvatarsAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _mediaService.GetOrganizationAvatarsAsync(organizationId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _mediaService.GetOrganizationAvatarsAsync(organizationId);
+            return result;
         }
 
         /// <summary>
@@ -729,24 +458,9 @@ namespace EList.Api.Controllers
         [HttpGet("organization/avatar/getByOrganizationId/{organizationId}")]
         public async Task<CommandResult<Guid?>> GetOrganizationAvatarAsync(Guid organizationId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetOrganizationAvatarAsync)}";
+            var result = await _mediaService.GetOrganizationAvatarAsync(organizationId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _mediaService.GetOrganizationAvatarAsync(organizationId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
         #endregion 
     }

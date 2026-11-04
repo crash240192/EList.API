@@ -1,5 +1,4 @@
 ﻿using EList.Api.Extensions;
-using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
@@ -10,8 +9,6 @@ using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using NLog;
-using System.Diagnostics;
 
 namespace EList.Api.Controllers
 {
@@ -21,25 +18,16 @@ namespace EList.Api.Controllers
     [LoggerHandlerWebApiFilter]
     public class EventsController : ControllerBase
     {
-        #region logger
-        private static readonly NLog.ILogger log = LogManager.GetCurrentClassLogger();
-        private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
-        private const string LOGGER_NAME = "EList.Api.Controllers.EventsController.";
-        #endregion
-
         private readonly IEventsService _eventsService;
         private readonly IOrdersService _ordersService;
-        private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
 
-        public EventsController(ICorrelationIdProvider correlationIdProvider,
-            IEventsService eventsService,
+        public EventsController(IEventsService eventsService,
             IOrdersService ordersService,
             IDataConnectionProvider connectionProvider)
         {
             _eventsService = eventsService;
             _ordersService = ordersService;
-            _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
         }
         
@@ -52,26 +40,19 @@ namespace EList.Api.Controllers
         [HttpPost("eventCategories/create")]
         public async Task<CommandResult<Guid?>> CreateEventCategoryAsync(EventCategoryRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateEventCategoryAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _eventsService.CreateEventCategoryAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -84,26 +65,19 @@ namespace EList.Api.Controllers
         [HttpPut("eventCategories/update/{id}")]
         public async Task<CommandResult> UpdateEventCategoryAsync([FromRoute] Guid id, [FromBody] EventCategoryRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(UpdateEventCategoryAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _eventsService.UpdateEventCategoryAsync(id, request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -116,26 +90,19 @@ namespace EList.Api.Controllers
         [HttpDelete("eventCategories/delete/{id}")]
         public async Task<CommandResult> DeleteEventCategoryAsync([FromRoute] Guid id)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeleteEventCategoryAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _eventsService.DeleteEventCategoryAsync(id);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -148,24 +115,8 @@ namespace EList.Api.Controllers
         [HttpGet("eventCategories/get/{id}")]
         public async Task<CommandResult<EventCategory?>> GetEventCategoryAsync(Guid id)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventCategoryAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _eventsService.GetEventCategoryAsync(id);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _eventsService.GetEventCategoryAsync(id);
+            return result;
         }
 
         /// <summary>
@@ -176,24 +127,9 @@ namespace EList.Api.Controllers
         [HttpGet("eventCategories/getAll")]
         public async Task<CommandResult<List<EventCategory>>> GetEventCategoriesAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventCategoryAsync)}";
+            var result = await _eventsService.GetAllEventCategoriesAsync();
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _eventsService.GetAllEventCategoriesAsync();
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
         #endregion
 
@@ -206,26 +142,19 @@ namespace EList.Api.Controllers
         [HttpPost("eventTypes/create")]
         public async Task<CommandResult<Guid?>> CreateEventTypeAsync(EventTypeRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateEventTypeAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _eventsService.CreateEventTypeAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -238,26 +167,19 @@ namespace EList.Api.Controllers
         [HttpPut("eventTypes/update/{id}")]
         public async Task<CommandResult> UpdateEventTypeAsync([FromRoute] Guid id, [FromBody] EventTypeRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(UpdateEventTypeAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _eventsService.UpdateEventTypeAsync(id, request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -270,26 +192,19 @@ namespace EList.Api.Controllers
         [HttpDelete("eventTypes/delete/{id}")]
         public async Task<CommandResult> DeleteEventTypeAsync([FromRoute] Guid id)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeleteEventTypeAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _eventsService.DeleteEventTypeAsync(id);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -302,24 +217,8 @@ namespace EList.Api.Controllers
         [HttpGet("eventTypes/get/{id}")]
         public async Task<CommandResult<EventType?>> GetEventTypeAsync(Guid id)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventTypeAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _eventsService.GetEventTypeAsync(id);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _eventsService.GetEventTypeAsync(id);
+            return result;
         }
 
         /// <summary>
@@ -330,24 +229,9 @@ namespace EList.Api.Controllers
         [HttpGet("eventTypes/byCategoryId/{id}")]
         public async Task<CommandResult<List<EventType>?>> GetEventTypesByCategoryIdAsync(Guid categoryId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventTypesByCategoryIdAsync)}";
+            var result = await _eventsService.GetEventTypesByCategoryIdAsync(categoryId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _eventsService.GetEventTypesByCategoryIdAsync(categoryId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -358,24 +242,9 @@ namespace EList.Api.Controllers
         [HttpGet("eventTypes/byEvent/{eventId}")]
         public async Task<CommandResult<List<EventType>?>> GetEventTypeByEventIdAsync(Guid eventId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventTypeByEventIdAsync)}";
+            var result = await _eventsService.GetEventTypesByEventIdAsync(eventId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _eventsService.GetEventTypesByEventIdAsync(eventId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -386,24 +255,9 @@ namespace EList.Api.Controllers
         [HttpGet("eventTypes/getAll")]
         public async Task<CommandResult<List<EventType>>> GetEventTypesAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventTypesAsync)}";
+            var result = await _eventsService.GetAllEventTypesAsync();
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _eventsService.GetAllEventTypesAsync();
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -415,26 +269,19 @@ namespace EList.Api.Controllers
         [HttpPost("eventTypes/assignToEvent/{eventId}")]
         public async Task<CommandResult> SetEventTypesAsync(Guid eventId, [FromBody] List<Guid> typeids)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SetEventTypesAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _eventsService.SetEventTypesAsync(eventId, typeids);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -449,24 +296,8 @@ namespace EList.Api.Controllers
         [HttpGet("eventParameters/byEvent/{eventId}")]
         public async Task<CommandResult<EventParameters?>> GetEventParametersByEventIdAsync(Guid eventId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventParametersByEventIdAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _eventsService.GetEventParametersByEventIdAsync(eventId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _eventsService.GetEventParametersByEventIdAsync(eventId);
+            return result;
         }
 
         /// <summary>
@@ -477,22 +308,9 @@ namespace EList.Api.Controllers
             Guid eventId,
             [FromQuery] bool includeInactive = false)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventTicketTypesAsync)}";
+            var result = await _eventsService.GetEventTicketTypesAsync(eventId, includeInactive);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-                var result = await _eventsService.GetEventTicketTypesAsync(eventId, includeInactive);
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -502,22 +320,9 @@ namespace EList.Api.Controllers
         public async Task<CommandResult<List<TicketDeskHubItem>>> GetMyTicketDeskHubAsync(
             [FromQuery] int limit = 100)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetMyTicketDeskHubAsync)}";
+            var result = await _ordersService.GetMyTicketDeskHubAsync(limit);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-                var result = await _ordersService.GetMyTicketDeskHubAsync(limit);
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -526,22 +331,9 @@ namespace EList.Api.Controllers
         [HttpGet("{eventId}/tickets/stats")]
         public async Task<CommandResult<EventTicketStatsResponse>> GetEventTicketStatsAsync(Guid eventId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventTicketStatsAsync)}";
+            var result = await _ordersService.GetEventTicketStatsAsync(eventId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-                var result = await _ordersService.GetEventTicketStatsAsync(eventId);
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -550,22 +342,9 @@ namespace EList.Api.Controllers
         [HttpGet("{eventId}/ticket-staff")]
         public async Task<CommandResult<List<EventTicketStaffResponse>?>> GetEventTicketStaffAsync(Guid eventId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventTicketStaffAsync)}";
+            var result = await _eventsService.GetEventTicketStaffAsync(eventId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-                var result = await _eventsService.GetEventTicketStaffAsync(eventId);
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -576,24 +355,17 @@ namespace EList.Api.Controllers
             Guid eventId,
             [FromBody] EventTicketStaffUpsertRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SetEventTicketStaffAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 var result = await _eventsService.SetEventTicketStaffAsync(eventId, request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -607,32 +379,24 @@ namespace EList.Api.Controllers
         [HttpPost("eventParameters/assignToEvent/{eventId}")]
         public async Task<CommandResult> SetEventParametersAsync(Guid eventId, [FromBody] EventParametersRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SetEventParametersAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _eventsService.SetEventParametersAsync(eventId, request);
 
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
         #endregion
-
 
         
         #region events
@@ -644,26 +408,19 @@ namespace EList.Api.Controllers
         [HttpPost("create")]
         public async Task<CommandResult<Guid?>> CreateEventAsync(CreateEventRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateEventAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _eventsService.CreateEventAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
                 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -677,26 +434,19 @@ namespace EList.Api.Controllers
         [HttpGet("setCoverImage")]
         public async Task<CommandResult> SetEventCoverImageAsync(Guid eventId, Guid? imageId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SetEventCoverImageAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _eventsService.SetEventCoverImageAsync(eventId, imageId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -709,26 +459,19 @@ namespace EList.Api.Controllers
         [HttpPut("update/{id}")]
         public async Task<CommandResult> UpdateEventAsync(Guid id, EventRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(UpdateEventAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _eventsService.UpdateEventAsync(id, request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -741,24 +484,8 @@ namespace EList.Api.Controllers
         [HttpGet("get/{id}")]
         public async Task<CommandResult<Event>> GetEventAsync(Guid id)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateEventAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _eventsService.GetEventAsync(id);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _eventsService.GetEventAsync(id);
+            return result;
         }
 
         /// <summary>
@@ -769,24 +496,9 @@ namespace EList.Api.Controllers
         [HttpPost("search")]
         public async Task<CommandResult<PagedList<Event>>> SearchEventsAsync(EventsSearchRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SearchEventsAsync)}";
+            var result = await _eventsService.SearchEventsAsync(request);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _eventsService.SearchEventsAsync(request);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -797,24 +509,9 @@ namespace EList.Api.Controllers
         [HttpPost("search/short")]
         public async Task<CommandResult<PagedList<EventShort>>> SearchEventsShortAsync(EventsSearchRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SearchEventsShortAsync)}";
+            var result = await _eventsService.SearchEventsShortAsync(request);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _eventsService.SearchEventsShortAsync(request);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -825,13 +522,8 @@ namespace EList.Api.Controllers
         [HttpDelete("{eventId}/cancel")]
         public async Task<CommandResult> CancelEventAsync(Guid eventId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CancelEventAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _eventsService.CancelEventAsync(eventId);
@@ -839,13 +531,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }

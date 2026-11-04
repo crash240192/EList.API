@@ -1,4 +1,3 @@
-using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
@@ -7,8 +6,6 @@ using EList.Models.Enums;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NLog;
-using System.Diagnostics;
 
 namespace EList.Api.Controllers
 {
@@ -18,23 +15,13 @@ namespace EList.Api.Controllers
     [LoggerHandlerWebApiFilter]
     public class ContentReportsController : ControllerBase
     {
-        #region logger
-        private static readonly NLog.ILogger log = LogManager.GetCurrentClassLogger();
-        private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
-        private const string LOGGER_NAME = "EList.Api.Controllers.ContentReportsController.";
-        #endregion
-
         private readonly IContentReportsService _contentReportsService;
-        private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
 
         public ContentReportsController(
-            IContentReportsService contentReportsService,
-            ICorrelationIdProvider correlationIdProvider,
-            IDataConnectionProvider connectionProvider)
+            IContentReportsService contentReportsService, IDataConnectionProvider connectionProvider)
         {
             _contentReportsService = contentReportsService;
-            _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
         }
 
@@ -47,9 +34,7 @@ namespace EList.Api.Controllers
             [FromQuery] ReportTargetType? forTargetType = null,
             [FromQuery] ReportSeverity? severity = null)
         {
-            return await ExecuteAsync(
-                nameof(GetReasonsAsync),
-                () => _contentReportsService.GetReasonsAsync(onlyActive, forTargetType, severity));
+            return await _contentReportsService.GetReasonsAsync(onlyActive, forTargetType, severity);
         }
 
         /// <summary>
@@ -58,7 +43,7 @@ namespace EList.Api.Controllers
         [HttpGet("reasons/{reasonId}")]
         public async Task<CommandResult<ReportReason?>> GetReasonAsync(Guid reasonId)
         {
-            return await ExecuteAsync(nameof(GetReasonAsync), () => _contentReportsService.GetReasonAsync(reasonId));
+            return await _contentReportsService.GetReasonAsync(reasonId);
         }
 
         /// <summary>
@@ -67,9 +52,7 @@ namespace EList.Api.Controllers
         [HttpPost("reasons/create")]
         public async Task<CommandResult<Guid?>> CreateReasonAsync([FromBody] CreateReportReasonRequest request)
         {
-            return await ExecuteTransactionalAsync(
-                nameof(CreateReasonAsync),
-                () => _contentReportsService.CreateReasonAsync(request));
+            return await ExecuteTransactionalAsync(() => _contentReportsService.CreateReasonAsync(request));
         }
 
         /// <summary>
@@ -78,9 +61,7 @@ namespace EList.Api.Controllers
         [HttpPut("reasons/update/{reasonId}")]
         public async Task<CommandResult> UpdateReasonAsync(Guid reasonId, [FromBody] UpdateReportReasonRequest request)
         {
-            return await ExecuteTransactionalAsync(
-                nameof(UpdateReasonAsync),
-                () => _contentReportsService.UpdateReasonAsync(reasonId, request));
+            return await ExecuteTransactionalAsync(() => _contentReportsService.UpdateReasonAsync(reasonId, request));
         }
 
         /// <summary>
@@ -89,9 +70,7 @@ namespace EList.Api.Controllers
         [HttpPut("reasons/setActive/{reasonId}")]
         public async Task<CommandResult> SetReasonActiveAsync(Guid reasonId, [FromQuery] bool active)
         {
-            return await ExecuteTransactionalAsync(
-                nameof(SetReasonActiveAsync),
-                () => _contentReportsService.SetReasonActiveAsync(reasonId, active));
+            return await ExecuteTransactionalAsync(() => _contentReportsService.SetReasonActiveAsync(reasonId, active));
         }
 
         /// <summary>
@@ -100,9 +79,7 @@ namespace EList.Api.Controllers
         [HttpDelete("reasons/delete/{reasonId}")]
         public async Task<CommandResult> DeleteReasonAsync(Guid reasonId)
         {
-            return await ExecuteTransactionalAsync(
-                nameof(DeleteReasonAsync),
-                () => _contentReportsService.DeleteReasonAsync(reasonId));
+            return await ExecuteTransactionalAsync(() => _contentReportsService.DeleteReasonAsync(reasonId));
         }
 
         /// <summary>
@@ -111,9 +88,7 @@ namespace EList.Api.Controllers
         [HttpPost("create")]
         public async Task<CommandResult<Guid?>> CreateReportAsync([FromBody] CreateContentReportRequest request)
         {
-            return await ExecuteTransactionalAsync(
-                nameof(CreateReportAsync),
-                () => _contentReportsService.CreateReportAsync(request));
+            return await ExecuteTransactionalAsync(() => _contentReportsService.CreateReportAsync(request));
         }
 
         /// <summary>
@@ -122,7 +97,7 @@ namespace EList.Api.Controllers
         [HttpGet("get/{reportId}")]
         public async Task<CommandResult<ContentReportResponse?>> GetReportAsync(Guid reportId)
         {
-            return await ExecuteAsync(nameof(GetReportAsync), () => _contentReportsService.GetReportAsync(reportId));
+            return await _contentReportsService.GetReportAsync(reportId);
         }
 
         /// <summary>
@@ -133,9 +108,7 @@ namespace EList.Api.Controllers
             [FromQuery] int? pageIndex = 0,
             [FromQuery] int? pageSize = 20)
         {
-            return await ExecuteAsync(
-                nameof(GetMyReportsAsync),
-                () => _contentReportsService.GetMyReportsAsync(pageIndex, pageSize));
+            return await _contentReportsService.GetMyReportsAsync(pageIndex, pageSize);
         }
 
         /// <summary>
@@ -146,9 +119,7 @@ namespace EList.Api.Controllers
             [FromQuery] int? pageIndex = 0,
             [FromQuery] int? pageSize = 20)
         {
-            return await ExecuteAsync(
-                nameof(GetReportsAgainstMeAsync),
-                () => _contentReportsService.GetReportsAgainstMeAsync(pageIndex, pageSize));
+            return await _contentReportsService.GetReportsAgainstMeAsync(pageIndex, pageSize);
         }
 
         /// <summary>
@@ -157,9 +128,7 @@ namespace EList.Api.Controllers
         [HttpGet("againstMe/{reportId}")]
         public async Task<CommandResult<ContentReportSubjectView?>> GetReportAgainstMeAsync(Guid reportId)
         {
-            return await ExecuteAsync(
-                nameof(GetReportAgainstMeAsync),
-                () => _contentReportsService.GetReportAgainstMeAsync(reportId));
+            return await _contentReportsService.GetReportAgainstMeAsync(reportId);
         }
 
         /// <summary>
@@ -169,9 +138,7 @@ namespace EList.Api.Controllers
         public async Task<CommandResult<PagedList<ContentReportResponse>>> SearchPlatformQueueAsync(
             [FromBody] ContentReportsSearchRequest request)
         {
-            return await ExecuteAsync(
-                nameof(SearchPlatformQueueAsync),
-                () => _contentReportsService.SearchPlatformQueueAsync(request));
+            return await _contentReportsService.SearchPlatformQueueAsync(request);
         }
 
         /// <summary>
@@ -180,9 +147,7 @@ namespace EList.Api.Controllers
         [HttpGet("platform/count")]
         public async Task<CommandResult<int>> CountPlatformQueueAsync([FromQuery] bool onlyActive = true)
         {
-            return await ExecuteAsync(
-                nameof(CountPlatformQueueAsync),
-                () => _contentReportsService.CountPlatformQueueAsync(onlyActive));
+            return await _contentReportsService.CountPlatformQueueAsync(onlyActive);
         }
 
         /// <summary>
@@ -193,9 +158,7 @@ namespace EList.Api.Controllers
             Guid eventId,
             [FromBody] ContentReportsSearchRequest? request)
         {
-            return await ExecuteAsync(
-                nameof(SearchOrganizerQueueAsync),
-                () => _contentReportsService.SearchOrganizerQueueAsync(eventId, request));
+            return await _contentReportsService.SearchOrganizerQueueAsync(eventId, request);
         }
 
         /// <summary>
@@ -204,9 +167,7 @@ namespace EList.Api.Controllers
         [HttpGet("organizer/{eventId}/count")]
         public async Task<CommandResult<int>> CountOrganizerQueueAsync(Guid eventId, [FromQuery] bool onlyActive = true)
         {
-            return await ExecuteAsync(
-                nameof(CountOrganizerQueueAsync),
-                () => _contentReportsService.CountOrganizerQueueAsync(eventId, onlyActive));
+            return await _contentReportsService.CountOrganizerQueueAsync(eventId, onlyActive);
         }
 
         /// <summary>
@@ -217,9 +178,7 @@ namespace EList.Api.Controllers
             ReportTargetType targetType,
             Guid targetId)
         {
-            return await ExecuteAsync(
-                nameof(GetTargetStatsAsync),
-                () => _contentReportsService.GetTargetStatsAsync(targetType, targetId));
+            return await _contentReportsService.GetTargetStatsAsync(targetType, targetId);
         }
 
         /// <summary>
@@ -228,7 +187,7 @@ namespace EList.Api.Controllers
         [HttpGet("penalties/my")]
         public async Task<CommandResult<List<ModerationPenalty>>> GetMyPenaltiesAsync()
         {
-            return await ExecuteAsync(nameof(GetMyPenaltiesAsync), () => _contentReportsService.GetMyPenaltiesAsync());
+            return await _contentReportsService.GetMyPenaltiesAsync();
         }
 
         /// <summary>
@@ -239,9 +198,7 @@ namespace EList.Api.Controllers
             Guid penaltyId,
             [FromBody] RevokeModerationPenaltyRequest? request)
         {
-            return await ExecuteTransactionalAsync(
-                nameof(RevokePenaltyAsync),
-                () => _contentReportsService.RevokePenaltyAsync(penaltyId, request));
+            return await ExecuteTransactionalAsync(() => _contentReportsService.RevokePenaltyAsync(penaltyId, request));
         }
 
         /// <summary>
@@ -252,9 +209,7 @@ namespace EList.Api.Controllers
             Guid eventId,
             [FromBody] RestoreEventRequest? request)
         {
-            return await ExecuteTransactionalAsync(
-                nameof(RestoreEventAsync),
-                () => _contentReportsService.RestoreEventAsync(eventId, request));
+            return await ExecuteTransactionalAsync(() => _contentReportsService.RestoreEventAsync(eventId, request));
         }
 
         /// <summary>
@@ -263,9 +218,7 @@ namespace EList.Api.Controllers
         [HttpPost("take/{reportId}")]
         public async Task<CommandResult> TakeInReviewAsync(Guid reportId)
         {
-            return await ExecuteTransactionalAsync(
-                nameof(TakeInReviewAsync),
-                () => _contentReportsService.TakeInReviewAsync(reportId));
+            return await ExecuteTransactionalAsync(() => _contentReportsService.TakeInReviewAsync(reportId));
         }
 
         /// <summary>
@@ -274,9 +227,7 @@ namespace EList.Api.Controllers
         [HttpPost("resolve/{reportId}")]
         public async Task<CommandResult> ResolveAsync(Guid reportId, [FromBody] ResolveContentReportRequest request)
         {
-            return await ExecuteTransactionalAsync(
-                nameof(ResolveAsync),
-                () => _contentReportsService.ResolveAsync(reportId, request));
+            return await ExecuteTransactionalAsync(() => _contentReportsService.ResolveAsync(reportId, request));
         }
 
         /// <summary>
@@ -285,9 +236,7 @@ namespace EList.Api.Controllers
         [HttpPost("escalate/{reportId}")]
         public async Task<CommandResult> EscalateAsync(Guid reportId, [FromBody] EscalateContentReportRequest request)
         {
-            return await ExecuteTransactionalAsync(
-                nameof(EscalateAsync),
-                () => _contentReportsService.EscalateAsync(reportId, request));
+            return await ExecuteTransactionalAsync(() => _contentReportsService.EscalateAsync(reportId, request));
         }
 
         /// <summary>
@@ -296,7 +245,7 @@ namespace EList.Api.Controllers
         [HttpGet("actions/{reportId}")]
         public async Task<CommandResult<List<ContentReportAction>>> GetActionsAsync(Guid reportId)
         {
-            return await ExecuteAsync(nameof(GetActionsAsync), () => _contentReportsService.GetActionsAsync(reportId));
+            return await _contentReportsService.GetActionsAsync(reportId);
         }
 
         /// <summary>
@@ -307,34 +256,21 @@ namespace EList.Api.Controllers
             Guid reportId,
             [FromHeader(Name = "FullSize")] bool? fullSize)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DownloadReportedFileAsync)}";
-            try
+            var result = await _contentReportsService.DownloadReportedFileAsync(reportId, fullSize);
+            if (!result.Success || result.Result == null)
             {
-                logger.Debug(correlationId, null, methodName, "Method started", null);
-                var result = await _contentReportsService.DownloadReportedFileAsync(reportId, fullSize);
-                if (!result.Success || result.Result == null)
-                {
-                    if (result.ErrorCode == (int)EList.Common.Support.ErrorCode.AccessError)
-                        return Unauthorized(result);
-                    if (result.ErrorCode == (int)EList.Common.Support.ErrorCode.ContentReportNotFound
-                        || result.ErrorCode == (int)EList.Common.Support.ErrorCode.AlbumItemNotFound)
-                        return NotFound(result);
-                    return BadRequest(result);
-                }
+                if (result.ErrorCode == (int)EList.Common.Support.ErrorCode.AccessError)
+                    return Unauthorized(result);
+                if (result.ErrorCode == (int)EList.Common.Support.ErrorCode.ContentReportNotFound
+                    || result.ErrorCode == (int)EList.Common.Support.ErrorCode.AlbumItemNotFound)
+                    return NotFound(result);
+                return BadRequest(result);
+            }
+            return File(
+                result.Result.Content,
+                result.Result.ContentType ?? "application/octet-stream",
+                result.Result.FileName);
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
-                return File(
-                    result.Result.Content,
-                    result.Result.ContentType ?? "application/octet-stream",
-                    result.Result.FileName);
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -343,54 +279,23 @@ namespace EList.Api.Controllers
         [HttpPost("restoreFileAccess/{reportId}")]
         public async Task<CommandResult> RestoreReportedFileAccessAsync(Guid reportId)
         {
-            return await ExecuteTransactionalAsync(
-                nameof(RestoreReportedFileAccessAsync),
-                () => _contentReportsService.RestoreReportedFileAccessAsync(reportId));
+            return await ExecuteTransactionalAsync(() => _contentReportsService.RestoreReportedFileAccessAsync(reportId));
         }
 
-        private async Task<T> ExecuteAsync<T>(string methodShortName, Func<Task<T>> action)
-        {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{methodShortName}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, "Method started", null);
-                var result = await action();
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
-        }
-
-        private async Task<T> ExecuteTransactionalAsync<T>(string methodShortName, Func<Task<T>> action)
+        private async Task<T> ExecuteTransactionalAsync<T>(Func<Task<T>> action)
             where T : CommandResult
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{methodShortName}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
-
                 var result = await action();
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
-
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }

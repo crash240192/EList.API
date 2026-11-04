@@ -1,7 +1,5 @@
-using System.Diagnostics;
 using System.Text;
 using EList.Api.Extensions;
-using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
@@ -9,7 +7,6 @@ using EList.Models.Orders;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NLog;
 
 namespace EList.Api.Controllers
 {
@@ -20,23 +17,13 @@ namespace EList.Api.Controllers
     [LoggerHandlerWebApiFilter]
     public class PaymentsController : ControllerBase
     {
-        #region logger
-        private static readonly NLog.ILogger log = LogManager.GetCurrentClassLogger();
-        private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
-        private const string LOGGER_NAME = "EList.Api.Controllers.PaymentsController.";
-        #endregion
-
         private readonly IOrdersService _ordersService;
-        private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
 
         public PaymentsController(
-            IOrdersService ordersService,
-            ICorrelationIdProvider correlationIdProvider,
-            IDataConnectionProvider connectionProvider)
+            IOrdersService ordersService, IDataConnectionProvider connectionProvider)
         {
             _ordersService = ordersService;
-            _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
         }
 
@@ -47,14 +34,9 @@ namespace EList.Api.Controllers
         [HttpPost("/api/payments/yookassa/webhook")]
         public async Task<IActionResult> YooKassaWebhookAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(YooKassaWebhookAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 string rawPayload;
                 using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
@@ -67,13 +49,11 @@ namespace EList.Api.Controllers
                     return BadRequest(result);
                 }
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return Ok(result);
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -85,14 +65,9 @@ namespace EList.Api.Controllers
         [HttpPost("/api/payments/tbank/webhook")]
         public async Task<IActionResult> TBankWebhookAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(TBankWebhookAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 string rawPayload;
                 using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
@@ -105,13 +80,11 @@ namespace EList.Api.Controllers
                     return BadRequest(result);
                 }
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return Content("OK", "text/plain", Encoding.UTF8);
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -123,14 +96,9 @@ namespace EList.Api.Controllers
         [HttpPost("/api/payments/cloudkassir/receipt")]
         public async Task<IActionResult> CloudKassirReceiptWebhookAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CloudKassirReceiptWebhookAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 string rawPayload;
                 using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
@@ -149,13 +117,11 @@ namespace EList.Api.Controllers
                     return BadRequest(result);
                 }
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return Content("{\"code\":0}", "application/json", Encoding.UTF8);
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -167,26 +133,19 @@ namespace EList.Api.Controllers
         [HttpPost("/api/payments/yookassa/stub/simulate-succeeded")]
         public async Task<CommandResult<OrderResponse>> SimulateSucceededAsync([FromBody] CompletePaymentRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SimulateSucceededAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _ordersService.CompletePaymentAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -199,26 +158,19 @@ namespace EList.Api.Controllers
         public async Task<CommandResult<RefundResponse>> SimulateRefundSucceededAsync(
             [FromBody] CompleteRefundRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SimulateRefundSucceededAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _ordersService.CompleteRefundAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }

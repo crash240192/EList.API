@@ -1,5 +1,4 @@
 ﻿using EList.Api.Extensions;
-using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
@@ -9,8 +8,6 @@ using EList.Services.Impl;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NLog;
-using System.Diagnostics;
 
 namespace EList.Api.Controllers
 {
@@ -20,22 +17,13 @@ namespace EList.Api.Controllers
     [LoggerHandlerWebApiFilter]
     public class WalletsController : ControllerBase
     {
-        #region logger
-        private static readonly NLog.ILogger log = LogManager.GetCurrentClassLogger();
-        private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
-        private const string LOGGER_NAME = "EList.Api.Controllers.WalletsController.";
-        #endregion
-
-        private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
         private readonly IWalletsService _walletsService;
 
-        public WalletsController(ICorrelationIdProvider correlationIdProvider,
-            IWalletsService walletsService,
+        public WalletsController(IWalletsService walletsService,
             IDataConnectionProvider connectionProvider)
         {
             _walletsService = walletsService;
-            _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
         }
 
@@ -48,27 +36,20 @@ namespace EList.Api.Controllers
         [HttpPost("tariff/create")]
         public async Task<CommandResult<Guid?>> CreateTariffAsync(Tariff request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateTariffAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _walletsService.CreateTariffAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
 
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -81,27 +62,20 @@ namespace EList.Api.Controllers
         [HttpPut("tariff/update")]
         public async Task<CommandResult> UpdateTariffAsync(Tariff request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(UpdateTariffAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _walletsService.UpdateTariffAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return CommandResult.OK;
 
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -114,25 +88,8 @@ namespace EList.Api.Controllers
         [HttpGet("tariff/{tariffId}")]
         public async Task<CommandResult<Tariff?>> GetTariffAsync(Guid tariffId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetTariffAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _walletsService.GetTariffAsync(tariffId);
-             
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _walletsService.GetTariffAsync(tariffId);
+            return result;
         }
 
         /// <summary>
@@ -143,25 +100,9 @@ namespace EList.Api.Controllers
         [HttpGet("tariff/byWalletId/{walletId}")]
         public async Task<CommandResult<Tariff?>> GetWalletTariffAsync(Guid walletId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetWalletTariffAsync)}";
+            var result = await _walletsService.GetWalletTariffAsync(walletId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _walletsService.GetWalletTariffAsync(walletId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -171,28 +112,11 @@ namespace EList.Api.Controllers
         [HttpGet("tariffs")]
         public async Task<CommandResult<List<Tariff>?>> GetTariffsAsync(bool forOrganization = false)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetTariffsAsync)}";
+            var result = await _walletsService.GetTariffsAsync(forOrganization);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _walletsService.GetTariffsAsync(forOrganization);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
         #endregion
-
 
         #region tariff validator
         /// <summary>
@@ -203,31 +127,23 @@ namespace EList.Api.Controllers
         [HttpPost("tariffValidator/create")]
         public async Task<CommandResult<Guid?>> CreateTariffValidatorAsync(TariffValidator request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateTariffValidatorAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _walletsService.CreateTariffValidatorAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
 
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
-
 
         /// <summary>
         /// Обновление валидатора тарифа
@@ -237,31 +153,23 @@ namespace EList.Api.Controllers
         [HttpPut("tariffValidator/update")]
         public async Task<CommandResult> UpdateTariffValidatorAsync(TariffValidator request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(UpdateTariffValidatorAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _walletsService.UpdateTariffValidatorAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return CommandResult.OK;
 
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
-
 
         /// <summary>
         /// Получение валидатора тарифа
@@ -271,27 +179,9 @@ namespace EList.Api.Controllers
         [HttpGet("tariffValidator/{tariffValidatorId}")]
         public async Task<CommandResult<TariffValidator?>> GetTariffValidatorAsync(Guid tariffValidatorId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetTariffValidatorAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _walletsService.GetTariffValidatorAsync(tariffValidatorId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _walletsService.GetTariffValidatorAsync(tariffValidatorId);
+            return result;
         }
-
 
         /// <summary>
         /// Получение валидатора тарифа по tariffId
@@ -301,25 +191,9 @@ namespace EList.Api.Controllers
         [HttpGet("tariffValidator/byTariffId/{tariffId}")]
         public async Task<CommandResult<TariffValidator?>> GetTariffValidatorByTariffIdAsync(Guid tariffId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetTariffValidatorByTariffIdAsync)}";
+            var result = await _walletsService.GetTariffValidatorByTariffIdAsync(tariffId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _walletsService.GetTariffValidatorByTariffIdAsync(tariffId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
         #endregion
 
@@ -331,27 +205,20 @@ namespace EList.Api.Controllers
         [HttpGet("create")]
         public async Task<CommandResult<Guid?>> CreateAccountWalletAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateAccountWalletAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _walletsService.CreateAccountWalletAsync();
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
 
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -364,27 +231,20 @@ namespace EList.Api.Controllers
         [HttpPost("byOrganization/create")]
         public async Task<CommandResult<Guid?>> CreateOrganizationWalletAsync(Wallet request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateOrganizationWalletAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _walletsService.CreateOrganizationWalletAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
 
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -396,27 +256,20 @@ namespace EList.Api.Controllers
         [HttpPut("setTariff")]
         public async Task<CommandResult> SetWalletTariffAsync(Guid walletId, Guid tariffId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(SetWalletTariffAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _walletsService.SetWalletTariffAsync(walletId, tariffId);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
 
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -428,25 +281,8 @@ namespace EList.Api.Controllers
         [HttpGet("/{walletId}")]
         public async Task<CommandResult<Wallet?>> GetWalletAsync(Guid walletId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetWalletAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _walletsService.GetWalletAsync(walletId);
-                
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _walletsService.GetWalletAsync(walletId);
+            return result;
         }
 
         /// <summary>
@@ -456,25 +292,9 @@ namespace EList.Api.Controllers
         [HttpGet("byAccount/{accountId}")]
         public async Task<CommandResult<Wallet?>> GetAccountWalletAsync(Guid accountId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetAccountWalletAsync)}";
+            var result = await _walletsService.GetAccountWalletAsync(accountId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _walletsService.GetAccountWalletAsync(accountId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -484,25 +304,9 @@ namespace EList.Api.Controllers
         [HttpGet("byOrganization/{organizationId}")]
         public async Task<CommandResult<Wallet?>> GetOrganizationWalletAsync(Guid organizationId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetOrganizationWalletAsync)}";
+            var result = await _walletsService.GetOrganizationWalletAsync(organizationId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _walletsService.GetOrganizationWalletAsync(organizationId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -512,22 +316,9 @@ namespace EList.Api.Controllers
         public async Task<CommandResult<TariffPurchaseQuoteResponse>> QuoteTariffPurchaseAsync(
             [FromBody] TariffPurchaseQuoteRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(QuoteTariffPurchaseAsync)}";
+            var result = await _walletsService.QuoteTariffPurchaseAsync(request);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, "Method started", null);
-                var result = await _walletsService.QuoteTariffPurchaseAsync(request);
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -538,26 +329,19 @@ namespace EList.Api.Controllers
         public async Task<CommandResult<CreateTariffPurchaseResponse>> CreateTariffPurchaseAsync(
             [FromBody] TariffPurchaseRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateTariffPurchaseAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _walletsService.CreateTariffPurchaseAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -569,22 +353,8 @@ namespace EList.Api.Controllers
         public async Task<CommandResult<TariffCancelQuoteResponse>> QuoteTariffCancelAsync(
             [FromBody] TariffCancelQuoteRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(QuoteTariffCancelAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, "Method started", null);
-                var result = await _walletsService.QuoteTariffCancelAsync(request);
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _walletsService.QuoteTariffCancelAsync(request);
+            return result;
         }
 
         /// <summary>
@@ -594,26 +364,19 @@ namespace EList.Api.Controllers
         public async Task<CommandResult<CreateTariffCancelResponse>> CancelTariffPurchaseAsync(
             [FromBody] TariffCancelRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CancelTariffPurchaseAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _walletsService.CancelTariffPurchaseAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -623,22 +386,8 @@ namespace EList.Api.Controllers
         public async Task<CommandResult<List<WalletTariffRefundResponse>>> GetWalletTariffRefundsAsync(
             Guid walletId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetWalletTariffRefundsAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, "Method started", null);
-                var result = await _walletsService.GetWalletTariffRefundsAsync(walletId);
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _walletsService.GetWalletTariffRefundsAsync(walletId);
+            return result;
         }
 
         /// <summary>
@@ -648,26 +397,19 @@ namespace EList.Api.Controllers
         public async Task<CommandResult<CreateWalletDepositResponse>> CreateWalletDepositAsync(
             [FromBody] CreateWalletDepositRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateWalletDepositAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _walletsService.CreateWalletDepositAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -677,26 +419,19 @@ namespace EList.Api.Controllers
         public async Task<CommandResult<WalletDepositResponse>> CompleteWalletDepositAsync(
             [FromBody] CompleteWalletDepositRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CompleteWalletDepositAsync)}";
-
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, "Method started", null);
 
                 var result = await _walletsService.CompleteWalletDepositAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -707,72 +442,26 @@ namespace EList.Api.Controllers
         [HttpGet("deposits/{depositId}")]
         public async Task<CommandResult<WalletDepositResponse>> GetWalletDepositAsync(Guid depositId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetWalletDepositAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, "Method started", null);
-
-                var result = await _walletsService.GetWalletDepositAsync(depositId);
-
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _walletsService.GetWalletDepositAsync(depositId);
+            return result;
         }
 
         /// <summary>История пополнений тарифного кошелька.</summary>
         [HttpGet("{walletId}/deposits")]
         public async Task<CommandResult<List<WalletDepositResponse>>> GetWalletDepositsAsync(Guid walletId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetWalletDepositsAsync)}";
+            var result = await _walletsService.GetWalletDepositsAsync(walletId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, "Method started", null);
-
-                var result = await _walletsService.GetWalletDepositsAsync(walletId);
-
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>История списаний тарифа платформы.</summary>
         [HttpGet("{walletId}/tariffCharges")]
         public async Task<CommandResult<List<WalletTariffChargeResponse>>> GetWalletTariffChargesAsync(Guid walletId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetWalletTariffChargesAsync)}";
+            var result = await _walletsService.GetWalletTariffChargesAsync(walletId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, "Method started", null);
-
-                var result = await _walletsService.GetWalletTariffChargesAsync(walletId);
-
-                logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
         #endregion
     }

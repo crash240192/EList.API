@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-using EList.Common.CorrelationId;
-using EList.Common.Logger;
+﻿using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.Models.Enums;
@@ -8,7 +6,6 @@ using EList.Models.EventsRating;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NLog;
 using Org.BouncyCastle.Asn1.Ocsp;
 
 namespace EList.Api.Controllers
@@ -22,13 +19,6 @@ namespace EList.Api.Controllers
     [LoggerHandlerWebApiFilter]
     public class RatingController : ControllerBase
     {
-        #region logger
-        private static readonly NLog.ILogger log = LogManager.GetCurrentClassLogger();
-        private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
-        private const string LOGGER_NAME = "EList.Api.Controllers.RatingController.";
-        #endregion
-
-        private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
         private readonly IEventsRatingService _eventsRatingService;
 
@@ -38,11 +28,9 @@ namespace EList.Api.Controllers
         /// <param name="correlationIdProvider"></param>
         /// <param name="connectionProvider"></param>
         /// <param name="eventsRatingService"></param>
-        public RatingController(ICorrelationIdProvider correlationIdProvider, 
-            IDataConnectionProvider connectionProvider, 
+        public RatingController(IDataConnectionProvider connectionProvider, 
             IEventsRatingService eventsRatingService)
         {
-            _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
             _eventsRatingService = eventsRatingService;
         }
@@ -55,13 +43,8 @@ namespace EList.Api.Controllers
         [HttpPost("events/vote")]
         public async Task<CommandResult<Guid>> VoteAsync(EventsRatingItem request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(VoteAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _eventsRatingService.VoteAsync(request);
@@ -69,13 +52,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -91,24 +72,8 @@ namespace EList.Api.Controllers
         [HttpGet("events/getRating")]
         public async Task<CommandResult<EventRating>> GetEventRatingAsync(Guid eventId, EventRatingType eventRatingType, int? pageIndex = 0, int? pageSize = 20)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventRatingAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _eventsRatingService.GetEventRatingAsync(eventId, eventRatingType, pageIndex, pageSize);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _eventsRatingService.GetEventRatingAsync(eventId, eventRatingType, pageIndex, pageSize);
+            return result;
         }
 
         /// <summary>
@@ -119,24 +84,9 @@ namespace EList.Api.Controllers
         [HttpGet("organizators/{accountId}")]
         public async Task<CommandResult<double?>> GetOrganizatorRatingAsync(Guid accountId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetOrganizatorRatingAsync)}";
+            var result = await _eventsRatingService.GetOrganizatorRatingAsync(accountId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _eventsRatingService.GetOrganizatorRatingAsync(accountId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -147,24 +97,9 @@ namespace EList.Api.Controllers
         [HttpGet("organizations/{organizationId}")]
         public async Task<CommandResult<double?>> GetOrganizationRatingAsync(Guid organizationId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetOrganizationRatingAsync)}";
+            var result = await _eventsRatingService.GetOrganizationRatingAsync(organizationId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _eventsRatingService.GetOrganizationRatingAsync(organizationId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -175,13 +110,8 @@ namespace EList.Api.Controllers
         [HttpDelete("events/delete/{itemId}")]
         public async Task<CommandResult> DeleteAsync(Guid itemId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeleteAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _eventsRatingService.DeleteAsync(itemId);
@@ -189,13 +119,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }

@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-using EList.Common.CorrelationId;
-using EList.Common.Logger;
+﻿using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
 using EList.Models.Conversations;
@@ -10,7 +8,6 @@ using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using NLog;
 using Org.BouncyCastle.Asn1.Ocsp;
 
 namespace EList.Api.Controllers
@@ -24,13 +21,6 @@ namespace EList.Api.Controllers
     [LoggerHandlerWebApiFilter]
     public class ConversationsController : ControllerBase
     {
-        #region logger
-        private static readonly NLog.ILogger log = LogManager.GetCurrentClassLogger();
-        private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
-        private const string LOGGER_NAME = "EList.Api.Controllers.ConversationsController.";
-        #endregion
-
-        private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
         private readonly IConversationService _conversationsService;
 
@@ -40,11 +30,9 @@ namespace EList.Api.Controllers
         /// <param name="correlationIdProvider"></param>
         /// <param name="connectionProvider"></param>
         /// <param name="conversationsService"></param>
-        public ConversationsController(ICorrelationIdProvider correlationIdProvider, 
-            IDataConnectionProvider connectionProvider, 
+        public ConversationsController(IDataConnectionProvider connectionProvider, 
             IConversationService conversationsService)
         {
-            _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
             _conversationsService = conversationsService;
         }
@@ -57,13 +45,8 @@ namespace EList.Api.Controllers
         [HttpPost("create")]
         public async Task<CommandResult<Guid>> CreateConversationAsync(ConversationRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateConversationAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _conversationsService.CreateConversationAsync(request);
@@ -71,13 +54,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -90,13 +71,8 @@ namespace EList.Api.Controllers
         [HttpDelete("delete/{conversationId}")]
         public async Task<CommandResult> DeleteConversationAsync(Guid conversationId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeleteConversationAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _conversationsService.DeleteConversationAsync(conversationId);
@@ -104,13 +80,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -123,24 +97,8 @@ namespace EList.Api.Controllers
         [HttpGet("get/{conversationId}")]
         public async Task<CommandResult<Conversation?>> GetConversationAsync(Guid conversationId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetConversationAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _conversationsService.GetConversationAsync(conversationId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _conversationsService.GetConversationAsync(conversationId);
+            return result;
         }
 
         /// <summary>
@@ -151,13 +109,8 @@ namespace EList.Api.Controllers
         [HttpPut("update")]
         public async Task<CommandResult> UpdateConversationAsync(ConversationRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(UpdateConversationAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _conversationsService.UpdateConversationAsync(request);
@@ -165,13 +118,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -184,25 +135,9 @@ namespace EList.Api.Controllers
         [HttpGet("byAccount")]
         public async Task<CommandResult<List<Conversation>>> GetAccountConversationsAsync(bool personalOnly = true)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetAccountConversationsAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                // personalOnly=false → личные + event-чаты событий, где пользователь участник/организатор
-                var result = await _conversationsService.GetAccountConversationsAsync(personalOnly);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            // personalOnly=false → личные + event-чаты событий, где пользователь участник/организатор
+            var result = await _conversationsService.GetAccountConversationsAsync(personalOnly);
+            return result;
         }
 
         /// <summary>
@@ -213,25 +148,10 @@ namespace EList.Api.Controllers
         [HttpGet("byEvent/{eventId}")]
         public async Task<CommandResult<List<Conversation>>> GetEventConversations(Guid eventId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetEventConversations)}";
+            // byEvent возвращает чаты конкретного события; ACL видимости — в ConversationService.
+            var result = await _conversationsService.GetEventConversations(eventId);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                // byEvent возвращает чаты конкретного события; ACL видимости — в ConversationService.
-                var result = await _conversationsService.GetEventConversations(eventId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -244,24 +164,9 @@ namespace EList.Api.Controllers
         [HttpGet("messages/byConversationId/{conversationId}")]
         public async Task<CommandResult<PagedList<Message>>> GetConversationMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetConversationMessagesAsync)}";
+            var result = await _conversationsService.GetConversationMessagesAsync(conversationId, pageIndex, pageSize);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _conversationsService.GetConversationMessagesAsync(conversationId, pageIndex, pageSize);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -270,24 +175,9 @@ namespace EList.Api.Controllers
         [HttpGet("messages/roots/byConversationId/{conversationId}")]
         public async Task<CommandResult<PagedList<Message>>> GetConversationRootMessagesAsync(Guid conversationId, int? pageIndex, int? pageSize)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetConversationRootMessagesAsync)}";
+            var result = await _conversationsService.GetConversationRootMessagesAsync(conversationId, pageIndex, pageSize);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _conversationsService.GetConversationRootMessagesAsync(conversationId, pageIndex, pageSize);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -300,24 +190,9 @@ namespace EList.Api.Controllers
         [HttpGet("messages/replies/{messageId}")]
         public async Task<CommandResult<PagedList<Message>>> GetMessageRepliesAsync(Guid messageId, int? pageIndex, int? pageSize)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetMessageRepliesAsync)}";
+            var result = await _conversationsService.GetMessageRepliesAsync(messageId, pageIndex, pageSize);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _conversationsService.GetMessageRepliesAsync(messageId, pageIndex, pageSize);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -329,24 +204,9 @@ namespace EList.Api.Controllers
             int? rootPageSize = null,
             int? siblingPageSize = null)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetMessageLocationAsync)}";
+            var result = await _conversationsService.GetMessageLocationAsync(messageId, rootPageSize, siblingPageSize);
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _conversationsService.GetMessageLocationAsync(messageId, rootPageSize, siblingPageSize);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
 
         /// <summary>
@@ -357,13 +217,8 @@ namespace EList.Api.Controllers
         [HttpPost("messages/create")]
         public async Task<CommandResult<Guid>> CreateMessageAsync(MessageRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreateMessageAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _conversationsService.CreateMessageAsync(request);
@@ -371,13 +226,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -390,13 +243,8 @@ namespace EList.Api.Controllers
         [HttpPut("messages/update")]
         public async Task<CommandResult> UpdateMessageAsync(MessageRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(UpdateMessageAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _conversationsService.UpdateMessageAsync(request);
@@ -404,13 +252,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -423,13 +269,8 @@ namespace EList.Api.Controllers
         [HttpDelete("messages/{messageId}")]
         public async Task<CommandResult> DeleteMessageAsync(Guid messageId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DeleteMessageAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _conversationsService.DeleteMessageAsync(messageId);
@@ -437,13 +278,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -455,13 +294,8 @@ namespace EList.Api.Controllers
         [HttpPost("messages/{messageId}/like")]
         public async Task<CommandResult<MessageVoteResult>> LikeMessageAsync(Guid messageId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(LikeMessageAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _conversationsService.LikeMessageAsync(messageId);
@@ -469,13 +303,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -487,13 +319,8 @@ namespace EList.Api.Controllers
         [HttpPost("messages/{messageId}/dislike")]
         public async Task<CommandResult<MessageVoteResult>> DislikeMessageAsync(Guid messageId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(DislikeMessageAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _conversationsService.DislikeMessageAsync(messageId);
@@ -501,13 +328,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -518,13 +343,8 @@ namespace EList.Api.Controllers
         [HttpDelete("messages/{messageId}/vote")]
         public async Task<CommandResult<MessageVoteResult>> RemoveMessageVoteAsync(Guid messageId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(RemoveMessageVoteAsync)}";
-
             try
             {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
                 await _connectionProvider.StartNewTransactionAsync();
 
                 var result = await _conversationsService.RemoveMessageVoteAsync(messageId);
@@ -532,13 +352,11 @@ namespace EList.Api.Controllers
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }

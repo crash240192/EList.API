@@ -35,7 +35,6 @@ namespace EList.Api.Controllers
             _profilePrivacyService = profilePrivacyService;
         }
 
-
         /// <summary>
         /// Создание аккаунта
         /// </summary>
@@ -274,7 +273,7 @@ namespace EList.Api.Controllers
                     await _connectionProvider.RollbackTransactionAsync();
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
                 throw;

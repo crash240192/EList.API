@@ -1,5 +1,4 @@
 ﻿using EList.Api.Extensions;
-using EList.Common.CorrelationId;
 using EList.Common.Logger;
 using EList.Common.Models;
 using EList.DbDataProvider.Interfaces;
@@ -7,8 +6,6 @@ using EList.Models.Person;
 using EList.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NLog;
-using System.Diagnostics;
 
 namespace EList.Api.Controllers
 {
@@ -18,22 +15,13 @@ namespace EList.Api.Controllers
     [LoggerHandlerWebApiFilter]
     public class PersonsController : ControllerBase
     {
-        #region logger
-        private static readonly NLog.ILogger log = LogManager.GetCurrentClassLogger();
-        private static readonly ILoggerWrapper logger = new NLogLoggerWrapper(log);
-        private const string LOGGER_NAME = "EList.Api.Controllers.PersonController.";
-        #endregion
-
         private readonly IPersonsService _personService;
-        private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IDataConnectionProvider _connectionProvider;
 
-        public PersonsController(ICorrelationIdProvider correlationIdProvider, 
-            IPersonsService personService,
+        public PersonsController(IPersonsService personService,
             IDataConnectionProvider connectionProvider)
         {
             _personService = personService;
-            _correlationIdProvider = correlationIdProvider;
             _connectionProvider = connectionProvider;
         }
 
@@ -45,26 +33,20 @@ namespace EList.Api.Controllers
         [HttpPost("set")]
         public async Task<CommandResult<Guid?>> CreatePersonInfoAsync(PersonRequest request)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(CreatePersonInfoAsync)}";
             
             try
             {
                 await _connectionProvider.StartNewTransactionAsync();
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
 
                 var result = await _personService.CreatePersonInfoAsync(request);
                 if (!result.Success)
                     await _connectionProvider.RollbackTransactionAsync();
 
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
                 return result;
             }
-            catch (Exception ex)
+            catch
             {
                 await _connectionProvider.RollbackTransactionAsync();
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
                 throw;
             }
         }
@@ -77,26 +59,9 @@ namespace EList.Api.Controllers
         [HttpGet("get/{accountId}")]
         public async Task<CommandResult<PersonInfo?>> GetPersonInfoByAccountIdAsync(Guid accountId)
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetPersonInfoByAccountIdAsync)}";
-
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _personService.GetPersonInfoByAccountIdAsync(accountId);
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
+            var result = await _personService.GetPersonInfoByAccountIdAsync(accountId);
+            return result;
         }
-
 
         /// <summary>
         /// Получение личных данных
@@ -106,24 +71,9 @@ namespace EList.Api.Controllers
         [HttpGet("get")]
         public async Task<CommandResult<PersonInfo?>> GetPersonInfoAsync()
         {
-            var correlationId = _correlationIdProvider.Get();
-            var execTime = Stopwatch.StartNew();
-            var methodName = $"{LOGGER_NAME}{nameof(GetPersonInfoAsync)}";
+            var result = await _personService.GetPersonInfoAsync();
+            return result;
 
-            try
-            {
-                logger.Debug(correlationId, null, methodName, $"Method started", null);
-
-                var result = await _personService.GetPersonInfoAsync();
-
-                logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-                throw;
-            }
         }
         ///// <summary>
         ///// Обновление личных данных
@@ -133,15 +83,11 @@ namespace EList.Api.Controllers
         //[HttpPut("update")]
         //public async Task<CommandResult> UpdatePersonAsync(PersonRequest request)
         //{
-        //    var correlationId = _correlationIdProvider.Get();
-        //    var execTime = Stopwatch.StartNew();
-        //    var methodName = $"{LOGGER_NAME}{nameof(UpdatePersonAsync)}";
-
+        //        //        //
         //    try
         //    {
         //        await _connectionProvider.StartNewTransactionAsync();
-        //        logger.Debug(correlationId, null, methodName, $"Method started", null);
-
+        //
         //        var token = this.GetToken();
 
         //        var result = await _personService.UpdatePersonInfoAsync(token, request);
@@ -153,14 +99,12 @@ namespace EList.Api.Controllers
 
         //        await _connectionProvider.CommitTransactionAsync();
 
-        //        logger.Debug(correlationId, null, methodName, $"Method finished", null, execTime.Elapsed);
-
+        //
         //        return result;
         //    }
-        //    catch (Exception ex)
+        //    catch
         //    {
-        //        ExceptionLogger.LogException(logger, correlationId, methodName, "Method failed", execTime.Elapsed, ex);
-        //        throw;
+        //        //        throw;
         //    }
         //}
     }
