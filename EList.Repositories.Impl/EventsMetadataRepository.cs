@@ -93,7 +93,7 @@ namespace EList.Repositories.Impl
             var mappedRequest = new EventCategoryDto
             {
                 Description = request.Description,
-                Ico = request.Ico,
+                Ico = request.Ico ?? Array.Empty<byte>(),
                 Name = request.Name,
                 LocalizationPath = request.LocalizationPath,
                 Color = request.Color
@@ -126,7 +126,7 @@ namespace EList.Repositories.Impl
             var mappedRequest = new EventCategoryDto
             {
                 Description = request.Description,
-                Ico = request.Ico,
+                Ico = request.Ico ?? Array.Empty<byte>(),
                 Id = id,
                 LocalizationPath = request.LocalizationPath,
                 Name = request.Name,

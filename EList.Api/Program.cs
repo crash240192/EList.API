@@ -1,4 +1,5 @@
 using AutoMapper;
+using EList.Api;
 using EList.Api.Filtres;
 using EList.Api.Infrastructure;
 using EList.Api.Middleware;
@@ -26,6 +27,7 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.WriteIndented = true;
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    options.JsonSerializerOptions.Converters.Add(new ByteArrayConverter());
 });
 
 builder.Services.Configure<ApiBehaviorOptions>(options =>
