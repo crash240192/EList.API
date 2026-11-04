@@ -6,7 +6,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UserSecretsId>b244478e-5be7-483f-8f0b-09de0b3326e4</UserSecretsId>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-		<ContainerImageName>crash240192/elist-api</ContainerImageName>
+		<ContainerImageName>crash240192/elist.api</ContainerImageName>
 		<ContainerImageTag>3.0.1</ContainerImageTag>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 	</PropertyGroup>

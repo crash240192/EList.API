@@ -85,7 +85,7 @@ NLog (API) пишет в stdout (`jsonConsole`) и в `/app/logs/yyyy-MM-dd.log`
 ```yaml
 services:
   elist-api:
-    image: crash240192/elist-api:latest
+    image: crash240192/elist.api:latest
     environment:
       ASPNETCORE_ENVIRONMENT: Staging   # или Production
       # Секреты лучше так, а не в appsettings.json:

@@ -4,7 +4,7 @@
 #     EList.Common/
 #
 #   cd parent
-#   docker build -f elist.api/Dockerfile --build-arg PROJECT_DIR=elist.api -t crash240192/elist-api .
+#   docker build -f elist.api/Dockerfile --build-arg PROJECT_DIR=elist.api -t crash240192/elist.api .
 
 ARG PROJECT_DIR=elist.api
 
