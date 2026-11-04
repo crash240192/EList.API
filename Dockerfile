@@ -22,14 +22,17 @@ RUN dotnet publish EList.Api/EList.Api.csproj -c Release -o /app/publish /p:UseA
 FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS runtime
 WORKDIR /app
 
-RUN mkdir -p /app/logs \
-    && chown -R app:app /app/logs
+# aspnet:6.0 не содержит user app (в отличие от .NET 8+)
+RUN groupadd --system app \
+    && useradd --system --gid app --home-dir /app --shell /usr/sbin/nologin app \
+    && mkdir -p /app/logs \
+    && chown -R app:app /app
 
 ENV ASPNETCORE_ENVIRONMENT=Production
 # Override at runtime: -e ASPNETCORE_ENVIRONMENT=Staging
 ENV ASPNETCORE_URLS=http://+:80
 
-COPY --from=build /app/publish .
+COPY --from=build --chown=app:app /app/publish .
 
 EXPOSE 80
 
