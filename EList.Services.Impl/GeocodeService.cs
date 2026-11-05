@@ -18,7 +18,8 @@ using NLog;
 namespace EList.Services.Impl
 {
     /// <summary>
-    /// Обёртка над Geocoder API Яндекса. Кэширует успешные ответы в MemoryCache (≤ 30 суток по ToS).
+    /// Обёртка над Nominatim (OSM). Кэширует успешные ответы в MemoryCache.
+    /// Соблюдает ~1 req/s к публичному Nominatim (семафор + интервал).
     /// </summary>
     public class GeocodeService : IGeocodeService
     {
@@ -28,48 +29,61 @@ namespace EList.Services.Impl
         private const string LOGGER_NAME = "EList.Services.Impl.GeocodeService.";
         #endregion
 
-        private const string DefaultGeocodeBaseUrl = "https://geocode-maps.yandex.ru/1.x/";
-        private const string DefaultLang = "ru_RU";
+        private const string DefaultNominatimBaseUrl = "https://nominatim.openstreetmap.org/";
+        private const string DefaultUserAgent = "EList/3.0 (geocode; https://github.com/crash240192/elist.api)";
+        private const string DefaultLang = "ru";
         private const int ReverseCoordDecimals = 4;
+        private const int DefaultMinIntervalMs = 1100;
 
         private static readonly HttpClient Http = CreateHttpClient();
         private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
+        private static readonly SemaphoreSlim NominatimGate = new(1, 1);
+        private static DateTimeOffset _lastNominatimUtc = DateTimeOffset.MinValue;
+
+        private static readonly HashSet<string> LocalityPlaceTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "city", "town", "village", "municipality", "hamlet", "suburb", "neighbourhood",
+            "city_district", "quarter", "borough", "administrative"
+        };
 
         private readonly ICorrelationIdProvider _correlationIdProvider;
         private readonly IMemoryCache _memoryCache;
         private readonly string _baseUrl;
-        private readonly string _apiKey;
+        private readonly string _userAgent;
         private readonly TimeSpan _timeout;
         private readonly TimeSpan _cacheTtl;
+        private readonly int _minIntervalMs;
 
         public GeocodeService(ICorrelationIdProvider correlationIdProvider, IMemoryCache memoryCache)
         {
             _correlationIdProvider = correlationIdProvider ?? throw new ArgumentNullException(nameof(correlationIdProvider));
             _memoryCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
 
-            _baseUrl = ConfigurationManager.AppSettings.Contains("yandexService:geocode:baseUrl")
-                ? ConfigurationManager.AppSettings["yandexService:geocode:baseUrl"]
-                : DefaultGeocodeBaseUrl;
+            // Новый блок geocode:*; fallback на legacy yandexService:geocode:*
+            _baseUrl = ReadSetting("geocode:baseUrl")
+                       ?? ReadSetting("yandexService:geocode:baseUrl")
+                       ?? DefaultNominatimBaseUrl;
+            if (!_baseUrl.EndsWith('/'))
+                _baseUrl += "/";
 
-            _apiKey = ConfigurationManager.AppSettings.Contains("yandexService:geocode:apiKey")
-                ? ConfigurationManager.AppSettings["yandexService:geocode:apiKey"]
-                : string.Empty;
+            _userAgent = ReadSetting("geocode:userAgent")
+                         ?? DefaultUserAgent;
 
-            _timeout = ConfigurationManager.AppSettings.Contains("yandexService:geocode:timeout")
-                ? TimeSpan.Parse(ConfigurationManager.AppSettings["yandexService:geocode:timeout"])
+            var timeoutRaw = ReadSetting("geocode:timeout") ?? ReadSetting("yandexService:geocode:timeout");
+            _timeout = timeoutRaw != null && TimeSpan.TryParse(timeoutRaw, out var t)
+                ? t
                 : TimeSpan.FromSeconds(10);
 
-            if (ConfigurationManager.AppSettings.Contains("yandexService:geocode:cacheDays")
-                && int.TryParse(ConfigurationManager.AppSettings["yandexService:geocode:cacheDays"], out var days)
-                && days > 0)
-            {
-                // Условия Яндекса: временный кэш не дольше 30 суток
+            var cacheDaysRaw = ReadSetting("geocode:cacheDays") ?? ReadSetting("yandexService:geocode:cacheDays");
+            if (cacheDaysRaw != null && int.TryParse(cacheDaysRaw, out var days) && days > 0)
                 _cacheTtl = TimeSpan.FromDays(Math.Min(days, 30));
-            }
             else
-            {
                 _cacheTtl = DefaultCacheTimeouts.GeocodeTimeout;
-            }
+
+            var intervalRaw = ReadSetting("geocode:minIntervalMs");
+            _minIntervalMs = intervalRaw != null && int.TryParse(intervalRaw, out var ms) && ms >= 0
+                ? ms
+                : DefaultMinIntervalMs;
         }
 
         public async Task<CommandResult<GeocodedPlace?>> GeocodeAsync(
@@ -84,7 +98,7 @@ namespace EList.Services.Impl
             if (string.IsNullOrWhiteSpace(normalized))
                 return CommandResult<GeocodedPlace?>.Fail(ErrorCode.IsNullOrEmpty, "Пустой запрос геокодирования");
 
-            var effectiveLang = string.IsNullOrWhiteSpace(lang) ? DefaultLang : lang.Trim();
+            var effectiveLang = NormalizeLang(lang);
             var cacheKey = BuildForwardCacheKey(effectiveLang, normalized);
 
             if (cacheOnly)
@@ -94,12 +108,9 @@ namespace EList.Services.Impl
                 return new CommandResult<GeocodedPlace?>(cached);
             }
 
-            if (string.IsNullOrWhiteSpace(_apiKey))
-                return CommandResult<GeocodedPlace?>.Fail(ErrorCode.InternalError, "Геокодер не настроен (yandexService:geocode:apiKey)");
-
             var place = await GetOrFetchAsync(
                 cacheKey,
-                () => FetchFromYandexAsync(correlationId, methodName, normalized, effectiveLang, kind: null));
+                () => FetchSearchFirstAsync(correlationId, methodName, normalized, effectiveLang));
 
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return new CommandResult<GeocodedPlace?>(place);
@@ -116,7 +127,7 @@ namespace EList.Services.Impl
             if (lat is < -90 or > 90 || lng is < -180 or > 180)
                 return CommandResult<GeocodedPlace?>.Fail(ErrorCode.InvalidValue, "Некорректные координаты");
 
-            var effectiveLang = string.IsNullOrWhiteSpace(lang) ? DefaultLang : lang.Trim();
+            var effectiveLang = NormalizeLang(lang);
             var cacheKey = BuildReverseCacheKey(effectiveLang, lat, lng, kind);
 
             if (cacheOnly)
@@ -126,20 +137,44 @@ namespace EList.Services.Impl
                 return new CommandResult<GeocodedPlace?>(cached);
             }
 
-            if (string.IsNullOrWhiteSpace(_apiKey))
-                return CommandResult<GeocodedPlace?>.Fail(ErrorCode.InternalError, "Геокодер не настроен (yandexService:geocode:apiKey)");
-
             var roundedLat = Math.Round(lat, ReverseCoordDecimals, MidpointRounding.AwayFromZero);
             var roundedLng = Math.Round(lng, ReverseCoordDecimals, MidpointRounding.AwayFromZero);
-            var geocodeParam =
-                $"{roundedLng.ToString(CultureInfo.InvariantCulture)},{roundedLat.ToString(CultureInfo.InvariantCulture)}";
 
             var place = await GetOrFetchAsync(
                 cacheKey,
-                () => FetchFromYandexAsync(correlationId, methodName, geocodeParam, effectiveLang, kind));
+                () => FetchReverseAsync(correlationId, methodName, roundedLat, roundedLng, kind, effectiveLang));
 
             logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
             return new CommandResult<GeocodedPlace?>(place);
+        }
+
+        public async Task<CommandResult<List<GeocodeSuggestItem>>> SuggestAsync(
+            string query, int limit = 8, string? lang = null)
+        {
+            var correlationId = _correlationIdProvider.Get();
+            var execTime = Stopwatch.StartNew();
+            var methodName = $"{LOGGER_NAME}{nameof(SuggestAsync)}";
+            logger.Debug(correlationId, null, methodName, "Method started", null);
+
+            var normalized = NormalizeQuery(query);
+            if (normalized.Length < 2)
+                return new CommandResult<List<GeocodeSuggestItem>>(new List<GeocodeSuggestItem>());
+
+            var effectiveLang = NormalizeLang(lang);
+            var capped = Math.Clamp(limit, 1, 15);
+            var cacheKey = KeyBuilder.Build("geocode", $"sug:{effectiveLang}:{capped}:{normalized}");
+
+            var items = await _memoryCache.GetOrUpdateAsync(
+                cacheKey,
+                async () =>
+                {
+                    var list = await FetchSuggestAsync(correlationId, methodName, normalized, capped, effectiveLang);
+                    return new CacheContent<List<GeocodeSuggestItem>>(_cacheTtl, list);
+                },
+                cacheDataCriteriaFunc: list => Task.FromResult(list != null && list.Count > 0));
+
+            logger.Debug(correlationId, null, methodName, "Method finished", null, execTime.Elapsed);
+            return new CommandResult<List<GeocodeSuggestItem>>(items ?? new List<GeocodeSuggestItem>());
         }
 
         public async Task<CommandResult> WarmCacheAsync(GeocodeCacheWarmRequest request)
@@ -155,7 +190,7 @@ namespace EList.Services.Impl
             if (double.IsNaN(request.Place.Lat) || double.IsNaN(request.Place.Lng))
                 return CommandResult.Fail(ErrorCode.InvalidValue, "Некорректные координаты Place");
 
-            var effectiveLang = string.IsNullOrWhiteSpace(request.Lang) ? DefaultLang : request.Lang.Trim();
+            var effectiveLang = NormalizeLang(request.Lang);
             string cacheKey;
 
             var normalizedQuery = NormalizeQuery(request.Query);
@@ -187,6 +222,26 @@ namespace EList.Services.Impl
             return CommandResult.OK;
         }
 
+        private static string? ReadSetting(string key)
+            => ConfigurationManager.AppSettings.Contains(key)
+                ? ConfigurationManager.AppSettings[key]
+                : null;
+
+        private static string NormalizeLang(string? lang)
+        {
+            if (string.IsNullOrWhiteSpace(lang))
+                return DefaultLang;
+            // Nominatim: ru; legacy Яндекс: ru_RU → ru
+            var t = lang.Trim();
+            var under = t.IndexOf('_');
+            if (under > 0)
+                t = t[..under];
+            var dash = t.IndexOf('-');
+            if (dash > 0)
+                t = t[..dash];
+            return t.ToLowerInvariant();
+        }
+
         private static string BuildForwardCacheKey(string lang, string normalizedQuery)
             => KeyBuilder.Build("geocode", $"fwd:{lang}:{normalizedQuery}");
 
@@ -200,9 +255,6 @@ namespace EList.Services.Impl
             return KeyBuilder.Build("geocode", $"rev:{lang}:{latStr},{lngStr}{kindPart}");
         }
 
-        /// <summary>
-        /// GetOrUpdate с single-flight; промахи Яндекса не кэшируем (cacheDataCriteriaFunc).
-        /// </summary>
         private async Task<GeocodedPlace?> GetOrFetchAsync(string cacheKey, Func<Task<GeocodedPlace?>> fetch)
         {
             return await _memoryCache.GetOrUpdateAsync(
@@ -215,111 +267,255 @@ namespace EList.Services.Impl
                 cacheDataCriteriaFunc: p => Task.FromResult(p != null));
         }
 
-        private async Task<GeocodedPlace?> FetchFromYandexAsync(
-            string correlationId,
-            string methodName,
-            string geocodeParam,
-            string lang,
-            string? kind)
+        private async Task<GeocodedPlace?> FetchSearchFirstAsync(
+            string correlationId, string methodName, string query, string lang)
         {
-            var url = BuildGeocodeUrl(geocodeParam, lang, kind);
+            var url = BuildSearchUrl(query, lang, limit: 1, addressDetails: false);
+            var json = await GetNominatimJsonAsync(correlationId, methodName, url, "search");
+            if (json == null)
+                return null;
 
+            var arr = json as JArray;
+            var first = arr?.FirstOrDefault() as JObject;
+            return first == null ? null : ParseSearchHit(first);
+        }
+
+        private async Task<GeocodedPlace?> FetchReverseAsync(
+            string correlationId, string methodName, double lat, double lng, string? kind, string lang)
+        {
+            var url = BuildReverseUrl(lat, lng, lang);
+            var json = await GetNominatimJsonAsync(correlationId, methodName, url, "reverse");
+            if (json is not JObject obj)
+                return null;
+
+            var display = obj["display_name"]?.ToString();
+            if (string.IsNullOrWhiteSpace(display))
+                return null;
+
+            // kind=locality → предпочитаем название города/нас. пункта
+            if (string.Equals(kind, "locality", StringComparison.OrdinalIgnoreCase))
+            {
+                var shortName = ExtractLocalityName(obj["address"] as JObject);
+                if (!string.IsNullOrWhiteSpace(shortName))
+                    display = shortName;
+            }
+
+            if (!TryParseCoord(obj["lat"]?.ToString(), out var parsedLat)
+                || !TryParseCoord(obj["lon"]?.ToString(), out var parsedLng))
+            {
+                parsedLat = lat;
+                parsedLng = lng;
+            }
+
+            return new GeocodedPlace { Lat = parsedLat, Lng = parsedLng, Address = display! };
+        }
+
+        private async Task<List<GeocodeSuggestItem>> FetchSuggestAsync(
+            string correlationId, string methodName, string query, int limit, string lang)
+        {
+            // Берём с запасом — отфильтруем не-населённые пункты
+            var url = BuildSearchUrl(query, lang, limit: Math.Min(limit * 2, 20), addressDetails: true);
+            var json = await GetNominatimJsonAsync(correlationId, methodName, url, "suggest");
+            var arr = json as JArray;
+            if (arr == null || arr.Count == 0)
+                return new List<GeocodeSuggestItem>();
+
+            var result = new List<GeocodeSuggestItem>();
+            foreach (var token in arr)
+            {
+                if (token is not JObject obj)
+                    continue;
+                if (!IsLocalityHit(obj))
+                    continue;
+
+                var item = ParseSuggestHit(obj);
+                if (item == null)
+                    continue;
+
+                result.Add(item);
+                if (result.Count >= limit)
+                    break;
+            }
+
+            return result;
+        }
+
+        private async Task<JToken?> GetNominatimJsonAsync(
+            string correlationId, string methodName, string url, string mode)
+        {
+            await NominatimGate.WaitAsync().ConfigureAwait(false);
             try
             {
-                using var cts = new CancellationTokenSource(_timeout);
-                // Не логируем URL с apikey и текстовый адрес из ответа
+                var since = DateTimeOffset.UtcNow - _lastNominatimUtc;
+                var waitMs = _minIntervalMs - (int)since.TotalMilliseconds;
+                if (waitMs > 0)
+                    await Task.Delay(waitMs).ConfigureAwait(false);
+
+                using var req = new HttpRequestMessage(HttpMethod.Get, url);
+                req.Headers.TryAddWithoutValidation("User-Agent", _userAgent);
+                req.Headers.TryAddWithoutValidation("Accept", "application/json");
+
                 logger.Debug(
                     correlationId,
                     null,
                     methodName,
-                    "Yandex geocode request",
+                    "Nominatim geocode request",
                     null,
                     null,
-                    new Dictionary<string, object>
-                    {
-                        ["lang"] = lang,
-                        ["kind"] = kind ?? string.Empty,
-                        ["mode"] = IsCoordinatePair(geocodeParam) ? "reverse" : "forward"
-                    });
+                    new Dictionary<string, object> { ["mode"] = mode });
 
-                using var response = await Http.GetAsync(url, cts.Token);
+                using var cts = new CancellationTokenSource(_timeout);
+                using var response = await Http.SendAsync(req, cts.Token).ConfigureAwait(false);
+                _lastNominatimUtc = DateTimeOffset.UtcNow;
+
                 if (!response.IsSuccessStatusCode)
                 {
                     logger.Warn(correlationId, null, methodName,
-                        $"Yandex geocode HTTP {(int)response.StatusCode}");
+                        $"Nominatim geocode HTTP {(int)response.StatusCode}");
                     return null;
                 }
 
-                var json = await response.Content.ReadAsStringAsync(cts.Token);
-                return ParseGeoObject(json);
+                var body = await response.Content.ReadAsStringAsync(cts.Token).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(body))
+                    return null;
+
+                return JToken.Parse(body);
             }
             catch (OperationCanceledException)
             {
-                logger.Warn(correlationId, null, methodName, "Yandex geocode timeout");
+                logger.Warn(correlationId, null, methodName, "Nominatim geocode timeout");
                 return null;
             }
             catch (Exception ex)
             {
-                logger.Error(correlationId, null, methodName, "Yandex geocode failed", null, ex);
+                logger.Error(correlationId, null, methodName, "Nominatim geocode failed", null, ex);
                 return null;
+            }
+            finally
+            {
+                NominatimGate.Release();
             }
         }
 
-        private string BuildGeocodeUrl(string geocodeParam, string lang, string? kind)
+        private string BuildSearchUrl(string query, string lang, int limit, bool addressDetails)
         {
             var sb = new StringBuilder();
             sb.Append(_baseUrl.TrimEnd('/'));
-            sb.Append("/?apikey=");
-            sb.Append(Uri.EscapeDataString(_apiKey));
-            sb.Append("&geocode=");
-            sb.Append(Uri.EscapeDataString(geocodeParam));
-            sb.Append("&format=json&results=1&lang=");
+            sb.Append("/search?format=jsonv2&limit=");
+            sb.Append(limit.ToString(CultureInfo.InvariantCulture));
+            sb.Append("&accept-language=");
             sb.Append(Uri.EscapeDataString(lang));
-            if (!string.IsNullOrWhiteSpace(kind))
-            {
-                sb.Append("&kind=");
-                sb.Append(Uri.EscapeDataString(kind.Trim()));
-            }
-
+            sb.Append("&q=");
+            sb.Append(Uri.EscapeDataString(query));
+            if (addressDetails)
+                sb.Append("&addressdetails=1");
             return sb.ToString();
         }
 
-        private static bool IsCoordinatePair(string geocodeParam)
+        private string BuildReverseUrl(double lat, double lng, string lang)
         {
-            var parts = geocodeParam.Split(',');
-            return parts.Length == 2
-                   && double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out _)
-                   && double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out _);
+            var sb = new StringBuilder();
+            sb.Append(_baseUrl.TrimEnd('/'));
+            sb.Append("/reverse?format=jsonv2&addressdetails=1&accept-language=");
+            sb.Append(Uri.EscapeDataString(lang));
+            sb.Append("&lat=");
+            sb.Append(lat.ToString(CultureInfo.InvariantCulture));
+            sb.Append("&lon=");
+            sb.Append(lng.ToString(CultureInfo.InvariantCulture));
+            return sb.ToString();
         }
 
-        private static GeocodedPlace? ParseGeoObject(string json)
+        private static GeocodedPlace? ParseSearchHit(JObject obj)
         {
-            if (string.IsNullOrWhiteSpace(json))
+            if (!TryParseCoord(obj["lat"]?.ToString(), out var lat)
+                || !TryParseCoord(obj["lon"]?.ToString(), out var lng))
                 return null;
 
-            var root = JObject.Parse(json);
-            var member = root["response"]?["GeoObjectCollection"]?["featureMember"]?.FirstOrDefault()?["GeoObject"];
-            if (member == null)
+            var address = obj["display_name"]?.ToString() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(address))
                 return null;
 
-            var pos = member["Point"]?["pos"]?.ToString()?.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (pos == null || pos.Length < 2)
+            return new GeocodedPlace { Lat = lat, Lng = lng, Address = address };
+        }
+
+        private static GeocodeSuggestItem? ParseSuggestHit(JObject obj)
+        {
+            if (!TryParseCoord(obj["lat"]?.ToString(), out var lat)
+                || !TryParseCoord(obj["lon"]?.ToString(), out var lng))
                 return null;
 
-            if (!double.TryParse(pos[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var lng)
-                || !double.TryParse(pos[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var lat))
+            var address = obj["address"] as JObject;
+            var shortName = ExtractLocalityName(address)
+                            ?? obj["name"]?.ToString()
+                            ?? obj["display_name"]?.ToString();
+            if (string.IsNullOrWhiteSpace(shortName))
                 return null;
 
-            var address = member["metaDataProperty"]?["GeocoderMetaData"]?["text"]?.ToString()
-                          ?? string.Empty;
+            var region = address?["state"]?.ToString()
+                         ?? address?["region"]?.ToString()
+                         ?? address?["county"]?.ToString()
+                         ?? string.Empty;
+            var country = address?["country"]?.ToString() ?? string.Empty;
 
-            return new GeocodedPlace
+            var suffix = string.Empty;
+            if (!string.IsNullOrWhiteSpace(country)
+                && !string.Equals(country, "Россия", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(country, "Russia", StringComparison.OrdinalIgnoreCase))
+            {
+                suffix = $", {country}";
+            }
+            else if (!string.IsNullOrWhiteSpace(region)
+                     && !string.Equals(region, shortName, StringComparison.OrdinalIgnoreCase))
+            {
+                suffix = $", {region}";
+            }
+
+            return new GeocodeSuggestItem
             {
                 Lat = lat,
                 Lng = lng,
-                Address = address
+                ShortName = shortName!,
+                Name = shortName + suffix
             };
         }
+
+        private static bool IsLocalityHit(JObject obj)
+        {
+            var type = obj["type"]?.ToString() ?? string.Empty;
+            var addresstype = obj["addresstype"]?.ToString() ?? string.Empty;
+            var cls = obj["class"]?.ToString() ?? string.Empty;
+
+            if (LocalityPlaceTypes.Contains(type) || LocalityPlaceTypes.Contains(addresstype))
+                return true;
+
+            // administrative с именем города в address
+            if (string.Equals(cls, "boundary", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(cls, "place", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(cls, "boundary", StringComparison.OrdinalIgnoreCase))
+            {
+                return ExtractLocalityName(obj["address"] as JObject) != null;
+            }
+
+            return false;
+        }
+
+        private static string? ExtractLocalityName(JObject? address)
+        {
+            if (address == null)
+                return null;
+
+            foreach (var key in new[] { "city", "town", "village", "municipality", "hamlet", "suburb", "city_district" })
+            {
+                var v = address[key]?.ToString();
+                if (!string.IsNullOrWhiteSpace(v))
+                    return v;
+            }
+
+            return null;
+        }
+
+        private static bool TryParseCoord(string? raw, out double value)
+            => double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
 
         private static string NormalizeQuery(string? query)
         {

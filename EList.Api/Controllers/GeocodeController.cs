@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace EList.Api.Controllers
 {
     /// <summary>
-    /// Геокодер Яндекса через API (с серверным MemoryCache).
+    /// Геокодер Nominatim (OSM) через API (с серверным MemoryCache).
     /// </summary>
     [Authorize]
     [ApiController]
@@ -27,8 +27,8 @@ namespace EList.Api.Controllers
         /// Прямое геокодирование: адрес → координаты.
         /// </summary>
         /// <param name="q">Строка запроса</param>
-        /// <param name="lang">Язык ответа Яндекса (по умолчанию ru_RU)</param>
-        /// <param name="cacheOnly">Только MemoryCache, без Яндекса (для UI: peek → fallback)</param>
+        /// <param name="lang">Язык ответа (ru / en; по умолчанию ru)</param>
+        /// <param name="cacheOnly">Только MemoryCache, без Nominatim (для UI: peek → fallback)</param>
         [AllowAnonymous]
         [HttpGet]
         public async Task<CommandResult<GeocodedPlace?>> GeocodeAsync(
@@ -55,7 +55,20 @@ namespace EList.Api.Controllers
         }
 
         /// <summary>
-        /// Прогрев кэша результатом с клиента (после прямого вызова Яндекса).
+        /// Подсказки населённых пунктов (CitySearch).
+        /// </summary>
+        [AllowAnonymous]
+        [HttpGet("suggest")]
+        public async Task<CommandResult<List<GeocodeSuggestItem>>> SuggestAsync(
+            [FromQuery] string q,
+            [FromQuery] int limit = 8,
+            [FromQuery] string? lang = null)
+        {
+            return await _geocodeService.SuggestAsync(q, limit, lang);
+        }
+
+        /// <summary>
+        /// Прогрев кэша результатом с клиента.
         /// </summary>
         [AllowAnonymous]
         [HttpPost("cache")]
